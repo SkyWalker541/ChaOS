@@ -7,7 +7,8 @@
 # image and changes only the copy of TortOS it carries for the card
 # (/usr/share/tortos/card in the root squashfs, copied onto the card at first
 # boot by /etc/init.d/tortos): ChaOS's tortos.elf and diatom, the overlays it
-# ships (TortOS/overlays, put in Overlays/ at first start), its credits in
+# ships (TortOS/overlays, put in Overlays/ at first start), ChaOS Transfer's
+# web page (TortOS/res/web), its credits in
 # Licenses/, and its version (CHAOS_VERSION) as TortOS/VERSION and TortOS/CHAOS.
 # And /etc/init.d/tortos learns the version, and that a card whose TortOS is
 # not ChaOS (no TortOS/CHAOS) gets ChaOS's copy whatever its version says, so
@@ -53,6 +54,11 @@ rm -rf "$C/TortOS/overlays"
 cp -R "$ROOT/res/overlays" "$C/TortOS/overlays"
 find "$C/TortOS/overlays" -type d -exec chmod 755 {} +
 find "$C/TortOS/overlays" -type f -exec chmod 644 {} +
+# ChaOS Transfer's page: the launcher serves it off the card, so it is the
+# card's copy that has to be ChaOS's (mk/payload.sh does the same)
+rm -f "$C/TortOS/res/web/"*.html "$C/TortOS/res/web/"*.svg "$C/TortOS/res/web/"*.js "$C/TortOS/res/web/"*.css
+install -m 644 "$ROOT/res/web/"* "$C/TortOS/res/web/"
+install -m 644 "$ROOT/res/web/index.html" "$C/TortOS/res/web/wire.html"
 install -m 644 "$ROOT/CREDITS.md" "$C/Licenses/ChaOS.md"
 V=$(tr -d ' \n' < "$ROOT/CHAOS_VERSION")
 echo "$V" > "$C/TortOS/VERSION"
