@@ -104,7 +104,7 @@ With the ChaOS Installer, choose **Fresh install**, then go on from step 3. By h
 2. **Write it to the card** with any program that writes disk images, like Raspberry Pi Imager or balenaEtcher. It erases everything on the card.
 3. **Put the card in the Brick and turn it on.** The first boot takes a bit longer while it turns the rest of the card into space for games, music and saves. Every boot after that comes straight up.
 4. **Set the time zone** under **MENU > Date & Time**. Wi-Fi sets the time whenever it connects; without it, set the time there too, and it keeps it.
-5. **Add games** to the folders in `Roms/`. Put the card back in the computer, where it shows up as TORTOS (the name TortOS gave it, which the installers look for), or send them over later with ChaOS Transfer.
+5. **Add games** to the folders in `Roms/`. Put the card back in the computer, where it shows up as ChaOS, or send them over later with ChaOS Transfer.
 
 ### Updating
 
@@ -251,8 +251,4 @@ TortOS is C and SDL2. Games run in [diatom](https://github.com/ericreinsmidt/dia
 
 ## License
 
-TortOS is free software under the GNU General Public License, version 3 or any later version ([LICENSE](LICENSE)): anyone may change it, share it and sell it, and whoever gets it, changed or not, gets its source and the same rights. Releases up to v1.6.0 were MIT, and stay so. Diatom, the emulator it runs games in, is under the Mozilla Public License 2.0. The cores keep their own licenses, two of them non-commercial. Full notices are in [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md).
-
-<p align="center">
-  <a href="https://github.com/ericreinsmidt/TortOS/releases"><img src="https://img.shields.io/github/downloads/ericreinsmidt/TortOS/total?color=80B076" alt="Downloads"></a>
-</p>
+ChaOS is free software under the GNU General Public License, version 3 or any later version ([LICENSE](LICENSE)), as TortOS is: anyone may change it, share it and sell it, and whoever gets it, changed or not, gets its source and the same rights. It is TortOS, Copyright (c) 2026 Eric Reinsmidt, with ChaOS's changes, Copyright (c) 2026 SkyWalker541. ChaOS-diatom, the emulator it runs games in, is under the Mozilla Public License 2.0, and the PT SkyWalker541 shader in it under the MIT license. SkyWalker541's overlays are CC0. The cores keep their own licenses, two of them non-commercial. Full notices are in [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md) and [CREDITS.md](CREDITS.md); every release carries the source of everything in its image.

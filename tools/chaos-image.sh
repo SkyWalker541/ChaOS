@@ -18,13 +18,17 @@
 #
 # Needs xz, unsquashfs and mksquashfs, and root (to keep the files' owners).
 # DIATOM defaults to ../chaos-diatom/build/brick/diatom; tortos.elf is
-# build/tortos.elf (make -f mk/cross.mk DEVICE=brick).
+# build/tortos.elf (make -f mk/cross.mk DEVICE=brick), or TORTOS_ELF. The
+# release (.github/workflows/release.yml) uses dist/brick's, with
+# DIATOM_NOTICE naming ChaOS-diatom's THIRD-PARTY.md.
 set -e
 IN=$1 OUT=$2
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 DIATOM=${3:-$ROOT/../chaos-diatom/build/brick/diatom}
 [ -n "$IN" ] && [ -n "$OUT" ] || { echo "usage: $0 TortOS-brick.img.xz OUT.img.xz [diatom]" >&2; exit 2; }
-[ -f "$ROOT/build/tortos.elf" ] && [ -f "$DIATOM" ] || { echo "build tortos.elf and diatom first" >&2; exit 1; }
+ELF=${TORTOS_ELF:-$ROOT/build/tortos.elf}
+NOTICE=${DIATOM_NOTICE:-$(dirname "$DIATOM")/../../THIRD-PARTY.md}
+[ -f "$ELF" ] && [ -f "$DIATOM" ] || { echo "build tortos.elf and diatom first" >&2; exit 1; }
 
 W=$(mktemp -d)
 trap 'rm -rf "$W"' EXIT
@@ -49,7 +53,7 @@ unsquashfs -q -d "$W/root" "$W/root.sqfs" > /dev/null
 C=$W/root/usr/share/tortos/card
 [ -f "$C/TortOS/tortos.elf" ] || { echo "no TortOS in this image's root" >&2; exit 1; }
 
-install -m 755 "$ROOT/build/tortos.elf" "$C/TortOS/tortos.elf"
+install -m 755 "$ELF" "$C/TortOS/tortos.elf"
 install -m 755 "$DIATOM" "$C/TortOS/diatom"
 rm -rf "$C/TortOS/overlays"
 cp -R "$ROOT/res/overlays" "$C/TortOS/overlays"
@@ -63,6 +67,18 @@ install -m 644 "$ROOT/res/web/index.html" "$C/TortOS/res/web/wire.html"
 # The boot: ChaOS's logo flying together (tools/genchaosmotion.py), in
 # place of TortOS's flyby, for plastron's splash
 install -m 644 "$ROOT/res/boot/chaos-splash-brick.bin" "$W/root/usr/share/splash/frames.bin"
+# The games partition is called ChaOS on a computer: made so on a new card's
+# first boot, and a TortOS card's TORTOS renamed on its first ChaOS boot,
+# before it is mounted. ChaOS Installer knows both names.
+D=$W/root/etc/init.d/datapart
+grep -q 'mkfs.exfat -c 32K -L TORTOS' "$D" || { echo "datapart has changed: check the label" >&2; exit 1; }
+sed -i 's/mkfs.exfat -c 32K -L TORTOS/mkfs.exfat -c 32K -L ChaOS/; s/formatted as exFAT, label TORTOS/formatted as exFAT, label ChaOS/' "$D"
+sed -i '/^\t\trepair \$games$/a\
+		# ChaOS: a TortOS card named ChaOS from now on\
+		exfatlabel $games 2>/dev/null | grep -q "TORTOS$" \&\&\
+			exfatlabel $games ChaOS > /dev/null 2>\&1 \&\&\
+			echo "datapart: $games renamed ChaOS" > /dev/kmsg' "$D"
+grep -q 'exfatlabel $games ChaOS' "$D" || { echo "datapart: the rename did not go in" >&2; exit 1; }
 # What a computer calls the Brick on the USB cable
 sed -i 's|echo TortOS > \$g/strings/0x409/manufacturer|echo ChaOS > $g/strings/0x409/manufacturer|' "$W/root/etc/init.d/usbgadget"
 install -m 644 "$ROOT/CREDITS.md" "$C/Licenses/ChaOS.md"
@@ -78,8 +94,7 @@ grep -q '^newer_seed() {$' "$INIT" || { echo "no newer_seed in the image's init.
 sed -i '/^newer_seed() {$/a\
 	# ChaOS: a card whose TortOS is not ChaOS gets ChaOS, whatever its version\
 	[ -f "$CARD/TortOS/CHAOS" ] || return 0' "$INIT"
-[ -f "$(dirname "$DIATOM")/../../THIRD-PARTY.md" ] &&
-	install -m 644 "$(dirname "$DIATOM")/../../THIRD-PARTY.md" "$C/Licenses/ChaOS-diatom.md"
+[ -f "$NOTICE" ] && install -m 644 "$NOTICE" "$C/Licenses/ChaOS-diatom.md"
 chown -R 0:0 "$C"
 
 mksquashfs "$W/root" "$W/new.sqfs" -comp lz4 -Xhc -b 131072 -noappend -no-xattrs -quiet > /dev/null

@@ -1,4 +1,4 @@
-/* Over The Hare, the browser half.
+/* ChaOS Transfer (TortOS's Over The Hare), the browser half.
  *
  * No framework and no build step: this file is served off the card exactly as
  * it is written, so it can be edited on the device and reloaded. That is worth

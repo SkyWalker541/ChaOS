@@ -1,0 +1,80 @@
+# A ChaOS release, when a version in CHAOS_VERSION is pushed to main that has
+# no release yet: the Brick's card image, made from TortOS's release image
+# (TORTOS_BASE) with dist/brick's launcher and emulator in it, the source of
+# everything in it, and their SHA256SUMS. See dist/README.md.
+name: release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: The version, and whether it is out already
+        id: v
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          V=$(tr -d ' \n' < CHAOS_VERSION)
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "base=$(tr -d ' \n' < TORTOS_BASE)" >> "$GITHUB_OUTPUT"
+          if gh release view "v$V" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "ChaOS $V is already released"; echo "out=1" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Tools
+        if: steps.v.outputs.out != '1'
+        run: sudo apt-get update && sudo apt-get install -y squashfs-tools xz-utils
+
+      - name: TortOS's release, checked
+        if: steps.v.outputs.out != '1'
+        run: |
+          B=${{ steps.v.outputs.base }}
+          U=https://github.com/ericreinsmidt/TortOS/releases/download/v$B
+          mkdir -p tortos && cd tortos
+          for f in SHA256SUMS TortOS-v$B-brick.img.xz TortOS-v$B-brick-sources.tar; do
+            curl -fsSL -o "$f" "$U/$f"
+          done
+          grep -E " TortOS-v$B-brick(\.img\.xz|-sources\.tar)$" SHA256SUMS | sha256sum -c -
+
+      - name: The card image
+        if: steps.v.outputs.out != '1'
+        run: |
+          V=${{ steps.v.outputs.version }}
+          B=${{ steps.v.outputs.base }}
+          mkdir -p out
+          sudo TORTOS_ELF=dist/brick/tortos.elf DIATOM_NOTICE=dist/brick/ChaOS-diatom-THIRD-PARTY.md \
+            sh tools/chaos-image.sh tortos/TortOS-v$B-brick.img.xz out/ChaOS-v$V-brick.img.xz dist/brick/diatom
+          sudo chown -R "$(id -u):$(id -g)" out
+
+      - name: Its source
+        if: steps.v.outputs.out != '1'
+        run: |
+          V=${{ steps.v.outputs.version }}
+          B=${{ steps.v.outputs.base }}
+          sh tools/chaos-sources.sh tortos/TortOS-v$B-brick-sources.tar out/ChaOS-v$V-brick-sources.tar
+          cd out && sha256sum ChaOS-v* > SHA256SUMS && cat SHA256SUMS
+
+      - name: Release
+        if: steps.v.outputs.out != '1'
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          V=${{ steps.v.outputs.version }}
+          B=${{ steps.v.outputs.base }}
+          cat > notes.md <<EOF
+          ChaOS $V for the TrimUI Brick and Brick Hammer.
+
+          **Install or update** with [ChaOS Installer](https://github.com/SkyWalker541/ChaOS-Installer/releases/latest), or write \`ChaOS-v$V-brick.img.xz\` to a card yourself (that erases it).
+
+          ChaOS is built on [TortOS $B](https://github.com/ericreinsmidt/TortOS/releases/tag/v$B) by Eric Reinsmidt. \`ChaOS-v$V-brick-sources.tar\` is the source of everything in the image; what came from where is in [CREDITS.md](https://github.com/SkyWalker541/ChaOS/blob/main/CREDITS.md).
+          EOF
+          sed -i 's/^          //' notes.md
+          gh release create "v$V" out/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "ChaOS $V" --notes-file notes.md
