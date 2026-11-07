@@ -17,6 +17,13 @@
   <a href="#faq">FAQ</a>
 </p>
 
+> [!IMPORTANT]
+> **ChaOS is for the TrimUI Brick (and Brick Hammer) only at this time.** TortOS also runs on the GKD Pixel 2;
+> ChaOS does not, and the parts of this page about the Pixel 2 are TortOS's.
+>
+> **Every game is drawn at a whole-number (integer) scale only at this time.** There is no stretched or
+> aspect-fit mode.
+
 > [!NOTE]
 > ChaOS is TortOS by Eric Reinsmidt with ChaOS's changes: the shader and its settings, overlays, whole-number
 > scaling only, ChaOS Transfer, the menu colors and the look. Everything below that isn't about those is TortOS's
