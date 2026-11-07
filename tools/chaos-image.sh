@@ -7,9 +7,12 @@
 # image and changes only the copy of TortOS it carries for the card
 # (/usr/share/tortos/card in the root squashfs, copied onto the card at first
 # boot by /etc/init.d/tortos): ChaOS's tortos.elf and diatom, the overlays it
-# ships (TortOS/overlays, put in Overlays/ at first start), and its credits in
-# Licenses/. The boot partition, the kernel and every other file are the
-# release's, byte for byte.
+# ships (TortOS/overlays, put in Overlays/ at first start), its credits in
+# Licenses/, and its version (CHAOS_VERSION) as TortOS/VERSION and TortOS/CHAOS.
+# And /etc/init.d/tortos learns the version, and that a card whose TortOS is
+# not ChaOS (no TortOS/CHAOS) gets ChaOS's copy whatever its version says, so
+# an update from TortOS to ChaOS takes. The boot partition, the kernel and
+# every other file are the release's, byte for byte.
 #
 # Needs xz, unsquashfs and mksquashfs, and root (to keep the files' owners).
 # DIATOM defaults to ../chaos-diatom/build/brick/diatom; tortos.elf is
@@ -51,6 +54,18 @@ cp -R "$ROOT/res/overlays" "$C/TortOS/overlays"
 find "$C/TortOS/overlays" -type d -exec chmod 755 {} +
 find "$C/TortOS/overlays" -type f -exec chmod 644 {} +
 install -m 644 "$ROOT/CREDITS.md" "$C/Licenses/ChaOS.md"
+V=$(tr -d ' \n' < "$ROOT/CHAOS_VERSION")
+echo "$V" > "$C/TortOS/VERSION"
+echo "$V" > "$C/TortOS/CHAOS"
+chmod 644 "$C/TortOS/VERSION" "$C/TortOS/CHAOS"
+IFS=. read -r va vb vc < "$ROOT/CHAOS_VERSION"
+INIT=$W/root/etc/init.d/tortos
+grep -q '^SEED_V=' "$INIT" || { echo "no SEED_V in the image's init.d/tortos" >&2; exit 1; }
+sed -i "s/^SEED_V=.*/SEED_V=$((va * 1000000 + vb * 1000 + ${vc:-0}))/" "$INIT"
+grep -q '^newer_seed() {$' "$INIT" || { echo "no newer_seed in the image's init.d/tortos" >&2; exit 1; }
+sed -i '/^newer_seed() {$/a\
+	# ChaOS: a card whose TortOS is not ChaOS gets ChaOS, whatever its version\
+	[ -f "$CARD/TortOS/CHAOS" ] || return 0' "$INIT"
 [ -f "$(dirname "$DIATOM")/../../THIRD-PARTY.md" ] &&
 	install -m 644 "$(dirname "$DIATOM")/../../THIRD-PARTY.md" "$C/Licenses/ChaOS-diatom.md"
 chown -R 0:0 "$C"

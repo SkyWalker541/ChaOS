@@ -202,7 +202,7 @@ button:active, .ghost:active { background: #262a36; }
 	 * tall and a laptop window cut the shell off top and bottom, which reads
 	 * as a broken image rather than a quiet one. ChaOS's handheld is square. */
 	background-size: min(var(--wrap), 86vw, 62vh) auto;
-	opacity: .09;
+	opacity: .05;
 }
 
 header {
