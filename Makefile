@@ -5,7 +5,7 @@
 # the offline checks, a host build of the launcher, the cores, and the assets.
 # docs/building.md says how to work on a device.
 
-.PHONY: all clean native vendor boot checkmark \
+.PHONY: all clean native vendor boot chaosboot checkmark \
         check check-cheevos check-hare check-httpd check-idle check-rahash \
         check-raset check-xfer check-menus check-artscrape check-artrun check-audioout \
         check-db check-stats check-sort check-bt check-ss
@@ -242,6 +242,10 @@ vendor:
 # rule is kept in step with config/systems.cfg by tools/recolor-cards.py.
 boot:
 	python3 tools/genboot.py
+
+# ChaOS's boot (plastron's splash frames) and the shutdown's squares
+chaosboot:
+	python3 tools/genchaosmotion.py
 
 # Fourteen config files became two databases, so properties that used to be
 # obvious from looking at a text file now need asserting - chiefly that a

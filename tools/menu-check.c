@@ -183,13 +183,16 @@ static void tortos_menu_offline(void)
 	u.wifi = WIFI_OFF;
 	u.cards = "Plain Jane";
 	u.cards_dir = "Horizontal";
+	u.menu_color = "ChaOS Orange";
 	u.auto_off = 120;
 	u.clock = "Oct 3, 6:12 AM";
 	n = sys_menu_build(&u, rows, &b, &heading);
 
-	printf("TortOS menu, radio off:\n");
+	printf("ChaOS menu, radio off:\n");
 	ck(n == PM_ROWS, "every row is filled");
-	ck(!strcmp(heading, "TortOS"), "heading");
+	ck(!strcmp(heading, "ChaOS"), "heading");
+	ck(!strcmp(val(&rows[PM_COLOR]), "ChaOS Orange") && rows[PM_COLOR].live,
+	   "Menu Color names the accent, and is reachable offline");
 	ck(!strcmp(val(&rows[PM_WIFI]), "off"), "Wi-Fi reads off");
 	ck(!strcmp(val(&rows[PM_XFER]), "needs Wi-Fi"), "OTH says why it is dead");
 	ck(!rows[PM_XFER].live, "OTH is not selectable offline");
@@ -301,7 +304,7 @@ static void tortos_menu_online(void)
 	n = sys_menu_build(&u, rows, &b, &heading);
 
 	ck(n == PM_ROWS, "row count does not depend on the network");
-	printf("TortOS menu, connected:\n");
+	printf("ChaOS menu, connected:\n");
 	ck(!strcmp(val(&rows[PM_WIFI]), "kitchen"), "Wi-Fi shows the network name");
 	ck(rows[PM_XFER].live && !rows[PM_XFER].value, "OTH is live and unqualified");
 	ck(rows[PM_SCRAPE].live, "Box Art is live");
@@ -650,6 +653,7 @@ static void radio_less(void)
 	u.wifi = WIFI_OFF;
 	u.cards = "Plain Jane";
 	u.cards_dir = "Horizontal";
+	u.menu_color = "ChaOS Orange";
 	u.shader = "On";
 	printf("a device with both radios:\n");
 	k = sys_menu_tortos_rows(&u, pm);
@@ -663,7 +667,7 @@ static void radio_less(void)
 	u.no_bt = true;
 	n = sys_menu_build(&u, rows, &b, &heading);
 	k = sys_menu_tortos_rows(&u, pm);
-	printf("TortOS menu, no radio at all:\n");
+	printf("ChaOS menu, no radio at all:\n");
 	ck(n == k && n == PM_ROWS - 6, "six rows fewer, and the build agrees with the list");
 	ck(!has_label(rows, n, "Wi-Fi") && !has_label(rows, n, "Bluetooth"),
 	   "no Wi-Fi, no Bluetooth");
@@ -672,10 +676,10 @@ static void radio_less(void)
 	ck(!has_label(rows, n, "Cheevos") && !has_label(rows, n, "ScreenScraper"),
 	   "and no sign-ins");
 	ck(has_label(rows, n, "Audio Output") && has_label(rows, n, "Play Time") &&
-	   has_label(rows, n, "Controls") && has_label(rows, n, "About TortOS") &&
+	   has_label(rows, n, "Controls") && has_label(rows, n, "About ChaOS") &&
 	   has_label(rows, n, "Date & Time"),
 	   "the rest is all there, Date & Time with it");
-	ck(pm[n - 1] == PM_ABOUT && !strcmp(rows[n - 1].label, "About TortOS") &&
+	ck(pm[n - 1] == PM_ABOUT && !strcmp(rows[n - 1].label, "About ChaOS") &&
 	   pm[0] == PM_STATS && !strcmp(rows[0].label, "Play Time"),
 	   "and the list names the rows the build drew, first to last");
 
@@ -683,7 +687,7 @@ static void radio_less(void)
 	u.cable_xfer = true;
 	n = sys_menu_build(&u, rows, &b, &heading);
 	k = sys_menu_tortos_rows(&u, pm);
-	printf("TortOS menu, no radio, files over the cable:\n");
+	printf("ChaOS menu, no radio, files over the cable:\n");
 	ck(n == k && n == PM_ROWS - 5, "five rows fewer: the transfer row stays");
 	for (i = 0; i < k && pm[i] != PM_XFER; i++) { }
 	ck(i < k && !strcmp(rows[i].label, "ChaOS Transfer"),

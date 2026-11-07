@@ -10,9 +10,10 @@
  * not either a card, the name of what is under the cursor, or a rail saying
  * where you are in the list. */
 
-#define UI_BG_R 7
-#define UI_BG_G 8
-#define UI_BG_B 12
+/* ChaOS: the logo's dark ground, 0x17151C. TortOS's was (7, 8, 12). */
+#define UI_BG_R 23
+#define UI_BG_G 21
+#define UI_BG_B 28
 
 /* Four steps, brightest first. A list is read at all of them at once, so the
  * gaps have to be wide enough to rank the rows and narrow enough that the

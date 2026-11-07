@@ -50,6 +50,8 @@
 #include "cards.h"
 #include "game_menu.h"
 #include "look.h"
+#include "theme.h"
+#include "chaos_mark.h"
 #include "ui.h"
 #include "wifi_menu.h"
 
@@ -2748,42 +2750,6 @@ static void restore_place(app *a)
 
 /* ---------- drawing ------------------------------------------------------- */
 
-/* One cell of the shell: a filled hexagon as a six-triangle fan, because
- * SDL_RenderGeometry is the only primitive here that antialiases nothing and
- * therefore looks identical to the boot animation's rasterizer. */
-static void draw_hex(SDL_Renderer *r, float cx, float cy, float rad, SDL_Color col)
-{
-	SDL_Vertex v[7];
-	int idx[18], i;
-	v[0].position.x = cx; v[0].position.y = cy;
-	for (i = 0; i < 6; i++) {
-		float a = (float)(M_PI / 6.0 + i * M_PI / 3.0);
-		v[i + 1].position.x = cx + rad * cosf(a);
-		v[i + 1].position.y = cy + rad * sinf(a);
-	}
-	for (i = 0; i < 7; i++) {
-		v[i].color = col;
-		v[i].tex_coord.x = v[i].tex_coord.y = 0;
-	}
-	for (i = 0; i < 6; i++) {
-		idx[i * 3 + 0] = 0;
-		idx[i * 3 + 1] = 1 + i;
-		idx[i * 3 + 2] = 1 + (i + 1) % 6;
-	}
-	SDL_RenderGeometry(r, NULL, v, 7, idx, 18);
-}
-
-/* The mark, drawn about its own center.
- *
- * `head` slides the dark cell back along the lattice: 1.0 is where it sits at
- * rest, 0.0 is home on the center. `dim` then fades that same dark over the
- * blue center cell, 0 to 1.
- *
- * The two are separate because at head = 0 the dark cell lands exactly on the
- * center and is drawn UNDER the blue, so on its own the head just disappears.
- * `dim` is what makes its arrival visible: the blue is the one lit thing in
- * either mark - the same color as the boot line and the menu chrome - so
- * covering it is the light going out, and the shell closes dark. */
 /* A heart, as a fan over the classic parametric curve:
  *
  *     x = 16 sin^3 t
@@ -2832,37 +2798,26 @@ static void draw_heart(SDL_Renderer *r, float cx, float cy, float rad,
 	SDL_RenderGeometry(r, NULL, v, HEART_N + 1, idx, HEART_N * 3);
 }
 
-static void draw_shell(SDL_Renderer *r, float cx, float cy, float rad,
-                       float head, float dim, Uint8 alpha)
+/* ChaOS's logo (src/chaos_mark.h, from tools/genchaosmotion.py) as squares,
+ * each `out` of the way along its path out (0 in place, 1 gone), at `alpha`,
+ * scaled by `k` about the screen's centre and moved by (ox, oy). */
+static void draw_chaos_mark(SDL_Renderer *r, float out, Uint8 alpha, float k,
+                            float ox, float oy)
 {
-	/* Mirrors tools/markdef.py, which is the definition. C cannot import it,
-	 * so this is the one hand-kept copy: change one, change both. The ring
-	 * alternates light, mid, light, mid, light, mid for three-fold symmetry. */
-	static const struct { float i, j; Uint8 c[3]; } cells[] = {
-		{ -0.5f, -1.0f, { 128, 176, 118 } }, {  0.5f, -1.0f, { 104, 138,  96 } },
-		{  1.0f,  0.0f, { 128, 176, 118 } }, {  0.5f,  1.0f, { 104, 138,  96 } },
-		{ -0.5f,  1.0f, { 128, 176, 118 } }, { -1.0f,  0.0f, { 104, 138,  96 } },
-	};
-	float dx = 1.7320508f * rad, dy = 1.5f * rad;
-	SDL_Color col;
-	int k;
+	const float cx = TORTOS_SCREEN_W / 2.0f, cy = TORTOS_SCREEN_H / 2.0f;
+	int i;
 
-	/* Head first, so the shell cells draw over it as it withdraws. */
-	col.r = 61; col.g = 89; col.b = 67; col.a = alpha;
-	draw_hex(r, cx + 2.0f * dx * head, cy, rad * 0.95f, col);
-	for (k = 0; k < 6; k++) {
-		col.r = cells[k].c[0]; col.g = cells[k].c[1]; col.b = cells[k].c[2];
-		col.a = alpha;
-		draw_hex(r, cx + cells[k].i * dx, cy + cells[k].j * dy, rad * 0.95f, col);
-	}
-	/* markdef.CYAN, and the same value as MENU_ACCENT below. */
-	col.r = 61; col.g = 214; col.b = 255; col.a = alpha;
-	draw_hex(r, cx, cy, rad * 0.95f, col);
-	if (dim > 0.0f) {
-		SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
-		col.r = 61; col.g = 89; col.b = 67;
-		col.a = (Uint8)(alpha * (dim > 1.0f ? 1.0f : dim));
-		draw_hex(r, cx, cy, rad * 0.95f, col);
+	SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+	for (i = 0; i < CHAOS_NCELLS; i++) {
+		const chaos_cell *c = &CHAOS_CELLS[i];
+		float d = c->dist * out;
+		SDL_FRect q;
+
+		q.x = cx + ((float)c->x + c->dx * d - cx) * k + ox;
+		q.y = cy + ((float)c->y + c->dy * d - cy) * k + oy;
+		q.w = q.h = CHAOS_CELL * k;
+		SDL_SetRenderDrawColor(r, c->r, c->g, c->b, alpha);
+		SDL_RenderFillRectF(r, &q);
 	}
 }
 
@@ -3877,52 +3832,53 @@ static void anim_launch(app *a, unsigned ms)
 	plat_present();
 }
 
-/* The send-off, and the inverse of the boot animation's gesture: there he
- * launches head-first out of frame, here he arrives and pulls the head in.
+/* The send-off (ChaOS), the boot played backwards: the logo whole, as the
+ * boot left it, then every square flies out along the path it came in by,
+ * accelerating and fading, in the order tools/genchaosmotion.py gave them,
+ * until only the ground is left.
  *
- * Timed against the shutdown rather than chosen. Measured 2026-08-28: 1.42 s
- * from the Power off press to adbd dying, of which the old 620 ms animation
- * was the first slice - the rest was a black screen while sync and the kernel
- * finished. So the animation runs to about 900 ms and then DOES NOT clear: the
- * closed shell is its last frame. power_off turns the backlight off right
- * after, rather than leaving the shell lit until the kernel cuts the panel
- * (which is how it was until 2026-10-02). */
+ * TortOS's timing, measured against the shutdown (2026-08-28): 1.42 s from
+ * the Power off press to the system going, so the animation runs about
+ * 900 ms and ends without clearing; power_off turns the backlight off right
+ * after. Its last frame is the empty ground. */
 static void anim_poweroff(app *a)
 {
-	const unsigned T_IN = 430, T_HEAD = 260, T_DIM = 210;
-	const unsigned ms = T_IN + T_HEAD + T_DIM;
-	const float cx = TORTOS_SCREEN_W / 2.0f, cy = TORTOS_SCREEN_H / 2.0f;
-	const float rad = 46.0f;
+	const unsigned T_HOLD = 160, T_SPREAD = 420, T_FLY = 300;
+	const unsigned ms = T_HOLD + T_SPREAD + T_FLY;      /* 880, about TortOS's 900 */
 	unsigned t0 = plat_now_ms(), now;
 
 	while ((now = plat_now_ms()) - t0 < ms) {
-		unsigned t = now - t0;
-		float x = cx, head = 1.0f, dim = 0.0f;
-		if (t < T_IN) {
-			/* In from the left, decelerating onto the center. */
-			float k = (float)t / (float)T_IN;
-			float e = 1.0f - (1.0f - k) * (1.0f - k) * (1.0f - k);
-			x = -TORTOS_SCREEN_W * 0.35f + (cx + TORTOS_SCREEN_W * 0.35f) * e;
-		} else if (t < T_IN + T_HEAD) {
-			float k = (float)(t - T_IN) / (float)T_HEAD;
-			head = 1.0f - k * k;          /* accelerating in, like a flinch */
-		} else {
-			float k = (float)(t - T_IN - T_HEAD) / (float)T_DIM;
-			head = 0.0f;
-			dim = 1.0f - (1.0f - k) * (1.0f - k) * (1.0f - k);
-		}
-		SDL_SetRenderDrawColor(a->r, 17, 19, 16, 255);
+		float t = (float)(now - t0);
+		int i;
+
+		SDL_SetRenderDrawColor(a->r, CHAOS_GROUND_R, CHAOS_GROUND_G, CHAOS_GROUND_B, 255);
 		SDL_RenderClear(a->r);
-		draw_shell(a->r, x, cy, rad, head, dim, 255);
+		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+		for (i = 0; i < CHAOS_NCELLS; i++) {
+			const chaos_cell *c = &CHAOS_CELLS[i];
+			/* Leaves in the boot's arrival order reversed: last in, first out */
+			float k = (t - T_HOLD - (1.0f - c->delay) * T_SPREAD) / (float)T_FLY;
+			float e, d;
+			SDL_FRect q;
+
+			if (k >= 1.0f) continue;
+			if (k < 0.0f) k = 0.0f;
+			e = k * k * k;                       /* accelerating away */
+			d = c->dist * e;
+			q.x = c->x + c->dx * d;
+			q.y = c->y + c->dy * d;
+			q.w = q.h = CHAOS_CELL;
+			SDL_SetRenderDrawColor(a->r, c->r, c->g, c->b,
+			                       (Uint8)(255.0f * (k < 0.4f ? 1.0f : 1.0f - (k - 0.4f) / 0.6f)));
+			SDL_RenderFillRectF(a->r, &q);
+		}
 		plat_present();
 		SDL_Delay(6);
 	}
-	/* Land on the closed state exactly, in case the loop exited a frame early,
-	 * and then deliberately no clear: the dark shell is the last thing on
-	 * screen and stays there while the device powers down. */
-	SDL_SetRenderDrawColor(a->r, 17, 19, 16, 255);
+	/* The empty ground, exactly, and no clear after: it is what is on the
+	 * panel as the backlight goes. */
+	SDL_SetRenderDrawColor(a->r, CHAOS_GROUND_R, CHAOS_GROUND_G, CHAOS_GROUND_B, 255);
 	SDL_RenderClear(a->r);
-	draw_shell(a->r, cx, cy, rad, 0.0f, 1.0f, 255);
 	plat_present();
 }
 
@@ -3950,9 +3906,11 @@ static void power_off(app *a)
 /* menu_row and the row kinds: src/menu.h. */
 
 #define MENU_RADIUS 20
-/* The system's one accent: this menu, the volume OSD, and the mark's center
- * cell in both animations. Hand-kept equal to markdef.CYAN and UI_CYAN_*. */
-#define MENU_ACCENT 0x3DD6FFu
+/* The launcher's one accent: its menus, the systems row and their chrome.
+ * ChaOS: chosen in MENU > Menu Color (src/theme.h), ChaOS Orange unless
+ * changed; TortOS's was its cyan, 0x3DD6FF, which is still on the list. */
+static int g_menu_color;
+#define MENU_ACCENT (MENU_COLORS[g_menu_color].rgb)
 
 /* The unit every menu measurement is in. Row height, padding and the gap
  * between the two columns are all cut from it, so the whole panel scales with
@@ -4910,6 +4868,7 @@ static int menu_build(app *a, screen_id screen, int sys,
 		u.ss_name   = u.ss_in ? ss_user() : NULL;
 		u.cards     = CARD_SETS[g_cards].name;
 		u.cards_dir = CARD_DIRS[g_dir].name;
+		u.menu_color = MENU_COLORS[g_menu_color].name;
 		u.auto_off  = a->auto_off;
 		{
 			static char clk[32];
@@ -5410,6 +5369,11 @@ static void wifi_screen(app *a)
 #ifndef TORTOS_VERSION
 #define TORTOS_VERSION "0.0"       /* set by the makefiles from Makefile's VERSION */
 #endif
+/* ChaOS's own, from the CHAOS_VERSION file; TORTOS_VERSION stays the TortOS
+ * it is built on, which is what the network services are told. */
+#ifndef CHAOS_VERSION
+#define CHAOS_VERSION "0.0"
+#endif
 
 /* Facts about the machine, which is a different thing from settings. The
  * address in particular has nowhere else to live: the Wi-Fi screen names the
@@ -5648,14 +5612,14 @@ static bool pack_logs(char *path, size_t pn, char *name, size_t nn)
 
 	localtime_r(&t, &tm);
 	strftime(stamp, sizeof stamp, "%Y-%m-%d %H:%M", &tm);
-	strftime(folder, sizeof folder, "tortos-logs-%Y-%m-%d-%H%M", &tm);
+	strftime(folder, sizeof folder, "chaos-logs-%Y-%m-%d-%H%M", &tm);
 	if ((f = fopen("/proc/uptime", "r"))) { if (fscanf(f, "%lf", &up) != 1) up = 0; fclose(f); }
 
 #define ABOUT(...) do { \
 		int k_ = snprintf(about + at, sizeof about - at, __VA_ARGS__); \
 		if (k_ > 0 && (size_t)k_ < sizeof about - at) at += (size_t)k_; \
 	} while (0)
-	ABOUT("TortOS %s\n", TORTOS_VERSION);
+	ABOUT("ChaOS %s, from TortOS %s\n", CHAOS_VERSION, TORTOS_VERSION);
 	ABOUT("Packed %s, up %.0f minutes\n", stamp, up / 60);
 	if (statvfs(P_CARD, &vf) == 0)
 		ABOUT("Card: %.1f GB free of %.1f GB\n",
@@ -6996,7 +6960,7 @@ static void about_screen(app *a)
 	unsigned secs;
 	bool done = false;
 
-	snprintf(ver, sizeof ver, "%s", TORTOS_VERSION);
+	snprintf(ver, sizeof ver, "%s", CHAOS_VERSION);
 
 	while (!done && !want_quit && a->running) {
 		static unsigned next_check;
@@ -7043,7 +7007,7 @@ static void about_screen(app *a)
 		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
 		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
 		SDL_RenderFillRect(a->r, NULL);
-		menu_draw(a, "About TortOS", rows, 4, -1, menu_std_width(a), MENU_ACCENT);
+		menu_draw(a, "About ChaOS", rows, 4, -1, menu_std_width(a), MENU_ACCENT);
 		plat_draw_osd(a->r);
 		plat_present();
 		SDL_Delay(8);
@@ -7551,6 +7515,13 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 
 	/* Which way both shelves run. Only the cards' positions change, not the
 	 * textures, so nothing is dropped and there is nothing to rebuild. */
+	/* ChaOS: the menus' accent, seen on this very menu as it changes. */
+	if (sel == PM_COLOR && (d || key == IN_ACCEPT)) {
+		g_menu_color = menu_color_step(g_menu_color, d ? d : 1);
+		db_set_str(db_dev(), "menu_color", MENU_COLORS[g_menu_color].id);
+		return MENU_STAY;
+	}
+
 	if (sel == PM_DIR && (d || key == IN_ACCEPT)) {
 		g_dir = cards_dir_step(g_dir, d ? d : 1);
 		db_set_str(db_dev(), "cards_dir", CARD_DIRS[g_dir].id);
@@ -10754,7 +10725,6 @@ static void seq_card(app *a)
 	int line = ui_font_line(UI_F_MENU), pad = menu_pad();
 	int w = menu_std_width(a), n, i, done = 0;
 	SDL_Rect panel;
-	float rad;
 
 	seq_decode(seq_next(), text, sizeof text);
 	n = wrap_text(f, text, w, lines, CHV_WRAP_LINES);
@@ -10764,9 +10734,6 @@ static void seq_card(app *a)
 	if (panel.h < TORTOS_SCREEN_H / 3) panel.h = TORTOS_SCREEN_H / 3;
 	panel.x = (TORTOS_SCREEN_W - panel.w) / 2;
 	panel.y = (TORTOS_SCREEN_H - panel.h) / 2;
-	/* The mark is five radii tall and about seven wide with its head. */
-	rad = panel.h * 0.75f / 5.0f;
-	if (rad > panel.w * 0.75f / 7.0f) rad = panel.w * 0.75f / 7.0f;
 
 	plat_input_flush();
 	memset(&a->in, 0, sizeof a->in);
@@ -10782,9 +10749,10 @@ static void seq_card(app *a)
 		ui_glow(a->r, &panel, MENU_ACCENT, 60, 1.5f);
 		ui_panel(a->r, &panel, MENU_RADIUS, MENU_ACCENT);
 		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
-		/* Centered on the whole mark, head included, not on its middle cell. */
-		draw_shell(a->r, panel.x + panel.w / 2 - 0.866f * rad,
-		           panel.y + panel.h / 2, rad, 1.0f, 0.0f, 30);
+		/* ChaOS's logo, faint behind the text, the panel's width */
+		draw_chaos_mark(a->r, 0.0f, 30, panel.w * 0.8f / (49.0f * CHAOS_CELL),
+		                panel.x + panel.w / 2 - TORTOS_SCREEN_W / 2.0f,
+		                panel.y + panel.h / 2 - TORTOS_SCREEN_H / 2.0f);
 		for (i = 0; i < n; i++)
 			ui_text(a->r, f, lines[i], panel.x + panel.w / 2,
 			        panel.y + (panel.h - n * line) / 2 + i * line, 0, UI_TEXT);
@@ -12649,6 +12617,8 @@ int main(int argc, char *argv[])
 		g_cards = cards_index(set);
 		db_get_str(db_dev(), "cards_dir", set, sizeof set, CARDS_DIR_DEFAULT);
 		g_dir = cards_dir_index(set);
+		db_get_str(db_dev(), "menu_color", set, sizeof set, "chaos");
+		g_menu_color = menu_color_index(set);
 	}
 	a.sys_cursor = 0;
 	db_get_str(db_lib(), "startup_system", startup, sizeof startup, "");

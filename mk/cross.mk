@@ -8,7 +8,8 @@ SRC := $(wildcard src/*.c) src/device/$(DEVICE).c
 CC ?= aarch64-linux-gnu-gcc
 
 VERSION ?= 0.0
-CFLAGS := -DTORTOS_VERSION='"$(VERSION)"' -O2 -mcpu=cortex-a53 -Wall -Wextra -Wno-unused-parameter -std=gnu11 \
+CHAOS_VERSION ?= $(shell cat CHAOS_VERSION 2>/dev/null || echo 0.0)
+CFLAGS := -DTORTOS_VERSION='"$(VERSION)"' -DCHAOS_VERSION='"$(CHAOS_VERSION)"' -O2 -mcpu=cortex-a53 -Wall -Wextra -Wno-unused-parameter -std=gnu11 \
           -I$(SYSROOT)/usr/include/SDL2 -D_GNU_SOURCE
 # No undefined symbols allowed, in this code or in the libraries it links:
 # SYSROOT has SDL and everything SDL needs, so the link checks that TortOS uses

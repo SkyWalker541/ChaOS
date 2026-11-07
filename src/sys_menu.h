@@ -38,7 +38,7 @@
 typedef enum {
 	PM_STATS,
 	PM_WIFI, PM_BT, PM_AUDIO, PM_CHANNELS, PM_XFER, PM_CLOCK,
-	PM_SLEEP, PM_THEME, PM_DIR, PM_SCRAPE, PM_ACHIEVEMENTS, PM_SS,
+	PM_SLEEP, PM_THEME, PM_DIR, PM_COLOR, PM_SCRAPE, PM_ACHIEVEMENTS, PM_SS,
 	PM_CONTROLS, PM_ABOUT, PM_ROWS
 } pm_row;
 
@@ -92,7 +92,7 @@ typedef enum { SMM_COUNT, SMM_SHOW, SMM_SORT, SMM_LOCK, SMM_ART, SMM_RESCAN } sm
  * two cannot disagree about what row 2 is. */
 int sys_menu_muse_rows(bool books, bool both, bool no_wifi, sm_muse_row *out);
 
-#define MENU_MAX_ROWS 15
+#define MENU_MAX_ROWS 16
 
 /* The array every caller declares must hold every row a build can produce, and
  * on 2026-09-16 it stopped: PM_ROWS went to 13 against a cap of 12 when the
@@ -164,6 +164,7 @@ typedef struct {
 	const char *ss_name;     /* only read when ss_in */
 	const char *cards;       /* the showing card set's name, from CARD_SETS */
 	const char *cards_dir;   /* which way the shelves run, from CARD_DIRS */
+	const char *menu_color;  /* ChaOS: the menus' accent's name, from theme.h */
 	int         auto_off;    /* seconds, 0 for off */
 	const char *clock;       /* the local date and time, "Oct 3, 6:12 AM" */
 	/* Where sound goes: the policy the player set, and where it actually ends

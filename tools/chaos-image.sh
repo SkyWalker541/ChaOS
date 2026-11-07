@@ -7,7 +7,8 @@
 # image and changes only the copy of TortOS it carries for the card
 # (/usr/share/tortos/card in the root squashfs, copied onto the card at first
 # boot by /etc/init.d/tortos): ChaOS's tortos.elf and diatom, the overlays it
-# ships (TortOS/overlays, put in Overlays/ at first start), ChaOS Transfer's
+# ships (TortOS/overlays, put in Overlays/ at first start), the boot
+# animation (plastron's splash frames), ChaOS Transfer's
 # web page (TortOS/res/web), its credits in
 # Licenses/, and its version (CHAOS_VERSION) as TortOS/VERSION and TortOS/CHAOS.
 # And /etc/init.d/tortos learns the version, and that a card whose TortOS is
@@ -59,6 +60,11 @@ find "$C/TortOS/overlays" -type f -exec chmod 644 {} +
 rm -f "$C/TortOS/res/web/"*.html "$C/TortOS/res/web/"*.svg "$C/TortOS/res/web/"*.js "$C/TortOS/res/web/"*.css
 install -m 644 "$ROOT/res/web/"* "$C/TortOS/res/web/"
 install -m 644 "$ROOT/res/web/index.html" "$C/TortOS/res/web/wire.html"
+# The boot: ChaOS's logo flying together (tools/genchaosmotion.py), in
+# place of TortOS's flyby, for plastron's splash
+install -m 644 "$ROOT/res/boot/chaos-splash-brick.bin" "$W/root/usr/share/splash/frames.bin"
+# What a computer calls the Brick on the USB cable
+sed -i 's|echo TortOS > \$g/strings/0x409/manufacturer|echo ChaOS > $g/strings/0x409/manufacturer|' "$W/root/etc/init.d/usbgadget"
 install -m 644 "$ROOT/CREDITS.md" "$C/Licenses/ChaOS.md"
 V=$(tr -d ' \n' < "$ROOT/CHAOS_VERSION")
 echo "$V" > "$C/TortOS/VERSION"

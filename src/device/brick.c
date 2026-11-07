@@ -150,7 +150,7 @@ bool plat_video_init(void)
 		return false;
 	}
 	SDL_ShowCursor(SDL_DISABLE);
-	win = SDL_CreateWindow("TortOS", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+	win = SDL_CreateWindow("ChaOS", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
 	                       TORTOS_SCREEN_W, TORTOS_SCREEN_H,
 	                       SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
 	if (!win) {

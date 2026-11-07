@@ -55,6 +55,13 @@ when they are written. They are original code.)*
 
 ---
 
+## Boot animation
+
+ChaOS's boot animation is packed for plastron's splash in the format of
+plastron's `scripts/make-splash-frames.py --brick` by Eric Reinsmidt
+(https://github.com/ericreinsmidt/plastron, GPL-3.0), whose packing
+`tools/genchaosmotion.py` repeats. The animation and the logo are ChaOS's own.
+
 ## Overlays
 
 **Brick overlays** by **SkyWalker541** - https://github.com/SkyWalker541/TrimUI-Brick-Overlays,

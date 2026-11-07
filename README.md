@@ -1,26 +1,26 @@
 <p align="center">
-  <img src="res/readme/wordmark.png" alt="TortOS" height="72">
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="res/readme/turtle.png" alt="" height="84">
+  <img src="res/logo/lockup.png" alt="ChaOS" height="96">
 </p>
 
 <p align="center">
-  <b>A <ins>fast</ins>, focused custom firmware for the TrimUI Brick, Brick Hammer and GKD Pixel 2.</b><br>
-  Plays eleven classic consoles and your music, and gets out of your way.
+  <b>Custom firmware for the TrimUI Brick, with the PT SkyWalker541 shader built in.</b><br>
+  A fork of <a href="https://github.com/ericreinsmidt/TortOS">TortOS</a>: eleven classic consoles and your music,
+  every game at a whole-number scale, Game Boy, Game Boy Color and Game Boy Advance through PT SkyWalker541, and
+  overlays for every console.
 </p>
 
 <p align="center">
   <a href="#install">Install</a> &nbsp;·&nbsp;
+  <a href="#shaders-and-overlays-chaos">Shaders and overlays</a> &nbsp;·&nbsp;
   <a href="#supported-systems">Systems</a> &nbsp;·&nbsp;
   <a href="#controls">Controls</a> &nbsp;·&nbsp;
   <a href="#faq">FAQ</a>
 </p>
 
-<div align="center">
-  
-https://github.com/user-attachments/assets/09b52bf2-bdb6-4a93-8613-27059d825ebf
-
-</div>
+> [!NOTE]
+> ChaOS is TortOS by Eric Reinsmidt with ChaOS's changes: the shader and its settings, overlays, whole-number
+> scaling only, ChaOS Transfer, the menu colors and the look. Everything below that isn't about those is TortOS's
+> own, and its screenshots are TortOS's. What came from where is in [CREDITS.md](CREDITS.md).
 
 <div align="center">
 
@@ -90,30 +90,25 @@ https://github.com/user-attachments/assets/09b52bf2-bdb6-4a93-8613-27059d825ebf
 
 ## Install
 
-You need a TrimUI Brick, Brick Hammer or GKD Pixel 2, a microSD card and, just this once, a computer.
+You need a TrimUI Brick or Brick Hammer, a microSD card and, just this once, a computer.
 
-The [TortOS Installer](https://github.com/ericreinsmidt/TortOS-Installer/releases/latest), for macOS, Windows and Linux, sets up a card for either device: it downloads the latest TortOS and puts it on the card, or updates a card that already has it. The steps below also say how to do it by hand.
+The [ChaOS Installer](https://github.com/SkyWalker541/ChaOS-Installer/releases/latest), for macOS, Windows and Linux, sets up a card: it downloads the latest ChaOS and puts it on the card, or updates a card that already has ChaOS or TortOS. The steps below also say how to do it by hand.
 
 ### Setting up a card
 
-The card is the whole system on both devices: TortOS on [plastron](https://github.com/ericreinsmidt/plastron), a small Linux built for them.
+The card is the whole system: ChaOS on [plastron](https://github.com/ericreinsmidt/plastron), the small Linux TortOS built for the Brick.
 
-With the TortOS Installer, choose your device and **Fresh install**, then go on from step 3. By hand, from the start:
+With the ChaOS Installer, choose **Fresh install**, then go on from step 3. By hand, from the start:
 
-1. **Download your device's image** from [Releases](https://github.com/ericreinsmidt/TortOS/releases/latest): `TortOS-v2.0.0-brick.img.xz` for the Brick and Brick Hammer, `TortOS-v2.0.0-pixel2.img.xz` for the Pixel 2.
-2. **Write it to the card** with any program that writes disk images, like Raspberry Pi Imager. It erases everything on the card.
-3. **Put the card in the device and turn it on.** The first boot takes a bit longer while it turns the rest of the card into space for games, music and saves. Every boot after that comes straight up.
+1. **Download the image** from [Releases](https://github.com/SkyWalker541/ChaOS/releases/latest): `ChaOS-v<version>-brick.img.xz`.
+2. **Write it to the card** with any program that writes disk images, like Raspberry Pi Imager or balenaEtcher. It erases everything on the card.
+3. **Put the card in the Brick and turn it on.** The first boot takes a bit longer while it turns the rest of the card into space for games, music and saves. Every boot after that comes straight up.
 4. **Set the time zone** under **MENU > Date & Time**. Wi-Fi sets the time whenever it connects; without it, set the time there too, and it keeps it.
-5. **Add games** to the folders in `Roms/`. Put the card back in the computer, where it shows up as TORTOS, or send them over later, with Wi-Fi or the USB cable.
-
-> [!NOTE]
-> **Coming from TortOS 1.x on the Brick?** First copy your games, music and audiobooks off the card yourself: the installer erases them with the card and doesn't keep them. Then put the card in the computer and choose **TrimUI Brick** and **Move to TortOS 2** in the TortOS Installer. It copies your saves, settings and BIOS files to a folder in your Documents and erases the card. After the Brick's first start, put the card back in the computer and choose **Put them back** to restore those saves, settings and BIOS files. Then copy your games, music and audiobooks back onto the card: the installer leaves it in for that, and **Show the card** opens it.
-
-The Pixel 2 has no radio of its own. A USB Wi-Fi adapter in its USB-C port gives it Wi-Fi while it's plugged in, and with it box art, RetroAchievements and ChaOS Transfer: one whose Realtek chip the Linux rtl8xxxu driver knows, like the TP-Link TL-WN725N on a USB-C adapter. Without one, ChaOS Transfer (below) moves files over the USB cable and fetches box art and album covers through your computer. Or add your own. There's no Bluetooth.
+5. **Add games** to the folders in `Roms/`. Put the card back in the computer, where it shows up as TORTOS (the name TortOS gave it, which the installers look for), or send them over later with ChaOS Transfer.
 
 ### Updating
 
-Put the card in the computer and choose **Update** in the TortOS Installer. The new TortOS goes on, and the games, music, saves and settings stay. The first boot after takes a bit longer while it copies the new TortOS into place.
+Put the card in the computer and choose **Update** in the ChaOS Installer. The new ChaOS goes on, and the games, music, saves and settings stay. The first boot after takes a bit longer while it copies the new ChaOS into place. A card with TortOS on it becomes a ChaOS card the same way.
 
 The installer is the only way that keeps them: writing the image by hand erases the card.
 
@@ -139,11 +134,11 @@ The same thing over a cable, with no Wi-Fi. It works with a Mac, Linux, or Windo
 3. Open that address in a browser on that computer, `http://10.55.0.2` on the Brick or `http://10.42.0.1` on the Pixel 2, and type the PIN.
 4. Drag games into their console's folder, albums into `Music` or books into `Audiobooks`. They're on the shelf when you leave the screen.
 
-### Removing TortOS
+### Removing ChaOS
 
 Take the card out. The Brick boots its own system again, as it was. On the Pixel 2 the card is the system, so another card with another system replaces it.
 
-Everything TortOS keeps is on the card, Wi-Fi passwords and Bluetooth pairings included, so reformat it before you give it away.
+Everything ChaOS keeps is on the card, Wi-Fi passwords and Bluetooth pairings included, so reformat it before you give it away.
 
 ## Shaders and overlays (ChaOS)
 
@@ -244,7 +239,7 @@ Battery saves are `.srm` files in `Saves/`, named after the game. Save states, t
 <details>
 <summary><b>Something went wrong. How do I send the logs?</b></summary>
 
-Open **MENU > ChaOS Transfer** (**ChaOS Transfer** over the USB cable), open its address in a browser, and click **Download logs** at the bottom of the first page. You get one `.tar.gz` file holding the last ten boots' logs and a short summary of the device, ready to send to whoever is helping you. Wi-Fi network, headset and account names are masked in it, and the logs on the card are left as they are. The logs themselves are on the card, in `.userdata/brick/logs/` on the Brick and `.userdata/pixel2/logs/` on the Pixel 2.
+Open **MENU > ChaOS Transfer**, open its address in a browser, and click **Download logs** at the bottom of the first page. You get one `.tar.gz` file holding the last ten boots' logs and a short summary of the device, ready to send to whoever is helping you. Wi-Fi network, headset and account names are masked in it, and the logs on the card are left as they are. The logs themselves are on the card, in `.userdata/brick/logs/` on the Brick and `.userdata/pixel2/logs/` on the Pixel 2.
 
 </details>
 
