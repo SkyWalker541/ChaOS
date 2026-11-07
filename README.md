@@ -59,7 +59,7 @@ https://github.com/user-attachments/assets/09b52bf2-bdb6-4a93-8613-27059d825ebf
 - **Two looks:** Plain Jane cards, or Fancy Pants photos of each console.
 - **RetroAchievements:** sign in on the device. A game's achievements download once and then work offline, and anything you unlock offline is sent later.
 - **Box art the Brick finds itself,** from libretro's collection with no account, or from ScreenScraper with a free one, which brings each game's year, genre and synopsis too. Or add your own.
-- **Over The Hare:** move games, music, audiobooks, saves and covers on and off the card from any browser on your Wi-Fi, behind a PIN. Or over a USB cable from your computer, with no Wi-Fi at all, as Down To The Wire.
+- **ChaOS Transfer:** move games, music, audiobooks, saves and covers on and off the card from any browser on your Wi-Fi, behind a PIN. Or over a USB cable from your computer, with no Wi-Fi at all.
 - **Autosave and resume,** plus six save slots for when you want a checkpoint.
 - **Turbo buttons:** X and Y press A and B for you, on the nine consoles whose controllers had two face buttons. On Game Boy Advance, L2 and R2 do the same for L and R.
 - **Fast forward:** hold MENU and press R1 to run a game at 2x, 3x or 4x, and once more to go back.
@@ -109,7 +109,7 @@ With the TortOS Installer, choose your device and **Fresh install**, then go on 
 > [!NOTE]
 > **Coming from TortOS 1.x on the Brick?** First copy your games, music and audiobooks off the card yourself: the installer erases them with the card and doesn't keep them. Then put the card in the computer and choose **TrimUI Brick** and **Move to TortOS 2** in the TortOS Installer. It copies your saves, settings and BIOS files to a folder in your Documents and erases the card. After the Brick's first start, put the card back in the computer and choose **Put them back** to restore those saves, settings and BIOS files. Then copy your games, music and audiobooks back onto the card: the installer leaves it in for that, and **Show the card** opens it.
 
-The Pixel 2 has no radio of its own. A USB Wi-Fi adapter in its USB-C port gives it Wi-Fi while it's plugged in, and with it box art, RetroAchievements and Over The Hare: one whose Realtek chip the Linux rtl8xxxu driver knows, like the TP-Link TL-WN725N on a USB-C adapter. Without one, Down To The Wire (below) moves files over the USB cable and fetches box art and album covers through your computer. Or add your own. There's no Bluetooth.
+The Pixel 2 has no radio of its own. A USB Wi-Fi adapter in its USB-C port gives it Wi-Fi while it's plugged in, and with it box art, RetroAchievements and ChaOS Transfer: one whose Realtek chip the Linux rtl8xxxu driver knows, like the TP-Link TL-WN725N on a USB-C adapter. Without one, ChaOS Transfer (below) moves files over the USB cable and fetches box art and album covers through your computer. Or add your own. There's no Bluetooth.
 
 ### Updating
 
@@ -119,23 +119,23 @@ The installer is the only way that keeps them: writing the image by hand erases 
 
 ### Adding games over Wi-Fi
 
-<img align="right" width="360" src="res/readme/hare.png" alt="Over The Hare, with a browser connected">
+<img align="right" width="360" src="res/readme/hare.png" alt="ChaOS Transfer, with a browser connected">
 
 1. Join a network under **MENU > Wi-Fi**.
-2. Open **MENU > Over The Hare**. It shows an address and a PIN.
+2. Open **MENU > ChaOS Transfer**. It shows an address and a PIN.
 3. Open that address in a browser on your phone or computer, and type the PIN.
 4. Drag games into their console's folder, albums into `Music` or books into `Audiobooks`. They're on the shelf when you leave the screen.
 
-The PIN is new every time you open Over The Hare.
+The PIN is new every time you open ChaOS Transfer.
 
 <br clear="right">
 
 ### Adding games over the USB cable
 
-The same thing over a cable, with no Wi-Fi, called Down To The Wire. It works with a Mac, Linux, or Windows 11; Windows 10 has no driver for this kind of connection.
+The same thing over a cable, with no Wi-Fi. It works with a Mac, Linux, or Windows 11; Windows 10 has no driver for this kind of connection.
 
 1. Plug the device into the computer with a USB cable.
-2. Open **MENU > Down To The Wire**, which takes Over The Hare's place while a computer is on the cable. It shows an address and a PIN.
+2. Open **MENU > ChaOS Transfer** while a computer is on the cable. It shows an address and a PIN.
 3. Open that address in a browser on that computer, `http://10.55.0.2` on the Brick or `http://10.42.0.1` on the Pixel 2, and type the PIN.
 4. Drag games into their console's folder, albums into `Music` or books into `Audiobooks`. They're on the shelf when you leave the screen.
 
@@ -159,8 +159,8 @@ rows instead:
 - **Overlay**: None, or any PNG in that console's folder under `Overlays/` on
   the card. ChaOS makes a folder there for every console at boot, and puts in
   SkyWalker541's Brick overlays for the three Game Boys the first time. Add
-  your own from a computer or with Over The Hare, whose Overlays folder is the
-  same one. An overlay should be 1024x768 with a transparent window where the
+  your own from a computer or with ChaOS Transfer, whose
+  Overlays folder is the same one. An overlay should be 1024x768 with a transparent window where the
   game shows through; another size is stretched to fit.
 
 In the in-game menu both apply at once: the paused game behind the menu is
@@ -185,7 +185,7 @@ The device lists every button under **MENU > Controls**, and [the guide](docs/gu
 <details>
 <summary><b>My games don't show up.</b></summary>
 
-Check the folder name against the table above, spelled exactly, and that the file type is listed for that console. A console with nothing in its folder is hidden. Games sent over Over The Hare appear when you leave its screen. Games copied any other way while the Brick is on appear after **Rescan Folder** in that console's menu, or after a restart. The log names every file a console's folder left out, and the file types it takes.
+Check the folder name against the table above, spelled exactly, and that the file type is listed for that console. A console with nothing in its folder is hidden. Games sent over ChaOS Transfer appear when you leave its screen. Games copied any other way while the Brick is on appear after **Rescan Folder** in that console's menu, or after a restart. The log names every file a console's folder left out, and the file types it takes.
 
 </details>
 
@@ -196,7 +196,7 @@ Check the folder name against the table above, spelled exactly, and that the fil
 
 Some games aren't in either collection, like fan translations and homebrew. Add your own: a PNG named exactly like the game file, in `Roms/<console>/.media/`. `Black Castle.gb` wants `Black Castle.png`. Around 512 pixels on the long side is plenty.
 
-Over Down To The Wire or Over The Hare, covers go separately: a console's folder comes over without them. Drop the PNGs into its `.media` folder, or drag `.media` itself onto the console's folder (Finder shows it after Cmd-Shift-.).
+Over ChaOS Transfer, covers go separately: a console's folder comes over without them. Drop the PNGs into its `.media` folder, or drag `.media` itself onto the console's folder (Finder shows it after Cmd-Shift-.).
 
 Don't like a cover? Press X on the game and choose **Replace Box Art**. It looks again, and if nothing turns up, you keep the one you had.
 
@@ -223,7 +223,7 @@ The Pixel 2 has no Bluetooth: use wired headphones, or a USB-C headphone adapter
 <details>
 <summary><b>How do I add music?</b></summary>
 
-Put it in `Music/` on the card, from a computer, over Wi-Fi with Over The Hare, or over the USB cable with Down To The Wire, a folder per artist and a folder inside that per album: `Music/Radiohead/The Bends/01 Planet Telex.mp3`. An album folder put straight into `Music/` is moved under its artist when its tags name one, and songs in no folder at all are moved into `Music/Singles/`, an album of their own. MP3, M4A, M4B, MP4, AAC, FLAC, Ogg, Opus and WAV all play. Muse appears on the shelf once there's music, and each album's cover comes from its own files, or a picture in the album's folder. **MENU > Album Art** on Muse's shelf fetches a sharper cover over Wi-Fi from [MusicBrainz](https://musicbrainz.org)'s Cover Art Archive for any album whose files carry none, or only a small one.
+Put it in `Music/` on the card, from a computer, over Wi-Fi with ChaOS Transfer, or over the USB cable with ChaOS Transfer, a folder per artist and a folder inside that per album: `Music/Radiohead/The Bends/01 Planet Telex.mp3`. An album folder put straight into `Music/` is moved under its artist when its tags name one, and songs in no folder at all are moved into `Music/Singles/`, an album of their own. MP3, M4A, M4B, MP4, AAC, FLAC, Ogg, Opus and WAV all play. Muse appears on the shelf once there's music, and each album's cover comes from its own files, or a picture in the album's folder. **MENU > Album Art** on Muse's shelf fetches a sharper cover over Wi-Fi from [MusicBrainz](https://musicbrainz.org)'s Cover Art Archive for any album whose files carry none, or only a small one.
 
 </details>
 
@@ -244,7 +244,7 @@ Battery saves are `.srm` files in `Saves/`, named after the game. Save states, t
 <details>
 <summary><b>Something went wrong. How do I send the logs?</b></summary>
 
-Open **MENU > Over The Hare** (**Down To The Wire** over the USB cable), open its address in a browser, and click **Download logs** at the bottom of the first page. You get one `.tar.gz` file holding the last ten boots' logs and a short summary of the device, ready to send to whoever is helping you. Wi-Fi network, headset and account names are masked in it, and the logs on the card are left as they are. The logs themselves are on the card, in `.userdata/brick/logs/` on the Brick and `.userdata/pixel2/logs/` on the Pixel 2.
+Open **MENU > ChaOS Transfer** (**ChaOS Transfer** over the USB cable), open its address in a browser, and click **Download logs** at the bottom of the first page. You get one `.tar.gz` file holding the last ten boots' logs and a short summary of the device, ready to send to whoever is helping you. Wi-Fi network, headset and account names are masked in it, and the logs on the card are left as they are. The logs themselves are on the card, in `.userdata/brick/logs/` on the Brick and `.userdata/pixel2/logs/` on the Pixel 2.
 
 </details>
 

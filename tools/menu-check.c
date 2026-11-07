@@ -667,8 +667,8 @@ static void radio_less(void)
 	ck(n == k && n == PM_ROWS - 6, "six rows fewer, and the build agrees with the list");
 	ck(!has_label(rows, n, "Wi-Fi") && !has_label(rows, n, "Bluetooth"),
 	   "no Wi-Fi, no Bluetooth");
-	ck(!has_label(rows, n, "Over The Hare") && !has_label(rows, n, "Box Art"),
-	   "no Over The Hare, no Box Art");
+	ck(!has_label(rows, n, "ChaOS Transfer") && !has_label(rows, n, "Box Art"),
+	   "no ChaOS Transfer, no Box Art");
 	ck(!has_label(rows, n, "Cheevos") && !has_label(rows, n, "ScreenScraper"),
 	   "and no sign-ins");
 	ck(has_label(rows, n, "Audio Output") && has_label(rows, n, "Play Time") &&
@@ -686,10 +686,9 @@ static void radio_less(void)
 	printf("TortOS menu, no radio, files over the cable:\n");
 	ck(n == k && n == PM_ROWS - 5, "five rows fewer: the transfer row stays");
 	for (i = 0; i < k && pm[i] != PM_XFER; i++) { }
-	ck(i < k && !strcmp(rows[i].label, "Down To The Wire"),
-	   "as Down To The Wire, where the list says it is");
+	ck(i < k && !strcmp(rows[i].label, "ChaOS Transfer"),
+	   "as ChaOS Transfer, where the list says it is");
 	ck(i < k && rows[i].live && !rows[i].value, "live, and not asking for Wi-Fi");
-	ck(!has_label(rows, n, "Over The Hare"), "never under its Wi-Fi name");
 
 	memset(&u, 0, sizeof u);
 	u.games = true;

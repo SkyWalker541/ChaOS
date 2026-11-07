@@ -73,7 +73,7 @@ cp "$ROOT/res/fonts/menu.ttf" "$P/res/web/menu.ttf"
 # index.html while a computer is on the cable (hare_set_page). Both devices
 # go both ways, Wi-Fi or the cable. Only the page's own words: the browser
 # code names nothing, and the server is the same.
-sed 's/Over The Hare/Down To The Wire/g' "$ROOT/res/web/index.html" > "$P/res/web/wire.html"
+cp "$ROOT/res/web/index.html" "$P/res/web/wire.html"   # ChaOS: one name for both
 # The device has curl and OpenSSL but nothing to trust - see res/ssl/README.md.
 # Without this, every HTTPS request fails verification and achievements never
 # arrive, with an error that reads like the network being down.

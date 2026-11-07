@@ -197,12 +197,11 @@ button:active, .ghost:active { background: #262a36; }
 	inset: 0;
 	z-index: -1;
 	pointer-events: none;
-	background: url(/web/turtle.svg) no-repeat center;
+	background: url(/web/watermark.svg) no-repeat center;
 	/* Capped on height as well as width - at the column's 880 the mark is 640
 	 * tall and a laptop window cut the shell off top and bottom, which reads
-	 * as a broken image rather than a quiet one. 1.375 is the mark's own
-	 * 286x208 aspect. */
-	background-size: min(var(--wrap), 86vw, calc(62vh * 1.375)) auto;
+	 * as a broken image rather than a quiet one. ChaOS's handheld is square. */
+	background-size: min(var(--wrap), 86vw, 62vh) auto;
 	opacity: .09;
 }
 

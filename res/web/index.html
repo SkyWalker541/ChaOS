@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
-<title>Over The Hare</title>
+<title>ChaOS Transfer</title>
 <!-- The shell without the head. The full mark is two thirds head by width, so
      squeezed into a 16px square the shell is a smudge; the six cells and the
      charge stay legible. tools/genhare.py writes it. -->
@@ -17,8 +17,8 @@
      browser can reach without a session. -->
 <section id="gate" class="gate">
   <div class="panel">
-    <img class="logo" src="/web/mark.svg" alt="" width="120" height="80">
-    <h1>Over The Hare</h1>
+    <img class="logo" src="/web/mark.svg" alt="" width="245" height="80">
+    <h1>ChaOS Transfer</h1>
     <p class="sub">Enter the PIN shown on the device</p>
     <form id="pinform" autocomplete="off">
       <input id="pin" inputmode="numeric" pattern="[0-9]*" maxlength="4"
@@ -33,9 +33,9 @@
 <section id="app" class="app" hidden>
   <header>
     <!-- The real drawn size, so the bar does not jump on a cold load before the
-         stylesheet arrives. The mark's viewBox is 210.8 x 112.8, so 84 tall is
-         157 wide. -->
-    <img class="logo small" src="/web/mark.svg" alt="Over The Hare" width="157" height="84">
+         stylesheet arrives. The ChaOS lockup's viewBox is 49 x 16, so 84 tall
+         is 257 wide. -->
+    <img class="logo small" src="/web/mark.svg" alt="ChaOS Transfer" width="257" height="84">
     <nav id="crumbs" class="crumbs" aria-label="Location"></nav>
     <!-- A standing hint that files can be dropped, lit while one is over the
          window. Beside the crumbs rather than replacing them: with the pointer
@@ -68,7 +68,7 @@
   <p id="empty" class="empty" hidden>Nothing here yet.</p>
 
   <!-- Covers, on the first page, where the device has no network of its own
-       (Down To The Wire): this page fetches games' box art from libretro and
+       (over the USB cable): this page fetches games' box art from libretro and
        albums' covers from MusicBrainz and the Cover Art Archive, and the
        device matches them. Hidden where the device says no, and when nothing
        is missing. -->
