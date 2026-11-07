@@ -63,7 +63,12 @@ static void cfg_quote(FILE *f, const char *v)
  * does not; the project's address is that way, and nobody's email is. The
  * other services are sent the same line, since one client should say one
  * thing about itself. */
-#define NET_UA "TortOS/" TORTOS_VERSION " ( https://github.com/ericreinsmidt/TortOS )"
+/* ChaOS names itself and its own address, not TortOS's: a request from ChaOS
+ * is ChaOS's, and the people to reach about it are ChaOS's. */
+#ifndef CHAOS_VERSION
+#define CHAOS_VERSION "0.0"
+#endif
+#define NET_UA "ChaOS/" CHAOS_VERSION " ( https://github.com/SkyWalker541/ChaOS )"
 
 static bool write_get_config(const char *path, const char *url,
                             const char *body_path, int timeout_s)

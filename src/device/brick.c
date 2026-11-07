@@ -58,7 +58,7 @@ static const struct { int code; in_button b; } keymap[] = {
 };
 #endif
 
-const char *P_ROOT = "/mnt/SDCARD/TortOS";
+const char *P_ROOT = "/mnt/SDCARD/ChaOS";   /* TortOS/ on TortOS */
 const char *P_CARD = "/mnt/SDCARD";
 const char *P_ROMS = "/mnt/SDCARD/Roms";
 const char *P_USERDATA = "/mnt/SDCARD/.userdata/brick";
@@ -66,9 +66,9 @@ const char *P_SHARED = "/mnt/SDCARD/.userdata/shared";
 /* Over The Hare's page. On the card rather than in the binary so it can be
  * restyled with a text editor and a reload, which is the whole argument for
  * a file-transfer feature existing at all. */
-const char *P_WEB = "/mnt/SDCARD/TortOS/res/web";
+const char *P_WEB = "/mnt/SDCARD/ChaOS/res/web";
 
-const char *P_FONT = "/mnt/SDCARD/TortOS/menu.ttf";
+const char *P_FONT = "/mnt/SDCARD/ChaOS/menu.ttf";
 
 SDL_Renderer *plat_renderer(void) { return ren; }
 

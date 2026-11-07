@@ -52,6 +52,7 @@ dd if="$W/card.img" of="$W/root.sqfs" bs=512 skip="$START" count="$COUNT" status
 unsquashfs -q -d "$W/root" "$W/root.sqfs" > /dev/null
 C=$W/root/usr/share/tortos/card
 [ -f "$C/TortOS/tortos.elf" ] || { echo "no TortOS in this image's root" >&2; exit 1; }
+INIT=$W/root/etc/init.d/tortos
 
 install -m 755 "$ELF" "$C/TortOS/tortos.elf"
 install -m 755 "$DIATOM" "$C/TortOS/diatom"
@@ -95,6 +96,33 @@ sed -i '/^newer_seed() {$/a\
 	# ChaOS: a card whose TortOS is not ChaOS gets ChaOS, whatever its version\
 	[ -f "$CARD/TortOS/CHAOS" ] || return 0' "$INIT"
 [ -f "$NOTICE" ] && install -m 644 "$NOTICE" "$C/Licenses/ChaOS-diatom.md"
+
+# ChaOS's own folder on the card is ChaOS/, where TortOS's was TortOS/: the
+# image's copy, the launch script's and the Bluetooth player's paths, and
+# plastron's init.d/tortos, which copies it onto the card. A TortOS card has
+# no ChaOS/launch.sh, so its first ChaOS boot copies ChaOS on; then the old
+# TortOS/ (TortOS's own files only, by its own design) goes, keeping where
+# the shelf was and what was playing. The launcher looks in /mnt/SDCARD/ChaOS
+# (src/device/brick.c), ChaOS Installer in either.
+mv "$C/TortOS" "$C/ChaOS"
+sed -i 's|/mnt/SDCARD/TortOS|/mnt/SDCARD/ChaOS|' "$C/ChaOS/launch.sh" "$W/root/etc/init.d/bluetooth"
+grep -q '^TORTOS_DIR=/mnt/SDCARD/ChaOS$' "$C/ChaOS/launch.sh" || { echo "launch.sh has changed: check its folder" >&2; exit 1; }
+grep -q 'SDCARD/ChaOS/btplayer' "$W/root/etc/init.d/bluetooth" || { echo "bluetooth has changed: check its path" >&2; exit 1; }
+sed -i 's|\$CARD/TortOS|$CARD/ChaOS|g; s|\$SEED/TortOS|$SEED/ChaOS|g; s|= TortOS \]|= ChaOS ]|' "$INIT"
+grep -q 'TortOS copied onto the card' "$INIT" || { echo "init.d/tortos has changed: check the seed" >&2; exit 1; }
+cat > "$W/move.sh" <<'MOVE'
+	# ChaOS: TortOS's folder from before, once ChaOS is on: where the shelf
+	# was and what was playing kept, the rest, TortOS's own files, gone
+	if [ -d "$CARD/TortOS" ]; then
+		for f in .last .playing; do
+			[ -f "$CARD/TortOS/$f" ] && [ ! -f "$CARD/ChaOS/$f" ] && cp "$CARD/TortOS/$f" "$CARD/ChaOS/"
+		done
+		rm -rf "$CARD/TortOS" && echo "tortos: TortOS's old folder removed" > /dev/kmsg
+	fi
+MOVE
+sed -i "/echo \"tortos: TortOS copied onto the card\" > \/dev\/kmsg/r $W/move.sh" "$INIT"
+sed -i 's/tortos: TortOS copied onto the card/tortos: ChaOS copied onto the card/' "$INIT"
+grep -q "TortOS's old folder removed" "$INIT" || { echo "init.d/tortos: the move did not go in" >&2; exit 1; }
 chown -R 0:0 "$C"
 
 mksquashfs "$W/root" "$W/new.sqfs" -comp lz4 -Xhc -b 131072 -noappend -no-xattrs -quiet > /dev/null

@@ -9,7 +9,7 @@
 # boot logo and splash, procd's services) went with it: the system is
 # plastron, ours from the kernel up.
 
-TORTOS_DIR=/mnt/SDCARD/TortOS
+TORTOS_DIR=/mnt/SDCARD/ChaOS
 SDCARD=/mnt/SDCARD
 
 export BIOS_PATH=$SDCARD/Bios
