@@ -55,6 +55,19 @@ when they are written. They are original code.)*
 
 ---
 
+## Overlays
+
+**Brick overlays** by **SkyWalker541** - https://github.com/SkyWalker541/TrimUI-Brick-Overlays,
+as collected in NextUI Community Overlays (https://github.com/LoveRetro/nextui-community-overlays).
+
+The Game Boy, Game Boy Color and Game Boy Advance overlays made for the Brick's
+screen at a whole-number scale, which ChaOS puts in the card's `Overlays/`
+folder at first boot. Renamed for the menu, pictures unchanged; the list is in
+`res/overlays/SOURCE.md`. Licence: **CC0 1.0** (public domain dedication), in
+`res/overlays/LICENSE-SkyWalker541.txt`.
+
+---
+
 ## Emulator cores
 
 Unchanged binaries from the libretro buildbot, as TortOS ships them. Each is

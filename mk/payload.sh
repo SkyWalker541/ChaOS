@@ -59,6 +59,7 @@ cp "$ROOT/config/systems.cfg" "$P/"
 cp -R "$ROOT/res/cards/." "$P/cards/"     # the classic/ and fancy/ sets
 cp "$ROOT/res/fonts/menu.ttf" "$P/"       # the UI face, and the in-game menu's
 cp "$ROOT/res/singles.png" "$P/"          # Muse's cover for Singles, the loose songs
+cp -R "$ROOT/res/overlays" "$P/overlays"  # ChaOS: SkyWalker541's overlays, put in Overlays/ at boot
 # Over The Hare's page. The launcher serves these off the card at P_WEB, so a
 # payload without them is a card whose transfer screen starts a server and then
 # answers its own page with a 404, which only shows on a built card - the

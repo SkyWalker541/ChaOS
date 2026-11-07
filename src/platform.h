@@ -185,6 +185,15 @@ int  plat_resident_volume(int *count);
 unsigned plat_resident_generation(void);
 /* Path from the most recent PREVIEW message, or "" - the menu's backdrop. */
 const char *plat_resident_last_preview(void);
+/* ChaOS. The shader settings file and the overlay file the next game is sent
+ * before its RUN (SETSHADER and SETBEZEL), "" or NULL for none. */
+void plat_resident_set_look(const char *shader_cfg, const char *bezel);
+/* The paused frame as the shader draws it, the size of the game's rect, or
+ * NULL when the game is not shaded. Written by Diatom on the way into its
+ * pause, and again after a SETSHADER with preview=. */
+const char *plat_resident_last_shaded(void);
+/* After a SETSHADER with preview=, while paused: wait for its answer. */
+bool plat_resident_sync_shaded(int timeout_ms);
 /* Core options the launcher wants applied to every game, read once from
  * the coreopt. namespace. Diatom keeps no per-core knowledge (its register
  * section 12), so the per-core opinions live here. Each entry is a whole

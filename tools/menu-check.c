@@ -13,6 +13,7 @@
 #include "../src/sys_menu.h"
 #include "../src/cards.h"
 #include "../src/game_menu.h"
+#include "../src/look.h"
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -383,7 +384,8 @@ static void system_menu(void)
 	u.sys_name = "Game Boy";
 	u.sys_core = "gambatte";
 	u.game_count = 412;
-	u.dmode = "Sharp";
+	u.shader = "On";
+	u.overlay = "Clean Frame";
 	n = sys_menu_build(&u, rows, &b, &heading);
 
 	printf("system menu:\n");
@@ -391,8 +393,10 @@ static void system_menu(void)
 	ck(!strcmp(heading, "Game Boy"), "heading is the system, not TortOS");
 	ck(!strcmp(val(&rows[SM_GAMES]), "412"), "the count is the real one");
 	ck(!strcmp(val(&rows[SM_CORE]), "gambatte"), "the core is the real one");
-	ck(!strcmp(val(&rows[SM_DISPLAY]), "Sharp"), "display mode is passed through");
-	ck(rows[SM_DISPLAY].live && rows[SM_RESCAN].live, "the two live rows are live");
+	ck(!strcmp(val(&rows[SM_SHADER]), "On"), "the shader's state is passed through");
+	ck(!strcmp(val(&rows[SM_OVERLAY]), "Clean Frame"), "and the overlay's name");
+	ck(rows[SM_SHADER].live && rows[SM_OVERLAY].live && rows[SM_RESCAN].live,
+	   "the rows that do something are live");
 	ck(!rows[SM_GAMES].live && !rows[SM_CORE].live, "reported facts are not rows to press");
 	ck(rows[SM_BOXART].live, "Box Art is live on a network");
 
@@ -556,6 +560,15 @@ static bool holds(const int *v, int n, int want)
 	return false;
 }
 
+/* Is a row with this label among the ones the cursor reaches? By label,
+ * because a console without a shader has one row fewer and the rest move. */
+static bool reaches(const menu_row *rows, const int *got, int k, const char *label)
+{
+	int i;
+	for (i = 0; i < k; i++) if (!strcmp(rows[got[i]].label, label)) return true;
+	return false;
+}
+
 /* The migration of the system menu onto the runner changed this on purpose:
  * the cursor used to walk every row, including the four that only report a
  * fact. Now it visits what can be pressed. */
@@ -571,18 +584,21 @@ static void cursor_reaches(void)
 	u.games = true;
 	u.wifi = WIFI_CONNECTED;
 	u.sys_name = "NES"; u.sys_core = "nestopia";
-	u.game_count = 3; u.dmode = "Native";
+	u.game_count = 3;
 	n = sys_menu_build(&u, rows, &b, &heading);
 	k = reachable(rows, n, got, MENU_MAX_ROWS);
 
 	printf("system menu, what the cursor can reach:\n");
-	ck(k == 4, "four rows, not seven");
-	ck(holds(got, k, SM_DISPLAY), "Display Mode");
+	ck(k == 4, "four rows, not six");
+	ck(!reaches(rows, got, k, "Shader"), "no Shader: nothing is made for the NES yet");
+	ck(n == SM_ROWS - 1 && !strcmp(rows[SM_SHADER].label, "Overlay"),
+	   "and Overlay moves up into its place");
 	/* Live since sorting stopped being alphabetical-only. It was a
 	 * placeholder for long enough that this check counted three. */
-	ck(holds(got, k, SM_SORT), "Sort By");
-	ck(holds(got, k, SM_BOXART), "Box Art");
-	ck(holds(got, k, SM_RESCAN), "Rescan Folder");
+	ck(reaches(rows, got, k, "Sort By"), "Sort By");
+	ck(reaches(rows, got, k, "Overlay"), "Overlay");
+	ck(reaches(rows, got, k, "Box Art"), "Box Art");
+	ck(reaches(rows, got, k, "Rescan Folder"), "Rescan Folder");
 	ck(!holds(got, k, SM_GAMES) && !holds(got, k, SM_CORE),
 	   "the reported facts are not stops");
 
@@ -634,6 +650,7 @@ static void radio_less(void)
 	u.wifi = WIFI_OFF;
 	u.cards = "Plain Jane";
 	u.cards_dir = "Horizontal";
+	u.shader = "On";
 	printf("a device with both radios:\n");
 	k = sys_menu_tortos_rows(&u, pm);
 	for (i = 0, ok = true; i < k; i++) if (pm[i] != (pm_row)i) ok = false;
@@ -678,7 +695,7 @@ static void radio_less(void)
 	u.games = true;
 	u.no_wifi = true;
 	u.sys_name = "NES"; u.sys_core = "nestopia";
-	u.game_count = 3; u.dmode = "Native";
+	u.game_count = 3; u.shader = "Off";
 	n = sys_menu_build(&u, rows, &b, &heading);
 	k = sys_menu_system_rows(&u, sm);
 	printf("system menu, no radio at all:\n");
@@ -888,13 +905,14 @@ static void ingame_rows(void)
 	menu_row rows[GM_ROWS];
 	int got[GM_ROWS], n, k;
 
-	u.dmode = "Native"; u.earned = 12; u.total = 40;
+	u.shader = "On"; u.overlay = NULL; u.earned = 12; u.total = 40;
 	n = gm_rows(&u, rows, &b);
 
 	printf("in-game menu, a game with a set:\n");
-	ck(n == GM_ROWS, "seven rows");
+	ck(n == GM_ROWS, "eight rows");
 	ck(!strcmp(rows[GM_CONTINUE].label, "Continue"), "Continue leads");
-	ck(!strcmp(val(&rows[GM_DISPLAY]), "Native"), "Display carries the mode");
+	ck(!strcmp(val(&rows[GM_SHADER]), "On"), "Shader carries its state");
+	ck(!strcmp(val(&rows[GM_OVERLAY]), "None"), "Overlay says None with none chosen");
 	ck(!strcmp(val(&rows[GM_CHEEVOS]), "12 / 40"), "Cheevos counts the set");
 	ck(rows[GM_CHEEVOS].live, "and is reachable");
 	k = reachable(rows, n, got, GM_ROWS);
@@ -1064,6 +1082,88 @@ static void card_sets(void)
 	ck(ok, "a step always lands on a different, real set");
 }
 
+/* ---------- ChaOS: the shader's settings ---------------------------------- */
+
+static void look_rows(void)
+{
+	look_settings st;
+	look_param ps[LP_COUNT];
+	char v[32], name[64];
+	int n, i;
+	bool ok;
+	FILE *f;
+
+	printf("shader settings, a Game Boy's as recommended:\n");
+	look_recommended(LOOK_GB, &st);
+	look_format(&st, LP_GAME_SYSTEM, v, sizeof v);
+	ck(st.on && !strcmp(v, "Game Boy"), "on, and Game System reads Game Boy");
+	look_format(&st, LP_BACKING_COLOR, v, sizeof v);
+	ck(!strcmp(v, "Pocket"), "the Pocket's backing, as the README says");
+	look_recommended(LOOK_GBA, &st);
+	look_format(&st, LP_GAME_SYSTEM, v, sizeof v);
+	ck(!strcmp(v, "GBA"), "a GBA's is the original GBA");
+	look_format(&st, LP_BACKING_COLOR, v, sizeof v);
+	ck(!strcmp(v, "Grey"), "with the grey backing");
+	ck(look_console_of("GBC") == LOOK_GBC && look_console_of("NES") == LOOK_NONE,
+	   "only the three Game Boys have a shader");
+
+	printf("shader settings, values in words:\n");
+	look_format(&st, LP_TRANSPARENCY, v, sizeof v);
+	ck(!strcmp(v, "10%"), "a fraction reads as a percent");
+	look_format(&st, LP_DARKEN, v, sizeof v);
+	ck(!strcmp(v, "Off"), "nothing darkened reads Off");
+	st.v[LP_PIXEL_EFFECT] = 2;
+	ck(look_step(&st, LP_PIXEL_EFFECT, +1, 5) && st.v[LP_PIXEL_EFFECT] == 0,
+	   "a choice goes round, one at a time even held");
+	st.v[LP_TRANSPARENCY] = 0.98f;
+	look_step(&st, LP_TRANSPARENCY, +1, 5);
+	ck(st.v[LP_TRANSPARENCY] == 1.0f, "a number stops at its end");
+	ck(!look_step(&st, LP_TRANSPARENCY, +1, 1), "and says nothing changed there");
+	st.v[LP_TRANSPARENCY] = 0.10f;
+	look_step(&st, LP_TRANSPARENCY, +1, 5);
+	look_format(&st, LP_TRANSPARENCY, v, sizeof v);
+	ck(!strcmp(v, "15%"), "held, it moves five steps at once");
+
+	printf("shader settings, only the rows that matter:\n");
+	st.v[LP_PIXEL_EFFECT] = 1;
+	n = look_group_rows(&st, LG_PIXELS, ps);
+	ck(n == 4 && ps[0] == LP_PIXEL_EFFECT, "Grid: the effect, gap color and two grid rows");
+	st.v[LP_PIXEL_EFFECT] = 2;
+	n = look_group_rows(&st, LG_PIXELS, ps);
+	for (i = 0, ok = true; i < n; i++) if (ps[i] == LP_GRID_WIDTH) ok = false;
+	ck(n == 6 && ok, "LCD Dot: the dot rows, and no grid rows");
+	st.v[LP_PIXEL_EFFECT] = 0;
+	ck(look_group_rows(&st, LG_PIXELS, ps) == 1, "Off: only the effect itself");
+	st.v[LP_GLARE_AND_SHEEN] = 0;
+	ck(look_group_rows(&st, LG_LIGHT, ps) == 1, "glare off: only its switch");
+	st.v[LP_GLARE_AND_SHEEN] = 1;
+	ck(look_group_rows(&st, LG_LIGHT, ps) == 10, "glare on: its nine settings, ripple size waiting on ripple");
+	ck(!look_param_shown(&st, LP_WHITE_LEVEL), "white detection only for a Manual game system");
+
+	printf("shader settings, what Diatom is sent:\n");
+	look_recommended(LOOK_GBC, &st);
+	st.on = false;
+	ok = look_write_cfg("/tmp/menu-check-look.cfg", LOOK_GBC, &st);
+	n = 0;
+	if (ok && (f = fopen("/tmp/menu-check-look.cfg", "r"))) {
+		char line[128];
+		bool con = false, off = false;
+		while (fgets(line, sizeof line, f)) {
+			if (!strcmp(line, "console = gbc\n")) con = true;
+			if (!strcmp(line, "enabled = 0\n")) off = true;
+			if (!strncmp(line, "PT_", 3)) n++;
+		}
+		fclose(f);
+		ok = con && off;
+	}
+	ck(ok && n == LP_COUNT, "the console, off, and every parameter by name");
+	ck(look_set_named(&st, "PT_DOT_SIZE", 5.0f) && st.v[LP_DOT_SIZE] == 0.9f,
+	   "a stored value is read back within range");
+	ck(!look_set_named(&st, "PT_NO_SUCH", 1.0f), "and an unknown name is refused");
+	look_overlay_label("/mnt/SDCARD/Overlays/Game Boy/Clean Frame.png", name, sizeof name);
+	ck(!strcmp(name, "Clean Frame"), "an overlay is called by its file's name");
+}
+
 int main(void)
 {
 	off_state();
@@ -1086,6 +1186,7 @@ int main(void)
 	what_scrolls();
 	info_rows();
 	ingame_rows();
+	look_rows();
 	audio_row();
 	channels_row();
 	if (fails) { printf("\n%d menu check(s) failed\n", fails); return 1; }

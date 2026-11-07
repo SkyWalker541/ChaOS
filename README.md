@@ -145,6 +145,28 @@ Take the card out. The Brick boots its own system again, as it was. On the Pixel
 
 Everything TortOS keeps is on the card, Wi-Fi passwords and Bluetooth pairings included, so reformat it before you give it away.
 
+## Shaders and overlays (ChaOS)
+
+Every game is drawn at a whole-number scale, so there is no Display Mode to
+choose. Each console's menu (MENU on its shelf) and the in-game menu have two
+rows instead:
+
+- **Shader**, for Game Boy, Game Boy Color and Game Boy Advance: PT
+  SkyWalker541. Left and right turn it on and off; A opens its settings,
+  grouped into Screen, Pixels, Shadows and Glare and Sheen, with only the
+  settings that matter for what is chosen. Reset to Recommended puts back the
+  shader README's settings for that console. Saved per console.
+- **Overlay**: None, or any PNG in that console's folder under `Overlays/` on
+  the card. ChaOS makes a folder there for every console at boot, and puts in
+  SkyWalker541's Brick overlays for the three Game Boys the first time. Add
+  your own from a computer or with Over The Hare, whose Overlays folder is the
+  same one. An overlay should be 1024x768 with a transparent window where the
+  game shows through; another size is stretched to fit.
+
+In the in-game menu both apply at once: the paused game behind the menu is
+drawn with the shader's new settings and the overlay you are on. Hold Y to
+hide the menu and see the whole picture.
+
 ## Controls
 
 | Button | What it does |

@@ -5,7 +5,7 @@
 
 #include "xfer.h"
 
-static xfer_root g_roots[6];
+static xfer_root g_roots[7];
 static int       g_nroots;
 
 static void add_root(const char *name, const char *label, const char *fmt,
@@ -41,6 +41,7 @@ void xfer_init(const char *roms_dir, const char *card_dir,
 	add_root("music", "Music", "%s/Music", card_dir, false);
 	add_root("books", "Audiobooks", "%s/Audiobooks", card_dir, false);
 	add_root("bios",  "BIOS",  "%s/Bios",  card_dir, false);
+
 	/* Two different things, both called saves in conversation.
 	 *
 	 * Saves/ is battery saves - the .srm a cartridge would have had - and is
@@ -59,6 +60,9 @@ void xfer_init(const char *roms_dir, const char *card_dir,
 	 * under this root out of listings and out of every path that resolves. */
 	add_root("saves",  "Saves",       "%s/Saves", card_dir, false);
 	add_root("states", "Save States", "%s/.tortos", shared_dir, true);
+	/* ChaOS: overlays, one folder per console as ROMs are, made by the
+	 * launcher at boot. Last, so the roots before it keep their places. */
+	add_root("overlays", "Overlays", "%s/Overlays", card_dir, false);
 }
 
 int xfer_root_count(void) { return g_nroots; }

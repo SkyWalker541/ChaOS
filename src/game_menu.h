@@ -101,13 +101,18 @@ int gi_rows(menu_row *out, const game_info *gi, bool net);
 /* ---------- the in-game menu ---------------------------------------------- */
 
 typedef enum {
-	GM_CONTINUE, GM_SAVE, GM_LOAD, GM_DISPLAY, GM_CHEEVOS, GM_RESET, GM_QUIT,
+	GM_CONTINUE, GM_SAVE, GM_LOAD, GM_SHADER, GM_OVERLAY, GM_CHEEVOS, GM_RESET,
+	GM_QUIT,
 	GM_ROWS
 } gm_row;
 
 /* What the in-game menu needs to know, gathered by the caller. */
 typedef struct {
-	const char *dmode;    /* the display mode's label */
+	/* ChaOS. The shader's state, "On" or "Off", or NULL when the game's
+	 * console has none: the row then says so and is passed over. The
+	 * overlay's name, or NULL for none. */
+	const char *shader;
+	const char *overlay;
 	int         earned;
 	int         total;    /* 0: this game has no achievement set */
 } gm_ui;

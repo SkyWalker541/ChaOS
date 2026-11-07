@@ -49,7 +49,11 @@ typedef enum {
  * so these are hooks waiting to be wired, not wishes. */
 typedef enum {
 	SM_GAMES, SM_CORE, SM_SORT,
-	SM_DISPLAY, /* SM_BUTTONS, */ SM_BOXART, SM_RESCAN, SM_ROWS
+	/* ChaOS: the console's shader, which opens its settings, and its
+	 * overlay. They took Display Mode's place: every game is drawn at a
+	 * whole-number scale now, so there is no mode to choose. Shader is left
+	 * out for a console with no shader made for it. */
+	SM_SHADER, SM_OVERLAY, /* SM_BUTTONS, */ SM_BOXART, SM_RESCAN, SM_ROWS
 } sm_row;
 
 /* What the Favorites shelf's menu is, which is two of those rows.
@@ -180,10 +184,14 @@ typedef struct {
 	const char *sys_name;
 	const char *sys_core;
 	int         game_count;
-	const char *dmode;
-	/* The label of the shelf's sort order. A label rather than an index for
-	 * the same reason dmode is one: this file must not know the table, or a
-	 * check that links it would have to link the table too. */
+	/* ChaOS. The shader's state, "On" or "Off", or NULL for a console with
+	 * no shader made for it, which then has no Shader row. The overlay's
+	 * name, or NULL for none. */
+	const char *shader;
+	const char *overlay;
+	/* The label of the shelf's sort order. A label rather than an index: this
+	 * file must not know the table, or a check that links it would have to
+	 * link the table too. */
 	const char *sort;
 } sys_ui;
 

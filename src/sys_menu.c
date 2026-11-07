@@ -43,6 +43,7 @@ int sys_menu_system_rows(const sys_ui *u, sm_row *out)
 
 	for (r = 0; r < SM_ROWS; r++) {
 		if (u->no_wifi && r == SM_BOXART) continue;
+		if (!u->shader && r == SM_SHADER) continue;
 		out[n++] = (sm_row)r;
 	}
 	return n;
@@ -117,7 +118,9 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 		full[SM_CORE]    = (menu_row){ "Core",          b->b,        false };
 		full[SM_SORT]    = (menu_row){ "Sort By",
 		                              u->sort ? u->sort : "Name", true  };
-		full[SM_DISPLAY] = (menu_row){ "Display Mode",  u->dmode,    true  };
+		full[SM_SHADER]  = (menu_row){ "Shader",        u->shader,   true  };
+		full[SM_OVERLAY] = (menu_row){ "Overlay",
+		                              u->overlay ? u->overlay : "None", true };
 		/* Button Mapping is out until there is something behind it. Diatom
 		 * supplies core button labels, so the hook is real - but a dead row
 		 * in a menu of live ones is a promise the launcher is not keeping,

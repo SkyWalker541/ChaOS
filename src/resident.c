@@ -26,6 +26,12 @@ static size_t dused;
 static char   d_preview[1024];
 static SDL_Rect d_rect;
 static bool     d_rect_known;
+
+/* ChaOS: the look Diatom is given with the next game - the shader settings
+ * file and the overlay file, empty for none - and the shaded pause frame it
+ * last wrote, empty when the game is not shaded. */
+static char     d_look_cfg[512], d_look_dtov[512];
+static char     d_shaded[1024];
 static int    d_pend_vol = -1, d_pend_vol_n;      /* LEVEL events, held until */
 static int    d_pend_bri = -1, d_pend_bri_n;      /* EXIT hands levels back  */
 /* Diatom's QUIET: what the launcher wants, and what this connection was last
@@ -275,6 +281,7 @@ bool plat_resident_send(const char *tag, const char *core, const char *rom,
 		 * Diatom restarted, or after something displaced this connection. */
 		if (!dconnect()) return false;
 		d_preview[0] = '\0';
+		d_shaded[0] = '\0';
 		d_rect_known = false;
 		d_pend_vol = d_pend_bri = -1;
 
@@ -308,6 +315,13 @@ bool plat_resident_send(const char *tag, const char *core, const char *rom,
 		 * a game started on a low battery shows it from its first frame. */
 		if (dsend("SETLOWBATTERY\ton=%d\tblink=%d", d_lowbat > 0, d_lowbat == 2))
 			d_lowbat_said = d_lowbat;
+
+		/* ChaOS: the shader and the overlay before RUN, on every RUN, so the
+		 * first frame is drawn with them and nothing is left over from the
+		 * last game. An empty path is none. A Diatom without them ignores
+		 * the verbs, which its protocol promises for unknown ones. */
+		dsend("SETSHADER\tpath=%s", d_look_cfg);
+		dsend("SETBEZEL\tpath=%s", d_look_dtov);
 
 		/* console and cheevos on RUN rather than after it, so a set is
 		 * watched from the first frame - an achievement can fire in the
@@ -436,6 +450,46 @@ bool plat_resident_line(const char *fmt, ...)
 }
 
 const char *plat_resident_last_preview(void) { return d_preview; }
+
+static void d_note_level(const char *l);
+static void d_note_audio(const char *l);
+static void d_note_display(const char *l);
+
+void plat_resident_set_look(const char *shader_cfg, const char *bezel)
+{
+	snprintf(d_look_cfg, sizeof d_look_cfg, "%s", shader_cfg ? shader_cfg : "");
+	snprintf(d_look_dtov, sizeof d_look_dtov, "%s", bezel ? bezel : "");
+}
+
+const char *plat_resident_last_shaded(void) { return d_shaded[0] ? d_shaded : NULL; }
+
+/* "SHADED\tpath=/tmp/x.bmp\tx=..." or a bare "SHADED" for none. */
+static void d_note_shaded(const char *l)
+{
+	const char *p = strstr(l, "path=");
+
+	d_shaded[0] = '\0';
+	if (!p) return;
+	snprintf(d_shaded, sizeof d_shaded, "%s", p + 5);
+	d_shaded[strcspn(d_shaded, "\t\r\n")] = '\0';
+}
+
+bool plat_resident_sync_shaded(int timeout_ms)
+{
+	unsigned t0 = SDL_GetTicks();
+	char *l;
+
+	if (dsock < 0) return false;
+	while ((int)(SDL_GetTicks() - t0) < timeout_ms) {
+		l = dline(timeout_ms);
+		if (!l) break;
+		if (strncmp(l, "SHADED", 6) == 0) { d_note_shaded(l); return true; }
+		if (strncmp(l, "LEVEL\t", 6) == 0) d_note_level(l);
+		else if (strncmp(l, "AUDIO\t", 6) == 0) d_note_audio(l);
+		else if (strncmp(l, "DISPLAY\t", 8) == 0) d_note_display(l);
+	}
+	return false;
+}
 
 /* Block until the game is over, watching the power button throughout -- the
  * same job plat_run does for the one-shot binary, except the signal ends the
@@ -608,6 +662,7 @@ static int diatom_wait(void)
 			 * GKD Pixel 2 2026-10-02, raised to 18 in a game, and the menu's
 			 * first press went to 3. */
 			else if (strncmp(l, "PAUSED", 6) == 0)  { d_apply_levels(); return RES_PAUSED; }
+			else if (strncmp(l, "SHADED", 6) == 0) d_note_shaded(l);
 			else if (strncmp(l, "PREVIEW\tpath=", 13) == 0)
 				snprintf(d_preview, sizeof d_preview, "%s", l + 13);
 			else if (strncmp(l, "LEVEL\t", 6) == 0) d_note_level(l);

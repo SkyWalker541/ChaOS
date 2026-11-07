@@ -85,16 +85,18 @@ int gi_rows(menu_row *out, const game_info *gi, bool net)
 	return n;
 }
 
-/* The in-game rows, carrying the display mode's current label. */
+/* The in-game rows, carrying the shader's state and the overlay's name. */
 int gm_rows(const gm_ui *u, menu_row *out, gm_bufs *b)
 {
 	static const char *label[GM_ROWS] = {
-		"Continue", "Save", "Load", "Display", "Cheevos", "Reset", "Quit"
+		"Continue", "Save", "Load", "Shader", "Overlay", "Cheevos", "Reset", "Quit"
 	};
 	int i;
 
 	for (i = 0; i < GM_ROWS; i++) out[i] = (menu_row){ label[i], NULL, true };
-	out[GM_DISPLAY].value = u->dmode;
+	out[GM_SHADER].value = u->shader ? u->shader : "none";
+	out[GM_SHADER].live = u->shader != NULL;
+	out[GM_OVERLAY].value = u->overlay ? u->overlay : "None";
 
 	/* Most of a library has no set, and a row that says so plainly is better
 	 * than one that is missing: "none" answers the question the player opened

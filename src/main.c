@@ -49,6 +49,7 @@
 #include "controls.h"
 #include "cards.h"
 #include "game_menu.h"
+#include "look.h"
 #include "ui.h"
 #include "wifi_menu.h"
 
@@ -95,10 +96,11 @@ typedef struct {
 	int *tw, *th;
 	float *cb;      /* where each card's art stops, for its reflection */
 	int cursor;
-	/* Index into DMODES. Zero-initialized like the rest of this struct, so
-	 * whatever sits at index 0 is what an untouched card plays at - see the
-	 * note on DMODES itself. */
-	int dmode;
+	/* ChaOS: how this console's games look - its shader's settings and its
+	 * overlay's file name under Overlays/<folder>/, empty for none. Kept per
+	 * console in the device database (look_load). */
+	look_settings look;
+	char overlay[256];
 	/* Index into SORTS. Zero is by name, which is what every shelf was
 	 * before this existed and what an untouched one still is. On Muse's
 	 * shelf an ml_order instead, whose zero is by artist. */
@@ -122,29 +124,6 @@ typedef struct {
 	bool jump_by_name;
 } sysview;
 
-/* Diatom's display modes, in the order TortOS offers them: the sensible
- * default first, then whole-pixel scaling, then the ones that trade shape or
- * edges for coverage, with 1:1 last as a reference rather than a choice.
- *
- * The names are Diatom's protocol strings and have to match its own table in
- * src/scale.c exactly - it answers an unknown one with ERROR code=bad_display
- * and changes nothing. The labels are ours, and are what the menu shows. */
-/* STRETCH IS FIRST, AND FIRST IS THE DEFAULT. A sysview is zero-initialized
- * and no display mode is seeded, so index 0 is what every system plays at
- * nobody has configured. Filling the panel is the right default on a handheld
- * whose screen is the whole device: the alternative spends a fifth of a
- * 1024x768 panel on black bars for the Game Boys before anyone has been given
- * a reason to choose. The rest keep their order. */
-static const struct { const char *name, *label; } DMODES[] = {
-	{ "stretch",          "Stretch"      },
-	{ "aspect",           "Aspect"       },
-	{ "integer",          "Integer"      },
-	{ "integer-vertical", "Integer tall" },
-	{ "overscale",        "Overscale"    },
-	{ "fill",             "Fill"         },
-	{ "native",           "Native 1:1"   },
-};
-#define DMODE_COUNT ((int)(sizeof DMODES / sizeof DMODES[0]))
 
 typedef struct {
 	systems_cfg sys;
@@ -242,45 +221,267 @@ static void present_black(app *a)
 	SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
 }
 
-/* ---------- per-system display mode --------------------------------------- */
+/* ---------- per-console look (ChaOS) -------------------------------------
+ *
+ * Every game is drawn at a whole-number scale, which Diatom decides, so the
+ * display mode that was here is gone. What a console chooses instead is its
+ * shader and its overlay.
+ *
+ * Keyed on the system's tag, as saves are: "shader.<TAG>.on", one
+ * "shader.<TAG>.<PT_NAME>" per setting that differs from the recommended one
+ * (so a better recommendation in a later release reaches everyone who never
+ * changed it), and "overlay.<TAG>" for the overlay's file name. */
+static void look_load_one(app *a, int i);
 
-/* Keyed on the system's tag rather than its folder or its place in the list,
- * for the same reason saves are: renaming a ROM folder or reordering
- * systems.cfg then cannot quietly hand a system somebody else's setting. */
-static void display_load(app *a)
+static bool look_load_param(const char *key, const char *value, void *ctx)
 {
-	char key[CFG_STR + 16], name[CFG_STR];
-	int i, k;
+	const char *dot = strrchr(key, '.');
 
+	if (dot) look_set_named(ctx, dot + 1, (float)atof(value));
+	return true;
+}
+
+static void look_load_one(app *a, int i)
+{
+	const system_cfg *sc = &a->sys.systems[i];
+	sysview *v = &a->view[i];
+	char key[CFG_STR + 32];
+
+	look_recommended(look_console_of(sc->tag), &v->look);
+	snprintf(key, sizeof key, "shader.%s.on", sc->tag);
+	v->look.on = db_get_int(db_dev(), key, 1) != 0;
+	snprintf(key, sizeof key, "shader.%s.PT_", sc->tag);
+	db_each_prefix(db_dev(), key, look_load_param, &v->look);
+	snprintf(key, sizeof key, "overlay.%s", sc->tag);
+	db_get_str(db_dev(), key, v->overlay, sizeof v->overlay, "");
+}
+
+static void look_load(app *a)
+{
+	int i;
+	for (i = 0; i < a->sys.count; i++) look_load_one(a, i);
+}
+
+/* One console's settings, written: what differs from the recommendation is
+ * stored, and what matches it is not. */
+static void look_save(app *a, int i)
+{
+	const system_cfg *sc = &a->sys.systems[i];
+	const sysview *v = &a->view[i];
+	look_settings rec;
+	char key[CFG_STR + 64], val[32];
+	int k;
+
+	look_recommended(look_console_of(sc->tag), &rec);
+	snprintf(key, sizeof key, "shader.%s.on", sc->tag);
+	db_set_int(db_dev(), key, v->look.on ? 1 : 0);
+	for (k = 0; k < LP_COUNT; k++) {
+		snprintf(key, sizeof key, "shader.%s.%s", sc->tag, look_params[k].name);
+		if (fabsf(v->look.v[k] - rec.v[k]) < look_params[k].step * 0.25f) {
+			db_del(db_dev(), key);
+		} else {
+			snprintf(val, sizeof val, "%g", (double)v->look.v[k]);
+			db_set_str(db_dev(), key, val);
+		}
+	}
+	snprintf(key, sizeof key, "overlay.%s", sc->tag);
+	if (v->overlay[0]) db_set_str(db_dev(), key, v->overlay);
+	else               db_del(db_dev(), key);
+}
+
+static bool file_nonempty(const char *p);
+/* ChaOS: a console's shader settings. `game` is the in-game menu's context,
+ * when it is opened from there, and NULL from the shelf. */
+static void shader_screen(app *a, int sys, void *game);
+
+/* ---------- overlays (ChaOS) ----------------------------------------------
+ *
+ * Overlays/<console folder>/ on the card, one folder per console as Roms/ has,
+ * made at every boot so there is always somewhere to put one: a PNG the size
+ * of the screen (1024x768 on the Brick; another size is scaled to it), drawn
+ * over the game with its transparency. Copied on from a computer, or sent
+ * with Over The Hare, whose Overlays folder is this one. */
+#define OVERLAYS_DIR "Overlays"
+#define OVERLAY_MAX  64
+
+static void overlay_dir(const app *a, int sys, char *out, size_t n)
+{
+	snprintf(out, n, "%s/%s/%s", P_CARD, OVERLAYS_DIR, a->sys.systems[sys].folder);
+}
+
+/* The overlays ChaOS ships (TortOS/overlays/<console folder>/, see
+ * res/overlays/SOURCE.md), put in the card's folder for that console once, so
+ * they sit with the player's own and can be deleted like them. Once per card
+ * and console: a deleted one is not put back, and a file of the same name
+ * already there is left as it is. */
+static void copy_file(const char *from, const char *to);
+
+static void overlay_seed(const app *a, int sys, const char *dest)
+{
+	char key[CFG_STR + 32], src[LIB_PATH * 2], from[LIB_PATH * 3], to[LIB_PATH * 3];
+	struct dirent *e;
+	DIR *dir;
+	int n = 0;
+
+	snprintf(key, sizeof key, "overlays.seeded.%s", a->sys.systems[sys].tag);
+	if (db_get_int(db_lib(), key, 0)) return;
+	snprintf(src, sizeof src, "%s/overlays/%s", P_ROOT, a->sys.systems[sys].folder);
+	if (!(dir = opendir(src))) return;
+	while ((e = readdir(dir))) {
+		if (e->d_name[0] == '.') continue;
+		snprintf(from, sizeof from, "%s/%s", src, e->d_name);
+		snprintf(to, sizeof to, "%s/%s", dest, e->d_name);
+		if (access(to, F_OK) == 0) continue;
+		copy_file(from, to);
+		n++;
+	}
+	closedir(dir);
+	db_set_int(db_lib(), key, 1);
+	if (n) fprintf(stderr, "overlays: %d put in %s\n", n, dest);
+}
+
+static void overlay_dirs_ensure(const app *a)
+{
+	char d[LIB_PATH * 2];
+	int i;
+
+	snprintf(d, sizeof d, "%s/%s", P_CARD, OVERLAYS_DIR);
+	mkdir(d, 0755);
 	for (i = 0; i < a->sys.count; i++) {
-		snprintf(key, sizeof key, "display.%s", a->sys.systems[i].tag);
-		if (!db_get_str(db_dev(), key, name, sizeof name, NULL)) continue;
-		for (k = 0; k < DMODE_COUNT; k++)
-			if (!strcmp(DMODES[k].name, name)) { a->view[i].dmode = k; break; }
+		if (!a->sys.systems[i].folder[0]) continue;
+		overlay_dir(a, i, d, sizeof d);
+		mkdir(d, 0755);
+		overlay_seed(a, i, d);
 	}
 }
 
-/* One row per visible system, and nothing else touched.
- *
- * The file this replaces was rewritten whole, so it had to read itself back
- * first and carry forward the modes of systems that are not on the shelf right
- * now. That was not tidiness: empty systems are hidden, so "every system" meant
- * "every system with games in it today", and a plain rewrite would quietly
- * erase the mode of any system whose ROMs happened to be off the card. Take
- * the ROMs out, change one unrelated setting, put them back, and the mode you
- * chose is gone with no sign it existed.
- *
- * A row write cannot touch another row, so that whole pass is gone rather than
- * ported. It is the clearest thing the database bought. */
-static void display_save(app *a)
+static int overlay_name_cmp(const void *x, const void *y)
 {
-	char key[CFG_STR + 16];
-	int i;
+	return strcasecmp((const char *)x, (const char *)y);
+}
 
-	for (i = 0; i < a->sys.count; i++) {
-		snprintf(key, sizeof key, "display.%s", a->sys.systems[i].tag);
-		db_set_str(db_dev(), key, DMODES[a->view[i].dmode].name);
+/* The PNGs in a console's folder, by name. Returns how many. */
+static int overlay_list(const app *a, int sys, char (*out)[256], int max)
+{
+	char d[LIB_PATH * 2];
+	struct dirent *e;
+	DIR *dir;
+	int n = 0;
+
+	overlay_dir(a, sys, d, sizeof d);
+	if (!(dir = opendir(d))) return 0;
+	while ((e = readdir(dir)) && n < max) {
+		const char *dot = strrchr(e->d_name, '.');
+
+		if (e->d_name[0] == '.' || !dot || strcasecmp(dot, ".png")) continue;
+		if (strlen(e->d_name) >= 256) continue;
+		snprintf(out[n++], 256, "%s", e->d_name);
 	}
+	closedir(dir);
+	qsort(out, (size_t)n, sizeof *out, overlay_name_cmp);
+	return n;
+}
+
+/* The console's overlay as its row says it: its name, or NULL for none - and
+ * for one whose file has gone from the card, which draws as none. */
+static const char *overlay_label(const app *a, int sys, char *buf, size_t n)
+{
+	const sysview *v = &a->view[sys];
+	char path[LIB_PATH * 3];
+
+	if (!v->overlay[0]) return NULL;
+	overlay_dir(a, sys, path, sizeof path);
+	snprintf(path + strlen(path), sizeof path - strlen(path), "/%s", v->overlay);
+	if (!file_nonempty(path)) return NULL;
+	look_overlay_label(v->overlay, buf, n);
+	return buf;
+}
+
+/* The next overlay, or the one before: None, then each PNG by name. */
+static void overlay_cycle(app *a, int sys, int d)
+{
+	static char names[OVERLAY_MAX][256];
+	sysview *v = &a->view[sys];
+	int n = overlay_list(a, sys, names, OVERLAY_MAX), at = -1, i;
+	char buf[8];
+
+	if (overlay_label(a, sys, buf, sizeof buf))
+		for (i = 0; i < n; i++)
+			if (!strcmp(names[i], v->overlay)) at = i;
+	/* -1 is None: n + 1 places in all. */
+	at = ((at + 1 + d) % (n + 1) + (n + 1)) % (n + 1) - 1;
+	if (at < 0) v->overlay[0] = '\0';
+	else        snprintf(v->overlay, sizeof v->overlay, "%s", names[at]);
+	look_save(a, sys);
+}
+
+/* The overlay as Diatom's SETBEZEL takes it: the screen's size, straight
+ * alpha, as bytes B, G, R, A after an 8-byte DTOV header. Written to /tmp,
+ * which is memory. Returns false for no overlay, or one that will not load. */
+static bool overlay_write_dtov(const app *a, int sys, const char *out)
+{
+	const sysview *v = &a->view[sys];
+	char path[LIB_PATH * 3];
+	SDL_Surface *raw, *conv = NULL, *fit = NULL;
+	unsigned char hdr[8] = { 'D', 'T', 'O', 'V',
+	                         TORTOS_SCREEN_W & 255, TORTOS_SCREEN_W >> 8,
+	                         TORTOS_SCREEN_H & 255, TORTOS_SCREEN_H >> 8 };
+	bool ok = false;
+	FILE *f;
+	int y;
+
+	if (!v->overlay[0]) return false;
+	overlay_dir(a, sys, path, sizeof path);
+	snprintf(path + strlen(path), sizeof path - strlen(path), "/%s", v->overlay);
+	if (!(raw = IMG_Load(path))) {
+		fprintf(stderr, "overlay: cannot load %s: %s\n", path, IMG_GetError());
+		return false;
+	}
+	conv = SDL_ConvertSurfaceFormat(raw, SDL_PIXELFORMAT_ARGB8888, 0);
+	SDL_FreeSurface(raw);
+	if (!conv) return false;
+	if (conv->w == TORTOS_SCREEN_W && conv->h == TORTOS_SCREEN_H) {
+		fit = conv;
+		conv = NULL;
+	} else {
+		fit = SDL_CreateRGBSurfaceWithFormat(0, TORTOS_SCREEN_W, TORTOS_SCREEN_H, 32,
+		                                     SDL_PIXELFORMAT_ARGB8888);
+		if (fit) {
+			SDL_SetSurfaceBlendMode(conv, SDL_BLENDMODE_NONE);
+			SDL_BlitScaled(conv, NULL, fit, NULL);
+			fprintf(stderr, "overlay: %s is %dx%d, scaled to %dx%d\n", v->overlay,
+			        conv->w, conv->h, TORTOS_SCREEN_W, TORTOS_SCREEN_H);
+		}
+	}
+	if (fit && (f = fopen(out, "wb"))) {
+		ok = fwrite(hdr, 1, sizeof hdr, f) == sizeof hdr;
+		SDL_LockSurface(fit);
+		/* ARGB8888 in a little-endian word is B, G, R, A in memory, which is
+		 * the order DTOV wants. */
+		for (y = 0; ok && y < fit->h; y++)
+			ok = fwrite((const uint8_t *)fit->pixels + (size_t)y * fit->pitch, 4,
+			            (size_t)fit->w, f) == (size_t)fit->w;
+		SDL_UnlockSurface(fit);
+		if (fclose(f) != 0) ok = false;
+	}
+	if (conv) SDL_FreeSurface(conv);
+	if (fit) SDL_FreeSurface(fit);
+	return ok;
+}
+
+#define LOOK_CFG_PATH  "/tmp/chaos-shader.cfg"
+#define LOOK_DTOV_PATH "/tmp/chaos-overlay.dtov"
+#define LOOK_SHADED_PATH "/tmp/chaos-shaded.bmp"
+
+/* What Diatom is told about a console's look: the shader file, or "" for no
+ * shader, and the overlay file, or "" for none. */
+static void look_files(const app *a, int sys, const char **cfg, const char **dtov)
+{
+	look_console c = look_console_of(a->sys.systems[sys].tag);
+
+	*cfg = c != LOOK_NONE && look_write_cfg(LOOK_CFG_PATH, c, &a->view[sys].look)
+	     ? LOOK_CFG_PATH : "";
+	*dtov = overlay_write_dtov(a, sys, LOOK_DTOV_PATH) ? LOOK_DTOV_PATH : "";
 }
 
 /* ---------- per-system sort order ----------------------------------------- */
@@ -885,12 +1086,6 @@ static int shelf_owner(app *a, int sysidx, int item)
  * every system reads stretch and all the answers agree. Named as a function
  * rather than repeated at each site so the next per-system setting has one
  * obvious thing to call. */
-static sysview *owner_view(app *a)
-{
-	sysview *v = &a->view[a->sys_cursor];
-
-	return &a->view[shelf_owner(a, a->sys_cursor, v->cursor)];
-}
 
 /* Where a game's box art lives.
  *
@@ -4691,7 +4886,15 @@ static int menu_build(app *a, screen_id screen, int sys,
 		u.muse       = is_muse(sc);
 		u.fav        = !u.muse && sc->core[0] == '\0' && sc->folder[0] == '\0';
 		u.game_count = a->view[sys].list.count;
-		u.dmode      = DMODES[a->view[sys].dmode].label;
+		/* ChaOS: the shader row only for a console with a shader made for
+		 * it, and the overlay by name. */
+		{
+			static char ovl[256];
+
+			u.shader  = look_console_of(sc->tag) == LOOK_NONE ? NULL
+			          : a->view[sys].look.on ? "On" : "Off";
+			u.overlay = u.fav || u.muse ? NULL : overlay_label(a, sys, ovl, sizeof ovl);
+		}
 		u.muse_books = u.muse && muse_books_shown();
 		u.muse_both  = u.muse && ml_count(&g_muse, true) && ml_count(&g_muse, false);
 		u.muse_playing = u.muse && lock_allowed();
@@ -4909,6 +5112,10 @@ typedef struct {
 	 * going anywhere, and the wait loop below it has to be told, or it goes
 	 * straight back to waiting on a game nobody is running. */
 	menu_result (*on_power)(app *a, void *ctx);
+	/* ChaOS: holding Y hides the panel, so the game behind an in-game menu
+	 * can be seen as it now looks. The backdrop leaves out its dimming
+	 * while Y is held too (gm_backdrop). */
+	bool     peek;
 } menu_style;
 
 /* SELECT: Muse, over whatever is on screen. Declared here, after menu_style,
@@ -5029,8 +5236,9 @@ static menu_exit menu_run_body(app *a, const menu_style *st,
 			SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
 			SDL_RenderFillRect(a->r, NULL);
 		}
-		menu_draw(a, heading, rows, n, sel, st->fixed_w,
-		          st->follow_tint ? a->tint : st->accent);
+		if (!(st->peek && a->in.down[IN_Y]))
+			menu_draw(a, heading, rows, n, sel, st->fixed_w,
+			          st->follow_tint ? a->tint : st->accent);
 		plat_draw_osd(a->r);
 		plat_present();
 		SDL_Delay(8);
@@ -6982,13 +7190,6 @@ static int menu_shelf_width(app *a)
 				if (mw > w) w = mw;
 			}
 		}
-		for (k = 0; !own && k < DMODE_COUNT; k++) {
-			int mw;
-			rows[SM_DISPLAY].value = DMODES[k].label;
-			mw = menu_measure(rows, n, heading);
-			if (mw > w) w = mw;
-		}
-		if (!own) rows[SM_DISPLAY].value = DMODES[0].label;
 		for (k = 0; k < (muse ? ML_ORDERS : SORT_COUNT); k++) {
 			int mw;
 			rows[srow].value = muse ? ml_order_label((ml_order)k, false) : SORTS[k].label;
@@ -7208,19 +7409,31 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 		 * moves Rescan Folder up one: which row is which comes from the same
 		 * list the build used. */
 		else if (!is_muse(&a->sys.systems[a->sys_cursor])) {
-			sys_ui dev = { .no_wifi = !plat_has_wifi() };
+			sys_ui dev = { .no_wifi = !plat_has_wifi(),
+			               .shader = look_console_of(a->sys.systems[a->sys_cursor].tag)
+			                         == LOOK_NONE ? NULL : "" };
 			sm_row ids[SM_ROWS];
 			int n = sys_menu_system_rows(&dev, ids);
 
 			sel = sel >= 0 && sel < n ? (int)ids[sel] : SM_ROWS;
 		}
-		/* Display mode, saved the moment it changes because there is no
+		/* ChaOS. Shader: left and right turn it on and off, A opens its
+		 * settings. Overlay: left, right and A go through None and the
+		 * console's PNGs. Both saved the moment they change, as there is no
 		 * confirm step to hang the write off. */
-		if (d && sel == SM_DISPLAY) {
+		if (sel == SM_SHADER) {
 			sysview *v = &a->view[a->sys_cursor];
 
-			v->dmode = (v->dmode + d + DMODE_COUNT) % DMODE_COUNT;
-			display_save(a);
+			if (d) {
+				v->look.on = !v->look.on;
+				look_save(a, a->sys_cursor);
+			} else if (key == IN_ACCEPT) {
+				shader_screen(a, a->sys_cursor, NULL);
+			}
+			return MENU_STAY;
+		}
+		if (sel == SM_OVERLAY) {
+			if (d || key == IN_ACCEPT) overlay_cycle(a, a->sys_cursor, d ? d : 1);
 			return MENU_STAY;
 		}
 		/* Sort order, on the same left/right idiom.
@@ -7702,29 +7915,23 @@ static int slot_strip(app *a, SDL_Texture *bg, int saving)
 	return done == 1 ? chosen : 0;
 }
 
-/* Change the mode, keep it, tell the running game, and take back the rect so
- * the backdrop behind the menu redraws where the game is about to be. */
-static void gm_cycle_display(app *a, int d)
-{
-	/* The OWNER's, so a mode chosen while playing a favorite is set for the
-	 * system that game belongs to - which is what a per-system mode means.
-	 * Set on the Favorites shelf it would have been filed under FAV and worn
-	 * by every game launched from there, whatever machine it came from. */
-	sysview *v = owner_view(a);
-
-	v->dmode = (v->dmode + d + DMODE_COUNT) % DMODE_COUNT;
-	display_save(a);
-	plat_resident_line("SETDISPLAY\tmode=%s", DMODES[v->dmode].name);
-	plat_resident_sync_rect(150);
-}
-
 /* What the in-game menu needs from the app, handed to gm_rows to become rows.
  * Same split as everywhere else. */
 static int gm_build(app *a, menu_row *out, gm_bufs *b)
 {
 	gm_ui u;
 
-	u.dmode  = DMODES[a->view[a->sys_cursor].dmode].label;
+	{
+		/* The OWNER's look, so a game played from Favorites is set for the
+		 * console it belongs to. */
+		static char ovl[256];
+		sysview *sv = &a->view[a->sys_cursor];
+		int o = shelf_owner(a, a->sys_cursor, sv->cursor);
+
+		u.shader  = look_console_of(a->sys.systems[o].tag) == LOOK_NONE ? NULL
+		          : a->view[o].look.on ? "On" : "Off";
+		u.overlay = overlay_label(a, o, ovl, sizeof ovl);
+	}
 	u.earned = chv_earned();
 	u.total  = chv_count();
 	return gm_rows(&u, out, b);
@@ -9493,22 +9700,11 @@ static void cheevos_screen(app *a, SDL_Texture *bg, bool over_shelf)
 	memset(&a->in, 0, sizeof a->in);
 }
 
-/* Measured across every mode label, so cycling the row does not resize the
- * panel under the cursor - the same reason the shelf menus have a fixed width. */
+/* The standard width, so the panel does not resize as the Overlay row goes
+ * through names, or on the way into the shader's settings, which use it too. */
 static int gm_width(app *a)
 {
-	menu_row rows[GM_ROWS];
-	gm_bufs b;
-	int w = 0, k;
-
-	gm_build(a, rows, &b);
-	for (k = 0; k < DMODE_COUNT; k++) {
-		int mw;
-		rows[GM_DISPLAY].value = DMODES[k].label;
-		mw = menu_measure(rows, GM_ROWS, NULL);
-		if (mw > w) w = mw;
-	}
-	return w;
+	return menu_std_width(a);
 }
 
 /* The in-game menu's context. `resume` is what the epilogue turns on: whether
@@ -9516,10 +9712,74 @@ static int gm_width(app *a)
 typedef struct {
 	app         *a;
 	SDL_Texture *bg;       /* the paused frame, as Diatom last wrote it */
+	SDL_Texture *ov;       /* ChaOS: the overlay, drawn over it, or NULL */
 	gm_bufs      bufs;
 	menu_style   st;
 	bool         resume;
 } gm_ctx;
+
+/* The console whose game is paused: the owner, for one played from
+ * Favorites. */
+static int gm_owner(app *a)
+{
+	sysview *sv = &a->view[a->sys_cursor];
+	return shelf_owner(a, a->sys_cursor, sv->cursor);
+}
+
+/* The paused frame again: shaded when Diatom drew one, plain when not. */
+static void gm_load_bg(gm_ctx *c)
+{
+	const char *pv = plat_resident_last_shaded();
+	SDL_Surface *sf;
+
+	if (!pv) pv = plat_resident_last_preview();
+	if (!pv || !*pv || !(sf = IMG_Load(pv))) return;
+	if (c->bg) SDL_DestroyTexture(c->bg);
+	c->bg = SDL_CreateTextureFromSurface(c->a->r, sf);
+	SDL_FreeSurface(sf);
+}
+
+/* The overlay, from its PNG, for the backdrop: what the game will be under. */
+static void gm_load_overlay(gm_ctx *c)
+{
+	app *a = c->a;
+	int o = gm_owner(a);
+	char path[LIB_PATH * 3], buf[8];
+	SDL_Surface *sf;
+
+	if (c->ov) { SDL_DestroyTexture(c->ov); c->ov = NULL; }
+	if (!overlay_label(a, o, buf, sizeof buf)) return;
+	overlay_dir(a, o, path, sizeof path);
+	snprintf(path + strlen(path), sizeof path - strlen(path), "/%s", a->view[o].overlay);
+	if (!(sf = IMG_Load(path))) return;
+	c->ov = SDL_CreateTextureFromSurface(a->r, sf);
+	SDL_FreeSurface(sf);
+	if (c->ov) SDL_SetTextureBlendMode(c->ov, SDL_BLENDMODE_BLEND);
+}
+
+/* The console's shader settings, to the paused game at once: Diatom draws the
+ * paused frame with them, and that becomes the backdrop. */
+static void gm_apply_shader(gm_ctx *c)
+{
+	app *a = c->a;
+	int o = gm_owner(a);
+	look_console lc = look_console_of(a->sys.systems[o].tag);
+
+	if (lc == LOOK_NONE) return;
+	if (!look_write_cfg(LOOK_CFG_PATH, lc, &a->view[o].look)) return;
+	plat_resident_line("SETSHADER\tpath=%s\tpreview=%s", LOOK_CFG_PATH, LOOK_SHADED_PATH);
+	if (plat_resident_sync_shaded(2000)) gm_load_bg(c);
+}
+
+/* And the overlay: to Diatom for when the game goes on, and to the backdrop. */
+static void gm_apply_overlay(gm_ctx *c)
+{
+	app *a = c->a;
+
+	plat_resident_line("SETBEZEL\tpath=%s",
+	                   overlay_write_dtov(a, gm_owner(a), LOOK_DTOV_PATH) ? LOOK_DTOV_PATH : "");
+	gm_load_overlay(c);
+}
 
 static int gm_menu_build(void *ctx, menu_row *rows, int max,
                          const char **heading)
@@ -9540,7 +9800,10 @@ static void gm_backdrop(app *a, void *ctx)
 	SDL_SetRenderDrawColor(a->r, 0, 0, 0, 255);
 	SDL_RenderClear(a->r);
 	draw_paused_frame(a, c->bg);
+	if (c->ov) SDL_RenderCopy(a->r, c->ov, NULL, NULL);
 	SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+	/* Y held: the game as it will look, undimmed (menu_style.peek). */
+	if (a->in.down[IN_Y]) return;
 	SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
 	SDL_RenderFillRect(a->r, NULL);
 	/* The low-battery disc, as on the shelf: this menu is drawn by this
@@ -9564,13 +9827,21 @@ static menu_result gm_key(app *a, void *ctx, in_button key, int sel)
 {
 	gm_ctx *c = ctx;
 
-	/* Applied to the running game at once, not on resume: the whole point of
-	 * this row being here rather than on the shelf is judging the mode against
-	 * the game it is being applied to. Diatom takes SETDISPLAY while paused,
-	 * answers with the new rect, and the backdrop behind this menu redraws
-	 * into it. */
-	if (sel == GM_DISPLAY && (key == IN_LEFT || key == IN_RIGHT)) {
-		gm_cycle_display(a, key == IN_RIGHT ? 1 : -1);
+	/* ChaOS. Applied to the paused game at once, not on resume: the point
+	 * of these rows being here is judging them against the game. Left and
+	 * right turn the shader on and off; A opens its settings. The overlay
+	 * goes round on left, right and A. */
+	if (sel == GM_SHADER && (key == IN_LEFT || key == IN_RIGHT)) {
+		int o = gm_owner(a);
+
+		a->view[o].look.on = !a->view[o].look.on;
+		look_save(a, o);
+		gm_apply_shader(c);
+		return MENU_STAY;
+	}
+	if (sel == GM_OVERLAY && (key == IN_LEFT || key == IN_RIGHT || key == IN_ACCEPT)) {
+		overlay_cycle(a, gm_owner(a), key == IN_LEFT ? -1 : 1);
+		gm_apply_overlay(c);
 		return MENU_STAY;
 	}
 	if (key != IN_ACCEPT) return MENU_STAY;
@@ -9609,11 +9880,8 @@ static menu_result gm_key(app *a, void *ctx, in_button key, int sel)
 		memset(&a->in, 0, sizeof a->in);
 		break;
 	}
-	/* A cycles it forward as well as left and right. Every other row in this
-	 * menu is something A does, so a row that only answered to left and right
-	 * was a row that looked broken. */
-	case GM_DISPLAY:
-		gm_cycle_display(a, +1);
+	case GM_SHADER:
+		shader_screen(a, gm_owner(a), c);
 		break;
 	case GM_CHEEVOS:
 		cheevos_screen(a, c->bg, false);
@@ -9639,23 +9907,193 @@ static menu_result gm_key(app *a, void *ctx, in_button key, int sel)
 	return MENU_STAY;
 }
 
+/* ---- ChaOS: a console's shader settings -----------------------------------
+ *
+ * The shader's own page: the switch, which shader it is (only the ones made
+ * for this console are listed, and for now that is one), Game System, then a
+ * row for each group of settings, which opens that group's page, and Reset.
+ * A group's page has only the rows that matter with the settings as they are:
+ * no grid rows with LCD Dot chosen, nothing about glare with it off.
+ *
+ * Left and right change a value; held, a number speeds up. A on a choice
+ * moves it on, as on every other menu. From the in-game menu each change is
+ * applied to the paused game at once and shown behind the panel, and holding
+ * Y hides the panel to see it. Saved per console as it changes. */
+enum { SH_SWITCH, SH_NAME, SH_SYSTEM, SH_GROUP, SH_RESET = SH_GROUP + LG_COUNT, SH_NONE };
+
+typedef struct {
+	app        *a;
+	int         sys;
+	gm_ctx     *game;          /* NULL from the shelf */
+	int         group;         /* -1: the shader's page */
+	int         ids[MENU_RUN_ROWS];   /* per built row: SH_* or a look_param */
+	char        vals[MENU_RUN_ROWS][32];
+	char        heading[96];
+	menu_style  st;
+	/* Held left or right: how long, to speed a number up. */
+	int         run, last_sel;
+	in_button   last_key;
+	Uint32      last_ms;
+} shader_ctx;
+
+static int shader_build(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	shader_ctx *c = ctx;
+	look_settings *ls = &c->a->view[c->sys].look;
+	int n = 0, g;
+
+	(void)max;
+	*heading = c->heading;
+	if (c->group < 0) {
+		snprintf(c->heading, sizeof c->heading, "%s Shader", c->a->sys.systems[c->sys].name);
+		c->ids[n] = SH_SWITCH;
+		rows[n++] = (menu_row){ "Shader", ls->on ? "On" : "Off", true };
+		if (ls->on) {
+			c->ids[n] = SH_NAME;
+			rows[n++] = (menu_row){ "Style", "PT SkyWalker541", false };
+			c->ids[n] = SH_SYSTEM;
+			look_format(ls, LP_GAME_SYSTEM, c->vals[n], sizeof c->vals[n]);
+			rows[n] = (menu_row){ "Game System", c->vals[n], true };
+			n++;
+			c->ids[n] = SH_NONE; rows[n++] = MENU_RULE;
+			for (g = 0; g < LG_COUNT; g++) {
+				static const look_param SUMMARY[LG_COUNT] = {
+					LP_BACKING_COLOR, LP_PIXEL_EFFECT, LP_SHADOW_OPACITY, LP_GLARE_AND_SHEEN
+				};
+				c->ids[n] = SH_GROUP + g;
+				look_format(ls, SUMMARY[g], c->vals[n], sizeof c->vals[n]);
+				rows[n] = (menu_row){ look_group_label((look_group)g), c->vals[n], true };
+				n++;
+			}
+			c->ids[n] = SH_NONE; rows[n++] = MENU_RULE;
+			c->ids[n] = SH_RESET;
+			rows[n++] = (menu_row){ "Reset to Recommended", NULL, true };
+		}
+	} else {
+		look_param ps[LP_COUNT];
+		int k, np = look_group_rows(ls, (look_group)c->group, ps);
+
+		snprintf(c->heading, sizeof c->heading, "%s", look_group_label((look_group)c->group));
+		for (k = 0; k < np; k++) {
+			c->ids[n] = SH_NONE + 1 + (int)ps[k];
+			look_format(ls, ps[k], c->vals[n], sizeof c->vals[n]);
+			rows[n] = (menu_row){ look_params[ps[k]].label, c->vals[n], true };
+			n++;
+		}
+	}
+	if (c->game) {
+		c->ids[n] = SH_NONE;
+		rows[n++] = MENU_NOTE("Hold Y to see the game");
+	}
+	return n;
+}
+
+/* Kept, and in a game shown at once. */
+static void shader_changed(shader_ctx *c)
+{
+	look_save(c->a, c->sys);
+	if (c->game) gm_apply_shader(c->game);
+}
+
+static void shader_backdrop(app *a, void *ctx)
+{
+	shader_ctx *c = ctx;
+	gm_backdrop(a, c->game);
+}
+
+static menu_result shader_key(app *a, void *ctx, in_button key, int sel)
+{
+	shader_ctx *c = ctx;
+	look_settings *ls = &a->view[c->sys].look;
+	int d = key == IN_RIGHT ? 1 : key == IN_LEFT ? -1 : 0;
+	int id = sel >= 0 && sel < MENU_RUN_ROWS ? c->ids[sel] : SH_NONE;
+
+	if (id == SH_SWITCH && (d || key == IN_ACCEPT)) {
+		ls->on = !ls->on;
+		shader_changed(c);
+	} else if (id == SH_SYSTEM && (d || key == IN_ACCEPT)) {
+		if (look_step(ls, LP_GAME_SYSTEM, d ? d : 1, 1)) shader_changed(c);
+	} else if (id >= SH_GROUP && id < SH_GROUP + LG_COUNT && key == IN_ACCEPT) {
+		c->group = id - SH_GROUP;
+		menu_run(a, &c->st, shader_build, shader_key, c);
+		c->group = -1;
+	} else if (id == SH_RESET && key == IN_ACCEPT) {
+		look_recommended(look_console_of(a->sys.systems[c->sys].tag), ls);
+		shader_changed(c);
+	} else if (id > SH_NONE && (d || key == IN_ACCEPT)) {
+		look_param p = (look_param)(id - SH_NONE - 1);
+		Uint32 now = SDL_GetTicks();
+		int mult;
+
+		/* Held: a step at a time for the first few, then five, then ten,
+		 * so a 0-100% setting crosses in about two seconds. A pause or
+		 * another row starts again from one. */
+		if (d && sel == c->last_sel && key == c->last_key && now - c->last_ms < 300)
+			c->run++;
+		else
+			c->run = 0;
+		c->last_sel = sel;
+		c->last_key = key;
+		c->last_ms = now;
+		mult = c->run >= 20 ? 10 : c->run >= 8 ? 5 : 1;
+		if (look_step(ls, p, d ? d : 1, d ? mult : 1)) shader_changed(c);
+	}
+	return MENU_STAY;
+}
+
+static void shader_screen(app *a, int sys, void *game)
+{
+	shader_ctx *c = calloc(1, sizeof *c);
+
+	if (!c) return;
+	c->a = a;
+	c->sys = sys;
+	c->game = game;
+	c->group = -1;
+	c->last_sel = -1;
+	c->last_key = IN_NONE;
+	if (c->game) {
+		c->st = c->game->st;           /* its width, tint, power rule and peek */
+		c->st.backdrop = shader_backdrop;
+	} else {
+		c->st.fixed_w = menu_shelf_width(a);
+		c->st.follow_tint = true;
+	}
+	menu_run(a, &c->st, shader_build, shader_key, c);
+	free(c);
+}
+
+/* For a shot: one frame of the shader's page (group -1) or a group's, over
+ * the shelf, with row `sel` selected. */
+static void shader_shot(app *a, int group, int sel)
+{
+	shader_ctx c;
+	menu_row rows[MENU_RUN_ROWS];
+	const char *heading;
+	int n;
+
+	memset(&c, 0, sizeof c);
+	c.a = a;
+	c.sys = a->sys_cursor;
+	c.group = group;
+	n = shader_build(&c, rows, MENU_RUN_ROWS, &heading);
+	SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+	SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
+	SDL_RenderFillRect(a->r, NULL);
+	menu_draw(a, heading, rows, n, sel, menu_shelf_width(a), a->tint);
+}
+
 static void game_menu(app *a)
 {
 	gm_ctx c = { 0 };
-	const char *pv = plat_resident_last_preview();
 
 	c.a = a;
-	if (pv && *pv) {
-		SDL_Surface *sf = IMG_Load(pv);
-
-		if (sf) {
-			c.bg = SDL_CreateTextureFromSurface(a->r, sf);
-			SDL_FreeSurface(sf);
-		}
-	}
-	/* Measured across every mode label, so cycling Display does not resize
-	 * the panel underneath the cursor. */
+	/* The frame as the shader drew it, when it did: what the player was
+	 * looking at. And the overlay over it. */
+	gm_load_bg(&c);
+	gm_load_overlay(&c);
 	c.st.fixed_w     = gm_width(a);
+	c.st.peek        = true;
 	c.st.follow_tint = true;
 	c.st.backdrop    = gm_backdrop;
 	c.st.on_power    = gm_power;
@@ -9671,6 +10109,7 @@ static void game_menu(app *a)
 	g_menu_closing = false;
 
 	if (c.bg) SDL_DestroyTexture(c.bg);
+	if (c.ov) SDL_DestroyTexture(c.ov);
 
 	/* Asked to quit with the menu open. Leaving here without saying anything
 	 * strands the game: it is paused, waiting on this socket, and the wait
@@ -9932,6 +10371,13 @@ static void launch(app *a)
 		 * the in-game menu, which is drawn HERE now, over the frame the
 		 * emulator hands us on the way into its pause. */
 		aout_before_launch();
+		/* ChaOS: the console's shader and overlay go with the RUN. */
+		{
+			const char *lcfg, *ldtov;
+
+			look_files(a, o, &lcfg, &ldtov);
+			plat_resident_set_look(lcfg, ldtov);
+		}
 		if (plat_resident_send(s->tag, core, rom, st, st, pv,
 		                       console, active[0] ? active : NULL)) {
 			int r;
@@ -9948,13 +10394,6 @@ static void launch(app *a)
 			 * several. See stats.h. */
 			stats_begin(s->tag, romfile, plat_now_ms());
 
-			/* Straight after RUN and the levels, and for the same reason: the
-			 * mode is Diatom's own global and survives from the last game, so
-			 * a system that has never been set would otherwise inherit
-			 * whatever the previous one chose. Ordered on the same socket, so
-			 * it lands before the first frame. */
-			plat_resident_line("SETDISPLAY\tmode=%s",
-			                   DMODES[a->view[o].dmode].name);
 
 			/* Auto Off. Out here rather than inside the chv_load branch
 			 * above, which is where the first version put it and is the same
@@ -10091,7 +10530,7 @@ static void launch(app *a)
 		argv[n++] = (char *)"--save";            argv[n++] = save;
 		argv[n++] = (char *)"--system";          argv[n++] = bios;
 		argv[n++] = (char *)"--display";
-		argv[n++] = (char *)DMODES[a->view[o].dmode].name;
+		argv[n++] = (char *)"integer";   /* ChaOS: whole-number scale only */
 		/* The channels too: this path is rare, but a player who hears with
 		 * one ear should not lose half a game to it. It plays on the codec,
 		 * so the cable decides between headphones and the speaker. */
@@ -11335,7 +11774,7 @@ static void rescan_all(app *a)
 	}
 
 	scan_all(a);
-	display_load(a);     /* indexes by tag, so it is safe to run again */
+	look_load(a);        /* indexes by tag, so it is safe to run again */
 	sort_load(a);
 	sort_all(a);
 
@@ -11369,6 +11808,8 @@ static void rescan_all(app *a)
 static const char *shot_path;
 static int shot_screen = -1;
 static int shot_menu, shot_menu_sel;
+/* --shader [group [row]]: the shader's page, -1, or a group's (ChaOS). */
+static int shot_shader = -2, shot_shader_sel;
 static int shot_kb, shot_kb_layer;
 static const char *shot_notice;
 static const char *shot_notice_head = "Unlocked  -  5 points";
@@ -11528,6 +11969,7 @@ static void take_shot(app *a)
 	muse_covers_settle();
 	draw_shelf(a);
 	if (shot_menu) tortos_menu_draw(a, shot_menu_sel);
+	if (shot_shader > -2) shader_shot(a, shot_shader, shot_shader_sel);
 	if (shot_slots) shot_draw_slots(a);
 	if (shot_kb) kb_preview(a->r, shot_kb_title, shot_kb_text,
 	                        shot_kb_layer, 1, 0, MENU_ACCENT);
@@ -11741,6 +12183,14 @@ int main(int argc, char *argv[])
 				shot_np_at = (float)atof(argv[++i]);
 		}
 		else if (!strcmp(argv[i], "--paused")) shot_np_paused = 1;
+		else if (!strcmp(argv[i], "--shader")) {
+			shot_shader = -1;
+			if (i + 1 < argc && (argv[i + 1][0] == '-' ? argv[i + 1][1] >= '0' && argv[i + 1][1] <= '9'
+			                                          : argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9'))
+				shot_shader = atoi(argv[++i]);
+			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9')
+				shot_shader_sel = atoi(argv[++i]);
+		}
 		else if (!strcmp(argv[i], "--mode") && i + 1 < argc) shot_mode = argv[++i];
 		else if (!strcmp(argv[i], "--sysmove") && i + 1 < argc)
 			shot_sysmove = (float)atof(argv[++i]);
@@ -12103,6 +12553,9 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	/* ChaOS: somewhere to put overlays, one folder per console. */
+	overlay_dirs_ensure(&a);
+
 	/* Before the scan, because the scan builds the Favorites shelf out of
 	 * them and a shelf cannot be built from a list that has not been read. */
 	fav_load();
@@ -12160,7 +12613,7 @@ int main(int argc, char *argv[])
 	t_mark("library scan");
 	/* After the scan, because it indexes by system, and before anything can
 	 * launch, because the mode has to reach Diatom with the first RUN. */
-	display_load(&a);
+	look_load(&a);
 	sort_load(&a);
 	sort_all(&a);
 	t_mark("scan");
