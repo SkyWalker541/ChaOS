@@ -9718,6 +9718,27 @@ typedef struct {
 	bool         resume;
 } gm_ctx;
 
+/* The overlay as Diatom draws it: around the game's picture, never over it
+ * (port/brick.c, bezel_over). Four strips, each from the same part of the
+ * overlay, scaled as the whole overlay is to the screen. */
+static void draw_overlay_around(app *a, SDL_Texture *ov)
+{
+	SDL_Rect g, d[4];
+	int tw, th, i;
+
+	if (!plat_resident_rect(&g)) { SDL_RenderCopy(a->r, ov, NULL, NULL); return; }
+	SDL_QueryTexture(ov, NULL, NULL, &tw, &th);
+	d[0] = (SDL_Rect){ 0, 0, TORTOS_SCREEN_W, g.y };
+	d[1] = (SDL_Rect){ 0, g.y + g.h, TORTOS_SCREEN_W, TORTOS_SCREEN_H - g.y - g.h };
+	d[2] = (SDL_Rect){ 0, g.y, g.x, g.h };
+	d[3] = (SDL_Rect){ g.x + g.w, g.y, TORTOS_SCREEN_W - g.x - g.w, g.h };
+	for (i = 0; i < 4; i++) {
+		SDL_Rect sr = { d[i].x * tw / TORTOS_SCREEN_W, d[i].y * th / TORTOS_SCREEN_H,
+		                d[i].w * tw / TORTOS_SCREEN_W, d[i].h * th / TORTOS_SCREEN_H };
+		if (d[i].w > 0 && d[i].h > 0) SDL_RenderCopy(a->r, ov, &sr, &d[i]);
+	}
+}
+
 /* The console whose game is paused: the owner, for one played from
  * Favorites. */
 static int gm_owner(app *a)
@@ -9800,7 +9821,7 @@ static void gm_backdrop(app *a, void *ctx)
 	SDL_SetRenderDrawColor(a->r, 0, 0, 0, 255);
 	SDL_RenderClear(a->r);
 	draw_paused_frame(a, c->bg);
-	if (c->ov) SDL_RenderCopy(a->r, c->ov, NULL, NULL);
+	if (c->ov) draw_overlay_around(a, c->ov);
 	SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
 	/* Y held: the game as it will look, undimmed (menu_style.peek). */
 	if (a->in.down[IN_Y]) return;
