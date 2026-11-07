@@ -64,7 +64,7 @@ check-cheevos: build-native/cheevos-check
 build-native/cheevos-check: tools/cheevos-check.c src/cheevos.c src/cheevos.h \
                             src/atomic.c src/atomic.h src/db.c src/db.h FORCE
 	@mkdir -p build-native
-	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g \
+	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g \
 	      -o $@ tools/cheevos-check.c src/cheevos.c src/atomic.c src/db.c -lsqlite3
 
 # Hare's routes: is anything reachable without the PIN? check-xfer proves a
@@ -115,7 +115,7 @@ check-audioout: build-native/audioout-check
 build-native/audioout-check: tools/audioout-check.c src/audioout.c \
                             src/audioout.h FORCE
 	@mkdir -p build-native
-	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g \
+	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g \
 	      -o $@ tools/audioout-check.c src/audioout.c
 
 # What MENU > Controls says: every button on exactly one page, and rows short
@@ -127,7 +127,7 @@ check-controls: build-native/controls-check
 build-native/controls-check: tools/controls-check.c src/controls.c \
                             src/controls.h src/menu.h FORCE
 	@mkdir -p build-native
-	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g \
+	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g \
 	      -o $@ tools/controls-check.c src/controls.c
 
 build-native/menu-check: tools/menu-check.c src/wifi_menu.c src/wifi.c \
@@ -136,13 +136,13 @@ build-native/menu-check: tools/menu-check.c src/wifi_menu.c src/wifi.c \
                         src/game_menu.h src/menu.h src/audioout.h \
                         src/look.c src/look.h FORCE
 	@mkdir -p build-native
-	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g -o $@ \
+	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g -o $@ \
 	      tools/menu-check.c src/wifi_menu.c src/wifi.c src/sys_menu.c \
 	      src/menu.c src/game_menu.c src/audioout.c src/look.c -lm
 
 build-native/xfer-check: tools/xfer-check.c src/xfer.c src/xfer.h FORCE
 	@mkdir -p build-native
-	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g \
+	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g \
 	      -o $@ tools/xfer-check.c src/xfer.c
 
 # Auto Off's clock. It has broken five times, once in this arithmetic and four
@@ -153,7 +153,7 @@ check-idle: build-native/idle-check
 
 build-native/idle-check: tools/idle-check.c src/idle.c src/idle.h FORCE
 	@mkdir -p build-native
-	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g \
+	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g \
 	      -o $@ tools/idle-check.c src/idle.c
 
 # Date & Time: each row moving only itself, the 12-hour words, and the zone
@@ -163,7 +163,7 @@ check-clock: build-native/clock-check
 
 build-native/clock-check: tools/clock-check.c src/clock.c src/clock.h FORCE
 	@mkdir -p build-native
-	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g \
+	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g \
 	      -o $@ tools/clock-check.c src/clock.c
 
 # The device's title matcher against the host tool's. A drift here does not
@@ -174,7 +174,7 @@ check-artscrape: build-native/artscrape-check
 
 build-native/artscrape-check: tools/artscrape-check.c src/artscrape.c src/artscrape.h src/urlenc.c
 	@mkdir -p build-native
-	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g -Isrc \
+	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g -Isrc \
 	      -DTORTOS_VERSION='"check"' \
 	      -o $@ tools/artscrape-check.c src/artscrape.c src/net.c src/urlenc.c
 
@@ -186,7 +186,7 @@ check-artrun: build-native/artrun-check
 
 build-native/artrun-check: tools/artrun-check.c src/artscrape.c src/artscrape.h src/urlenc.c FORCE
 	@mkdir -p build-native
-	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g -Isrc -DSS_BUSY_WAIT=0 -DART_QUIET \
+	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g -Isrc -DSS_BUSY_WAIT=0 -DART_QUIET \
 	      -o $@ tools/artrun-check.c src/artscrape.c src/urlenc.c
 
 # The two hashers - one C for the device, one Python for the host tools - over
@@ -197,7 +197,7 @@ check-rahash: build-native/rahash-check
 
 build-native/rahash-check: tools/rahash-check.c src/rahash.c src/rahash.h FORCE
 	@mkdir -p build-native
-	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g \
+	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g \
 	      -o $@ tools/rahash-check.c src/rahash.c -lz
 
 # The two set converters - one C on the device, one Python in the bulk tool -
@@ -208,7 +208,7 @@ check-raset: build-native/raset-check
 
 build-native/raset-check: tools/raset-check.c src/rafetch.c src/rajson.c src/rahash.c src/net.c src/atomic.c src/db.c FORCE
 	@mkdir -p build-native
-	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g -DTORTOS_VERSION='"check"' \
+	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g -DTORTOS_VERSION='"check"' \
 	      -o $@ tools/raset-check.c src/rafetch.c src/rajson.c src/rahash.c src/net.c src/atomic.c src/db.c -lsqlite3 -lz
 
 # Whether this build can reach ScreenScraper, and whether an account survives
@@ -220,7 +220,7 @@ check-ss: build-native/ss-check
 build-native/ss-check: tools/ss-check.c src/ss.c src/ss.h src/ssfetch.c src/ssfetch.h src/db.c src/net.c src/urlenc.c src/rajson.c FORCE
 	@mkdir -p build-native
 	@$(MAKE) -f mk/native.mk creds
-	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g -Ibuild-native \
+	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g -Ibuild-native \
 	      -DTORTOS_VERSION='"check"' \
 	      -o $@ tools/ss-check.c src/ss.c src/ssfetch.c src/db.c src/net.c src/urlenc.c src/rajson.c -lsqlite3
 
@@ -256,7 +256,7 @@ check-db: build-native/db-check
 
 build-native/db-check: tools/db-check.c src/db.c src/db.h src/atomic.c FORCE
 	@mkdir -p build-native
-	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g \
+	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g \
 	      -o $@ tools/db-check.c src/db.c src/atomic.c -lsqlite3
 
 # Play time. The assertion that earns this its place is that a LAUNCH writes
@@ -267,7 +267,7 @@ check-stats: build-native/stats-check
 
 build-native/stats-check: tools/stats-check.c src/stats.c src/stats.h src/db.c src/atomic.c FORCE
 	@mkdir -p build-native
-	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g \
+	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g \
 	      -o $@ tools/stats-check.c src/stats.c src/db.c src/atomic.c -lsqlite3
 
 # What order a shelf ends up in. Two of the four orders read the session rows,
@@ -279,7 +279,7 @@ check-sort: build-native/sort-check
 build-native/sort-check: tools/sort-check.c src/sort.h src/library.h src/stats.c \
                          src/stats.h src/db.c src/atomic.c FORCE
 	@mkdir -p build-native
-	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g \
+	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g \
 	      -o $@ tools/sort-check.c src/stats.c src/db.c src/atomic.c -lsqlite3
 
 # Bluetooth. A device NAME is arbitrary bytes chosen by whoever owns the
@@ -291,7 +291,7 @@ check-bt: build-native/bt-check
 
 build-native/bt-check: tools/bt-check.c src/bt.c src/bt.h src/bt_menu.c src/bt_menu.h FORCE
 	@mkdir -p build-native
-	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g \
+	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g \
 	      -o $@ tools/bt-check.c src/bt.c src/bt_menu.c
 
 # Muse's view of the Music folder: the two shapes it reads, the litter a Mac
@@ -301,7 +301,7 @@ check-muselib: build-native/muselib-check
 
 build-native/muselib-check: tools/muselib-check.c src/muselib.c src/muselib.h FORCE
 	@mkdir -p build-native
-	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g \
+	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g \
 	      -o $@ tools/muselib-check.c src/muselib.c
 
 # The logs pack: names and Bluetooth addresses masked, and a whole pack
@@ -311,7 +311,7 @@ check-logpack: build-native/logpack-check
 
 build-native/logpack-check: tools/logpack-check.c src/logpack.c src/logpack.h FORCE
 	@mkdir -p build-native
-	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g \
+	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g \
 	      -o $@ tools/logpack-check.c src/logpack.c
 
 # The play modes: the last track, the first, a shuffle running out, a track
@@ -321,7 +321,7 @@ check-musequeue: build-native/musequeue-check
 
 build-native/musequeue-check: tools/musequeue-check.c src/musequeue.c src/musequeue.h FORCE
 	@mkdir -p build-native
-	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g \
+	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g \
 	      -o $@ tools/musequeue-check.c src/musequeue.c
 
 # Album covers from MusicBrainz: the rule that picks the record, against what
@@ -332,7 +332,7 @@ check-museart: build-native/museart-check
 build-native/museart-check: tools/museart-check.c src/museart.c src/museart.h \
                             src/urlenc.c src/rajson.c tools/fixtures/musicbrainz/*.json FORCE
 	@mkdir -p build-native
-	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g \
+	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g \
 	      -o $@ tools/museart-check.c src/museart.c src/urlenc.c src/rajson.c
 
 # src/main.c hand-keeps a copy of the mark that C cannot import from

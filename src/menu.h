@@ -14,6 +14,10 @@ typedef struct {
 	const char *label;
 	const char *value;  /* the right column, or NULL for a row that is only a label */
 	bool live;          /* false: a placeholder, drawn quiet and doing nothing */
+	/* ChaOS: A on this row opens another screen, a submenu or a picker, and
+	 * the row says so with a chevron at its right. Last, so every existing
+	 * { label, value, live } initializer stays valid and false. */
+	bool opens;
 } menu_row;
 
 /* A row that is only a rule, separating a list from a footer that is not part

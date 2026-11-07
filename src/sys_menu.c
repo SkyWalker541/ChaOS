@@ -118,7 +118,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 		full[SM_CORE]    = (menu_row){ "Core",          b->b,        false };
 		full[SM_SORT]    = (menu_row){ "Sort By",
 		                              u->sort ? u->sort : "Name", true  };
-		full[SM_SHADER]  = (menu_row){ "Shader",        u->shader,   true  };
+		full[SM_SHADER]  = (menu_row){ "Shader",        u->shader,   true, true };
 		full[SM_OVERLAY] = (menu_row){ "Overlay",
 		                              u->overlay ? u->overlay : "None", true };
 		/* Button Mapping is out until there is something behind it. Diatom
@@ -138,7 +138,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 		/* Just this system. Needs the network like its counterpart in the
 		 * TortOS menu, and says so rather than opening a screen that can only
 		 * report the same thing. */
-		full[SM_BOXART]  = (menu_row){ "Box Art",       NEEDS_WIFI(net), net };
+		full[SM_BOXART]  = (menu_row){ "Box Art",       NEEDS_WIFI(net), net, true };
 		/* Live now that there is something behind it. It rescans the whole
 		 * card rather than this one folder - the work is three directory reads
 		 * and the shared parts (hiding a system that emptied, rebuilding
@@ -236,6 +236,11 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	 * is which button opens Muse. See src/controls.h. */
 	full[PM_CONTROLS]     = (menu_row){ "Controls",    NULL,   true  };
 	full[PM_ABOUT]        = (menu_row){ "About ChaOS", NULL,   true  };
+	/* ChaOS: the rows A opens a screen from, marked so */
+	full[PM_STATS].opens = full[PM_WIFI].opens = full[PM_BT].opens = true;
+	full[PM_XFER].opens = full[PM_CLOCK].opens = full[PM_SCRAPE].opens = true;
+	full[PM_ACHIEVEMENTS].opens = full[PM_SS].opens = true;
+	full[PM_CONTROLS].opens = full[PM_ABOUT].opens = true;
 	{
 		pm_row ids[PM_ROWS];
 		int k, n = sys_menu_tortos_rows(u, ids);

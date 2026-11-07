@@ -9,7 +9,7 @@ CC ?= aarch64-linux-gnu-gcc
 
 VERSION ?= 0.0
 CHAOS_VERSION ?= $(shell cat CHAOS_VERSION 2>/dev/null || echo 0.0)
-CFLAGS := -DTORTOS_VERSION='"$(VERSION)"' -DCHAOS_VERSION='"$(CHAOS_VERSION)"' -O2 -mcpu=cortex-a53 -Wall -Wextra -Wno-unused-parameter -std=gnu11 \
+CFLAGS := -DTORTOS_VERSION='"$(VERSION)"' -DCHAOS_VERSION='"$(CHAOS_VERSION)"' -O2 -mcpu=cortex-a53 -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -std=gnu11 \
           -I$(SYSROOT)/usr/include/SDL2 -D_GNU_SOURCE
 # No undefined symbols allowed, in this code or in the libraries it links:
 # SYSROOT has SDL and everything SDL needs, so the link checks that TortOS uses
@@ -67,7 +67,7 @@ $(BUILD)/tortos.elf: $(SRC) $(CREDS) $(NOTES) $(wildcard src/*.h)
 MUSE_SRC := $(wildcard src/muse/*.c)
 $(BUILD)/muse: $(MUSE_SRC) $(wildcard src/muse/*.h)
 	mkdir -p $(BUILD)
-	$(CC) -O2 -mcpu=cortex-a53 -Wall -Wextra -Wno-unused-parameter -std=gnu11 \
+	$(CC) -O2 -mcpu=cortex-a53 -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -std=gnu11 \
 	      -D_GNU_SOURCE -I$(SYSROOT)/usr/include $(LDFLAGS) -o $@ $(MUSE_SRC) \
 	      -lavformat -lavcodec -lavfilter -lswresample -lavutil -lasound -lpthread
 

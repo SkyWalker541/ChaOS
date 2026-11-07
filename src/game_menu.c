@@ -97,6 +97,11 @@ int gm_rows(const gm_ui *u, menu_row *out, gm_bufs *b)
 	out[GM_SHADER].value = u->shader ? u->shader : "none";
 	out[GM_SHADER].live = u->shader != NULL;
 	out[GM_OVERLAY].value = u->overlay ? u->overlay : "None";
+	/* ChaOS: the rows A opens a screen from: the save slots, the shader's
+	 * settings, the achievements */
+	out[GM_SAVE].opens = out[GM_LOAD].opens = true;
+	out[GM_SHADER].opens = u->shader != NULL;
+	out[GM_CHEEVOS].opens = true;
 
 	/* Most of a library has no set, and a row that says so plainly is better
 	 * than one that is missing: "none" answers the question the player opened

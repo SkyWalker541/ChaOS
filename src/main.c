@@ -3912,6 +3912,34 @@ static void power_off(app *a)
 static int g_menu_color;
 #define MENU_ACCENT (MENU_COLORS[g_menu_color].rgb)
 
+/* ChaOS: the menu being drawn is a first one, opened straight from the shelf
+ * or a game (MENU, or a game's info), rather than one opened from another
+ * menu. A submenu shows a back chevron before its heading; a first menu does
+ * not. Set around the draw by whoever draws a first menu (menu_style.root). */
+static bool g_menu_root;
+
+/* A chevron: `dir` +1 points right, -1 left; `h` its height; at (cx, cy). Two
+ * strokes of a few px, as SDL has no thick line. */
+static void draw_chevron(SDL_Renderer *r, float cx, float cy, float h, int dir,
+                         SDL_Color c)
+{
+	const float w = h * 0.5f, t = h * 0.2f > 2.5f ? h * 0.2f : 2.5f;
+	float x0 = cx - dir * w / 2, x1 = cx + dir * w / 2;
+	SDL_Vertex v[6];
+	int idx[12] = { 0, 1, 2, 1, 3, 2,  2, 3, 4, 3, 5, 4 }, i;
+
+	/* top arm then bottom arm, each a quad of thickness t */
+	v[0].position = (SDL_FPoint){ x0, cy - h / 2 };
+	v[1].position = (SDL_FPoint){ x0 - dir * t, cy - h / 2 + t * 0.6f };
+	v[2].position = (SDL_FPoint){ x1, cy };
+	v[3].position = (SDL_FPoint){ x1 - dir * t * 1.4f, cy };
+	v[4].position = (SDL_FPoint){ x0, cy + h / 2 };
+	v[5].position = (SDL_FPoint){ x0 - dir * t, cy + h / 2 - t * 0.6f };
+	for (i = 0; i < 6; i++) { v[i].color = c; v[i].tex_coord = (SDL_FPoint){ 0, 0 }; }
+	SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+	SDL_RenderGeometry(r, NULL, v, 6, idx, 12);
+}
+
 /* The unit every menu measurement is in. Row height, padding and the gap
  * between the two columns are all cut from it, so the whole panel scales with
  * the type rather than with a set of numbers that have to be retuned together. */
@@ -4317,6 +4345,14 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 		                       (Uint8)(accent >> 8), (Uint8)accent, 70);
 		SDL_RenderFillRect(a->r, &(SDL_Rect){ content_x, panel.y + head_h,
 		                                      content_w, 2 });
+		/* ChaOS: a submenu says so, and that B goes back, with a chevron
+		 * pointing back at the heading's left, in the margin */
+		if (!g_menu_root)
+			draw_chevron(a->r, (float)(panel.x + pad / 2 + UI_PANEL_BORDER / 2),
+			             panel.y + head_h / 2.0f + pad / 4.0f,
+			             (float)ui_font_line(UI_F_LABEL) * 0.55f, -1,
+			             (SDL_Color){ (Uint8)(accent >> 16), (Uint8)(accent >> 8),
+			                          (Uint8)accent, 220 });
 	}
 
 	/* THE HIGHLIGHT SLIDES. It used to be drawn inside the row loop at
@@ -4557,6 +4593,12 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 			                            (Uint8)(accent >> 8),
 			                            (Uint8)accent, 255 }, sel_w)
 			     : UI_TEXT_DIM;
+		/* ChaOS: a row that opens another screen, with a chevron in the
+		 * right margin: the value's color, so it brightens with the row */
+		if (rows[i].opens && rows[i].live && !ROW_IS_NOTE(rows[i]))
+			draw_chevron(a->r, (float)(content_x + content_w + pad / 2),
+			             y + ROW_H(rows[i]) / 2.0f, (float)text_h * 0.5f, +1,
+			             rows[i].value ? vc : lc);
 
 		/* Trimmed to the panel, HERE, rather than by every caller.
 		 *
@@ -5071,6 +5113,8 @@ typedef struct {
 	 * going anywhere, and the wait loop below it has to be told, or it goes
 	 * straight back to waiting on a game nobody is running. */
 	menu_result (*on_power)(app *a, void *ctx);
+	/* ChaOS: a first menu, not a submenu: no back chevron (g_menu_root). */
+	bool     root;
 	/* ChaOS: holding Y hides the panel, so the game behind an in-game menu
 	 * can be seen as it now looks. The backdrop leaves out its dimming
 	 * while Y is held too (gm_backdrop). */
@@ -5195,9 +5239,12 @@ static menu_exit menu_run_body(app *a, const menu_style *st,
 			SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
 			SDL_RenderFillRect(a->r, NULL);
 		}
-		if (!(st->peek && a->in.down[IN_Y]))
+		if (!(st->peek && a->in.down[IN_Y])) {
+			g_menu_root = st->root;
 			menu_draw(a, heading, rows, n, sel, st->fixed_w,
 			          st->follow_tint ? a->tint : st->accent);
+			g_menu_root = false;
+		}
 		plat_draw_osd(a->r);
 		plat_present();
 		SDL_Delay(8);
@@ -6433,6 +6480,7 @@ static void game_info_screen(app *a)
 	 * info_preview next door was given the shared width and this was not,
 	 * which is the same one-of-two-paths miss as every other bug of the day. */
 	c.st.fixed_w = menu_std_width(a);
+	c.st.root = true;
 
 	menu_run(a, &c.st, info_build, info_key, &c);
 
@@ -6464,8 +6512,10 @@ void info_preview(app *a, bool net)
 	SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
 	SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
 	SDL_RenderFillRect(a->r, NULL);
+	g_menu_root = true;
 	menu_draw(a, v->list.items[v->cursor].title, rows, n, sel, menu_std_width(a),
 	          a->sys.systems[owner].accent);
+	g_menu_root = false;
 }
 
 /* Bluetooth: pair a headset, connect it, forget it.
@@ -7295,8 +7345,10 @@ static void tortos_menu_draw(app *a, int sel)
 	SDL_RenderFillRect(a->r, NULL);
 	/* The shelf's menu is TortOS's own on the systems screen and a system's on
 	 * a game list, which is where it gains rows that belong to that system. */
+	g_menu_root = true;
 	menu_draw(a, heading, rows, n, sel, menu_shelf_width(a),
 	          a->screen == SCREEN_SYSTEMS ? MENU_ACCENT : a->tint);
+	g_menu_root = false;
 }
 
 /* The system menu's context. It holds the app rather than a copy of what was
@@ -7584,6 +7636,7 @@ static void tortos_menu_for(app *a, int screen)
 		/* On a game shelf this menu is about THAT system, so it wears the
 		 * shelf's color - which tick_tint is still moving while it is open. */
 		.follow_tint = screen != SCREEN_SYSTEMS,
+		.root        = true,
 	};
 
 	menu_run(a, &st, sysmenu_build, sysmenu_key, &c);
@@ -9954,7 +10007,7 @@ static int shader_build(void *ctx, menu_row *rows, int max, const char **heading
 				};
 				c->ids[n] = SH_GROUP + g;
 				look_format(ls, SUMMARY[g], c->vals[n], sizeof c->vals[n]);
-				rows[n] = (menu_row){ look_group_label((look_group)g), c->vals[n], true };
+				rows[n] = (menu_row){ look_group_label((look_group)g), c->vals[n], true, true };
 				n++;
 			}
 			c->ids[n] = SH_NONE; rows[n++] = MENU_RULE;
@@ -10047,6 +10100,7 @@ static void shader_screen(app *a, int sys, void *game)
 	if (c->game) {
 		c->st = c->game->st;           /* its width, tint, power rule and peek */
 		c->st.backdrop = shader_backdrop;
+		c->st.root = false;
 	} else {
 		c->st.fixed_w = menu_shelf_width(a);
 		c->st.follow_tint = true;
@@ -10086,6 +10140,7 @@ static void game_menu(app *a)
 	gm_load_overlay(&c);
 	c.st.fixed_w     = gm_width(a);
 	c.st.peek        = true;
+	c.st.root        = true;
 	c.st.follow_tint = true;
 	c.st.backdrop    = gm_backdrop;
 	c.st.on_power    = gm_power;
