@@ -1107,8 +1107,16 @@ static void look_rows(void)
 	ck(!strcmp(v, "GBA"), "a GBA's is the original GBA");
 	look_format(&st, LP_BACKING_COLOR, v, sizeof v);
 	ck(!strcmp(v, "Grey"), "with the grey backing");
-	ck(look_console_of("GBC") == LOOK_GBC && look_console_of("NES") == LOOK_NONE,
-	   "only the three Game Boys have a shader");
+	ck(look_console_of("GBC") == LOOK_GBC && look_shader_of(LOOK_GBC) == LS_PT,
+	   "the Game Boys have PT");
+	ck(look_shader_of(look_console_of("NES")) == LS_CRT && look_shader_of(look_console_of("SFC")) == LS_CRT &&
+	   look_shader_of(look_console_of("MD")) == LS_CRT && look_shader_of(look_console_of("SMS")) == LS_CRT &&
+	   look_shader_of(look_console_of("PCE")) == LS_CRT, "the five TV consoles have crt-lottes-fast");
+	ck(look_shader_of(look_console_of("GG")) == LS_LCD && look_shader_of(look_console_of("NGP")) == LS_LCD &&
+	   look_shader_of(look_console_of("NGPC")) == LS_LCD, "Game Gear and the Neo Geo Pockets have lcd3x");
+	ck(look_console_of("FAV") == LOOK_NONE && look_shader_of(LOOK_NONE) == LS_NONE,
+	   "anything else has none");
+	ck(!strcmp(look_console_name(look_console_of("NGPC")), "ngpc"), "Diatom knows a console by its tag in lower case");
 
 	printf("shader settings, values in words:\n");
 	look_format(&st, LP_TRANSPARENCY, v, sizeof v);
@@ -1129,19 +1137,60 @@ static void look_rows(void)
 
 	printf("shader settings, only the rows that matter:\n");
 	st.v[LP_PIXEL_EFFECT] = 1;
-	n = look_group_rows(&st, LG_PIXELS, ps);
+	n = look_group_rows(&st, LS_PT, LG_PIXELS, ps);
 	ck(n == 4 && ps[0] == LP_PIXEL_EFFECT, "Grid: the effect, gap color and two grid rows");
 	st.v[LP_PIXEL_EFFECT] = 2;
-	n = look_group_rows(&st, LG_PIXELS, ps);
+	n = look_group_rows(&st, LS_PT, LG_PIXELS, ps);
 	for (i = 0, ok = true; i < n; i++) if (ps[i] == LP_GRID_WIDTH) ok = false;
 	ck(n == 6 && ok, "LCD Dot: the dot rows, and no grid rows");
 	st.v[LP_PIXEL_EFFECT] = 0;
-	ck(look_group_rows(&st, LG_PIXELS, ps) == 1, "Off: only the effect itself");
+	ck(look_group_rows(&st, LS_PT, LG_PIXELS, ps) == 1, "Off: only the effect itself");
 	st.v[LP_GLARE_AND_SHEEN] = 0;
-	ck(look_group_rows(&st, LG_LIGHT, ps) == 1, "glare off: only its switch");
+	ck(look_group_rows(&st, LS_PT, LG_LIGHT, ps) == 1, "glare off: only its switch");
 	st.v[LP_GLARE_AND_SHEEN] = 1;
-	ck(look_group_rows(&st, LG_LIGHT, ps) == 10, "glare on: its nine settings, ripple size waiting on ripple");
+	ck(look_group_rows(&st, LS_PT, LG_LIGHT, ps) == 10, "glare on: its nine settings, ripple size waiting on ripple");
 	ck(!look_param_shown(&st, LP_WHITE_LEVEL), "white detection only for a Manual game system");
+
+	printf("crt-lottes-fast and lcd3x, on their own pages:\n");
+	look_recommended(LOOK_MD, &st);
+	ck(st.v[LP_CRT_CURVATURE] == 0 && st.v[LP_CRT_MASK] == 1 && st.v[LP_CRT_GAMMA] == 2.4f,
+	   "a Genesis starts flat, the rest the shader's own defaults");
+	n = look_group_rows(&st, LS_CRT, LG_PAGE, ps);
+	for (i = 0, ok = true; i < n; i++)
+		if (look_params[ps[i]].shader != LS_CRT || ps[i] == LP_CRT_CORNER || ps[i] == LP_CRT_TRINITRON) ok = false;
+	ck(n == 6 && ok, "flat: six rows, no corner or Trinitron, nothing of PT's");
+	st.v[LP_CRT_CURVATURE] = 0.02f;
+	ck(look_group_rows(&st, LS_CRT, LG_PAGE, ps) == 8, "curved: all eight");
+	st.v[LP_CRT_MASK] = 0;
+	ck(look_group_rows(&st, LS_CRT, LG_PAGE, ps) == 7, "no mask: no mask strength");
+	ck(look_group_rows(&st, LS_PT, LG_PAGE, ps) == 0, "PT has nothing on its own page");
+	look_format(&st, LP_CRT_MASK, v, sizeof v);
+	ck(!strcmp(v, "Off"), "the mask reads in words");
+	st.v[LP_CRT_MASK] = 3;
+	look_format(&st, LP_CRT_MASK, v, sizeof v);
+	ck(!strcmp(v, "Shadow Mask"), "the shadow mask by name");
+	look_format(&st, LP_CRT_CORNER, v, sizeof v);
+	ck(!strcmp(v, "3"), "the corner in whole numbers");
+	look_recommended(LOOK_NGP, &st);
+	ck(look_group_rows(&st, LS_LCD, LG_PAGE, ps) == 2 && ps[0] == LP_LCD_SCANLINES,
+	   "lcd3x: its two settings");
+	ck(look_set_named(&st, "brighten_lcd", 7.5f) && st.v[LP_LCD_STRIPES] == 7.5f,
+	   "lcd3x's names are read back");
+	ok = look_write_cfg("/tmp/menu-check-look.cfg", LOOK_NGP, &st);
+	n = 0;
+	if (ok && (f = fopen("/tmp/menu-check-look.cfg", "r"))) {
+		char line[128];
+		bool con = false, pt = false;
+		while (fgets(line, sizeof line, f)) {
+			if (!strcmp(line, "console = ngp\n")) con = true;
+			if (!strncmp(line, "PT_", 3) || !strncmp(line, "MASK", 4)) pt = true;
+			if (!strncmp(line, "brighten_", 9)) n++;
+		}
+		fclose(f);
+		ok = con && !pt;
+	}
+	ck(ok && n == 2, "Diatom gets the console and lcd3x's two, nobody else's");
+	ck(!look_write_cfg("/tmp/menu-check-look.cfg", LOOK_NONE, &st), "and no file for a console with none");
 
 	printf("shader settings, what Diatom is sent:\n");
 	look_recommended(LOOK_GBC, &st);
@@ -1159,7 +1208,7 @@ static void look_rows(void)
 		fclose(f);
 		ok = con && off;
 	}
-	ck(ok && n == LP_COUNT, "the console, off, and every parameter by name");
+	ck(ok && n == LP_CRT_MASK, "the console, off, and every PT parameter by name");
 	ck(look_set_named(&st, "PT_DOT_SIZE", 5.0f) && st.v[LP_DOT_SIZE] == 0.9f,
 	   "a stored value is read back within range");
 	ck(!look_set_named(&st, "PT_NO_SUCH", 1.0f), "and an unknown name is refused");

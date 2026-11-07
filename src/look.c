@@ -6,7 +6,7 @@
 #include <string.h>
 #include <strings.h>
 
-enum { F_WORDS, F_PCT, F_PCT_OFF, F_DARKEN, F_NUM1, F_NUM2, F_SPEED };
+enum { F_WORDS, F_PCT, F_PCT_OFF, F_DARKEN, F_NUM1, F_NUM2, F_SPEED, F_INT };
 
 static const char *const W_SYSTEM[] = { "Manual", "Game Boy", "Game Boy Color",
                                         "GBA SP", "GBA", NULL };
@@ -16,6 +16,10 @@ static const char *const W_ONOFF[] = { "Off", "On", NULL };
 static const char *const W_EFFECT[] = { "Off", "Grid", "LCD Dot", NULL };
 static const char *const W_GAP[] = { "Backing", "Black", "White", NULL };
 static const char *const W_DIR[] = { "Down right", "Down left", "Up right", "Up left", NULL };
+/* crt-lottes-fast's masks, as its source names them: the lite aperture grille
+ * dims one channel in three, the grille lights one, the shadow mask is a
+ * grille shifted every row */
+static const char *const W_MASK[] = { "Off", "Grille Lite", "Grille", "Shadow Mask", NULL };
 
 /* The shader's parameter list (PT_SkyWalker541.glsl, and pt_shader.c in
  * ChaOS-diatom, which match): name, default, range and step are its own. */
@@ -51,6 +55,22 @@ const look_param_info look_params[LP_COUNT] = {
 	[LP_SHADOW_DISTANCE]        = { "PT_SHADOW_DISTANCE", "Shadow Distance", 1, -10, 10, 0.5f, LG_SHADOWS, F_NUM1, NULL },
 	[LP_SHADOW_DIRECTION]       = { "PT_SHADOW_DIRECTION", "Shadow Direction", 0, 0, 3, 1, LG_SHADOWS, F_WORDS, W_DIR },
 	[LP_BEZEL_SHADOW]           = { "PT_BEZEL_EDGE_SHADOW", "Bezel Edge Shadow", 0.4f, 0, 1, 0.01f, LG_SHADOWS, F_PCT_OFF, NULL },
+
+	/* crt-lottes-fast.glsl's, labels and all, but CRT_GAMMA's range, which
+	 * the GLSL gives as 0 to 51, is kept to where a screen's gamma is.
+	 * SCAN_BLUR is how far the horizontal blur is cut off, so more is
+	 * sharper, as its label says. */
+	[LP_CRT_MASK]               = { "MASK", "Mask Type", 1, 0, 3, 1, LG_PAGE, F_WORDS, W_MASK, LS_CRT },
+	[LP_CRT_MASK_INTENSITY]     = { "MASK_INTENSITY", "Mask Intensity", 0.5f, 0, 1, 0.05f, LG_PAGE, F_PCT, NULL, LS_CRT },
+	[LP_CRT_SCANLINE_THINNESS]  = { "SCANLINE_THINNESS", "Scanline Intensity", 0.5f, 0, 1, 0.1f, LG_PAGE, F_PCT, NULL, LS_CRT },
+	[LP_CRT_SCAN_BLUR]          = { "SCAN_BLUR", "Sharpness", 2.5f, 1, 6, 0.5f, LG_PAGE, F_NUM1, NULL, LS_CRT },
+	[LP_CRT_CURVATURE]          = { "CURVATURE", "Curvature", 0.02f, 0, 0.25f, 0.01f, LG_PAGE, F_PCT_OFF, NULL, LS_CRT },
+	[LP_CRT_TRINITRON]          = { "TRINITRON_CURVE", "Trinitron-style Curve", 0, 0, 1, 1, LG_PAGE, F_WORDS, W_ONOFF, LS_CRT },
+	[LP_CRT_CORNER]             = { "CORNER", "Corner Round", 3, 0, 11, 1, LG_PAGE, F_INT, NULL, LS_CRT },
+	[LP_CRT_GAMMA]              = { "CRT_GAMMA", "CRT Gamma", 2.4f, 1, 4, 0.1f, LG_PAGE, F_NUM1, NULL, LS_CRT },
+	/* lcd3x.glsl's: more is brighter, so fainter lines */
+	[LP_LCD_SCANLINES]          = { "brighten_scanlines", "Brighten Scanlines", 16, 1, 32, 0.5f, LG_PAGE, F_NUM1, NULL, LS_LCD },
+	[LP_LCD_STRIPES]            = { "brighten_lcd", "Brighten LCD", 4, 1, 12, 0.1f, LG_PAGE, F_NUM1, NULL, LS_LCD },
 };
 
 static const char *const GROUP_LABEL[LG_COUNT] = {
@@ -62,18 +82,51 @@ const char *look_group_label(look_group g)
 	return g >= 0 && g < LG_COUNT ? GROUP_LABEL[g] : "";
 }
 
+/* By tag (systems.cfg), and the name Diatom knows each by, which is the tag
+ * in lower case */
+static const char *const CONSOLE_TAG[LOOK_CONSOLES] = {
+	"", "GB", "GBC", "GBA", "NES", "SMS", "MD", "PCE", "SFC", "GG", "NGP", "NGPC"
+};
+static const char *const CONSOLE_NAME[LOOK_CONSOLES] = {
+	"", "gb", "gbc", "gba", "nes", "sms", "md", "pce", "sfc", "gg", "ngp", "ngpc"
+};
+
 look_console look_console_of(const char *tag)
 {
+	int i;
 	if (!tag) return LOOK_NONE;
-	if (!strcasecmp(tag, "GB"))  return LOOK_GB;
-	if (!strcasecmp(tag, "GBC")) return LOOK_GBC;
-	if (!strcasecmp(tag, "GBA")) return LOOK_GBA;
+	for (i = LOOK_GB; i < LOOK_CONSOLES; i++)
+		if (!strcasecmp(tag, CONSOLE_TAG[i])) return (look_console)i;
 	return LOOK_NONE;
 }
 
 const char *look_console_name(look_console c)
 {
-	return c == LOOK_GB ? "gb" : c == LOOK_GBC ? "gbc" : c == LOOK_GBA ? "gba" : "";
+	return c > LOOK_NONE && c < LOOK_CONSOLES ? CONSOLE_NAME[c] : "";
+}
+
+look_shader look_shader_of(look_console c)
+{
+	switch (c) {
+	case LOOK_GB: case LOOK_GBC: case LOOK_GBA:
+		return LS_PT;
+	case LOOK_NES: case LOOK_SMS: case LOOK_MD: case LOOK_PCE: case LOOK_SFC:
+		return LS_CRT;
+	case LOOK_GG: case LOOK_NGP: case LOOK_NGPC:
+		return LS_LCD;
+	default:
+		return LS_NONE;
+	}
+}
+
+const char *look_shader_name(look_shader s)
+{
+	switch (s) {
+	case LS_PT:  return "PT SkyWalker541";
+	case LS_CRT: return "crt-lottes-fast";
+	case LS_LCD: return "lcd3x";
+	default:     return "";
+	}
 }
 
 /* The shader README's "Recommended Settings": Game system and Backing color
@@ -91,6 +144,7 @@ void look_recommended(look_console c, look_settings *out)
 	case LOOK_GBA: out->v[LP_GAME_SYSTEM] = 4; out->v[LP_BACKING_COLOR] = 2; break;
 	default: break;
 	}
+	out->v[LP_CRT_CURVATURE] = 0;
 }
 
 static int choice(const look_settings *s, look_param p)
@@ -148,6 +202,7 @@ void look_format(const look_settings *s, look_param p, char *out, size_t n)
 		return;
 	case F_NUM1:  snprintf(out, n, "%.1f", (double)v); return;
 	case F_NUM2:  snprintf(out, n, "%.2f", (double)v); return;
+	case F_INT:   snprintf(out, n, "%d", (int)lroundf(v)); return;
 	case F_SPEED:
 		if (v <= in->step * 0.5f) snprintf(out, n, "Still");
 		else                      snprintf(out, n, "%.2fx", (double)v);
@@ -178,6 +233,9 @@ bool look_param_shown(const look_settings *s, look_param p)
 	case LP_LIGHT_X: case LP_LIGHT_Y: case LP_LIGHT_DRIFT:
 		return light;
 	case LP_SHEEN_RIPPLE_SIZE:  return light && s->v[LP_SHEEN_RIPPLE] > 0.005f;
+	case LP_CRT_MASK_INTENSITY: return choice(s, LP_CRT_MASK) != 0;
+	case LP_CRT_TRINITRON:
+	case LP_CRT_CORNER:         return s->v[LP_CRT_CURVATURE] > 0.005f;
 	default:                    return true;
 	}
 }
@@ -193,29 +251,35 @@ static const look_param ORDER[] = {
 	LP_GLARE_AND_SHEEN, LP_GLARE_STRENGTH, LP_GLARE_SPREAD, LP_SHEEN_STRENGTH,
 	LP_SHEEN_DENSITY, LP_SHEEN_HUE, LP_SHEEN_RIPPLE, LP_SHEEN_RIPPLE_SIZE,
 	LP_LIGHT_X, LP_LIGHT_Y, LP_LIGHT_DRIFT,
+	LP_CRT_MASK, LP_CRT_MASK_INTENSITY, LP_CRT_SCANLINE_THINNESS, LP_CRT_SCAN_BLUR,
+	LP_CRT_GAMMA, LP_CRT_CURVATURE, LP_CRT_TRINITRON, LP_CRT_CORNER,
+	LP_LCD_SCANLINES, LP_LCD_STRIPES,
 };
 
-int look_group_rows(const look_settings *s, look_group g, look_param *out)
+int look_group_rows(const look_settings *s, look_shader sh, look_group g, look_param *out)
 {
 	int n = 0;
 	size_t i;
 
 	for (i = 0; i < sizeof ORDER / sizeof ORDER[0]; i++)
-		if (look_params[ORDER[i]].group == g && look_param_shown(s, ORDER[i]))
+		if (look_params[ORDER[i]].shader == sh && look_params[ORDER[i]].group == g &&
+		    look_param_shown(s, ORDER[i]))
 			out[n++] = ORDER[i];
 	return n;
 }
 
 bool look_write_cfg(const char *path, look_console c, const look_settings *s)
 {
-	FILE *f = fopen(path, "w");
+	look_shader sh = look_shader_of(c);
+	FILE *f;
 	int i;
 
-	if (!f) return false;
-	fprintf(f, "# Written by ChaOS for Diatom's SETSHADER: PT SkyWalker541\n");
+	if (sh == LS_NONE || !(f = fopen(path, "w"))) return false;
+	fprintf(f, "# Written by ChaOS for Diatom's SETSHADER: %s\n", look_shader_name(sh));
 	fprintf(f, "console = %s\nenabled = %d\n", look_console_name(c), s->on ? 1 : 0);
 	for (i = 0; i < LP_COUNT; i++)
-		fprintf(f, "%s = %g\n", look_params[i].name, (double)s->v[i]);
+		if (look_params[i].shader == sh)
+			fprintf(f, "%s = %g\n", look_params[i].name, (double)s->v[i]);
 	return fclose(f) == 0;
 }
 

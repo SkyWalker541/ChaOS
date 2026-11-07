@@ -5,8 +5,8 @@
 <p align="center">
   <b>Custom firmware for the TrimUI Brick, with the PT SkyWalker541 shader built in.</b><br>
   A fork of <a href="https://github.com/ericreinsmidt/TortOS">TortOS</a>: eleven classic consoles and your music,
-  every game at a whole-number scale, Game Boy, Game Boy Color and Game Boy Advance through PT SkyWalker541, and
-  overlays for every console.
+  every game at a whole-number scale, Game Boy, Game Boy Color and Game Boy Advance through PT SkyWalker541,
+  the TV consoles through a CRT shader and the other handhelds through an LCD one, and overlays for every console.
 </p>
 
 <p align="center">
@@ -153,11 +153,21 @@ Every game is drawn at a whole-number scale, so there is no Display Mode to
 choose. Each console's menu (MENU on its shelf) and the in-game menu have two
 rows instead:
 
-- **Shader**, for Game Boy, Game Boy Color and Game Boy Advance: PT
-  SkyWalker541. Left and right turn it on and off; A opens its settings,
-  grouped into Screen, Pixels, Shadows and Glare and Sheen, with only the
-  settings that matter for what is chosen. Reset to Recommended puts back the
-  shader README's settings for that console. Saved per console.
+- **Shader**: each console has the one made for its screen, and only that
+  one is offered.
+
+  | Consoles | Shader |
+  |---|---|
+  | Game Boy, Game Boy Color, Game Boy Advance | PT SkyWalker541 |
+  | NES, SNES, Genesis, Master System, TurboGrafx-16 | crt-lottes-fast (CRT) |
+  | Game Gear, Neo Geo Pocket, Neo Geo Pocket Color | lcd3x (LCD) |
+
+  Left and right turn it on and off; A opens its settings, with only the
+  settings that matter for what is chosen (PT's are grouped into Screen,
+  Pixels, Shadows and Glare and Sheen). Reset to Recommended puts back PT's
+  README settings for that console, and the other two's own, except that the
+  CRT starts flat: curvature works, and costs the CPU about twice as much.
+  Saved per console.
 - **Overlay**: None, or any PNG in that console's folder under `Overlays/` on
   the card. ChaOS makes a folder there for every console at boot, and puts in
   SkyWalker541's Brick overlays for the three Game Boys the first time. Add
@@ -258,4 +268,4 @@ TortOS is C and SDL2. Games run in [diatom](https://github.com/ericreinsmidt/dia
 
 ## License
 
-ChaOS is free software under the GNU General Public License, version 3 or any later version ([LICENSE](LICENSE)), as TortOS is: anyone may change it, share it and sell it, and whoever gets it, changed or not, gets its source and the same rights. It is TortOS, Copyright (c) 2026 Eric Reinsmidt, with ChaOS's changes, Copyright (c) 2026 SkyWalker541. ChaOS-diatom, the emulator it runs games in, is under the Mozilla Public License 2.0, and the PT SkyWalker541 shader in it under the MIT license. SkyWalker541's overlays are CC0. The cores keep their own licenses, two of them non-commercial. Full notices are in [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md) and [CREDITS.md](CREDITS.md); every release carries the source of everything in its image.
+ChaOS is free software under the GNU General Public License, version 3 or any later version ([LICENSE](LICENSE)), as TortOS is: anyone may change it, share it and sell it, and whoever gets it, changed or not, gets its source and the same rights. It is TortOS, Copyright (c) 2026 Eric Reinsmidt, with ChaOS's changes, Copyright (c) 2026 SkyWalker541. ChaOS-diatom, the emulator it runs games in, is under the Mozilla Public License 2.0, the PT SkyWalker541 shader in it under the MIT license, and its CRT and LCD shaders (crt-lottes-fast, lcd3x) are public domain. SkyWalker541's overlays are CC0. The cores keep their own licenses, two of them non-commercial. Full notices are in [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md) and [CREDITS.md](CREDITS.md); every release carries the source of everything in its image.

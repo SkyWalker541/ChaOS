@@ -40,8 +40,9 @@ ChaOS $V for the TrimUI Brick: the source of everything in its card image.
       https://github.com/SkyWalker541/ChaOS
 
   ChaOS-diatom-source.tar.gz
-      ChaOS-diatom, the emulator (diatom), with the PT SkyWalker541 shader.
-      MPL-2.0; the shader MIT. https://github.com/SkyWalker541/ChaOS-diatom
+      ChaOS-diatom, the emulator (diatom), with its shaders: PT
+      SkyWalker541 (MIT), crt-lottes-fast and lcd3x (public domain).
+      MPL-2.0. https://github.com/SkyWalker541/ChaOS-diatom
 
 The licenses are in the image's Licenses/ folder and in each archive.
 EOF

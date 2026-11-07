@@ -252,7 +252,8 @@ static void look_load_one(app *a, int i)
 	look_recommended(look_console_of(sc->tag), &v->look);
 	snprintf(key, sizeof key, "shader.%s.on", sc->tag);
 	v->look.on = db_get_int(db_dev(), key, 1) != 0;
-	snprintf(key, sizeof key, "shader.%s.PT_", sc->tag);
+	/* every stored parameter, by its GLSL name (".on" is no parameter's) */
+	snprintf(key, sizeof key, "shader.%s.", sc->tag);
 	db_each_prefix(db_dev(), key, look_load_param, &v->look);
 	snprintf(key, sizeof key, "overlay.%s", sc->tag);
 	db_get_str(db_dev(), key, v->overlay, sizeof v->overlay, "");
@@ -270,14 +271,17 @@ static void look_save(app *a, int i)
 {
 	const system_cfg *sc = &a->sys.systems[i];
 	const sysview *v = &a->view[i];
+	look_console lc = look_console_of(sc->tag);
+	look_shader sh = look_shader_of(lc);
 	look_settings rec;
 	char key[CFG_STR + 64], val[32];
 	int k;
 
-	look_recommended(look_console_of(sc->tag), &rec);
+	look_recommended(lc, &rec);
 	snprintf(key, sizeof key, "shader.%s.on", sc->tag);
 	db_set_int(db_dev(), key, v->look.on ? 1 : 0);
 	for (k = 0; k < LP_COUNT; k++) {
+		if (look_params[k].shader != sh) continue;
 		snprintf(key, sizeof key, "shader.%s.%s", sc->tag, look_params[k].name);
 		if (fabsf(v->look.v[k] - rec.v[k]) < look_params[k].step * 0.25f) {
 			db_del(db_dev(), key);
@@ -9954,11 +9958,12 @@ static menu_result gm_key(app *a, void *ctx, in_button key, int sel)
 
 /* ---- ChaOS: a console's shader settings -----------------------------------
  *
- * The shader's own page: the switch, which shader it is (only the ones made
- * for this console are listed, and for now that is one), Game System, then a
- * row for each group of settings, which opens that group's page, and Reset.
- * A group's page has only the rows that matter with the settings as they are:
- * no grid rows with LCD Dot chosen, nothing about glare with it off.
+ * The shader's own page: the switch, which shader it is (only the one made
+ * for this console), then for PT, Game System and a row for each group of
+ * settings, which opens that group's page; for crt-lottes-fast and lcd3x,
+ * which have few, the settings themselves; and Reset. A page has only the
+ * rows that matter with the settings as they are: no grid rows with LCD Dot
+ * chosen, nothing about glare with it off, no corner with a flat screen.
  *
  * Left and right change a value; held, a number speeds up. A on a choice
  * moves it on, as on every other menu. From the in-game menu each change is
@@ -9985,6 +9990,7 @@ static int shader_build(void *ctx, menu_row *rows, int max, const char **heading
 {
 	shader_ctx *c = ctx;
 	look_settings *ls = &c->a->view[c->sys].look;
+	look_shader sh = look_shader_of(look_console_of(c->a->sys.systems[c->sys].tag));
 	int n = 0, g;
 
 	(void)max;
@@ -9995,13 +10001,27 @@ static int shader_build(void *ctx, menu_row *rows, int max, const char **heading
 		rows[n++] = (menu_row){ "Shader", ls->on ? "On" : "Off", true };
 		if (ls->on) {
 			c->ids[n] = SH_NAME;
-			rows[n++] = (menu_row){ "Style", "PT SkyWalker541", false };
-			c->ids[n] = SH_SYSTEM;
-			look_format(ls, LP_GAME_SYSTEM, c->vals[n], sizeof c->vals[n]);
-			rows[n] = (menu_row){ "Game System", c->vals[n], true };
-			n++;
-			c->ids[n] = SH_NONE; rows[n++] = MENU_RULE;
-			for (g = 0; g < LG_COUNT; g++) {
+			rows[n++] = (menu_row){ "Style", look_shader_name(sh), false };
+			if (sh != LS_PT) {
+				look_param ps[LP_COUNT];
+				int k, np = look_group_rows(ls, sh, LG_PAGE, ps);
+
+				c->ids[n] = SH_NONE; rows[n++] = MENU_RULE;
+				for (k = 0; k < np; k++) {
+					c->ids[n] = SH_NONE + 1 + (int)ps[k];
+					look_format(ls, ps[k], c->vals[n], sizeof c->vals[n]);
+					rows[n] = (menu_row){ look_params[ps[k]].label, c->vals[n], true };
+					n++;
+				}
+			}
+			if (sh == LS_PT) {
+				c->ids[n] = SH_SYSTEM;
+				look_format(ls, LP_GAME_SYSTEM, c->vals[n], sizeof c->vals[n]);
+				rows[n] = (menu_row){ "Game System", c->vals[n], true };
+				n++;
+				c->ids[n] = SH_NONE; rows[n++] = MENU_RULE;
+			}
+			for (g = 0; sh == LS_PT && g < LG_COUNT; g++) {
 				static const look_param SUMMARY[LG_COUNT] = {
 					LP_BACKING_COLOR, LP_PIXEL_EFFECT, LP_SHADOW_OPACITY, LP_GLARE_AND_SHEEN
 				};
@@ -10016,7 +10036,7 @@ static int shader_build(void *ctx, menu_row *rows, int max, const char **heading
 		}
 	} else {
 		look_param ps[LP_COUNT];
-		int k, np = look_group_rows(ls, (look_group)c->group, ps);
+		int k, np = look_group_rows(ls, sh, (look_group)c->group, ps);
 
 		snprintf(c->heading, sizeof c->heading, "%s", look_group_label((look_group)c->group));
 		for (k = 0; k < np; k++) {

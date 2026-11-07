@@ -5,11 +5,20 @@
  * show these settings and main.c, which keeps them, both go through here, and
  * tools/menu-check.c links it to hold the rows to what they should say.
  *
- * The shader is PT SkyWalker541 (MIT, by SkyWalker541), drawn by Diatom
- * (ChaOS-diatom, shaders/pt). This file only names its settings: the table
- * below is the shader's own parameter list, with the GLSL names Diatom reads,
- * its defaults and ranges, in its order. What the launcher adds is grouping,
- * words for the values, and which rows matter when.
+ * Each console has the one shader made for it, drawn by Diatom (ChaOS-diatom,
+ * shaders/), and a console no shader suits has none and shows none:
+ *
+ *   Game Boy, Game Boy Color, Game Boy Advance   PT SkyWalker541 (MIT, by
+ *                                                SkyWalker541)
+ *   NES, SNES, Genesis, Master System,           crt-lottes-fast (Timothy
+ *   TurboGrafx-16                                Lottes, public domain)
+ *   Game Gear, Neo Geo Pocket (Color)            lcd3x (Gigaherz, public
+ *                                                domain)
+ *
+ * This file only names their settings: the table below is each shader's own
+ * parameter list, with the GLSL names Diatom reads, its defaults and ranges,
+ * in its order. What the launcher adds is grouping, words for the values, and
+ * which rows matter when.
  */
 #ifndef TORTOS_LOOK_H
 #define TORTOS_LOOK_H
@@ -17,14 +26,26 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-/* The consoles PT SkyWalker541 is made for, by systems.cfg tag. Any other
- * console has no shader yet, and its menus show none. */
-typedef enum { LOOK_NONE, LOOK_GB, LOOK_GBC, LOOK_GBA } look_console;
+/* The consoles with a shader, by systems.cfg tag. Any other console has no
+ * shader, and its menus show none. */
+typedef enum {
+	LOOK_NONE, LOOK_GB, LOOK_GBC, LOOK_GBA,
+	LOOK_NES, LOOK_SMS, LOOK_MD, LOOK_PCE, LOOK_SFC,
+	LOOK_GG, LOOK_NGP, LOOK_NGPC,
+	LOOK_CONSOLES
+} look_console;
 
 look_console look_console_of(const char *tag);
 const char  *look_console_name(look_console c);   /* "gb", for Diatom */
 
-/* The shader's parameters, in its own order. */
+/* The shaders. LS_PT is 0 so that the table's PT rows need not say so. */
+typedef enum { LS_PT, LS_CRT, LS_LCD, LS_NONE } look_shader;
+
+look_shader  look_shader_of(look_console c);
+const char  *look_shader_name(look_shader s);     /* "PT SkyWalker541" */
+
+/* Every shader's parameters, each shader's in its own order: PT's, then
+ * crt-lottes-fast's, then lcd3x's. */
 typedef enum {
 	LP_GAME_SYSTEM, LP_WHITE_LEVEL, LP_TRANSPARENT_PIXELS, LP_TRANSPARENCY,
 	LP_MIN_WHITE_TRANSPARENCY, LP_BACKING_COLOR, LP_BACKING_STRENGTH,
@@ -34,12 +55,19 @@ typedef enum {
 	LP_GAP_COLOR, LP_GRID_WIDTH, LP_GRID_OPACITY, LP_DOT_SIZE, LP_DOT_SOFTNESS,
 	LP_DOT_GAP_OPACITY, LP_DOT_MIN_BRIGHTNESS, LP_SHADOW_OPACITY,
 	LP_SHADOW_DISTANCE, LP_SHADOW_DIRECTION, LP_BEZEL_SHADOW,
+	/* crt-lottes-fast */
+	LP_CRT_MASK, LP_CRT_MASK_INTENSITY, LP_CRT_SCANLINE_THINNESS, LP_CRT_SCAN_BLUR,
+	LP_CRT_CURVATURE, LP_CRT_TRINITRON, LP_CRT_CORNER, LP_CRT_GAMMA,
+	/* lcd3x */
+	LP_LCD_SCANLINES, LP_LCD_STRIPES,
 	LP_COUNT
 } look_param;
 
-/* The pages the settings are grouped into, after Game System, which is on the
- * shader's own page because it decides most of the rest. */
-typedef enum { LG_SCREEN, LG_PIXELS, LG_SHADOWS, LG_LIGHT, LG_COUNT } look_group;
+/* PT's settings are grouped into pages, after Game System, which is on the
+ * shader's own page because it decides most of the rest. The other shaders
+ * have few enough to sit on their own page (LG_PAGE). */
+typedef enum { LG_SCREEN, LG_PIXELS, LG_SHADOWS, LG_LIGHT, LG_COUNT,
+               LG_PAGE = LG_COUNT } look_group;
 
 typedef struct {
 	const char *name;    /* the GLSL name, which is what Diatom reads */
@@ -48,6 +76,7 @@ typedef struct {
 	look_group group;
 	int fmt;             /* how the value reads: see look.c */
 	const char *const *words;   /* for a value that is a choice, its names */
+	look_shader shader;  /* whose it is */
 } look_param_info;
 
 extern const look_param_info look_params[LP_COUNT];
@@ -59,9 +88,10 @@ typedef struct {
 	float v[LP_COUNT];
 } look_settings;
 
-/* What a console starts from, and what Reset puts back: on, and the shader
- * README's recommended Game system and Backing color for it, the rest the
- * shader's own defaults. */
+/* What a console starts from, and what Reset puts back: on, and for PT the
+ * shader README's recommended Game system and Backing color for it, for
+ * crt-lottes-fast a flat screen (ChaOS-diatom's shading.c says why), the rest
+ * the shader's own defaults. */
 void look_recommended(look_console c, look_settings *out);
 
 /* One step left (-1) or right (+1), `mult` steps at a time while held, kept
@@ -76,11 +106,12 @@ void look_format(const look_settings *s, look_param p, char *out, size_t n);
  * LCD Dot chosen does not, and is not shown. */
 bool look_param_shown(const look_settings *s, look_param p);
 
-/* A group's rows that are shown, in order. Returns how many. */
-int look_group_rows(const look_settings *s, look_group g, look_param *out);
+/* A group's rows that are shown, in order, of shader sh's parameters (for
+ * LG_PAGE, the rows on its own page). Returns how many. */
+int look_group_rows(const look_settings *s, look_shader sh, look_group g, look_param *out);
 
-/* The file Diatom's SETSHADER reads: console, enabled, every parameter.
- * Returns false when it could not be written. */
+/* The file Diatom's SETSHADER reads: console, enabled, every parameter of the
+ * console's shader. Returns false when it could not be written. */
 bool look_write_cfg(const char *path, look_console c, const look_settings *s);
 
 /* A stored value back into the settings, by GLSL name. False for a name the

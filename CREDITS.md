@@ -50,8 +50,19 @@ It builds on:
 - LCD Dot mode is **inspired by Themaister's dot shader**, which is public
   domain. No code is taken from it.
 
-*(The CRT and handheld-LCD shaders for the other consoles will be listed here
-when they are written. They are original code.)*
+**crt-lottes-fast**: **[CRTS] "Public Domain CRT-Styled Scalar"** by
+**Timothy Lottes** (https://www.shadertoy.com/view/MtSfRK), adapted for
+RetroArch by **hunterk**, from libretro's glsl-shaders
+(https://github.com/libretro/glsl-shaders, `crt/shaders/crt-lottes-fast.glsl`).
+The CRT look for the NES, SNES, Genesis, Master System and TurboGrafx-16,
+ported from GLSL to C to run on the Brick's CPU (in ChaOS-diatom,
+`shaders/crt/`). Licence: **the Unlicense** (public domain); its full text is
+in the original's header, kept beside the port.
+
+**lcd3x** by **Gigaherz**, from libretro's glsl-shaders
+(`handheld/shaders/lcd3x.glsl`). The handheld-LCD look for the Game Gear and
+the Neo Geo Pocket and Pocket Color, ported the same way (ChaOS-diatom,
+`shaders/lcd/`). Licence: **public domain**, as its header says.
 
 ---
 
