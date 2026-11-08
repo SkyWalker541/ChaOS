@@ -250,7 +250,7 @@ Check the folder name against the table above, spelled exactly, and that the fil
 <details>
 <summary><b>A game has no box art.</b></summary>
 
-**MENU > Box Art** fetches every missing cover over Wi-Fi from [libretro's thumbnail collection](https://thumbnails.libretro.com). ScreenScraper sign-in (which adds each game's year, genre and synopsis) isn't in ChaOS builds yet, and the **ScreenScraper** row says "not in this build" until it is.
+**MENU > Box Art** fetches every missing cover over Wi-Fi from [libretro's thumbnail collection](https://thumbnails.libretro.com).
 
 For a game neither has, add your own: a PNG named like the game file, in `Roms/<console>/.media/` (`Black Castle.gb` wants `Black Castle.png`, about 512 pixels on the long side). To try again for a cover you don't like, press X on the game and choose **Replace Box Art**.
 

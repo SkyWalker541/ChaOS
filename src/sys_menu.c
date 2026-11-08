@@ -32,6 +32,10 @@ int sys_menu_tortos_rows(const sys_ui *u, pm_row *out)
 		/* Unless the files go over a cable, which needs no radio. */
 		if (u->no_wifi && !u->cable_xfer && r == PM_XFER) continue;
 		if (u->no_bt && r == PM_BT) continue;
+		/* ChaOS: no ScreenScraper row until a build carries its key; Box
+		 * Art uses libretro's thumbnails alone, and the menu says nothing of
+		 * a service it cannot reach. */
+		if (!u->ss_have && r == PM_SS) continue;
 		out[n++] = (pm_row)r;
 	}
 	return n;
@@ -230,7 +234,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	 * Dead when the build has no developer key, because then there is nothing
 	 * to sign into - and saying so is better than a row that opens a keyboard
 	 * and refuses whatever is typed into it. */
-	full[PM_SS]           = (menu_row){ "ScreenScraper",
+	full[PM_SS]           = (menu_row){ "ScreenScraper",   /* hidden without a key */
 	                                   !u->ss_have ? "not in this build"
 	                                   : u->ss_in ? u->ss_name : "sign in",
 	                                   u->ss_have };

@@ -136,13 +136,12 @@ than any one console:
 | **UI Direction** | `Horizontal`, `Vertical` or `Cubic` - see below |
 | **Box Art** | fetch what the whole library is missing |
 | **Cheevos** | the RetroAchievements account, or `sign in` |
-| **ScreenScraper** | the account that brings covers with each game's year, genre and synopsis, `sign in`, or `not in this build` |
 | **Controls** | every button and what it does, a page per place |
 | **About TortOS** | version, address, battery, uptime |
 
 On the Pixel 2, which has no radio of its own, the rows that need Wi-Fi are
-there only while a USB Wi-Fi adapter is plugged in: Wi-Fi, Box Art, Cheevos,
-ScreenScraper and Over The Hare here (Down To The Wire stays, with a computer
+there only while a USB Wi-Fi adapter is plugged in: Wi-Fi, Box Art, Cheevos
+and Over The Hare here (Down To The Wire stays, with a computer
 on the cable), Box Art in a console's menu, and Album Art in Muse's. Bluetooth
 is never there.
 
@@ -478,10 +477,8 @@ than turning away with the face.
 Card art comes from, in order:
 
 1. box art in `Roms/<system>/.media/<name>.png`, whether you put it there or
-   the Box Art row fetched it. With a ScreenScraper account the fetch asks
-   ScreenScraper first, and brings the game's year, genre and synopsis with the
-   cover. Without one, or for a game ScreenScraper does not have, it asks
-   libretro: by file name, and where no name matches, by checksum: a zip
+   the Box Art row fetched it. The fetch asks libretro's thumbnail
+   collection: by file name, and where no name matches, by checksum: a zip
    records its ROM's CRC, which names the game in No-Intro's list - the catalog
    libretro files its covers under - so a file still carrying an older name
    finds its box anyway. On the main card that found 29 more, every one the
@@ -500,7 +497,7 @@ fan translations, homebrew, a dump no catalog lists. Put one in yourself over
 Over The Hare: open `Roms/<system>/.media/` in its file browser and upload a
 PNG named exactly like the ROM file, with `.png` in place of its extension -
 `Black Castle.gb` wants `Black Castle.png`. Box Art never overwrites a cover
-that is already there, and Replace only swaps yours out when ScreenScraper or
+that is already there, and Replace only swaps yours out when
 libretro has a cover to put in its place. Keep it near 512 pixels on the long
 side: a cover you add is drawn as it is and never resized, so a 2000-pixel scan
 is decoded at full size whenever its card comes into view.

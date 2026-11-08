@@ -8145,7 +8145,7 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 	 * fewer of them, and the same list the build used says which is which. */
 	{
 		sys_ui dev = { .no_wifi = !plat_has_wifi(), .no_bt = !plat_has_bluetooth(),
-		               .cable_xfer = plat_cable_link(NULL, 0) };
+		               .cable_xfer = plat_cable_link(NULL, 0), .ss_have = ss_have_dev() };
 		pm_row ids[PM_ROWS];
 		int n = sys_menu_tortos_rows(&dev, ids);
 

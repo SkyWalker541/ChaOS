@@ -172,6 +172,8 @@ static const char *val(const menu_row *r) { return r->value ? r->value : ""; }
 /* A device with no network. Three rows depend on one, and all three have to
  * say so rather than silently doing nothing: Over The Hare, Box Art, and Box
  * Art's counterpart in the system menu. */
+static bool has_label(const menu_row *rows, int n, const char *label);
+
 static void tortos_menu_offline(void)
 {
 	sys_ui u;
@@ -181,6 +183,7 @@ static void tortos_menu_offline(void)
 	int n;
 
 	memset(&u, 0, sizeof u);
+	u.ss_have = true;   /* the full menu; its hiding is checked on its own */
 	u.wifi = WIFI_OFF;
 	u.cards = "Plain Jane";
 	u.cards_dir = "Horizontal";
@@ -297,6 +300,7 @@ static void tortos_menu_online(void)
 	int n;
 
 	memset(&u, 0, sizeof u);
+	u.ss_have = true;   /* the full menu; its hiding is checked on its own */
 	u.wifi = WIFI_CONNECTED;
 	u.ssid = "kitchen";
 	u.ra_in = true;
@@ -318,9 +322,10 @@ static void tortos_menu_online(void)
 	 * the one worth pinning - a row that opens a keyboard and then refuses
 	 * whatever is typed would look like a rejected password. */
 	printf("the ScreenScraper account row:\n");
-	ck(!u.ss_have, "the fixture above has no key");
-	ck(!strcmp(val(&rows[PM_SS]), "not in this build"), "and the row says so");
-	ck(!rows[PM_SS].live, "and does not open");
+	u.ss_have = false;
+	n = sys_menu_build(&u, rows, &b, &heading);
+	ck(n == PM_ROWS - 1 && !has_label(rows, n, "ScreenScraper"),
+	   "a build with no key has no ScreenScraper row at all");
 
 	u.ss_have = true;
 	n = sys_menu_build(&u, rows, &b, &heading);
@@ -383,6 +388,7 @@ static void system_menu(void)
 	int n;
 
 	memset(&u, 0, sizeof u);
+	u.ss_have = true;   /* the full menu; its hiding is checked on its own */
 	u.games = true;
 	u.wifi = WIFI_CONNECTED;
 	u.sys_name = "Game Boy";
@@ -585,6 +591,7 @@ static void cursor_reaches(void)
 	int got[MENU_MAX_ROWS], n, k;
 
 	memset(&u, 0, sizeof u);
+	u.ss_have = true;   /* the full menu; its hiding is checked on its own */
 	u.games = true;
 	u.wifi = WIFI_CONNECTED;
 	u.sys_name = "NES"; u.sys_core = "nestopia";
@@ -609,6 +616,7 @@ static void cursor_reaches(void)
 	   "the reported facts are not stops");
 
 	memset(&u, 0, sizeof u);
+	u.ss_have = true;   /* the full menu; its hiding is checked on its own */
 	u.wifi = WIFI_OFF;
 	n = sys_menu_build(&u, rows, &b, &heading);
 	k = reachable(rows, n, got, MENU_MAX_ROWS);
@@ -653,6 +661,7 @@ static void radio_less(void)
 	bool ok;
 
 	memset(&u, 0, sizeof u);
+	u.ss_have = true;   /* the full menu; its hiding is checked on its own */
 	u.wifi = WIFI_OFF;
 	u.cards = "Plain Jane";
 	u.cards_dir = "Horizontal";
@@ -699,6 +708,7 @@ static void radio_less(void)
 	ck(i < k && rows[i].live && !rows[i].value, "live, and not asking for Wi-Fi");
 
 	memset(&u, 0, sizeof u);
+	u.ss_have = true;   /* the full menu; its hiding is checked on its own */
 	u.games = true;
 	u.no_wifi = true;
 	u.sys_name = "NES"; u.sys_core = "nestopia";

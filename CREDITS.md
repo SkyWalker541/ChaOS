@@ -142,7 +142,6 @@ use its own art there instead.
 ## Services
 
 - **RetroAchievements** (https://retroachievements.org): achievements.
-- **ScreenScraper** (https://www.screenscraper.fr): box art and game details.
 - **libretro thumbnails** (https://thumbnails.libretro.com): box art.
 - **MusicBrainz Cover Art Archive** (https://musicbrainz.org): album art.
 
