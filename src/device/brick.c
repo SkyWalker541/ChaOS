@@ -55,6 +55,8 @@ static const struct { int code; in_button b; } keymap[] = {
 	{ BTN_THUMBL, IN_BRIGHTDN },  { BTN_THUMBR, IN_BRIGHTUP },
 	{ KEY_VOLUMEDOWN, IN_VOLDN }, { KEY_VOLUMEUP, IN_VOLUP },
 	{ KEY_POWER, IN_POWER },
+	/* ChaOS: L2 and R2, for the shelves' letter scrub */
+	{ BTN_TL2, IN_L2 },           { BTN_TR2, IN_R2 },
 };
 #endif
 

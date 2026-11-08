@@ -40,6 +40,7 @@ typedef enum {
 	IN_L1, IN_R1, IN_START, IN_SELECT, IN_MENU,
 	IN_VOLUP, IN_VOLDN, IN_BRIGHTUP, IN_BRIGHTDN,
 	IN_POWER,
+	IN_L2, IN_R2,      /* ChaOS: the letter scrub on the shelves */
 	IN_COUNT,
 	IN_NONE = -1,
 } in_button;

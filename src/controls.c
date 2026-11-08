@@ -152,6 +152,8 @@ static int moving(ctl_dir dir, menu_row *out)
 		out[n++] = (menu_row){ "Up/Down",    "Jump by letter", false };
 	}
 	out[n++] = (menu_row){ "L1/R1", "A screenful", false };
+	/* ChaOS: the letter scrub, with its letter shown big */
+	out[n++] = (menu_row){ "L2/R2", "Letter by letter", false };
 	return n;
 }
 

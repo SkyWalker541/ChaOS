@@ -670,6 +670,12 @@ static int g_pn_speed[8];
 static bool g_list_view;
 #define LIST_VIEW_ON() (g_list_view && !CARD_DIRS[g_dir].both)
 
+/* ChaOS: the letter popup, with the letter jumps, further down */
+static void letter_note(sysview *v);
+static void letter_hold(sysview *v, bool held);
+static void draw_letter_popup(app *a);
+static int shelf_letter_jump(sysview *v, int dir);
+
 static void pn_speed_load(void)
 {
 	int d, k;
@@ -3940,6 +3946,10 @@ static void draw_shelf(app *a)
 	if (a->sys.count <= 0) draw_no_games(a);
 	else if (a->screen == SCREEN_SYSTEMS) draw_systems(a);
 	else draw_games(a);
+	/* ChaOS: the letter, over whichever shelf of games it is about - the
+	 * games screen, or Cubic, whose faces are games */
+	if (a->sys.count > 0 && (a->screen != SCREEN_SYSTEMS || CARD_DIRS[g_dir].both))
+		draw_letter_popup(a);
 	draw_battery_dot(a->r);
 }
 
@@ -7923,7 +7933,8 @@ static void about_screen(app *a)
 static ctl_dir controls_dir(void)
 {
 	if (CARD_DIRS[g_dir].both)     return CTL_CUBIC;
-	if (CARD_DIRS[g_dir].vertical) return CTL_VERTICAL;
+	/* a List runs as a column does: up and down move, left and right jump */
+	if (CARD_DIRS[g_dir].vertical || LIST_VIEW_ON()) return CTL_VERTICAL;
 	return CTL_HORIZONTAL;
 }
 
@@ -12031,6 +12042,11 @@ static void update_both(app *a)
 	if (in_repeat(&a->in, IN_RIGHT)) { v->cursor = (v->cursor + 1) % ng; gdir = +1; }
 	if (in_repeat(&a->in, IN_L1))    { v->cursor = ((v->cursor - CF_WINDOW) % ng + ng) % ng; gdir = -1; }
 	if (in_repeat(&a->in, IN_R1))    { v->cursor = (v->cursor + CF_WINDOW) % ng; gdir = +1; }
+	/* ChaOS: L2 and R2 to the first game of a letter, each press, with the
+	 * letter shown; and the letter passing by once left or right is held */
+	if (in_repeat(&a->in, IN_R2)) { v->cursor = shelf_letter_jump(v, +1); gdir = +1; letter_note(v); }
+	if (in_repeat(&a->in, IN_L2)) { v->cursor = shelf_letter_jump(v, -1); gdir = -1; letter_note(v); }
+	letter_hold(v, a->in.down[IN_LEFT] || a->in.down[IN_RIGHT]);
 	if (gdir) cf_set_cursor_dir(&v->cf, v->cursor, ng, gdir);
 
 	/* Muse's row: its cards are albums, and A opens one onto its tracks, as on
@@ -12135,6 +12151,103 @@ static const char *shelf_key(const sysview *v, int i)
 	return v->jump_by_name ? v->list.items[i].name : v->list.items[i].title;
 }
 
+/* ---- ChaOS: the letter popup -------------------------------------------------
+ *
+ * A square in the menus' style with the letter the cursor is on, big, in the
+ * middle of the screen: while L2 and R2 scrub a shelf from one letter to the
+ * next, and once moving along it has been held for two seconds. It fades in,
+ * and out again a moment after the scrubbing or the holding stops. Every
+ * theme, both Game List Views, and Cubic's games. */
+static char   g_lp_letter;
+static Uint32 g_lp_last;           /* the last time it was asked for */
+static Uint32 g_lp_since;          /* when it came up from nothing */
+static Uint32 g_lp_held;           /* when the current hold began, or 0 */
+
+static void letter_note(sysview *v)
+{
+	Uint32 now = plat_now_ms();
+	char c;
+
+	if (v->list.count <= 0) return;
+	c = shelf_initial(v->jump_by_name ? v->list.items[v->cursor].name
+	                                  : v->list.items[v->cursor].title);
+	g_lp_letter = c ? c : '#';
+	if (!g_lp_last || now - g_lp_last > 1100) g_lp_since = now;
+	g_lp_last = now;
+}
+
+/* Called each pass with whether moving is held: two seconds of it shows the
+ * letter, for as long as it goes on */
+static void letter_hold(sysview *v, bool held)
+{
+	Uint32 now = plat_now_ms();
+	if (!held) { g_lp_held = 0; return; }
+	if (!g_lp_held) g_lp_held = now;
+	if (now - g_lp_held >= 2000) letter_note(v);
+}
+
+static void draw_letter_popup(app *a)
+{
+	static SDL_Texture *layer;
+	static TTF_Font *big;
+	static char drawn;
+	const int S = 220;
+	Uint32 now = plat_now_ms(), el;
+	float al;
+
+	if (!g_lp_last) return;
+	el = now - g_lp_last;
+	/* up while it is being asked for and 0.7 s after, then out over 0.4 s;
+	 * in over 0.12 s from nothing */
+	if (el >= 1100) { g_lp_last = 0; return; }
+	al = el < 700 ? 1.0f : 1.0f - (float)(el - 700) / 400.0f;
+	if (now - g_lp_since < 120) {
+		float in = (float)(now - g_lp_since) / 120.0f;
+		if (in < al) al = in;
+	}
+	if (!big) big = TTF_OpenFont(P_FONT, 150);
+	if (!layer) {
+		layer = SDL_CreateTexture(a->r, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, S, S);
+		if (!layer) return;
+		SDL_SetTextureBlendMode(layer, SDL_BLENDMODE_BLEND);
+		drawn = 0;
+	}
+	if (drawn != g_lp_letter) {
+		SDL_Texture *was = SDL_GetRenderTarget(a->r);
+		SDL_Rect q = { 0, 0, S, S };
+		char t[2] = { g_lp_letter, 0 };
+
+		if (SDL_SetRenderTarget(a->r, layer) == 0) {
+			SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_NONE);
+			SDL_SetRenderDrawColor(a->r, 0, 0, 0, 0);
+			SDL_RenderClear(a->r);
+			SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+			ui_panel(a->r, &q, 28, menu_accent());
+			if (big) {
+				SDL_Surface *ts = TTF_RenderUTF8_Blended(big, t, UI_TEXT);
+				if (ts) {
+					SDL_Texture *tt = SDL_CreateTextureFromSurface(a->r, ts);
+					/* centred on the ink: a capital's top to its baseline */
+					int mnx, mxx, mny, mxy, adv, asc = TTF_FontAscent(big);
+					int cap = TTF_GlyphMetrics(big, (Uint16)g_lp_letter, &mnx, &mxx, &mny,
+					                           &mxy, &adv) == 0 ? mxy : asc;
+					SDL_Rect d = { (S - ts->w) / 2, (S - cap) / 2 - (asc - cap), ts->w, ts->h };
+					if (tt) { SDL_RenderCopy(a->r, tt, NULL, &d); SDL_DestroyTexture(tt); }
+					SDL_FreeSurface(ts);
+				}
+			}
+			drawn = g_lp_letter;
+		}
+		SDL_SetRenderTarget(a->r, was);
+	}
+	{
+		SDL_Rect d = { (TORTOS_SCREEN_W - S) / 2, (TORTOS_SCREEN_H - S) / 2, S, S };
+		SDL_SetTextureAlphaMod(layer, (Uint8)(al * 255));
+		SDL_RenderCopy(a->r, layer, NULL, &d);
+	}
+	redraw_now();
+}
+
 static int shelf_group_start(sysview *v, int idx)
 {
 	int n = v->list.count, i = idx;
@@ -12211,6 +12324,11 @@ static void update_games(app *a)
 	if (in_repeat(&a->in, fwd))  { v->cursor = (v->cursor + 1) % n; dir = +1; }
 	if (in_repeat(&a->in, jdn))  v->cursor = shelf_letter_jump(v, +1);
 	if (in_repeat(&a->in, jup))  v->cursor = shelf_letter_jump(v, -1);
+	/* ChaOS: L2 and R2 scrub by letter, with the letter shown; holding
+	 * the way along for two seconds shows it too */
+	if (in_repeat(&a->in, IN_R2)) { v->cursor = shelf_letter_jump(v, +1); letter_note(v); }
+	if (in_repeat(&a->in, IN_L2)) { v->cursor = shelf_letter_jump(v, -1); letter_note(v); }
+	letter_hold(v, a->in.down[back] || a->in.down[fwd]);
 	/* L1/R1 jump a screenful, so a long shelf is crossable. Wrapped the long
 	 * way round on purpose: C's % truncates toward zero, so on a shelf of
 	 * three games the obvious `(cursor - CF_WINDOW + n*2) % n` lands on -1 and
@@ -13488,6 +13606,12 @@ int main(int argc, char *argv[])
 			shot_speed = true;
 		}
 		else if (!strcmp(argv[i], "--ss")) shot_ss = true;
+		/* --letter C: the letter popup, as if L2 had just been pressed */
+		else if (!strcmp(argv[i], "--letter") && i + 1 < argc) {
+			g_lp_letter = argv[++i][0];
+			g_lp_last = plat_now_ms() ? plat_now_ms() : 1;
+			g_lp_since = g_lp_last - 500;
+		}
 		/* --pixnames T: ChaOS Pixel Names with the focused card at T (0..1),
 		 * the one leaving at 1-T; -1 for both at their ends */
 		else if (!strcmp(argv[i], "--pixnames") && i + 1 < argc) pn_fix((float)atof(argv[++i]));
