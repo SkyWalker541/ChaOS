@@ -3,269 +3,215 @@
 </p>
 
 <p align="center">
-  <b>Custom firmware for the TrimUI Brick, with the PT SkyWalker541 shader built in.</b><br>
-  A fork of <a href="https://github.com/ericreinsmidt/TortOS">TortOS</a>: eleven classic consoles and your music,
-  every game at a whole-number scale, Game Boy, Game Boy Color and Game Boy Advance through PT SkyWalker541,
-  the TV consoles through a CRT shader and the other handhelds through an LCD one, and overlays for every console.
+  <b>Custom firmware for the TrimUI Brick, with shaders made for each console built in.</b><br>
+  Eleven classic consoles and your music, every game at a whole-number scale, a shader and overlays for every console.<br>
+  Built on <a href="https://github.com/ericreinsmidt/TortOS">TortOS</a> by Eric Reinsmidt.
 </p>
 
 <p align="center">
   <a href="#install">Install</a> &nbsp;·&nbsp;
-  <a href="#shaders-and-overlays-chaos">Shaders and overlays</a> &nbsp;·&nbsp;
+  <a href="#shaders">Shaders</a> &nbsp;·&nbsp;
+  <a href="#overlays">Overlays</a> &nbsp;·&nbsp;
   <a href="#supported-systems">Systems</a> &nbsp;·&nbsp;
   <a href="#controls">Controls</a> &nbsp;·&nbsp;
-  <a href="#faq">FAQ</a>
+  <a href="#faq">FAQ</a> &nbsp;·&nbsp;
+  <a href="#credits-and-license">Credits</a>
 </p>
 
 > [!IMPORTANT]
-> **ChaOS is for the TrimUI Brick (and Brick Hammer) only at this time.** TortOS also runs on the GKD Pixel 2;
-> ChaOS does not, and the parts of this page about the Pixel 2 are TortOS's.
+> **ChaOS is for the TrimUI Brick (and Brick Hammer) only at this time.**
 >
 > **Every game is drawn at a whole-number (integer) scale only at this time.** There is no stretched or
 > aspect-fit mode.
 
-> [!NOTE]
-> ChaOS is TortOS by Eric Reinsmidt with ChaOS's changes: the shader and its settings, overlays, whole-number
-> scaling only, ChaOS Transfer, the menu colors and the look. Everything below that isn't about those is TortOS's
-> own, and its screenshots are TortOS's. What came from where is in [CREDITS.md](CREDITS.md).
-
 <div align="center">
-
 <table>
   <tr>
-    <td align="center" colspan="2"><img src="res/readme/systems.png" width="240" alt="The consoles row"><br><sub>Scroll horizontally</sub></td>
-    <td align="center" colspan="2"><img src="res/readme/vertical.png" width="240" alt="The shelf standing on end"><br><sub>Vertically</sub></td>
-    <td align="center" colspan="2"><img src="res/readme/cubic.png" width="240" alt="The cube"><br><sub>Or as a cube</sub></td>
+    <td align="center"><img src="res/readme/chaos-shelf.png" width="380" alt="The ChaOS shelf"><br><sub>The shelf</sub></td>
+    <td align="center"><img src="res/readme/chaos-shader.png" width="380" alt="The NES's shader settings"><br><sub>Each console's shader and its settings</sub></td>
   </tr>
   <tr>
-    <td align="center" colspan="2"><img src="res/readme/info.png" width="240" alt="A game's details"><br><sub>A game's details, one button away</sub></td>
-    <td align="center" colspan="2"><img src="res/readme/cheevos.png" width="240" alt="An achievements list"><br><sub>RetroAchievements on the device</sub></td>
-    <td align="center" colspan="2"><img src="res/readme/menu.png" width="240" alt="The TortOS menu"><br><sub>The Brick's settings in one menu</sub></td>
-  </tr>
-  <tr>
-    <td align="center" colspan="3"><img src="res/readme/muse.png" width="240" alt="Muse's shelf of albums, with xx in focus"><br><sub>Your albums, in Muse</sub></td>
-    <td align="center" colspan="3"><img src="res/readme/nowplaying.png" width="240" alt="Muse's Now Playing"><br><sub>Now Playing, on SELECT from anywhere</sub></td>
+    <td align="center"><img src="res/readme/chaos-menu.png" width="380" alt="The ChaOS menu"><br><sub>The Brick's settings in one menu, in your color</sub></td>
+    <td align="center"><img src="res/readme/chaos-transfer.png" width="380" alt="ChaOS Transfer in a browser"><br><sub>ChaOS Transfer, from any browser</sub></td>
   </tr>
 </table>
-
 </div>
 
-## Why TortOS
+## What's in it
 
-**Games start the moment you press A.** The emulator is already running before you choose anything, so nothing loads between you and the game, even when you switch consoles.
+**From ChaOS**
 
-**You pick up exactly where you left off.** Quit from the menu or just press the power button. The game is saved on the way out, and next time it continues from that moment.
+- **A shader for every console,** each one made for that console's screen, drawn by the Brick's CPU. PT SkyWalker541 for the Game Boys, a CRT for the TV consoles, an LCD for the other handhelds.
+- **Overlays for every console,** with SkyWalker541's Brick overlays for the Game Boys included, and a folder for your own.
+- **See it before you choose it:** in the in-game menu, the paused game shows each shader setting and overlay as you scroll through them.
+- **Whole-number scaling** for every game, so every pixel is the same size.
+- **Menu colors,** starting from ChaOS's orange.
+- **ChaOS Transfer,** the boot and power-off animations, and the ChaOS look throughout.
 
-**Everything happens on the handheld.** Join Wi-Fi, fetch box art, sign in to RetroAchievements, pair headphones and send games over from your phone, all on the Brick. You need a computer once, to set up the card.
+**From TortOS**
 
-**Your Brick stays yours.** TortOS runs from the SD card and changes nothing on the Brick itself. Take the card out and the Brick boots its own system again.
+- **Games start the moment you press A.** The emulator is already running, so nothing loads between you and the game.
+- **Pick up where you left off.** Quit from the menu or press the power button: the game is saved on the way out and continues from that moment next time. Six save slots too.
+- **Everything on the handheld:** Wi-Fi, box art, RetroAchievements, Bluetooth headphones and sending games over from your phone. You need a computer once, to set up the card.
+- **Three ways to browse** (a row, a column or a cube) and two looks (Plain Jane or Fancy Pants).
+- **Muse,** a music and audiobook player, on SELECT from anywhere.
+- **Turbo buttons, fast forward, mono audio, Play Time, favorites and sorting.**
+- **Your Brick stays yours.** ChaOS runs from the SD card and changes nothing on the Brick. Take the card out and it boots its own system again.
 
-## Features
+## Install
 
-- **Three ways to browse:** a row of covers, a column, or a cube that turns both ways.
-- **Two looks:** Plain Jane cards, or Fancy Pants photos of each console.
-- **RetroAchievements:** sign in on the device. A game's achievements download once and then work offline, and anything you unlock offline is sent later.
-- **Box art the Brick finds itself,** from libretro's collection with no account, or from ScreenScraper with a free one, which brings each game's year, genre and synopsis too. Or add your own.
-- **ChaOS Transfer:** move games, music, audiobooks, saves and covers on and off the card from any browser on your Wi-Fi, behind a PIN. Or over a USB cable from your computer, with no Wi-Fi at all.
-- **Autosave and resume,** plus six save slots for when you want a checkpoint.
-- **Turbo buttons:** X and Y press A and B for you, on the nine consoles whose controllers had two face buttons. On Game Boy Advance, L2 and R2 do the same for L and R.
-- **Fast forward:** hold MENU and press R1 to run a game at 2x, 3x or 4x, and once more to go back.
-- **A USB-C headphone adapter on the Pixel 2:** plug one in and the sound goes there, ahead of the headphone jack, in games and in Muse. It's a choice of its own in Audio Output.
-- **Bluetooth headphones,** paired on the device, with the Brick's volume buttons reaching them and their own buttons playing and skipping in Muse. Plug in wired ones and they take over.
-- **Mono audio,** for anyone who hears with one ear: Audio Channels plays games and Muse in mono, or in mono in just the left or right ear on headphones.
-- **Muse, a music and audiobook player:** your albums and books on a shelf of their own covers, and every book picks up where you left it. SELECT opens Muse from anywhere, even the in-game menu, and it keeps playing when you close it. While it plays, the game is silent.
-- **Play Time:** how long you've played each game or console, today, this week, this month, this year or ever.
-- **Favorites and sorting:** Y favorites a game, and each console sorts by name, play time, last played or recently added.
+You need a TrimUI Brick or Brick Hammer, a microSD card and, just this once, a computer.
+
+**The easy way:** [ChaOS Installer](https://github.com/SkyWalker541/ChaOS-Installer/releases/latest), for macOS, Windows and Linux. It downloads the latest ChaOS and puts it on the card, or updates a card that has ChaOS or TortOS on it already.
+
+**By hand:**
+
+1. Download `ChaOS-v<version>-brick.img.xz` from [Releases](https://github.com/SkyWalker541/ChaOS/releases/latest).
+2. Write it to the card with a disk-image writer such as Raspberry Pi Imager or balenaEtcher. **This erases the card.**
+3. Put the card in the Brick and turn it on. The first boot takes a little longer while it makes the rest of the card into space for games, music and saves.
+4. Set your time zone under **MENU > Date & Time**.
+5. Add games to the folders in `Roms/`: on a computer, where the card shows up as **ChaOS**, or over ChaOS Transfer.
+
+### Updating
+
+Put the card in the computer and choose **Update** in ChaOS Installer. Your games, music, saves and settings stay. A TortOS card becomes a ChaOS card the same way. Writing the image by hand erases the card, so use the installer to update.
+
+### Removing
+
+Take the card out: the Brick boots its own system again. Everything ChaOS keeps is on the card, Wi-Fi passwords and Bluetooth pairings included, so reformat it before you give it away.
+
+## Shaders
+
+Each console's menu (MENU on its shelf) and the in-game menu have a **Shader** row. Each console offers only the shader made for it:
+
+| Consoles | Shader | By |
+|---|---|---|
+| Game Boy, Game Boy Color, Game Boy Advance | PT SkyWalker541 | SkyWalker541 |
+| NES, SNES, Genesis, Master System, TurboGrafx-16 | crt-lottes-fast | Timothy Lottes, adapted by hunterk |
+| Game Gear, Neo Geo Pocket, Neo Geo Pocket Color | lcd3x | Gigaherz |
+
+- **Left and right** turn it on and off. **A** opens its settings, showing only the ones that matter for what you've chosen.
+- **Reset to Recommended** puts back the shader's own settings. For PT, that's its README's settings for that console. The CRT starts flat: curvature works, but costs the CPU about twice as much.
+- Settings are saved per console.
+
+## Overlays
+
+The **Overlay** row offers **None** or any PNG in that console's folder in `Overlays/` on the card.
+
+- ChaOS makes a folder for every console at boot and puts in SkyWalker541's Brick overlays for the three Game Boys the first time.
+- Add your own from a computer or with ChaOS Transfer, which has the same `Overlays` folder.
+- Make an overlay **1024x768** with a transparent window where the game shows through. Another size is stretched to fit. The game is always drawn on top, so an overlay never covers it.
+
+In the in-game menu, the paused game behind the menu shows the shader and overlay as you change them. **Hold Y** to hide the menu and see the whole picture.
+
+## Adding games
+
+**From a computer:** put the card in it and copy games into their console's folder in `Roms/`.
+
+**Over Wi-Fi:**
+
+1. Join a network under **MENU > Wi-Fi**.
+2. Open **MENU > ChaOS Transfer**. It shows an address and a PIN, which is new every time.
+3. Open the address in a browser on your phone or computer and type the PIN.
+4. Drag games into their console's folder, albums into `Music` or books into `Audiobooks`. They're on the shelf when you leave the screen.
+
+**Over the USB cable** (Mac, Linux or Windows 11; Windows 10 lacks the driver): plug the Brick into the computer, open **MENU > ChaOS Transfer**, then open `http://10.55.0.2` in a browser on that computer and type the PIN.
 
 ## Supported systems
 
 | Console | Put games in | File types | Core |
 |---|---|---|---|
 | NES | `Roms/NES` | `.nes` `.fds` `.unf` `.unif` `.zip` | FCEUmm |
-| Master System | `Roms/Master System` | `.sms` `.zip` | Genesis Plus GX |
-| Game Boy | `Roms/Game Boy` | `.gb` `.dmg` `.zip` | mGBA |
-| Genesis | `Roms/Genesis` | `.md` `.gen` `.bin` `.smd` `.zip` | Genesis Plus GX |
-| TurboGrafx-16 and CD | `Roms/TurboGrafx-16` | `.pce` `.sgx` `.cue` `.ccd` `.chd` `.toc` `.m3u` `.zip` | Beetle PCE Fast |
-| Game Gear | `Roms/Game Gear` | `.gg` `.zip` | Genesis Plus GX |
 | SNES | `Roms/SNES` | `.sfc` `.smc` `.zip` | Snes9x 2010 |
-| Neo Geo Pocket | `Roms/Neo Geo Pocket` | `.ngp` `.ngc` `.ngpc` `.npc` `.zip` | Beetle NeoPop |
+| Genesis | `Roms/Genesis` | `.md` `.gen` `.bin` `.smd` `.zip` | Genesis Plus GX |
+| Master System | `Roms/Master System` | `.sms` `.zip` | Genesis Plus GX |
+| TurboGrafx-16 and CD | `Roms/TurboGrafx-16` | `.pce` `.sgx` `.cue` `.ccd` `.chd` `.toc` `.m3u` `.zip` | Beetle PCE Fast |
+| Game Boy | `Roms/Game Boy` | `.gb` `.dmg` `.zip` | mGBA |
 | Game Boy Color | `Roms/Game Boy Color` | `.gbc` `.cgb` `.zip` | mGBA |
-| Neo Geo Pocket Color | `Roms/Neo Geo Pocket Color` | `.ngp` `.ngc` `.ngpc` `.npc` `.zip` | Beetle NeoPop |
 | Game Boy Advance | `Roms/Game Boy Advance` | `.gba` `.agb` `.zip` | mGBA |
+| Game Gear | `Roms/Game Gear` | `.gg` `.zip` | Genesis Plus GX |
+| Neo Geo Pocket | `Roms/Neo Geo Pocket` | `.ngp` `.ngc` `.ngpc` `.npc` `.zip` | Beetle NeoPop |
+| Neo Geo Pocket Color | `Roms/Neo Geo Pocket Color` | `.ngp` `.ngc` `.ngpc` `.npc` `.zip` | Beetle NeoPop |
 
-**BIOS files** go loose in `Bios/`. Only TurboGrafx-CD games need one, `syscard3.pce`. Game Boy Advance runs without its BIOS; add `gba_bios.bin` if you want the original boot animation.
-
-## Install
-
-You need a TrimUI Brick or Brick Hammer, a microSD card and, just this once, a computer.
-
-The [ChaOS Installer](https://github.com/SkyWalker541/ChaOS-Installer/releases/latest), for macOS, Windows and Linux, sets up a card: it downloads the latest ChaOS and puts it on the card, or updates a card that already has ChaOS or TortOS. The steps below also say how to do it by hand.
-
-### Setting up a card
-
-The card is the whole system: ChaOS on [plastron](https://github.com/ericreinsmidt/plastron), the small Linux TortOS built for the Brick.
-
-With the ChaOS Installer, choose **Fresh install**, then go on from step 3. By hand, from the start:
-
-1. **Download the image** from [Releases](https://github.com/SkyWalker541/ChaOS/releases/latest): `ChaOS-v<version>-brick.img.xz`.
-2. **Write it to the card** with any program that writes disk images, like Raspberry Pi Imager or balenaEtcher. It erases everything on the card.
-3. **Put the card in the Brick and turn it on.** The first boot takes a bit longer while it turns the rest of the card into space for games, music and saves. Every boot after that comes straight up.
-4. **Set the time zone** under **MENU > Date & Time**. Wi-Fi sets the time whenever it connects; without it, set the time there too, and it keeps it.
-5. **Add games** to the folders in `Roms/`. Put the card back in the computer, where it shows up as ChaOS, or send them over later with ChaOS Transfer.
-
-### Updating
-
-Put the card in the computer and choose **Update** in the ChaOS Installer. The new ChaOS goes on, and the games, music, saves and settings stay. The first boot after takes a bit longer while it copies the new ChaOS into place. A card with TortOS on it becomes a ChaOS card the same way.
-
-The installer is the only way that keeps them: writing the image by hand erases the card.
-
-### Adding games over Wi-Fi
-
-<img align="right" width="360" src="res/readme/hare.png" alt="ChaOS Transfer, with a browser connected">
-
-1. Join a network under **MENU > Wi-Fi**.
-2. Open **MENU > ChaOS Transfer**. It shows an address and a PIN.
-3. Open that address in a browser on your phone or computer, and type the PIN.
-4. Drag games into their console's folder, albums into `Music` or books into `Audiobooks`. They're on the shelf when you leave the screen.
-
-The PIN is new every time you open ChaOS Transfer.
-
-<br clear="right">
-
-### Adding games over the USB cable
-
-The same thing over a cable, with no Wi-Fi. It works with a Mac, Linux, or Windows 11; Windows 10 has no driver for this kind of connection.
-
-1. Plug the device into the computer with a USB cable.
-2. Open **MENU > ChaOS Transfer** while a computer is on the cable. It shows an address and a PIN.
-3. Open that address in a browser on that computer, `http://10.55.0.2` on the Brick or `http://10.42.0.1` on the Pixel 2, and type the PIN.
-4. Drag games into their console's folder, albums into `Music` or books into `Audiobooks`. They're on the shelf when you leave the screen.
-
-### Removing ChaOS
-
-Take the card out. The Brick boots its own system again, as it was. On the Pixel 2 the card is the system, so another card with another system replaces it.
-
-Everything ChaOS keeps is on the card, Wi-Fi passwords and Bluetooth pairings included, so reformat it before you give it away.
-
-## Shaders and overlays (ChaOS)
-
-Every game is drawn at a whole-number scale, so there is no Display Mode to
-choose. Each console's menu (MENU on its shelf) and the in-game menu have two
-rows instead:
-
-- **Shader**: each console has the one made for its screen, and only that
-  one is offered.
-
-  | Consoles | Shader |
-  |---|---|
-  | Game Boy, Game Boy Color, Game Boy Advance | PT SkyWalker541 |
-  | NES, SNES, Genesis, Master System, TurboGrafx-16 | crt-lottes-fast (CRT) |
-  | Game Gear, Neo Geo Pocket, Neo Geo Pocket Color | lcd3x (LCD) |
-
-  Left and right turn it on and off; A opens its settings, with only the
-  settings that matter for what is chosen (PT's are grouped into Screen,
-  Pixels, Shadows and Glare and Sheen). Reset to Recommended puts back PT's
-  README settings for that console, and the other two's own, except that the
-  CRT starts flat: curvature works, and costs the CPU about twice as much.
-  Saved per console.
-- **Overlay**: None, or any PNG in that console's folder under `Overlays/` on
-  the card. ChaOS makes a folder there for every console at boot, and puts in
-  SkyWalker541's Brick overlays for the three Game Boys the first time. Add
-  your own from a computer or with ChaOS Transfer, whose
-  Overlays folder is the same one. An overlay should be 1024x768 with a transparent window where the
-  game shows through; another size is stretched to fit.
-
-In the in-game menu both apply at once: the paused game behind the menu is
-drawn with the shader's new settings and the overlay you are on. Hold Y to
-hide the menu and see the whole picture.
+**BIOS files** go loose in `Bios/`. Only TurboGrafx-CD games need one, `syscard3.pce`. Game Boy Advance runs without its BIOS; add `gba_bios.bin` for the original boot animation.
 
 ## Controls
 
 | Button | What it does |
 |---|---|
 | **A / B** | Choose and back |
-| **MENU** | Settings for whatever you're looking at. In a game: save, load, quit and more |
+| **MENU** | Settings for whatever you're looking at. In a game: save, load, shader, overlay, quit and more |
 | **SELECT** | Muse, the music and audiobook player, from anywhere |
-| **MENU + R1** | Fast forward a game |
+| **MENU + R1** | Fast forward a game (2x, 3x, 4x) |
 | **X / Y** | In a game, turbo A and B. On the shelf, a game's details and favorite |
 | **POWER** | Save and turn off |
 
-The device lists every button under **MENU > Controls**, and [the guide](docs/guide.md#controls-and-menus) covers every control, menu and setting in detail.
+Every button is listed under **MENU > Controls**. For every menu and setting in detail, see TortOS's [guide](docs/guide.md); ChaOS follows it except where this page says otherwise.
 
 ## FAQ
 
 <details>
 <summary><b>My games don't show up.</b></summary>
 
-Check the folder name against the table above, spelled exactly, and that the file type is listed for that console. A console with nothing in its folder is hidden. Games sent over ChaOS Transfer appear when you leave its screen. Games copied any other way while the Brick is on appear after **Rescan Folder** in that console's menu, or after a restart. The log names every file a console's folder left out, and the file types it takes.
+Check the folder name against the table above, spelled exactly, and that the file type is listed for that console. A console with nothing in its folder is hidden. Games sent over ChaOS Transfer appear when you leave its screen; games copied any other way while the Brick is on appear after **Rescan Folder** in that console's menu, or after a restart.
 
 </details>
 
 <details>
 <summary><b>A game has no box art.</b></summary>
 
-**MENU > Box Art** fetches every missing cover over Wi-Fi. Sign in to a free [ScreenScraper](https://www.screenscraper.fr) account under **MENU > ScreenScraper** and it asks there first, and brings each game's year, genre and synopsis for its details screen. Without an account, or for a game ScreenScraper doesn't have, it uses [libretro's thumbnail collection](https://thumbnails.libretro.com), looking a game up by its file name and, for zipped games, by checksum.
+**MENU > Box Art** fetches every missing cover over Wi-Fi. Sign in to a free [ScreenScraper](https://www.screenscraper.fr) account under **MENU > ScreenScraper** and it asks there first, and brings each game's year, genre and synopsis too. Otherwise it uses [libretro's thumbnail collection](https://thumbnails.libretro.com).
 
-Some games aren't in either collection, like fan translations and homebrew. Add your own: a PNG named exactly like the game file, in `Roms/<console>/.media/`. `Black Castle.gb` wants `Black Castle.png`. Around 512 pixels on the long side is plenty.
-
-Over ChaOS Transfer, covers go separately: a console's folder comes over without them. Drop the PNGs into its `.media` folder, or drag `.media` itself onto the console's folder (Finder shows it after Cmd-Shift-.).
-
-Don't like a cover? Press X on the game and choose **Replace Box Art**. It looks again, and if nothing turns up, you keep the one you had.
+For a game neither has, add your own: a PNG named like the game file, in `Roms/<console>/.media/` (`Black Castle.gb` wants `Black Castle.png`, about 512 pixels on the long side). To try again for a cover you don't like, press X on the game and choose **Replace Box Art**.
 
 </details>
 
 <details>
 <summary><b>How do achievements work?</b></summary>
 
-Sign in to your RetroAchievements account under **MENU > Cheevos**. The first time you start a game, the device needs Wi-Fi to look it up and download its achievements. After that the game works offline, and anything you unlock offline is kept and sent to your account later.
+Sign in to RetroAchievements under **MENU > Cheevos**. The first time you start a game the Brick needs Wi-Fi to download its achievements; after that it works offline, and anything you unlock offline is sent later.
 
 </details>
 
 <details>
 <summary><b>Can I use Bluetooth headphones?</b></summary>
 
-Yes, on the Brick. Put them in pairing mode, open **MENU > Bluetooth**, press **Y** to search and **A** to pair. They reconnect by themselves from then on. Wired headphones always win when they're plugged in.
-
-The Brick's volume buttons set the headphones' volume, and the headphones' own volume buttons move the Brick's. On a few headphones, the Brick's buttons set only the starting volume; after that, change it on the headphones themselves. Play, pause and skip on the headphones control Muse.
-
-The Pixel 2 has no Bluetooth: use wired headphones, or a USB-C headphone adapter.
+Yes. Put them in pairing mode, open **MENU > Bluetooth**, press **Y** to search and **A** to pair. They reconnect by themselves after that, and wired headphones take over whenever they're plugged in. The Brick's volume buttons reach them, and their play, pause and skip buttons control Muse.
 
 </details>
 
 <details>
-<summary><b>How do I add music?</b></summary>
+<summary><b>How do I add music and audiobooks?</b></summary>
 
-Put it in `Music/` on the card, from a computer, over Wi-Fi with ChaOS Transfer, or over the USB cable with ChaOS Transfer, a folder per artist and a folder inside that per album: `Music/Radiohead/The Bends/01 Planet Telex.mp3`. An album folder put straight into `Music/` is moved under its artist when its tags name one, and songs in no folder at all are moved into `Music/Singles/`, an album of their own. MP3, M4A, M4B, MP4, AAC, FLAC, Ogg, Opus and WAV all play. Muse appears on the shelf once there's music, and each album's cover comes from its own files, or a picture in the album's folder. **MENU > Album Art** on Muse's shelf fetches a sharper cover over Wi-Fi from [MusicBrainz](https://musicbrainz.org)'s Cover Art Archive for any album whose files carry none, or only a small one.
-
-</details>
-
-<details>
-<summary><b>How do I add audiobooks?</b></summary>
-
-Put each book in its own folder in `Audiobooks/`, with an author's folder above it or without: `Audiobooks/Iain M. Banks/The Hydrogen Sonata/` or `Audiobooks/The Hydrogen Sonata/`. One M4B or a folder of MP3s both work, and the files play in name order. **MENU > Show** on Muse's shelf switches between your music and your books. A book remembers where you stopped, even through a power-off, and one played to the end is marked finished; A on it starts it over.
+Music goes in `Music/`, a folder per artist and one per album inside it: `Music/Radiohead/The Bends/01 Planet Telex.mp3`. Each book goes in its own folder in `Audiobooks/`, as one M4B or a folder of MP3s. MP3, M4A, M4B, MP4, AAC, FLAC, Ogg, Opus and WAV all play. **MENU > Show** on Muse's shelf switches between music and books, and a book remembers where you stopped.
 
 </details>
 
 <details>
 <summary><b>Where are my saves?</b></summary>
 
-Battery saves are `.srm` files in `Saves/`, named after the game. Save states, the autosave included, are in `.userdata/shared/.tortos/`, one folder per console. Neo Geo Pocket Color games write no `.srm`, so their progress lives in the autosave.
+Battery saves are `.srm` files in `Saves/`, named after the game. Save states, the autosave included, are in `.userdata/shared/.tortos/`, one folder per console.
 
 </details>
 
 <details>
 <summary><b>Something went wrong. How do I send the logs?</b></summary>
 
-Open **MENU > ChaOS Transfer**, open its address in a browser, and click **Download logs** at the bottom of the first page. You get one `.tar.gz` file holding the last ten boots' logs and a short summary of the device, ready to send to whoever is helping you. Wi-Fi network, headset and account names are masked in it, and the logs on the card are left as they are. The logs themselves are on the card, in `.userdata/brick/logs/` on the Brick and `.userdata/pixel2/logs/` on the Pixel 2.
+Open **MENU > ChaOS Transfer**, open its address in a browser, and click **Download logs** at the bottom of the first page. You get one `.tar.gz` with the last ten boots' logs and a short summary of the device, with Wi-Fi, headset and account names masked. The logs themselves are on the card in `.userdata/brick/logs/`.
 
 </details>
 
-## For developers
+## Credits and license
 
-TortOS is C and SDL2. Games run in [diatom](https://github.com/ericreinsmidt/diatom), a small libretro frontend built for this device that starts once at boot and stays running.
+ChaOS is **TortOS by Eric Reinsmidt** ([TortOS](https://github.com/ericreinsmidt/TortOS), on [plastron](https://github.com/ericreinsmidt/plastron)), with ChaOS's changes by SkyWalker541. Games run in [ChaOS-diatom](https://github.com/SkyWalker541/ChaOS-diatom), a fork of Eric Reinsmidt's [diatom](https://github.com/ericreinsmidt/diatom) that adds the shaders. Who made what, and where everything came from, is in [CREDITS.md](CREDITS.md).
 
-- [Building](docs/building.md): the toolchain, the card, the checks, and deploying to a device
+ChaOS is free software under the **GNU General Public License, version 3 or any later version** ([LICENSE](LICENSE)), as TortOS is: anyone may change it, share it and sell it, and whoever gets it, changed or not, gets its source and the same rights. TortOS is Copyright (c) 2026 Eric Reinsmidt; ChaOS's changes are Copyright (c) 2026 SkyWalker541.
 
-## License
+- ChaOS-diatom is under the Mozilla Public License 2.0.
+- PT SkyWalker541 is MIT; crt-lottes-fast and lcd3x are public domain.
+- SkyWalker541's overlays are CC0.
+- The cores keep their own licenses, two of them non-commercial.
 
-ChaOS is free software under the GNU General Public License, version 3 or any later version ([LICENSE](LICENSE)), as TortOS is: anyone may change it, share it and sell it, and whoever gets it, changed or not, gets its source and the same rights. It is TortOS, Copyright (c) 2026 Eric Reinsmidt, with ChaOS's changes, Copyright (c) 2026 SkyWalker541. ChaOS-diatom, the emulator it runs games in, is under the Mozilla Public License 2.0, the PT SkyWalker541 shader in it under the MIT license, and its CRT and LCD shaders (crt-lottes-fast, lcd3x) are public domain. SkyWalker541's overlays are CC0. The cores keep their own licenses, two of them non-commercial. Full notices are in [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md) and [CREDITS.md](CREDITS.md); every release carries the source of everything in its image.
+Full notices are in [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md) and [CREDITS.md](CREDITS.md), and every release carries the source of everything in its image.
+
+**For developers:** ChaOS is C and SDL2. [docs/building.md](docs/building.md) is TortOS's build guide. A ChaOS release image is TortOS's release image with ChaOS's launcher, emulator, overlays, web page and boot animation swapped in, by `tools/chaos-image.sh` ([dist/README.md](dist/README.md)).
