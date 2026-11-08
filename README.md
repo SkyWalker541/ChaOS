@@ -111,7 +111,7 @@ Each console's menu (MENU on its shelf) and the in-game menu have a **Shader** r
 
 ## Button mapping and rewind
 
-**Controls**, in each console's menu (MENU on its shelf) and in the in-game menu, shows that console's controls under its own name (**GB Controls**, **Genesis Controls**). It lists what each of the Brick's buttons does there now, then the shortcuts: MENU, fast forward, rewind if it's on, and power. Left and right turn the pages.
+**Controls**, in each console's menu (MENU on its shelf) and in the in-game menu, shows that console's controls under its own name (**GB Controls**, **Genesis Controls**). It lists what each of the Brick's buttons does there now, then the shortcuts: MENU, fast forward, rewind if it's on, screenshot, and power. Left and right turn the pages.
 
 **Button Mapping**, the first row of that screen, changes them. Each button can press:
 - any of that console's buttons, by the console's own names (a Genesis has A, B, C, X, Y, Z and Mode);
@@ -123,6 +123,14 @@ Left and right change a button, and **Reset to Default** puts it back. The Game 
 From a game, changes apply as you make them. The **For** row picks **This game**, a mapping for this game only, or **All its games**, the console's. The d-pad and MENU can't be remapped.
 
 **Rewind**, in each console's menu, is off until you turn it on. With it on, **hold MENU + L1** in a game to step back through the last minutes of play, and let go to carry on from there. It saves the game several times a second in memory, which costs a little speed, so leave it off on consoles where you don't use it. It starts over when you load a state or reset.
+
+## Screenshots
+
+Keep a picture of a password screen, a code or a map to look at later.
+
+- **Take one:** press **MENU + X** while playing ("Screenshot Saved" shows over the game), or choose **Take Screenshot** in the in-game menu, which saves the paused frame.
+- **Look at them:** **Screenshots** in the in-game menu shows the game you're playing's screenshots full screen, newest first. **Left and right** go through them, **hold Y** hides the caption, **X** deletes the one shown (press **X** again to confirm), and **B** goes back.
+- They're saved as PNGs on the card in `Screenshots/<console>/<game>/`, named by date and time, so you can also copy them off with a computer or ChaOS Transfer. They're the game's own pixels, without the shader or overlay, and updates leave them alone.
 
 ## Overlays
 
@@ -223,6 +231,7 @@ If the Brick restarts but **About ChaOS** still shows the old version, the insta
 | **SELECT** | Muse, the music and audiobook player, from anywhere |
 | **MENU + R1** | Fast forward a game (2x, 3x, 4x) |
 | **MENU + L1** (hold) | Rewind, on consoles where it's turned on |
+| **MENU + X** | Take a screenshot of the game |
 | **X / Y** | In a game, turbo A and B. On the shelf, a game's details and favorite |
 | **POWER** | Save and turn off |
 

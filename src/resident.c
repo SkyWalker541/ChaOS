@@ -249,6 +249,8 @@ void plat_resident_on_unlock(void (*fn)(int id)) { d_on_unlock = fn; }
 static void (*d_on_speed)(int x);
 
 void plat_resident_on_speed(void (*fn)(int x)) { d_on_speed = fn; }
+static void (*d_on_shot)(const char *path);
+void plat_resident_on_shot(void (*fn)(const char *path)) { d_on_shot = fn; }
 
 static void (*d_on_tick)(void);
 static bool (*d_battery_empty)(void);
@@ -714,6 +716,9 @@ static int diatom_wait(void)
 			else if (strncmp(l, "AUDIO\t", 6) == 0) d_note_audio(l);
 			else if (strncmp(l, "DISPLAY\t", 8) == 0) d_note_display(l);
 			else if (strncmp(l, "CHEEVO\t", 7) == 0) d_note_cheevo(l);
+			else if (strncmp(l, "SHOT\tpath=", 10) == 0) {
+				if (d_on_shot) d_on_shot(l + 10);
+			}
 			else if (strncmp(l, "SPEED\tx=", 8) == 0) {
 				if (d_on_speed) d_on_speed(atoi(l + 8));
 			}

@@ -289,7 +289,7 @@ static void pagers_and_consoles(void)
 		md.value[i] = "C";
 	}
 	ck(ctl_console_pages(&gb) == 3, "six Game Boy buttons: two pages of them and the shortcuts");
-	ck(ctl_console_pages(&md) == 4, "ten Genesis buttons: three, and the shortcuts");
+	ck(ctl_console_pages(&md) == 5, "ten Genesis buttons: three, and two of shortcuts (rewind on)");
 	for (p = 0; p < ctl_console_pages(&md); p++) {
 		int text = 0, live = 0;
 		n = ctl_console_rows(&md, p, rows);
@@ -307,9 +307,19 @@ static void pagers_and_consoles(void)
 		snprintf(msg, sizeof msg, "page %d: Button Mapping, first, is its one live row", p);
 		ck(live == 1 && rows[0].live && rows[0].opens && !strcmp(rows[0].label, "Button Mapping"), msg);
 	}
-	n = ctl_console_rows(&md, ctl_console_pages(&md) - 1, rows);
-	for (i = p = 0; i < n; i++) if (rows[i].label && !strcmp(rows[i].label, "MENU+L1")) p = 1;
-	ck(p, "rewind on: MENU+L1 among the shortcuts");
+	{
+		int pg, shot = 0;
+		p = 0;
+		for (pg = 3; pg < ctl_console_pages(&md); pg++) {
+			n = ctl_console_rows(&md, pg, rows);
+			for (i = 0; i < n; i++) {
+				if (rows[i].label && !strcmp(rows[i].label, "MENU+L1")) p = 1;
+				if (rows[i].label && !strcmp(rows[i].label, "MENU+X")) shot = 1;
+			}
+		}
+		ck(p, "rewind on: MENU+L1 among the shortcuts");
+		ck(shot, "MENU+X, the screenshot, among them");
+	}
 	n = ctl_console_rows(&gb, ctl_console_pages(&gb) - 1, rows);
 	for (i = p = 0; i < n; i++) if (rows[i].label && !strcmp(rows[i].label, "MENU+L1")) p = 1;
 	ck(!p, "rewind off: no MENU+L1");

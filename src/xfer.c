@@ -5,7 +5,7 @@
 
 #include "xfer.h"
 
-static xfer_root g_roots[7];
+static xfer_root g_roots[8];
 static int       g_nroots;
 
 static void add_root(const char *name, const char *label, const char *fmt,
@@ -63,6 +63,8 @@ void xfer_init(const char *roms_dir, const char *card_dir,
 	/* ChaOS: overlays, one folder per console as ROMs are, made by the
 	 * launcher at boot. Last, so the roots before it keep their places. */
 	add_root("overlays", "Overlays", "%s/Overlays", card_dir, false);
+	/* ChaOS: screenshots, per console and game (shots.h) */
+	add_root("screenshots", "Screenshots", "%s/Screenshots", card_dir, false);
 }
 
 int xfer_root_count(void) { return g_nroots; }

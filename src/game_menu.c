@@ -90,7 +90,8 @@ int gi_rows(menu_row *out, const game_info *gi, bool net)
 int gm_rows(const gm_ui *u, menu_row *out, gm_bufs *b)
 {
 	static const char *label[GM_ROWS] = {
-		"Continue", "Save", "Load", "Shader", "Overlay", "Controls", "Cheevos", "Reset", "Quit"
+		"Continue", "Save", "Load", "Take Screenshot", "Screenshots",
+		"Shader", "Overlay", "Controls", "Cheevos", "Reset", "Quit"
 	};
 	int i;
 
@@ -104,6 +105,16 @@ int gm_rows(const gm_ui *u, menu_row *out, gm_bufs *b)
 	out[GM_SHADER].opens = u->shader != NULL;
 	out[GM_CHEEVOS].opens = true;
 	out[GM_BUTTONS].opens = true;   /* ChaOS: Button Mapping, for this game */
+
+	/* ChaOS: screenshots of this game, the paused frame. Take Screenshot says
+	 * "Saved" for a moment after; Screenshots counts them and opens the
+	 * viewer, and with none says so and is passed over, as Cheevos is. */
+	out[GM_SHOT].value = u->shot_said;
+	if (u->shots > 0) snprintf(b->shots, sizeof b->shots, "%d", u->shots);
+	else              snprintf(b->shots, sizeof b->shots, "none");
+	out[GM_SHOTS].value = b->shots;
+	out[GM_SHOTS].live = u->shots > 0;
+	out[GM_SHOTS].opens = u->shots > 0;
 
 	/* Most of a library has no set, and a row that says so plainly is better
 	 * than one that is missing: "none" answers the question the player opened

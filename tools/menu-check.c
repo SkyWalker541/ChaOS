@@ -923,10 +923,15 @@ static void ingame_rows(void)
 	int got[GM_SHOWN], n, k;
 
 	u.shader = "On"; u.overlay = NULL; u.earned = 12; u.total = 40;
+	u.shots = 3; u.shot_said = NULL;
 	n = gm_rows(&u, rows, &b);
 
 	printf("in-game menu, a game with a set:\n");
-	ck(n == GM_SHOWN, "nine rows, then a rule and a note");
+	ck(n == GM_SHOWN, "eleven rows, then a rule and a note");
+	ck(!strcmp(rows[GM_SHOT].label, "Take Screenshot") && rows[GM_SHOT].live,
+	   "Take Screenshot is always there");
+	ck(!strcmp(val(&rows[GM_SHOTS]), "3") && rows[GM_SHOTS].live,
+	   "Screenshots counts this game's, and opens them");
 	ck(ROW_IS_NOTE(rows[GM_ROWS + 1]) && !strcmp(rows[GM_ROWS + 1].label, "Hold " CTL_PEEK_NAME " to see the game"),
 	   "the note names the button that shows the game");
 	ck(!strcmp(rows[GM_CONTINUE].label, "Continue"), "Continue leads");
@@ -937,13 +942,16 @@ static void ingame_rows(void)
 	k = reachable(rows, n, got, GM_ROWS);
 	ck(k == GM_ROWS, "every row is a stop");
 
-	u.earned = 0; u.total = 0;
+	u.earned = 0; u.total = 0; u.shots = 0;
 	n = gm_rows(&u, rows, &b);
-	printf("in-game menu, a game with no set:\n");
+	printf("in-game menu, a game with no set and no screenshots:\n");
 	ck(!strcmp(val(&rows[GM_CHEEVOS]), "none"), "Cheevos says none");
 	ck(!rows[GM_CHEEVOS].live, "and does nothing");
+	ck(!strcmp(val(&rows[GM_SHOTS]), "none") && !rows[GM_SHOTS].live,
+	   "Screenshots says none, and does nothing");
 	k = reachable(rows, n, got, GM_ROWS);
-	ck(k == GM_ROWS - 1, "so the cursor steps over it");
+	ck(k == GM_ROWS - 2, "so the cursor steps over both");
+	ck(!holds(got, k, GM_SHOTS), "never resting on Screenshots");
 	ck(!holds(got, k, GM_CHEEVOS), "and never rests on it");
 	ck(holds(got, k, GM_QUIT) && holds(got, k, GM_CONTINUE),
 	   "the rows either side of it still work");

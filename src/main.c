@@ -49,6 +49,7 @@
 #include "controls.h"
 #include "update.h"
 #include "remap.h"
+#include "shots.h"
 
 /* ChaOS: the button held in the in-game menu to see the game whole. Its name
  * on screen is CTL_PEEK_NAME (controls.h): change one, change both. */
@@ -2647,6 +2648,42 @@ static void on_speed(int x)
 	snprintf(p, sizeof p, "%s/notice.dtov", P_USERDATA);
 	if (notice_render("Fast forward", body, p))
 		plat_resident_line("OVERLAY\tpath=%s\tms=1500", p);
+}
+
+/* ChaOS: screenshots. The game being played's folder (shots.h), set at its
+ * launch; a frame (a BMP Diatom wrote) filed there as a PNG. Returns whether
+ * it was kept. */
+static char g_shots_dir[LIB_PATH * 2];
+
+static bool shot_keep(const char *bmp)
+{
+	char path[LIB_PATH * 2 + 64];
+	SDL_Surface *sf;
+	bool ok = false;
+
+	if (!bmp || !*bmp || !g_shots_dir[0]) return false;
+	if (!shots_new_path(g_shots_dir, time(NULL), path, sizeof path)) return false;
+	if ((sf = IMG_Load(bmp))) {
+		ok = IMG_SavePNG(sf, path) == 0;
+		SDL_FreeSurface(sf);
+	}
+	if (!ok) unlink(path);
+	else sync();
+	fprintf(stderr, "screenshot: %s %s\n", ok ? "kept" : "could not keep", path);
+	return ok;
+}
+
+/* MENU+X in a game: Diatom wrote the frame; filed here, and said over the
+ * game as fast forward is */
+static void on_shot(const char *bmp)
+{
+	char p[CFG_STR * 2];
+	bool ok = shot_keep(bmp);
+
+	unlink(bmp);
+	snprintf(p, sizeof p, "%s/notice.dtov", P_USERDATA);
+	if (notice_render("Screenshot", ok ? "Saved" : "Couldn't save", p))
+		plat_resident_line("OVERLAY\tpath=%s\tms=1200", p);
 }
 
 /* ---------- where you were ------------------------------------------------ */
@@ -8569,9 +8606,12 @@ static int slot_strip(app *a, SDL_Texture *bg, int saving)
 
 /* What the in-game menu needs from the app, handed to gm_rows to become rows.
  * Same split as everywhere else. */
-static int gm_build(app *a, menu_row *out, gm_bufs *b)
+static int gm_build(app *a, menu_row *out, gm_bufs *b, int shots, const char *shot_said)
 {
 	gm_ui u;
+
+	u.shots = shots;
+	u.shot_said = shot_said;
 
 	{
 		/* The OWNER's look, so a game played from Favorites is set for the
@@ -10359,6 +10399,122 @@ static int gm_width(app *a)
 	return menu_std_width(a);
 }
 
+/* ---- ChaOS: screenshots, the game being played's ---------------------------
+ *
+ * Full screen, newest first: the picture as large as a whole-number scale
+ * lets it be, as the game was drawn, and a line under it saying which and
+ * when. Left and right go through them; X deletes the one shown, after X
+ * again to be sure; B or MENU goes back. Y held hides the line. */
+static int gm_count_shots(void)
+{
+	static char names[SHOTS_MAX][SHOTS_NAME];
+	return g_shots_dir[0] ? shots_list(g_shots_dir, names, SHOTS_MAX) : 0;
+}
+
+static void shots_draw(app *a, SDL_Texture *tex, int tw, int th, const char *name,
+                       int sel, int n, bool asking, bool hide)
+{
+	char line[96], when[48];
+
+	SDL_SetRenderDrawColor(a->r, 0, 0, 0, 255);
+	SDL_RenderClear(a->r);
+	if (tex && tw > 0 && th > 0) {
+		int k = TORTOS_SCREEN_W / tw < TORTOS_SCREEN_H / th ? TORTOS_SCREEN_W / tw
+		                                                     : TORTOS_SCREEN_H / th;
+		SDL_Rect d;
+		if (k >= 1) { d.w = tw * k; d.h = th * k; }
+		else {      /* bigger than the screen: fitted */
+			float f = (float)TORTOS_SCREEN_W / tw < (float)TORTOS_SCREEN_H / th
+			        ? (float)TORTOS_SCREEN_W / tw : (float)TORTOS_SCREEN_H / th;
+			d.w = (int)(tw * f); d.h = (int)(th * f);
+		}
+		d.x = (TORTOS_SCREEN_W - d.w) / 2;
+		d.y = (TORTOS_SCREEN_H - d.h) / 2;
+		/* the game's pixels, square and sharp, as the game drew them */
+		SDL_SetTextureScaleMode(tex, SDL_ScaleModeNearest);
+		SDL_RenderCopy(a->r, tex, NULL, &d);
+	}
+	if (!hide) {
+		int lh = ui_font_line(UI_F_META), fh = ui_font_height(UI_F_META);
+		SDL_Rect bar = { 0, TORTOS_SCREEN_H - lh - fh - 14, TORTOS_SCREEN_W, lh + fh + 14 };
+
+		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 170);
+		SDL_RenderFillRect(a->r, &bar);
+		shots_label(name, when, sizeof when);
+		snprintf(line, sizeof line, "%s%d of %d  \xC2\xB7  %s%s",
+		         sel > 0 ? "\xE2\x80\xB9  " : "", sel + 1, n, when,
+		         sel < n - 1 ? "  \xE2\x80\xBA" : "");
+		ui_text(a->r, ui_font(UI_F_META), line, TORTOS_SCREEN_W / 2, bar.y + 6, 0,
+		        UI_TEXT_SOFT);
+		ui_text(a->r, ui_font(UI_F_META),
+		        asking ? "Delete this screenshot?   X  Delete    B  Keep"
+		               : "X  Delete    B  Back    Hold " CTL_PEEK_NAME "  Hide this",
+		        TORTOS_SCREEN_W / 2, bar.y + 6 + lh, 0,
+		        asking ? (SDL_Color){ (Uint8)(a->tint >> 16), (Uint8)(a->tint >> 8),
+		                              (Uint8)a->tint, 255 }
+		               : UI_TEXT_DIM);
+	}
+}
+
+static void shots_screen(app *a)
+{
+	static char names[SHOTS_MAX][SHOTS_NAME];
+	SDL_Texture *tex = NULL;
+	int n = shots_list(g_shots_dir, names, SHOTS_MAX), sel = 0, loaded = -1;
+	int tw = 0, th = 0;
+	bool asking = false, done = false;
+	char path[LIB_PATH * 2 + SHOTS_NAME];
+
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+	while (n > 0 && !done && !want_quit) {
+		plat_input_poll(&a->in);
+		if (asking) {
+			if (a->in.pressed[IN_X]) {
+				if (shots_delete(g_shots_dir, names[sel])) {
+					n = shots_list(g_shots_dir, names, SHOTS_MAX);
+					if (sel >= n) sel = n - 1;
+					loaded = -1;
+				}
+				asking = false;
+			} else if (a->in.pressed[IN_BACK] || a->in.pressed[IN_ACCEPT]) {
+				asking = false;
+			}
+		} else {
+			if (in_repeat(&a->in, IN_LEFT)  && sel > 0)     sel--;
+			if (in_repeat(&a->in, IN_RIGHT) && sel < n - 1) sel++;
+			if (a->in.pressed[IN_X]) asking = true;
+			if (menu_leaving(a)) done = true;
+		}
+		if (a->in.pressed[IN_POWER] || idle_due(a)) {
+			plat_note_power_pressed();
+			plat_resident_line("STOP");
+			done = true;
+		}
+		if (n <= 0) break;
+		if (loaded != sel) {
+			SDL_Surface *sf;
+			if (tex) SDL_DestroyTexture(tex);
+			tex = NULL;
+			snprintf(path, sizeof path, "%s/%s", g_shots_dir, names[sel]);
+			if ((sf = IMG_Load(path))) {
+				tex = SDL_CreateTextureFromSurface(a->r, sf);
+				SDL_FreeSurface(sf);
+			}
+			if (tex) SDL_QueryTexture(tex, NULL, NULL, &tw, &th);
+			loaded = sel;
+		}
+
+		shots_draw(a, tex, tw, th, names[sel], sel, n, asking, a->in.down[IN_Y] && !asking);
+		plat_present();
+		SDL_Delay(8);
+	}
+	if (tex) SDL_DestroyTexture(tex);
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+}
+
 /* The in-game menu's context. `resume` is what the epilogue turns on: whether
  * the player is going back to the game or the game is over. */
 typedef struct {
@@ -10368,6 +10524,9 @@ typedef struct {
 	gm_bufs      bufs;
 	menu_style   st;
 	bool         resume;
+	int          shots;        /* ChaOS: this game's screenshots */
+	Uint32       shot_said;    /* when Take Screenshot last said "Saved", or 0 */
+	bool         shot_ok;
 } gm_ctx;
 
 /* The overlay as Diatom draws it: around the game's picture, never over it
@@ -10461,7 +10620,10 @@ static int gm_menu_build(void *ctx, menu_row *rows, int max,
 
 	(void)max;
 	*heading = NULL;       /* no title: the game behind it is the title */
-	return gm_build(c->a, rows, &c->bufs);
+	/* "Saved" for a moment after Take Screenshot */
+	if (c->shot_said && SDL_GetTicks() - c->shot_said > 1500) c->shot_said = 0;
+	return gm_build(c->a, rows, &c->bufs, c->shots,
+	                c->shot_said ? (c->shot_ok ? "Saved" : "Couldn't save") : NULL);
 }
 
 /* The paused game, not the shelf. Diatom reports its rect with every DISPLAY
@@ -10553,6 +10715,17 @@ static menu_result gm_key(app *a, void *ctx, in_button key, int sel)
 		memset(&a->in, 0, sizeof a->in);
 		break;
 	}
+	case GM_SHOT:
+		/* The paused frame, as the game drew it: Diatom wrote it on the
+		 * way into the pause */
+		c->shot_ok = shot_keep(plat_resident_last_preview());
+		c->shot_said = SDL_GetTicks();
+		c->shots = gm_count_shots();
+		break;
+	case GM_SHOTS:
+		shots_screen(a);
+		c->shots = gm_count_shots();
+		break;
 	case GM_SHADER:
 		shader_screen(a, gm_owner(a), c);
 		break;
@@ -10834,6 +11007,7 @@ static void game_menu(app *a)
 	gm_ctx c = { 0 };
 
 	c.a = a;
+	c.shots = gm_count_shots();
 	/* The frame as the shader drew it, when it did: what the player was
 	 * looking at. And the overlay over it. */
 	gm_load_bg(&c);
@@ -11125,6 +11299,9 @@ static void launch(app *a)
 			look_files(a, o, &lcfg, &ldtov);
 			plat_resident_set_look(lcfg, ldtov);
 		}
+		/* ChaOS: where its screenshots go (MENU+X, and the in-game menu) */
+		shots_dir(P_CARD, a->sys.systems[o].folder, v->list.items[v->cursor].file,
+		          g_shots_dir, sizeof g_shots_dir);
 		/* ChaOS: its buttons, and rewind, both by the console it belongs to */
 		{
 			char spec[512];
@@ -12563,6 +12740,8 @@ static int shot_screen = -1;
 static int shot_menu, shot_menu_sel;
 /* --shader [group [row]]: the shader's page, -1, or a group's (ChaOS). */
 static int shot_shader = -2, shot_shader_sel;
+static const char *shot_shots;      /* --shots DIR [asking]: the viewer */
+static int shot_shots_ask;
 static bool shot_ss;
 static int shot_kb, shot_kb_layer;
 static const char *shot_notice;
@@ -12728,6 +12907,21 @@ static void take_shot(app *a)
 	if (shot_menu) tortos_menu_draw(a, shot_menu_sel);
 	if (shot_shader > -2) shader_shot(a, shot_shader, shot_shader_sel);
 	if (shot_ss) ss_shot(a);
+	if (shot_shots) {
+		static char names[SHOTS_MAX][SHOTS_NAME];
+		int n = shots_list(shot_shots, names, SHOTS_MAX), tw = 0, th = 0;
+		char p[LIB_PATH * 2 + SHOTS_NAME];
+		SDL_Surface *sf;
+		SDL_Texture *t = NULL;
+
+		if (n > 1) {
+			snprintf(p, sizeof p, "%s/%s", shot_shots, names[1]);
+			if ((sf = IMG_Load(p))) { t = SDL_CreateTextureFromSurface(a->r, sf); SDL_FreeSurface(sf); }
+			if (t) SDL_QueryTexture(t, NULL, NULL, &tw, &th);
+			shots_draw(a, t, tw, th, names[1], 1, n, shot_shots_ask, false);
+			if (t) SDL_DestroyTexture(t);
+		}
+	}
 	if (shot_slots) shot_draw_slots(a);
 	if (shot_kb) kb_preview(a->r, shot_kb_title, shot_kb_text,
 	                        shot_kb_layer, 1, 0, MENU_ACCENT);
@@ -13015,6 +13209,10 @@ int main(int argc, char *argv[])
 			shot_speed = true;
 		}
 		else if (!strcmp(argv[i], "--ss")) shot_ss = true;
+		else if (!strcmp(argv[i], "--shots") && i + 1 < argc) {
+			shot_shots = argv[++i];
+			if (i + 1 < argc && !strcmp(argv[i + 1], "ask")) { shot_shots_ask = 1; i++; }
+		}
 		else if (!strcmp(argv[i], "--mode") && i + 1 < argc) shot_mode = argv[++i];
 		else if (!strcmp(argv[i], "--sysmove") && i + 1 < argc)
 			shot_sysmove = (float)atof(argv[++i]);
@@ -13399,6 +13597,7 @@ int main(int argc, char *argv[])
 		chv_earned_load();
 		plat_resident_on_unlock(on_cheevo_unlocked);
 		plat_resident_on_speed(on_speed);
+		plat_resident_on_shot(on_shot);
 		plat_resident_on_tick(on_game_tick);
 		plat_resident_on_battery_empty(battery_empty);
 

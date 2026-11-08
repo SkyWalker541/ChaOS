@@ -53,16 +53,34 @@ static int cc_buttons(const ctl_console *cc, int *idx)
 	return n;
 }
 
+/* What no mapping changes: MENU and its chords, and POWER */
+static int cc_shortcuts(const ctl_console *cc, menu_row *out)
+{
+	int n = 0;
+	out[n++] = (menu_row){ "MENU",    "Menu",              false };
+	out[n++] = (menu_row){ "MENU+R1", "Fast forward",      false };
+	if (cc->rewind)
+		out[n++] = (menu_row){ "MENU+L1", "Rewind, held",  false };
+	out[n++] = (menu_row){ "MENU+X",  "Screenshot",        false };
+	out[n++] = (menu_row){ "POWER",   "Save and turn off", false };
+	return n;
+}
+
 int ctl_console_pages(const ctl_console *cc)
 {
 	int idx[CTL_CC_BUTTONS], nb = cc_buttons(cc, idx);
-	return (nb + CC_PER_PAGE - 1) / CC_PER_PAGE + 1;
+	menu_row sc[8];
+	int ns = cc_shortcuts(cc, sc);
+	return (nb + CC_PER_PAGE - 1) / CC_PER_PAGE + (ns + CC_PER_PAGE - 1) / CC_PER_PAGE;
 }
 
 int ctl_console_rows(const ctl_console *cc, int page, menu_row *out)
 {
 	int idx[CTL_CC_BUTTONS], nb = cc_buttons(cc, idx);
-	int pages = (nb + CC_PER_PAGE - 1) / CC_PER_PAGE + 1, n = 0, i;
+	int bpages = (nb + CC_PER_PAGE - 1) / CC_PER_PAGE;
+	int pages = ctl_console_pages(cc), n = 0, i;
+	menu_row sc[8];
+	int ns = cc_shortcuts(cc, sc);
 	const char *name;
 
 	if (page < 0) page = 0;
@@ -70,17 +88,16 @@ int ctl_console_rows(const ctl_console *cc, int page, menu_row *out)
 	out[n] = (menu_row){ "Button Mapping", NULL, true };
 	out[n++].opens = true;
 	out[n++] = MENU_RULE;
-	if (page < pages - 1) {
+	if (page < bpages) {
 		for (i = page * CC_PER_PAGE; i < nb && i < (page + 1) * CC_PER_PAGE; i++)
 			out[n++] = (menu_row){ cc->button[idx[i]], cc->value[idx[i]], false };
 		name = "Buttons";
 	} else {
-		/* What no mapping changes: MENU and its chords, and POWER */
-		out[n++] = (menu_row){ "MENU",    "Menu",              false };
-		out[n++] = (menu_row){ "MENU+R1", "Fast forward",      false };
-		if (cc->rewind)
-			out[n++] = (menu_row){ "MENU+L1", "Rewind, held",  false };
-		out[n++] = (menu_row){ "POWER",   "Save and turn off", false };
+		/* shared out evenly over their pages: 3 and 2 rather than 4 and 1 */
+		int sp = page - bpages, spages = pages - bpages;
+		int per = (ns + spages - 1) / spages;
+		for (i = sp * per; i < ns && i < (sp + 1) * per; i++)
+			out[n++] = sc[i];
 		name = "Shortcuts";
 	}
 	out[n++] = MENU_RULE;

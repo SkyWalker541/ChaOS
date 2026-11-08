@@ -20,7 +20,7 @@ CHECKS = check-cheevos check-hare check-httpd check-idle check-rahash \
          check-raset check-xfer check-menus check-artscrape check-artrun check-audioout \
          check-db check-stats check-sort check-bt check-ss \
          check-muselib check-musequeue check-museart check-controls check-logpack \
-         check-clock check-update check-remap
+         check-clock check-update check-remap check-shots
 
 check:
 	@fail=0; for c in $(CHECKS); do \
@@ -122,6 +122,15 @@ build-native/audioout-check: tools/audioout-check.c src/audioout.c \
 # enough to sit still. The page is the device's own copy of the controls list,
 # so what it omits is invisible until somebody goes looking for a button.
 # ChaOS: Button Mapping's tables
+# ChaOS: screenshots, per game (src/shots.c)
+check-shots: build-native/shots-check
+	@./build-native/shots-check
+
+build-native/shots-check: tools/shots-check.c src/shots.c src/shots.h FORCE
+	@mkdir -p build-native
+	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g \
+	      -o $@ tools/shots-check.c src/shots.c
+
 check-remap: build-native/remap-check
 	@./build-native/remap-check
 
