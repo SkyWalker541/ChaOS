@@ -8268,8 +8268,13 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 	/* The row's identity rather than its position: a device with no radio has
 	 * fewer of them, and the same list the build used says which is which. */
 	{
+		/* Every field that hides a row, as the build sets it - a row hidden
+		 * there and not here moves every row under it by one (0.10.2's
+		 * Transition Speed turned Menu Color) */
 		sys_ui dev = { .no_wifi = !plat_has_wifi(), .no_bt = !plat_has_bluetooth(),
-		               .cable_xfer = plat_cable_link(NULL, 0), .ss_have = ss_have_dev() };
+		               .cable_xfer = plat_cable_link(NULL, 0), .ss_have = ss_have_dev(),
+		               .name_speed = CARDS_DRAWN(g_cards) ? PN_SPEEDS[g_pn_speed[g_dir]].name
+		                                                  : NULL };
 		pm_row ids[PM_ROWS];
 		int n = sys_menu_tortos_rows(&dev, ids);
 
