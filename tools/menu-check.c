@@ -669,13 +669,14 @@ static void radio_less(void)
 	n = sys_menu_build(&u, rows, &b, &heading);
 	k = sys_menu_tortos_rows(&u, pm);
 	printf("ChaOS menu, no radio at all:\n");
-	ck(n == k && n == PM_ROWS - 6, "six rows fewer, and the build agrees with the list");
+	ck(n == k && n == PM_ROWS - 7, "seven rows fewer (Updates too), and the build agrees with the list");
 	ck(!has_label(rows, n, "Wi-Fi") && !has_label(rows, n, "Bluetooth"),
 	   "no Wi-Fi, no Bluetooth");
 	ck(!has_label(rows, n, "ChaOS Transfer") && !has_label(rows, n, "Box Art"),
 	   "no ChaOS Transfer, no Box Art");
 	ck(!has_label(rows, n, "Cheevos") && !has_label(rows, n, "ScreenScraper"),
 	   "and no sign-ins");
+	ck(!has_label(rows, n, "Updates"), "and no Updates, which come over Wi-Fi");
 	ck(has_label(rows, n, "Audio Output") && has_label(rows, n, "Play Time") &&
 	   has_label(rows, n, "Controls") && has_label(rows, n, "About ChaOS") &&
 	   has_label(rows, n, "Date & Time"),
@@ -689,7 +690,7 @@ static void radio_less(void)
 	n = sys_menu_build(&u, rows, &b, &heading);
 	k = sys_menu_tortos_rows(&u, pm);
 	printf("ChaOS menu, no radio, files over the cable:\n");
-	ck(n == k && n == PM_ROWS - 5, "five rows fewer: the transfer row stays");
+	ck(n == k && n == PM_ROWS - 6, "six rows fewer: the transfer row stays");
 	for (i = 0; i < k && pm[i] != PM_XFER; i++) { }
 	ck(i < k && !strcmp(rows[i].label, "ChaOS Transfer"),
 	   "as ChaOS Transfer, where the list says it is");

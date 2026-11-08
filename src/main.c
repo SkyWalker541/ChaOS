@@ -47,6 +47,7 @@
 #include "ssrun.h"
 #include "sys_menu.h"
 #include "controls.h"
+#include "update.h"
 
 /* ChaOS: the button held in the in-game menu to see the game whole. Its name
  * on screen is CTL_PEEK_NAME (controls.h): change one, change both. */
@@ -2942,6 +2943,8 @@ static bool idle_due_ctx(void *ctx) { return idle_due((app *)ctx); }
  * low. Drawn with horizontal spans -- SDL has no circle. */
 static void draw_low_battery_dot(SDL_Renderer *r);
 static void redraw_at(Uint32 t);   /* below, with the rest of the redraw clock */
+static void draw_upd_notice(app *a);   /* ChaOS: with the Updates screen */
+static void upd_poll(void);
 
 /* The dot as the battery has it: steady when low, blinking when critical, a
  * second on and a second off, slow enough not to pull at the eye. Returns how
@@ -3742,6 +3745,7 @@ static void render(app *a)
 {
 	g_redraw_at = REDRAW_NEVER;
 	draw_shelf(a);
+	draw_upd_notice(a);
 	plat_draw_osd(a->r);
 	/* The tint lands exactly on its target now (see tick_tint), so this is a
 	 * test that ends rather than one that is true forever. */
@@ -4919,6 +4923,7 @@ static int menu_build(app *a, screen_id screen, int sys,
 		u.cards     = CARD_SETS[g_cards].name;
 		u.cards_dir = CARD_DIRS[g_dir].name;
 		u.menu_color = MENU_COLORS[g_menu_color].name;
+		u.update    = upd_row_value();
 		u.auto_off  = a->auto_off;
 		{
 			static char clk[32];
@@ -7008,6 +7013,215 @@ static bool stats_screen(app *a)
 	return false;
 }
 
+/* ---- ChaOS: Updates ---------------------------------------------------------
+ *
+ * What src/update.h does, on a screen: what is installed and what is latest,
+ * and the one thing to do next - check, download, cancel, install, or remove
+ * a download nobody wants yet. Nothing here starts on its own: the boot's
+ * check only says there is something (upd_announce, on the shelf), and a
+ * finished download waits on the card until the player comes back for it. */
+
+enum { UP_NONE, UP_CHECK, UP_DOWNLOAD, UP_CANCEL, UP_INSTALL, UP_REMOVE };
+
+typedef struct {
+	app  *a;
+	int   ids[16];
+	char  latest[48], size[24], pct[16], batt[32];
+	bool  online;
+	wifi_state wifi;
+	Uint32 next_look;
+} upd_ctx;
+
+/* Enough charge to be sure of the boot that writes the new system: a
+ * quarter, or the cable */
+#define UPD_MIN_BATTERY 25
+
+static bool upd_battery_ok(char *why, size_t n)
+{
+	int pct = 100;
+	bool charging = false;
+
+	if (!plat_battery(&pct, &charging) || charging || pct >= UPD_MIN_BATTERY) return true;
+	snprintf(why, n, "charge to %d%%", UPD_MIN_BATTERY);
+	return false;
+}
+
+static int upd_build(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	upd_ctx *c = ctx;
+	upd_state s;
+	const ota_info *o = upd_latest();
+	Uint32 now = plat_now_ms();
+	int n = 0;
+
+	(void)max;
+	if (now >= c->next_look) {
+		char ssid[WIFI_SSID_MAX], ip[64];
+		c->online = net_online();
+		c->wifi = wifi_status(ssid, sizeof ssid, ip, sizeof ip);
+		c->next_look = now + 2000;
+	}
+	upd_tick(c->online);
+	s = upd_get();
+	*heading = "Updates";
+
+	switch (s) {
+	case UPD_IDLE:     snprintf(c->latest, sizeof c->latest, "not checked"); break;
+	case UPD_CHECKING: snprintf(c->latest, sizeof c->latest, "checking"); break;
+	case UPD_CURRENT:  snprintf(c->latest, sizeof c->latest, "%s, up to date", o->version); break;
+	case UPD_FAILED:   snprintf(c->latest, sizeof c->latest, "%s", o->version[0] ? o->version : "unknown"); break;
+	default:           snprintf(c->latest, sizeof c->latest, "%s", o->version); break;
+	}
+	c->ids[n] = UP_NONE; rows[n++] = (menu_row){ "Installed", CHAOS_VERSION, false };
+	c->ids[n] = UP_NONE; rows[n++] = (menu_row){ "Latest", c->latest, false };
+	c->ids[n] = UP_NONE; rows[n++] = MENU_RULE;
+
+	switch (s) {
+	case UPD_AVAILABLE:
+		snprintf(c->size, sizeof c->size, "%.0f MB", (double)o->size / 1e6);
+		c->ids[n] = UP_DOWNLOAD;
+		rows[n++] = (menu_row){ "Download", c->online ? c->size : "needs Wi-Fi", true };
+		c->ids[n] = UP_NONE; rows[n++] = MENU_NOTE("Games and saves stay");
+		break;
+	case UPD_INSTALLER:
+		c->ids[n] = UP_NONE; rows[n++] = MENU_NOTE("This one needs ChaOS Installer");
+		c->ids[n] = UP_NONE; rows[n++] = MENU_NOTE("on a computer");
+		break;
+	case UPD_DOWNLOADING:
+		snprintf(c->pct, sizeof c->pct, "%d%%", upd_percent());
+		c->ids[n] = UP_NONE;   rows[n++] = (menu_row){ "Downloading", c->pct, false };
+		c->ids[n] = UP_CANCEL; rows[n++] = (menu_row){ "Cancel", NULL, true };
+		break;
+	case UPD_UNPACKING:
+		c->ids[n] = UP_NONE; rows[n++] = (menu_row){ "Checking the download", NULL, false };
+		break;
+	case UPD_READY: {
+		bool ok = upd_battery_ok(c->batt, sizeof c->batt);
+		c->ids[n] = UP_INSTALL;
+		rows[n++] = (menu_row){ "Install and Restart", ok ? NULL : c->batt, ok };
+		c->ids[n] = UP_REMOVE;
+		rows[n++] = (menu_row){ "Remove Download", NULL, true };
+		/* An install that could not be armed says why, and stays ready */
+		c->ids[n] = UP_NONE;
+		rows[n++] = MENU_NOTE(upd_error()[0] ? upd_error() : "Downloaded, and checked");
+		break;
+	}
+	case UPD_FAILED:
+		c->ids[n] = UP_NONE; rows[n++] = MENU_NOTE(upd_error());
+		/* then Try Again, below */
+		__attribute__((fallthrough));
+	default:
+		c->ids[n] = UP_CHECK;
+		/* Live without Wi-Fi too: A then says what is wrong with it, Wi-Fi
+		 * off or not connected, rather than the row doing nothing */
+		rows[n++] = (menu_row){ s == UPD_FAILED ? "Try Again" : "Check Now",
+		                        c->online ? NULL : "needs Wi-Fi",
+		                        s != UPD_CHECKING };
+		break;
+	}
+	return n;
+}
+
+static menu_result upd_key(app *a, void *ctx, in_button key, int sel)
+{
+	upd_ctx *c = ctx;
+	const ota_info *o = upd_latest();
+	int id = sel >= 0 && sel < 16 ? c->ids[sel] : UP_NONE;
+	char q[64];
+
+	if (key != IN_ACCEPT) return MENU_STAY;
+	if ((id == UP_CHECK || id == UP_DOWNLOAD) && !c->online) {
+		upd_offline(c->wifi == WIFI_OFF);
+		return MENU_STAY;
+	}
+	switch (id) {
+	case UP_CHECK:
+		/* After a failed download, Try Again downloads again; otherwise it
+		 * asks again */
+		if (upd_get() == UPD_FAILED && o->root[0] && !strcmp(o->base, upd_base()) &&
+		    ota_vercmp(o->version, CHAOS_VERSION) > 0 && upd_download())
+			break;
+		upd_check();
+		break;
+	case UP_DOWNLOAD:
+		upd_download();
+		break;
+	case UP_CANCEL:
+		if (confirm_panel(a, "Updates", "Stop the download?", "Stop")) upd_cancel();
+		break;
+	case UP_REMOVE:
+		if (confirm_panel(a, "Updates", "Remove the download?", "Remove")) upd_remove();
+		break;
+	case UP_INSTALL:
+		snprintf(q, sizeof q, "Install ChaOS %s now?", o->version);
+		if (!confirm_panel(a, "Updates", q, "Install and Restart")) break;
+		if (!upd_arm()) break;
+		/* The restart: as the power button does it, with launch.sh told to
+		 * boot again rather than power off. The boot writes the new system
+		 * and checks it, a few seconds longer than usual, then ChaOS
+		 * copies itself onto the card and comes up as it was. */
+		{
+			FILE *f = fopen(CHAOS_REBOOT_FLAG, "w");
+			if (f) fclose(f);
+		}
+		power_off(a);
+		return MENU_DONE;
+	default:
+		break;
+	}
+	return MENU_STAY;
+}
+
+static void update_screen(app *a)
+{
+	upd_ctx c;
+
+	memset(&c, 0, sizeof c);
+	c.a = a;
+	menu_run(a, &(menu_style){ .accent = MENU_ACCENT, .fixed_w = 0 }, upd_build, upd_key, &c);
+}
+
+/* The boot's check, once Wi-Fi is up, and what it found said once on the
+ * shelf. Called every pass of the shelf's loop. */
+static char   g_upd_msg[96];
+static Uint32 g_upd_msg_until;
+
+static void upd_poll(void)
+{
+	static Uint32 next;
+	static bool online;
+	Uint32 now = plat_now_ms();
+
+	if (now >= next) { online = net_online(); next = now + 5000; }
+	if (upd_tick(online)) redraw_now();
+	if (upd_announce(g_upd_msg, sizeof g_upd_msg)) {
+		g_upd_msg_until = now + 7000;
+		redraw_now();
+	}
+}
+
+/* A pill across the top of the shelf while there is something to say */
+static void draw_upd_notice(app *a)
+{
+	Uint32 now = plat_now_ms();
+	TTF_Font *f = ui_font(UI_F_META);
+	unsigned acc = MENU_ACCENT;
+	SDL_Color edge = { (Uint8)(acc >> 16), (Uint8)(acc >> 8), (Uint8)acc, 255 };
+	int w, h;
+
+	if (!g_upd_msg[0] || now >= g_upd_msg_until) return;
+	w = ui_text_width(f, g_upd_msg) + 48;
+	h = ui_font_height(UI_F_META) + 20;
+	{
+		SDL_Rect outer = { (TORTOS_SCREEN_W - w) / 2 - 2, 22, w + 4, h + 4 };
+		SDL_Rect inner = { (TORTOS_SCREEN_W - w) / 2, 24, w, h };
+		ui_round_rect(a->r, &outer, h / 2 + 2, edge);
+		ui_round_rect(a->r, &inner, h / 2, (SDL_Color){ 23, 21, 28, 255 });
+	}
+	ui_text(a->r, f, g_upd_msg, TORTOS_SCREEN_W / 2, 34, 0, UI_TEXT);
+	redraw_at(g_upd_msg_until);
+}
+
 static void about_screen(app *a)
 {
 	char ver[48], addr[80], batt[32], up[48];
@@ -7624,6 +7838,7 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 	case PM_STATS:        if (stats_screen(a)) return MENU_DONE; break;
 	case PM_CONTROLS:     controls_screen(a); break;
 	case PM_ABOUT:        about_screen(a); break;
+	case PM_UPDATE:       update_screen(a); break;
 	default: break;
 	}
 	return MENU_STAY;
@@ -11899,6 +12114,7 @@ static int shot_info;
  * --screen asked for: the page follows UI Direction, so this is the only way
  * to look at all three without setting the device three times. */
 static int shot_controls = -1;
+static int shot_updates = -1;   /* ChaOS: --updates <upd_state> */
 static int shot_art;
 static const char *shot_art_now = "Legend of Zelda, The - A Link to the Past (USA)";
 static int shot_hare;
@@ -12073,6 +12289,30 @@ static void take_shot(app *a)
 		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
 		SDL_RenderFillRect(a->r, NULL);
 		menu_draw(a, head, rows, n, -1, menu_std_width(a), MENU_ACCENT);
+	}
+	if (shot_updates >= 0) {
+		upd_ctx c;
+		menu_row rows[16];
+		const char *head;
+		int n;
+
+		memset(&c, 0, sizeof c);
+		c.a = a;
+		c.next_look = ~0u;              /* as found, not asked */
+		c.online = shot_updates < 100;
+		c.wifi = c.online ? WIFI_CONNECTED : WIFI_OFF;
+		upd_demo((upd_state)(shot_updates % 100), "0.8.0",
+		         shot_updates % 100 == UPD_FAILED ? "Wi-Fi is off" : NULL);
+		n = upd_build(&c, rows, 16, &head);
+		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
+		SDL_RenderFillRect(a->r, NULL);
+		menu_draw(a, head, rows, n, n - 1, 0, MENU_ACCENT);
+		if (shot_updates % 100 == UPD_AVAILABLE) {
+			snprintf(g_upd_msg, sizeof g_upd_msg, "ChaOS 0.8.0 is available: MENU > Updates");
+			g_upd_msg_until = plat_now_ms() + 5000;
+			draw_upd_notice(a);
+		}
 	}
 	if (shot_np >= 0) np_shot(a);
 	if (shot_art)
@@ -12265,6 +12505,8 @@ int main(int argc, char *argv[])
 		else if (!strcmp(argv[i], "--gamemove") && i + 1 < argc)
 			shot_gamemove = (float)atof(argv[++i]);
 		else if (!strcmp(argv[i], "--info")) shot_info = 1;
+		else if (!strcmp(argv[i], "--updates") && i + 1 < argc)
+			shot_updates = atoi(argv[++i]);   /* an upd_state, +100 offline */
 		else if (!strcmp(argv[i], "--controls")) {
 			shot_controls = 0;
 			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9')
@@ -12648,6 +12890,8 @@ int main(int argc, char *argv[])
 
 		snprintf(cp, sizeof cp, "%s/cacert.pem", P_ROOT);
 		net_set_ca_path(cp);
+		/* ChaOS: what is installed, and any update waiting on the card */
+		upd_init(P_CARD, P_ROOT, CHAOS_VERSION, TORTOS_VERSION);
 		ra_creds_load();
 		ss_creds_load();
 		{
@@ -12916,6 +13160,9 @@ int main(int argc, char *argv[])
 
 		/* Unlocks sent in the background: apply what the account answered. */
 		ra_flush_poll();
+
+		/* ChaOS: the boot's update check, and whatever download is running */
+		upd_poll();
 
 		/* What Muse said since the last pass - including END, which is how
 		 * the next track of an album starts while nobody is on its screen -

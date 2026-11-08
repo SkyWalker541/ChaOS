@@ -348,4 +348,6 @@ while : ; do
 	start_resident
 done
 sync
-poweroff
+# ChaOS: an update installs at the next boot (src/update.h): boot again rather
+# than power off
+if [ -f /tmp/chaos_reboot ]; then reboot; else poweroff; fi

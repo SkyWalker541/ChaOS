@@ -51,8 +51,30 @@ jobs:
           B=${{ steps.v.outputs.base }}
           mkdir -p out
           sudo TORTOS_ELF=dist/brick/tortos.elf DIATOM_NOTICE=dist/brick/ChaOS-diatom-THIRD-PARTY.md \
+            ROOT_OUT=$PWD/root.squashfs \
             sh tools/chaos-image.sh tortos/TortOS-v$B-brick.img.xz out/ChaOS-v$V-brick.img.xz dist/brick/diatom
-          sudo chown -R "$(id -u):$(id -g)" out
+          sudo chown -R "$(id -u):$(id -g)" out root.squashfs
+
+      - name: The update over Wi-Fi
+        if: steps.v.outputs.out != '1'
+        run: |
+          # The new root alone, and ChaOS-ota.txt, which the Brick reads from
+          # the latest release's downloads to know what it is (src/update.h)
+          V=${{ steps.v.outputs.version }}
+          B=${{ steps.v.outputs.base }}
+          R=ChaOS-v$V-brick-root.squashfs.xz
+          xz -T0 -9 -c root.squashfs > out/$R
+          cat > out/ChaOS-ota.txt <<EOF
+          # ChaOS: an update over Wi-Fi. Read by the Brick (src/update.h).
+          version = $V
+          base = $B
+          root = $R
+          sha256 = $(sha256sum out/$R | cut -d' ' -f1)
+          size = $(stat -c%s out/$R)
+          notes = $(git log -1 --format=%s | tr -d '\n' | cut -c1-150)
+          EOF
+          sed -i 's/^          //' out/ChaOS-ota.txt
+          cat out/ChaOS-ota.txt
 
       - name: Its source
         if: steps.v.outputs.out != '1'
@@ -60,7 +82,7 @@ jobs:
           V=${{ steps.v.outputs.version }}
           B=${{ steps.v.outputs.base }}
           sh tools/chaos-sources.sh tortos/TortOS-v$B-brick-sources.tar out/ChaOS-v$V-brick-sources.tar
-          cd out && sha256sum ChaOS-v* > SHA256SUMS && cat SHA256SUMS
+          cd out && sha256sum ChaOS-v* ChaOS-ota.txt > SHA256SUMS && cat SHA256SUMS
 
       - name: Release
         if: steps.v.outputs.out != '1'

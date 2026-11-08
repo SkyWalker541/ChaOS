@@ -20,6 +20,9 @@
 
 /* launch.sh polls for this and powers the device down when it appears. */
 #define TORTOS_POWEROFF_FLAG "/tmp/tortos_poweroff"
+/* ChaOS: with the power-off flag, launch.sh reboots instead (an update
+ * installing at the next boot, src/update.h) */
+#define CHAOS_REBOOT_FLAG "/tmp/chaos_reboot"
 
 /* Overridable at runtime so the launcher can be pointed at a test tree. */
 extern const char *P_ROOT;     /* /mnt/SDCARD/TortOS      */

@@ -27,7 +27,7 @@ int sys_menu_tortos_rows(const sys_ui *u, pm_row *out)
 		 * account nobody can reach is a row that can only fail. Audio Output
 		 * stays, since a cable and the speaker are still two places. */
 		if (u->no_wifi && (r == PM_WIFI || r == PM_SCRAPE ||
-		                   r == PM_ACHIEVEMENTS || r == PM_SS))
+		                   r == PM_ACHIEVEMENTS || r == PM_SS || r == PM_UPDATE))
 			continue;
 		/* Unless the files go over a cable, which needs no radio. */
 		if (u->no_wifi && !u->cable_xfer && r == PM_XFER) continue;
@@ -234,6 +234,10 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	/* What every button does, per screen. Needs nothing of the device, which
 	 * is the point: it is the page you reach when the thing you have forgotten
 	 * is which button opens Muse. See src/controls.h. */
+	/* ChaOS: a newer ChaOS, fetched and installed over Wi-Fi (src/update.h).
+	 * Live without Wi-Fi too: a download already on the card installs
+	 * without it, and the screen says what it needs. */
+	full[PM_UPDATE]       = (menu_row){ "Updates", u->update, true };
 	full[PM_CONTROLS]     = (menu_row){ "Controls",    NULL,   true  };
 	full[PM_ABOUT]        = (menu_row){ "About ChaOS", NULL,   true  };
 	/* ChaOS: the rows A opens a screen from, marked so */
@@ -241,6 +245,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	full[PM_XFER].opens = full[PM_CLOCK].opens = full[PM_SCRAPE].opens = true;
 	full[PM_ACHIEVEMENTS].opens = full[PM_SS].opens = true;
 	full[PM_CONTROLS].opens = full[PM_ABOUT].opens = true;
+	full[PM_UPDATE].opens = true;
 	{
 		pm_row ids[PM_ROWS];
 		int k, n = sys_menu_tortos_rows(u, ids);

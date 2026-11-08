@@ -413,6 +413,53 @@ bool net_get_async(const char *url, const char *path, int timeout_s)
 	return true;
 }
 
+pid_t net_get_spawn(const char *url, const char *path, int timeout_s)
+{
+	const char *bin = curl_bin();
+	char cfg[160];
+	pid_t pid;
+
+	if (!bin) return -1;
+	snprintf(cfg, sizeof cfg, "/tmp/chaos-get-%ld-%u.curl", (long)getpid(),
+	         (unsigned)now_ms());
+	if (!write_get_config(cfg, url, path, timeout_s)) return -1;
+	pid = fork();
+	if (pid < 0) { unlink(cfg); return -1; }
+	if (pid == 0) {
+		char *argv[4];
+		int devnull = open("/dev/null", O_RDWR);
+
+		if (devnull >= 0) { dup2(devnull, 0); dup2(devnull, 1); close(devnull); }
+		argv[0] = (char *)bin;
+		argv[1] = (char *)"-K";
+		argv[2] = cfg;
+		argv[3] = NULL;
+		execv(bin, argv);
+		_exit(127);
+	}
+	{
+		/* The config's name, by pid, for net_spawn_done */
+		char link[64];
+		snprintf(link, sizeof link, "/tmp/chaos-get-%ld.name", (long)pid);
+		FILE *f = fopen(link, "w");
+		if (f) { fputs(cfg, f); fclose(f); }
+	}
+	return pid;
+}
+
+void net_spawn_done(pid_t pid)
+{
+	char link[64], cfg[160];
+	FILE *f;
+
+	snprintf(link, sizeof link, "/tmp/chaos-get-%ld.name", (long)pid);
+	f = fopen(link, "r");
+	if (!f) return;
+	if (fgets(cfg, sizeof cfg, f)) unlink(cfg);
+	fclose(f);
+	unlink(link);
+}
+
 int net_async_poll(void)
 {
 	int st;

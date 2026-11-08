@@ -12,6 +12,7 @@
   <a href="#install">Install</a> &nbsp;·&nbsp;
   <a href="#shaders">Shaders</a> &nbsp;·&nbsp;
   <a href="#overlays">Overlays</a> &nbsp;·&nbsp;
+  <a href="#updates">Updates</a> &nbsp;·&nbsp;
   <a href="#supported-systems">Systems</a> &nbsp;·&nbsp;
   <a href="#controls">Controls</a> &nbsp;·&nbsp;
   <a href="#faq">FAQ</a> &nbsp;·&nbsp;
@@ -46,6 +47,7 @@
 - **See it before you choose it:** in the in-game menu, the paused game shows each shader setting and overlay as you scroll through them.
 - **Whole-number scaling** for every game, so every pixel is the same size.
 - **Menu colors,** starting from ChaOS's orange.
+- **Updates over Wi-Fi,** from the menu, when you choose.
 - **ChaOS Transfer,** the boot and power-off animations, and the ChaOS look throughout.
 
 **From TortOS**
@@ -74,7 +76,7 @@ You need a TrimUI Brick or Brick Hammer, a microSD card and, just this once, a c
 
 ### Updating
 
-Put the card in the computer and choose **Update** in ChaOS Installer. Your games, music, saves and settings stay. A TortOS card becomes a ChaOS card the same way. Writing the image by hand erases the card, so use the installer to update.
+On the Brick: **MENU > Updates**, over Wi-Fi (see [Updates](#updates)). Or put the card in the computer and choose **Update** in ChaOS Installer. Your games, music, saves and settings stay. A TortOS card becomes a ChaOS card the same way. Writing the image by hand erases the card, so use the installer to update.
 
 ### Removing
 
@@ -103,6 +105,48 @@ The **Overlay** row offers **None** or any PNG in that console's folder in `Over
 - Make an overlay **1024x768** with a transparent window where the game shows through. Another size is stretched to fit. The game is always drawn on top, so an overlay never covers it.
 
 In the in-game menu, the paused game behind the menu shows the shader and overlay as you change them. **Hold Y** to hide the menu and see the whole picture (the menu says so at its foot).
+
+## Updates
+
+**MENU > Updates** keeps ChaOS up to date over Wi-Fi, with no computer. Your games, music, saves and settings stay.
+
+- **Checking:** when the Brick joins Wi-Fi, it asks once whether there is a newer ChaOS. If there is, it says so once at the top of the screen, and the Updates row shows the version. It never downloads or installs anything by itself.
+- **Download:** the screen shows what's installed and what's latest. **Download** fetches the new version (about 40 MB) and checks it against the release's checksum. You can keep playing while it downloads.
+- **Install and Restart:** the Brick restarts and installs the update during the next start-up, which takes a few seconds longer than usual. It then comes back as it was. It needs a quarter of a charge, or the charger.
+- **Later:** a finished download waits on the card until you come back to install it, or choose **Remove Download**.
+- **Big updates:** a release built on a newer TortOS can change parts of the card that only [ChaOS Installer](https://github.com/SkyWalker541/ChaOS-Installer/releases/latest) writes. The Brick tells you to use the installer instead of offering the download.
+
+If the power goes out while the update installs, nothing is lost: the Brick starts the install again on the next start-up. **About ChaOS** shows the version you're on.
+
+### Update messages
+
+If an update can't go ahead, the Updates screen says why in one line:
+
+| Message | What it means | What to do |
+|---|---|---|
+| needs Wi-Fi | Shown beside **Check Now** and **Download** when the Brick isn't online. | Join a network under **MENU > Wi-Fi**. |
+| Wi-Fi is off | You pressed **Check Now** or **Download** with Wi-Fi turned off. | Turn Wi-Fi on under **MENU > Wi-Fi**, then **Try Again**. |
+| Wi-Fi isn't connected | Wi-Fi is on, but the Brick isn't connected to a network, or has no internet address yet. | Connect under **MENU > Wi-Fi**, wait a moment, then **Try Again**. |
+| charge to 25% | The battery is too low to install safely. | Charge to 25%, or plug in the charger. |
+| This one needs ChaOS Installer | The new version changes parts of the card the Brick can't update by itself. | Update with ChaOS Installer on a computer. |
+| Couldn't reach GitHub | The check couldn't reach the releases page: no internet on this network, or GitHub is down. | Check the network, then **Try Again**. |
+| Couldn't start the check | The Brick couldn't start the check at all. | Restart the Brick and try again. If it keeps happening, send the logs. |
+| Update info unreadable | The release's update information is damaged or missing. | Try again later. If it keeps happening, report it on GitHub. |
+| Not enough space on the card | The download and the unpacked update need about 200 MB free. | Free up space on the card, then **Try Again**. |
+| Couldn't start the download | The download couldn't start. | **Try Again**. If it keeps happening, restart the Brick. |
+| The download stopped | The connection dropped or timed out partway. | **Try Again** on a steadier connection. It starts over from the beginning. |
+| The download went missing | The partly downloaded file disappeared from the card before it could be checked. | **Try Again**. Don't move or delete files in `.dev` on the card while it downloads. |
+| Checksum didn't match | The download arrived damaged. It has been deleted, and nothing was changed. | **Try Again**. If it keeps happening, the network may be altering downloads: try another one. |
+| The download wouldn't unpack | The download passed its checksum but couldn't be unpacked, which usually means the card is full or failing. It has been deleted. | Free up space and **Try Again**. If it keeps happening, check the card on a computer. |
+| Couldn't check the download | The Brick couldn't run the check on the download. | **Try Again**. If it keeps happening, send the logs. |
+| The download is gone | The finished download was removed from the card before it could be installed. | Download it again. |
+| The download isn't a system | The file waiting on the card isn't a ChaOS update. Nothing was changed. | **Remove Download**, then download again. |
+| Too big for this card | The new system doesn't fit this card's system partition. Nothing was changed. | Update with ChaOS Installer. |
+| No boot partition found | The Brick couldn't find the card's boot partition. Nothing was changed. | Update with ChaOS Installer. |
+| Couldn't open the boot files | The boot partition wouldn't open. Nothing was changed. | Restart and try again. If it keeps happening, update with ChaOS Installer. |
+| Needs ChaOS Installer | This card's start-up files can't install updates by themselves. Nothing was changed. | Update with ChaOS Installer once. Later updates can then come over Wi-Fi. |
+
+If the Brick restarts but **About ChaOS** still shows the old version, the install didn't finish. Start the Brick again to let it retry, and if it still doesn't take, update with ChaOS Installer. Every step is also written to the logs, on lines starting `update:`. See *How do I send the logs?* in the FAQ.
 
 ## Adding games
 

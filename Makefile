@@ -20,7 +20,7 @@ CHECKS = check-cheevos check-hare check-httpd check-idle check-rahash \
          check-raset check-xfer check-menus check-artscrape check-artrun check-audioout \
          check-db check-stats check-sort check-bt check-ss \
          check-muselib check-musequeue check-museart check-controls check-logpack \
-         check-clock
+         check-clock check-update
 
 check:
 	@fail=0; for c in $(CHECKS); do \
@@ -121,6 +121,19 @@ build-native/audioout-check: tools/audioout-check.c src/audioout.c \
 # What MENU > Controls says: every button on exactly one page, and rows short
 # enough to sit still. The page is the device's own copy of the controls list,
 # so what it omits is invisible until somebody goes looking for a button.
+# ChaOS: updates over Wi-Fi, what src/update.c decides without the network
+check-update: build-native/update-check
+	@./build-native/update-check
+	@# Every message the Updates screen can show is explained in the README
+	@missing=0; grep -o 'fail("[^"]*")' src/update.c | sed 's/^fail("//; s/")$$//' | sort -u | \
+	 while read -r m; do grep -qF "$$m" README.md || { echo "  FAIL README does not explain: $$m"; exit 1; }; done && \
+	 echo "ok: the README explains every update message"
+
+build-native/update-check: tools/update-check.c src/update.c src/update.h src/net.c FORCE
+	@mkdir -p build-native
+	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g \
+	      -o $@ tools/update-check.c src/update.c src/net.c
+
 check-controls: build-native/controls-check
 	@./build-native/controls-check
 

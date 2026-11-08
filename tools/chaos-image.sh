@@ -20,7 +20,8 @@
 # DIATOM defaults to ../chaos-diatom/build/brick/diatom; tortos.elf is
 # build/tortos.elf (make -f mk/cross.mk DEVICE=brick), or TORTOS_ELF. The
 # release (.github/workflows/release.yml) uses dist/brick's, with
-# DIATOM_NOTICE naming ChaOS-diatom's THIRD-PARTY.md.
+# DIATOM_NOTICE naming ChaOS-diatom's THIRD-PARTY.md, and ROOT_OUT, where the
+# new root squashfs is copied for updates over Wi-Fi.
 set -e
 IN=$1 OUT=$2
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -123,10 +124,27 @@ MOVE
 sed -i "/echo \"tortos: TortOS copied onto the card\" > \/dev\/kmsg/r $W/move.sh" "$INIT"
 sed -i 's/tortos: TortOS copied onto the card/tortos: ChaOS copied onto the card/' "$INIT"
 grep -q "TortOS's old folder removed" "$INIT" || { echo "init.d/tortos: the move did not go in" >&2; exit 1; }
+# Updates over Wi-Fi (src/update.h): which TortOS release this card's boot
+# partition is, so the launcher offers only updates for the same one, and
+# launch.sh's last line rebooting instead of powering off when the launcher
+# leaves the flag for an update to install at the next boot
+tr -d ' \n' < "$ROOT/TORTOS_BASE" > "$C/ChaOS/BASE"
+chmod 644 "$C/ChaOS/BASE"
+L=$C/ChaOS/launch.sh
+[ "$(tail -n 1 "$L")" = "poweroff" ] || { echo "launch.sh has changed: check how it ends" >&2; exit 1; }
+sed -i '$d' "$L"
+cat >> "$L" <<'EOF2'
+# ChaOS: an update installs at the next boot (src/update.h): boot again rather
+# than power off
+if [ -f /tmp/chaos_reboot ]; then reboot; else poweroff; fi
+EOF2
 chown -R 0:0 "$C"
 
 mksquashfs "$W/root" "$W/new.sqfs" -comp lz4 -Xhc -b 131072 -noappend -no-xattrs -quiet > /dev/null
 [ "$(stat -c%s "$W/new.sqfs")" -le $((COUNT * 512)) ] || { echo "the new root does not fit" >&2; exit 1; }
+# The root alone too, for updates over Wi-Fi: what plastron's boot writes
+# over the root partition when it finds it on the card (src/update.h)
+if [ -n "$ROOT_OUT" ]; then cp "$W/new.sqfs" "$ROOT_OUT"; fi
 dd if=/dev/zero of="$W/card.img" bs=512 seek="$START" count="$COUNT" conv=notrunc status=none
 dd if="$W/new.sqfs" of="$W/card.img" bs=512 seek="$START" conv=notrunc status=none
 xz -T0 -6 -c "$W/card.img" > "$OUT"

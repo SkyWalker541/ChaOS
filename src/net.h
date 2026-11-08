@@ -83,6 +83,16 @@ int  net_async_poll(void);
  * leave half a file where a later run would find it and skip the download. */
 bool net_get_async(const char *url, const char *path, int timeout_s);
 
+/* ChaOS: a GET of its own, beside the one async slot box art and Muse share,
+ * for the update's check and download (src/update.c), which run for minutes
+ * and must not hold up the others or be held up by them. The body goes
+ * straight to `path`; the caller reaps the returned pid itself (waitpid) and
+ * reads success from its exit status, 0 for a 2xx. -1 when it did not start.
+ * Its config file is removed when it is reaped, by net_spawn_done. */
+#include <sys/types.h>
+pid_t net_get_spawn(const char *url, const char *path, int timeout_s);
+void  net_spawn_done(pid_t pid);
+
 /* What the server answered with, once net_async_poll has returned non-zero:
  * an HTTP status, or 0 when the request never reached a server at all.
  *
