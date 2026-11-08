@@ -1176,6 +1176,7 @@ static void look_rows(void)
 	ck(!strcmp(v, "GBA"), "a GBA's is the original GBA");
 	look_format(&st, LP_BACKING_COLOR, v, sizeof v);
 	ck(!strcmp(v, "Grey"), "with the grey backing");
+	ck(st.v[LP_GRID_WIDTH] == 0.30f, "and a Grid line wide enough to show at 4x");
 	ck(look_console_of("GBC") == LOOK_GBC && look_shader_of(LOOK_GBC) == LS_PT,
 	   "the Game Boys have PT");
 	ck(look_shader_of(look_console_of("NES")) == LS_CRT && look_shader_of(look_console_of("SFC")) == LS_CRT &&

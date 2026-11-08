@@ -206,6 +206,11 @@ void look_recommended(look_console c, look_settings *out)
 	case LOOK_GBA: out->v[LP_GAME_SYSTEM] = 4; out->v[LP_BACKING_COLOR] = 2; break;
 	default: break;
 	}
+	/* ChaOS: a GBA is drawn at 4x on the Brick at Integer, where a quarter-
+	 * pixel line falls between two screen pixels and the Grid shows nothing.
+	 * At 30% each line darkens the screen pixel either side as much as the
+	 * default does on a Game Boy at 5x. */
+	if (c == LOOK_GBA) out->v[LP_GRID_WIDTH] = 0.30f;
 	out->v[LP_CRT_CURVATURE] = 0;
 }
 
