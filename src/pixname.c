@@ -307,7 +307,7 @@ bool pn_big(SDL_Renderer *r, const char *name, unsigned accent, bool focused,
 			x = sx + (tx - sx) * e;
 			y = sy + (ty - sy) * e;
 			if (pass == 0) {
-				/* A blurred reflection in the system's colour, as if the name
+				/* A blurred reflection, as if the name
 				 * stood on a glossy floor: mirrored under the last line,
 				 * fading as it goes down, each pixel spread wide and faint
 				 * around a fainter core so it reads soft, not drawn */
@@ -317,14 +317,17 @@ bool pn_big(SDL_Renderer *r, const char *name, unsigned accent, bool focused,
 				float my = base + (base - y - (float)cell) * 0.5f;
 				float fade = 1.0f - (my - base) / ((float)cell * 11.0f);
 				int g = cell;
+				/* each pixel reflects in its own colour: the cream letters
+				 * cream, the accented ones the system's colour */
+				SDL_Color rc = p->pts[i].accent ? acc : CREAM;
 				SDL_Rect q = { (int)lroundf(x) - g, (int)lroundf(my) - g / 2,
 				               cell + g * 2, cell / 2 + g };
 				if (fade <= 0.0f) continue;
 				fade *= fade;
-				SDL_SetRenderDrawColor(r, acc.r, acc.g, acc.b, (Uint8)(22 * fade * e));
+				SDL_SetRenderDrawColor(r, rc.r, rc.g, rc.b, (Uint8)(22 * fade * e));
 				SDL_RenderFillRect(r, &q);
 				q = (SDL_Rect){ (int)lroundf(x), (int)lroundf(my), cell, cell / 2 + 1 };
-				SDL_SetRenderDrawColor(r, acc.r, acc.g, acc.b, (Uint8)(28 * fade * e));
+				SDL_SetRenderDrawColor(r, rc.r, rc.g, rc.b, (Uint8)(28 * fade * e));
 				SDL_RenderFillRect(r, &q);
 			} else if (pass == 1) {
 				int d = cell / 4 > 2 ? cell / 4 : 2;

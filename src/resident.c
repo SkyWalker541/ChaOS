@@ -20,6 +20,7 @@
 /* ChaOS: for the next RUN only (plat_resident_set_play) */
 static char g_play_map[512];
 static bool g_play_rewind;
+static char g_play_mode[16];     /* Display Mode, Diatom's name: "integer" */
 
 /* One connection, held across games. Diatom is fine with that - it is the
  * fifo pair that needed reopening per game - and holding it means peer death
@@ -343,13 +344,16 @@ bool plat_resident_send(const char *tag, const char *core, const char *rom,
 		 * first frame as soon as the load is done, and cannot while this
 		 * process holds it. */
 		device_display_release();
+		/* ChaOS: `mode=`, the console's Display Mode, on the RUN itself so
+		 * the first frame is drawn that way (ChaOS-diatom reads it there) */
 		if (!dsend("RUN\tcore=%s\trom=%s\ttag=%s"
 		           "\tresume=%s\texit_state=%s\tpreview=%s"
-		           "\tconsole=%d\tcheevos=%s",
+		           "\tconsole=%d\tcheevos=%s%s%s",
 		           core, rom, tag,
 		           resume ? resume : "", exit_state ? exit_state : "",
 		           preview ? preview : "",
-		           console, cheevos ? cheevos : "")) {
+		           console, cheevos ? cheevos : "",
+		           g_play_mode[0] ? "\tmode=" : "", g_play_mode)) {
 			device_display_take();      /* no game is coming */
 			return false;
 		}
@@ -475,6 +479,11 @@ void plat_resident_set_play(const char *map, bool rewind)
 {
 	snprintf(g_play_map, sizeof g_play_map, "%s", map ? map : "");
 	g_play_rewind = rewind;
+}
+
+void plat_resident_set_display(const char *mode)
+{
+	snprintf(g_play_mode, sizeof g_play_mode, "%s", mode ? mode : "");
 }
 
 void plat_resident_set_look(const char *shader_cfg, const char *bezel)

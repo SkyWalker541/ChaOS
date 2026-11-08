@@ -49,11 +49,10 @@ typedef enum {
  * so these are hooks waiting to be wired, not wishes. */
 typedef enum {
 	SM_GAMES, SM_CORE, SM_SORT,
-	/* ChaOS: the console's shader, which opens its settings, and its
-	 * overlay. They took Display Mode's place: every game is drawn at a
-	 * whole-number scale now, so there is no mode to choose. Shader is left
-	 * out for a console with no shader made for it. */
-	SM_SHADER, SM_OVERLAY,
+	/* ChaOS: how the console's games fill the screen (Integer, Aspect or
+	 * Stretch), its shader, which opens its settings, and its overlay.
+	 * Shader is left out for a console with no shader made for it. */
+	SM_DISPLAY, SM_SHADER, SM_OVERLAY,
 	/* ChaOS: what each of the Brick's buttons presses (src/remap.h), and
 	 * whether MENU+L1 can step the game back */
 	SM_BUTTONS, SM_REWIND, SM_BOXART, SM_RESCAN, SM_ROWS
@@ -202,6 +201,7 @@ typedef struct {
 	 * name, or NULL for none. */
 	const char *shader;
 	const char *overlay;
+	const char *dmode;      /* ChaOS: Display Mode's label, "Integer" */
 	/* The label of the shelf's sort order. A label rather than an index: this
 	 * file must not know the table, or a check that links it would have to
 	 * link the table too. */

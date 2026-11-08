@@ -66,6 +66,9 @@ typedef enum {
 	/* a CRT console's Style: crt-lottes-fast (0) or Scanlines (1), and the
 	 * Scanlines' own (res-independent-scanlines.glsl) */
 	LP_CRT_STYLE, LP_SCAN_AMP, LP_SCAN_LINES_BLACK,
+	/* a Game Boy console's Style: PT SkyWalker541 (0) or lcd3x (1), whose
+	 * own settings are lcd3x's above */
+	LP_PT_STYLE,
 	LP_COUNT
 } look_param;
 
@@ -92,6 +95,11 @@ const char *look_group_label(look_group g);
 typedef struct {
 	bool  on;
 	float v[LP_COUNT];
+	/* Not kept: whether the console's Display Mode may draw at a size that
+	 * is no whole-number scale (Aspect, Stretch). PT's Pixel Effect follows
+	 * the game's pixels, which are then not all one size, so ChaOS-diatom
+	 * draws it only at Integer, and its rows are not shown otherwise. */
+	bool  any_size;
 } look_settings;
 
 /* What a console starts from, and what Reset puts back: on, and for PT the
@@ -116,8 +124,17 @@ bool look_param_shown(const look_settings *s, look_param p);
  * LG_PAGE, the rows on its own page). Returns how many. */
 int look_group_rows(const look_settings *s, look_shader sh, look_group g, look_param *out);
 
-/* The shader's name as the Style row shows it: a CRT console's choice. */
+/* The shader's name as the Style row shows it: a CRT console's choice, or a
+ * Game Boy console's. */
 const char *look_style_name(look_console c, const look_settings *s);
+
+/* The shader a console's games are drawn with as set: its own, or for a Game
+ * Boy console with Style lcd3x, LS_LCD. */
+look_shader look_active_shader(look_console c, const look_settings *s);
+
+/* Is p one of the console's settings, kept for it (its shader's, its Style,
+ * and for a Game Boy console lcd3x's too)? */
+bool look_param_kept(look_console c, look_param p);
 
 /* The file Diatom's SETSHADER reads: console, enabled, the style for a CRT
  * console, every parameter of the shader in use. Returns false when it could

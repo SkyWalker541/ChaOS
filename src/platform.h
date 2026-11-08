@@ -199,6 +199,9 @@ void plat_resident_set_look(const char *shader_cfg, const char *bezel);
 /* ChaOS: the next RUN's button map (a SETMAP line, NULL for the console's
  * turbo default) and whether it keeps states to rewind to */
 void plat_resident_set_play(const char *map, bool rewind);
+/* ChaOS: the next RUN's Display Mode, by Diatom's name ("integer",
+ * "aspect", "stretch"); NULL or "" for Diatom's own */
+void plat_resident_set_display(const char *mode);
 /* The paused frame as the shader draws it, the size of the game's rect, or
  * NULL when the game is not shaded. Written by Diatom on the way into its
  * pause, and again after a SETSHADER with preview=. */

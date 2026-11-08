@@ -111,6 +111,8 @@ typedef struct {
 	 * console in the device database (look_load). */
 	look_settings look;
 	char overlay[256];
+	/* ChaOS: index into DMODES, the console's Display Mode */
+	int dmode;
 	/* Index into SORTS. Zero is by name, which is what every shelf was
 	 * before this existed and what an untouched one still is. On Muse's
 	 * shelf an ml_order instead, whose zero is by artist. */
@@ -251,6 +253,40 @@ static bool look_load_param(const char *key, const char *value, void *ctx)
 	return true;
 }
 
+/* ChaOS: how a console's games fill the screen, by Diatom's names
+ * (ChaOS-diatom src/scale.c). Integer first: whole-number steps, square
+ * pixels, and the only one at which PT's Grid is drawn. Aspect fills what the
+ * game's shape allows; Stretch fills the screen. Every shader draws at all
+ * three. Kept per console as "chaos.display.<tag>": a new key, so a mode
+ * TortOS kept under "display." is not picked up. */
+static const struct { const char *name, *label; } DMODES[] = {
+	{ "integer", "Integer" },
+	{ "aspect",  "Aspect"  },
+	{ "stretch", "Stretch" },
+};
+#define DMODE_COUNT ((int)(sizeof DMODES / sizeof DMODES[0]))
+
+static void display_load_one(app *a, int i)
+{
+	char key[CFG_STR + 32], name[16];
+	int k;
+
+	a->view[i].dmode = 0;
+	snprintf(key, sizeof key, "chaos.display.%s", a->sys.systems[i].tag);
+	db_get_str(db_dev(), key, name, sizeof name, DMODES[0].name);
+	for (k = 0; k < DMODE_COUNT; k++)
+		if (!strcmp(DMODES[k].name, name)) a->view[i].dmode = k;
+}
+
+static void display_save(app *a, int i)
+{
+	char key[CFG_STR + 32];
+
+	snprintf(key, sizeof key, "chaos.display.%s", a->sys.systems[i].tag);
+	if (a->view[i].dmode == 0) db_del(db_dev(), key);
+	else db_set_str(db_dev(), key, DMODES[a->view[i].dmode].name);
+}
+
 static void look_load_one(app *a, int i)
 {
 	const system_cfg *sc = &a->sys.systems[i];
@@ -265,6 +301,7 @@ static void look_load_one(app *a, int i)
 	db_each_prefix(db_dev(), key, look_load_param, &v->look);
 	snprintf(key, sizeof key, "overlay.%s", sc->tag);
 	db_get_str(db_dev(), key, v->overlay, sizeof v->overlay, "");
+	display_load_one(a, i);
 }
 
 static void look_load(app *a)
@@ -280,7 +317,6 @@ static void look_save(app *a, int i)
 	const system_cfg *sc = &a->sys.systems[i];
 	const sysview *v = &a->view[i];
 	look_console lc = look_console_of(sc->tag);
-	look_shader sh = look_shader_of(lc);
 	look_settings rec;
 	char key[CFG_STR + 64], val[32];
 	int k;
@@ -289,7 +325,7 @@ static void look_save(app *a, int i)
 	snprintf(key, sizeof key, "shader.%s.on", sc->tag);
 	db_set_int(db_dev(), key, v->look.on ? 1 : 0);
 	for (k = 0; k < LP_COUNT; k++) {
-		if (look_params[k].shader != sh) continue;
+		if (!look_param_kept(lc, (look_param)k)) continue;
 		snprintf(key, sizeof key, "shader.%s.%s", sc->tag, look_params[k].name);
 		if (fabsf(v->look.v[k] - rec.v[k]) < look_params[k].step * 0.25f) {
 			db_del(db_dev(), key);
@@ -5154,6 +5190,7 @@ static int menu_build(app *a, screen_id screen, int sys,
 			u.shader  = look_console_of(sc->tag) == LOOK_NONE ? NULL
 			          : a->view[sys].look.on ? "On" : "Off";
 			u.overlay = u.fav || u.muse ? NULL : overlay_label(a, sys, ovl, sizeof ovl);
+			u.dmode   = DMODES[a->view[sys].dmode].label;
 		}
 		u.muse_books = u.muse && muse_books_shown();
 		u.muse_both  = u.muse && ml_count(&g_muse, true) && ml_count(&g_muse, false);
@@ -8351,6 +8388,14 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 			if (d || key == IN_ACCEPT) overlay_cycle(a, a->sys_cursor, d ? d : 1);
 			return MENU_STAY;
 		}
+		if (sel == SM_DISPLAY) {
+			sysview *v = &a->view[a->sys_cursor];
+			if (d || key == IN_ACCEPT) {
+				v->dmode = (v->dmode + (d ? d : 1) + DMODE_COUNT) % DMODE_COUNT;
+				display_save(a, a->sys_cursor);
+			}
+			return MENU_STAY;
+		}
 		if (sel == SM_BUTTONS) {
 			if (key == IN_ACCEPT) console_controls_screen(a, a->sys_cursor, NULL, NULL, NULL);
 			return MENU_STAY;
@@ -8891,6 +8936,7 @@ static int gm_build(app *a, menu_row *out, gm_bufs *b, int shots, const char *sh
 		u.shader  = look_console_of(a->sys.systems[o].tag) == LOOK_NONE ? NULL
 		          : a->view[o].look.on ? "On" : "Off";
 		u.overlay = overlay_label(a, o, ovl, sizeof ovl);
+		u.dmode   = DMODES[a->view[o].dmode].label;
 	}
 	u.earned = chv_earned();
 	u.total  = chv_count();
@@ -10923,6 +10969,24 @@ static void gm_apply_shader(gm_ctx *c)
 	if (plat_resident_sync_shaded(2000)) gm_load_bg(c);
 }
 
+/* ChaOS: Display Mode, to the paused game at once. Diatom answers with the new
+ * rect (DISPLAY), which is where the backdrop is drawn; with a shader on, the
+ * shaded frame is drawn again at the new size, and the speed check starts
+ * over, as the shader's cost moves with the size. */
+static void gm_cycle_display(gm_ctx *c, int d)
+{
+	app *a = c->a;
+	int o = gm_owner(a);
+	sysview *v = &a->view[o];
+
+	v->dmode = (v->dmode + d + DMODE_COUNT) % DMODE_COUNT;
+	display_save(a, o);
+	plat_resident_line("SETDISPLAY\tmode=%s", DMODES[v->dmode].name);
+	plat_resident_sync_rect(1000);
+	if (look_console_of(a->sys.systems[o].tag) != LOOK_NONE && v->look.on) gm_apply_shader(c);
+	else gm_load_bg(c);
+}
+
 /* And the overlay: to Diatom for when the game goes on, and to the backdrop. */
 static void gm_apply_overlay(gm_ctx *c)
 {
@@ -10992,6 +11056,10 @@ static menu_result gm_key(app *a, void *ctx, in_button key, int sel)
 		a->view[o].look.on = !a->view[o].look.on;
 		look_save(a, o);
 		gm_apply_shader(c);
+		return MENU_STAY;
+	}
+	if (sel == GM_DISPLAY && (key == IN_LEFT || key == IN_RIGHT || key == IN_ACCEPT)) {
+		gm_cycle_display(c, key == IN_LEFT ? -1 : 1);
 		return MENU_STAY;
 	}
 	if (sel == GM_OVERLAY && (key == IN_LEFT || key == IN_RIGHT || key == IN_ACCEPT)) {
@@ -11115,19 +11183,25 @@ static int shader_build(void *ctx, menu_row *rows, int max, const char **heading
 	shader_ctx *c = ctx;
 	look_settings *ls = &c->a->view[c->sys].look;
 	look_console lc = look_console_of(c->a->sys.systems[c->sys].tag);
-	look_shader sh = look_shader_of(lc);
+	look_shader own = look_shader_of(lc);
+	look_shader sh;
 	int n = 0, g;
 
 	(void)max;
+	/* PT's Pixel Effect only at Integer, where it is drawn */
+	ls->any_size = c->a->view[c->sys].dmode != 0;
+	/* a Game Boy console drawn with lcd3x has lcd3x's page */
+	sh = look_active_shader(lc, ls);
 	*heading = c->heading;
 	if (c->group < 0) {
 		snprintf(c->heading, sizeof c->heading, "%s Shader", c->a->sys.systems[c->sys].name);
 		c->ids[n] = SH_SWITCH;
 		rows[n++] = (menu_row){ "Shader", ls->on ? "On" : "Off", true };
 		if (ls->on) {
-			/* A CRT console chooses between two; the others have one. */
-			if (sh == LS_CRT) {
-				c->ids[n] = SH_NONE + 1 + (int)LP_CRT_STYLE;
+			/* A CRT console chooses between two, and so does a Game Boy
+			 * console; the others have one. */
+			if (own == LS_CRT || own == LS_PT) {
+				c->ids[n] = SH_NONE + 1 + (int)(own == LS_CRT ? LP_CRT_STYLE : LP_PT_STYLE);
 				rows[n++] = (menu_row){ "Style", look_style_name(lc, ls), true };
 			} else {
 				c->ids[n] = SH_NAME;
@@ -11157,6 +11231,9 @@ static int shader_build(void *ctx, menu_row *rows, int max, const char **heading
 				static const look_param SUMMARY[LG_COUNT] = {
 					LP_BACKING_COLOR, LP_PIXEL_EFFECT, LP_SHADOW_OPACITY, LP_GLARE_AND_SHEEN
 				};
+				/* Pixels holds the Pixel Effect alone, which is drawn
+				 * only at Integer */
+				if (g == LG_PIXELS && ls->any_size) continue;
 				c->ids[n] = SH_GROUP + g;
 				look_format(ls, SUMMARY[g], c->vals[n], sizeof c->vals[n]);
 				rows[n] = (menu_row){ look_group_label((look_group)g), c->vals[n], true, true };
@@ -11618,6 +11695,7 @@ static void launch(app *a)
 
 			look_files(a, o, &lcfg, &ldtov);
 			plat_resident_set_look(lcfg, ldtov);
+			plat_resident_set_display(DMODES[a->view[o].dmode].name);
 		}
 		/* ChaOS: where its screenshots go (MENU+X, and the in-game menu) */
 		shots_dir(P_CARD, a->sys.systems[o].folder, v->list.items[v->cursor].file,
@@ -11783,7 +11861,7 @@ static void launch(app *a)
 		argv[n++] = (char *)"--save";            argv[n++] = save;
 		argv[n++] = (char *)"--system";          argv[n++] = bios;
 		argv[n++] = (char *)"--display";
-		argv[n++] = (char *)"integer";   /* ChaOS: whole-number scale only */
+		argv[n++] = (char *)DMODES[a->view[o].dmode].name;   /* ChaOS: the console's */
 		/* The channels too: this path is rare, but a player who hears with
 		 * one ear should not lose half a game to it. It plays on the codec,
 		 * so the cable decides between headphones and the speaker. */

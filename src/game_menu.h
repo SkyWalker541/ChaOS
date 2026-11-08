@@ -101,7 +101,7 @@ int gi_rows(menu_row *out, const game_info *gi, bool net);
 /* ---------- the in-game menu ---------------------------------------------- */
 
 typedef enum {
-	GM_CONTINUE, GM_SAVE, GM_LOAD, GM_SHOT, GM_SHOTS, GM_SHADER, GM_OVERLAY, GM_BUTTONS, GM_CHEEVOS, GM_RESET,
+	GM_CONTINUE, GM_SAVE, GM_LOAD, GM_SHOT, GM_SHOTS, GM_DISPLAY, GM_SHADER, GM_OVERLAY, GM_BUTTONS, GM_CHEEVOS, GM_RESET,
 	GM_QUIT,
 	GM_ROWS
 } gm_row;
@@ -117,6 +117,7 @@ typedef struct {
 	 * overlay's name, or NULL for none. */
 	const char *shader;
 	const char *overlay;
+	const char *dmode;    /* ChaOS: Display Mode's label, "Integer" */
 	int         earned;
 	int         total;    /* 0: this game has no achievement set */
 	/* ChaOS: this game's screenshots (shots.h), and what Take Screenshot

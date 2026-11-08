@@ -125,6 +125,8 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 		full[SM_CORE]    = (menu_row){ "Core",          b->b,        false };
 		full[SM_SORT]    = (menu_row){ "Sort By",
 		                              u->sort ? u->sort : "Name", true  };
+		full[SM_DISPLAY] = (menu_row){ "Display Mode",
+		                              u->dmode ? u->dmode : "Integer", true };
 		full[SM_SHADER]  = (menu_row){ "Shader",        u->shader,   true, true };
 		full[SM_OVERLAY] = (menu_row){ "Overlay",
 		                              u->overlay ? u->overlay : "None", true };

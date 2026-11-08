@@ -13,7 +13,9 @@ static const char *const W_SYSTEM[] = { "Manual", "Game Boy", "Game Boy Color",
 static const char *const W_TRANSP[] = { "White", "Bright", "All", NULL };
 static const char *const W_BACKING[] = { "Off", "Pocket", "Grey", "White", NULL };
 static const char *const W_ONOFF[] = { "Off", "On", NULL };
-static const char *const W_EFFECT[] = { "Off", "Grid", "LCD Dot", NULL };
+/* LCD Dot is gone (ChaOS): too slow on the Brick to keep a game at speed.
+ * A console that had it comes back with Grid, the next one down. */
+static const char *const W_EFFECT[] = { "Off", "Grid", NULL };
 static const char *const W_GAP[] = { "Backing", "Black", "White", NULL };
 /* Shadow Direction, by where the shadow lands on screen. PT's GLSL names its
  * values 0 Down-R, 1 Down-L, 2 Up-R, 3 Up-L, but each samples the source
@@ -25,6 +27,7 @@ static const char *const W_DIR[] = { "Up right", "Up left", "Down right", "Down 
  * grille shifted every row */
 static const char *const W_MASK[] = { "Off", "Grille Lite", "Grille", "Shadow Mask", NULL };
 static const char *const W_CRT_STYLE[] = { "crt-lottes-fast", "Scanlines", NULL };
+static const char *const W_PT_STYLE[] = { "PT SkyWalker541", "lcd3x", NULL };
 
 /* The shader's parameter list (PT_SkyWalker541.glsl, and pt_shader.c in
  * ChaOS-diatom, which match): name, default, range and step are its own. */
@@ -48,7 +51,7 @@ const look_param_info look_params[LP_COUNT] = {
 	[LP_LIGHT_Y]                = { "PT_LIGHT_HOME_Y", "Light Top to Bottom", 0.45f, -0.5f, 1.5f, 0.01f, LG_LIGHT, F_PCT, NULL },
 	[LP_LIGHT_DRIFT]            = { "PT_LIGHT_DRIFT_SPEED", "Light Drift", 0.5f, 0, 4, 0.05f, LG_LIGHT, F_SPEED, NULL },
 	[LP_DARKEN]                 = { "PT_DARKEN_PICTURE", "Darken Picture", 0, 0, 100, 1, LG_SCREEN, F_DARKEN, NULL },
-	[LP_PIXEL_EFFECT]           = { "PT_PIXEL_EFFECT", "Pixel Effect", 1, 0, 2, 1, LG_PIXELS, F_WORDS, W_EFFECT },
+	[LP_PIXEL_EFFECT]           = { "PT_PIXEL_EFFECT", "Pixel Effect", 1, 0, 1, 1, LG_PIXELS, F_WORDS, W_EFFECT },
 	[LP_GAP_COLOR]              = { "PT_GAP_COLOR", "Gap Color", 0, 0, 2, 1, LG_PIXELS, F_WORDS, W_GAP },
 	[LP_GRID_WIDTH]             = { "PT_GRID_LINE_WIDTH", "Grid Line Width", 0.25f, 0, 0.5f, 0.01f, LG_PIXELS, F_PCT, NULL },
 	[LP_GRID_OPACITY]           = { "PT_GRID_LINE_OPACITY", "Grid Line Strength", 0.5f, 0, 1, 0.01f, LG_PIXELS, F_PCT_OFF, NULL },
@@ -84,6 +87,9 @@ const look_param_info look_params[LP_COUNT] = {
 	[LP_CRT_STYLE]              = { "style", "Style", 0, 0, 1, 1, LG_PAGE, F_WORDS, W_CRT_STYLE, LS_CRT },
 	[LP_SCAN_AMP]               = { "amp", "Brightness", 1.25f, 0, 2, 0.05f, LG_PAGE, F_PCT, NULL, LS_CRT },
 	[LP_SCAN_LINES_BLACK]       = { "lines_black", "Line Brightness", 0, 0, 1, 0.05f, LG_PAGE, F_PCT, NULL, LS_CRT },
+	/* A Game Boy console's Style, written to Diatom as `style = lcd3x`:
+	 * lcd3x's grid, which, unlike PT's, looks the same at any size */
+	[LP_PT_STYLE]               = { "pt_style", "Style", 0, 0, 1, 1, LG_COUNT, F_WORDS, W_PT_STYLE, LS_PT },
 };
 
 /* A CRT console's parameter that belongs to the other Style */
@@ -106,7 +112,21 @@ const char *look_style_name(look_console c, const look_settings *s)
 {
 	look_shader sh = look_shader_of(c);
 	if (sh == LS_CRT && (int)floorf(s->v[LP_CRT_STYLE] + 0.5f) == 1) return "Scanlines";
-	return look_shader_name(sh);
+	return look_shader_name(look_active_shader(c, s));
+}
+
+look_shader look_active_shader(look_console c, const look_settings *s)
+{
+	look_shader sh = look_shader_of(c);
+	if (sh == LS_PT && (int)floorf(s->v[LP_PT_STYLE] + 0.5f) == 1) return LS_LCD;
+	return sh;
+}
+
+bool look_param_kept(look_console c, look_param p)
+{
+	look_shader sh = look_shader_of(c);
+	if (p < 0 || p >= LP_COUNT || sh == LS_NONE) return false;
+	return look_params[p].shader == sh || (sh == LS_PT && look_params[p].shader == LS_LCD);
 }
 
 static const char *const GROUP_LABEL[LG_COUNT] = {
@@ -173,6 +193,7 @@ void look_recommended(look_console c, look_settings *out)
 	int i;
 
 	out->on = true;
+	out->any_size = false;
 	for (i = 0; i < LP_COUNT; i++) out->v[i] = look_params[i].def;
 	switch (c) {
 	case LOOK_GB:  out->v[LP_GAME_SYSTEM] = 1; out->v[LP_BACKING_COLOR] = 1; break;
@@ -253,6 +274,10 @@ bool look_param_shown(const look_settings *s, look_param p)
 	bool light = choice(s, LP_GLARE_AND_SHEEN) != 0;
 
 	if (other_style(s, p)) return false;
+	/* PT's Pixel Effect, only where it is drawn (look.h, any_size) */
+	if (s->any_size && (p == LP_PIXEL_EFFECT || p == LP_GAP_COLOR ||
+	                    p == LP_GRID_WIDTH || p == LP_GRID_OPACITY))
+		return false;
 	switch (p) {
 	case LP_WHITE_LEVEL:        return choice(s, LP_GAME_SYSTEM) == 0;
 	case LP_BACKING_STRENGTH:   return choice(s, LP_BACKING_COLOR) != 0;
@@ -262,7 +287,8 @@ bool look_param_shown(const look_settings *s, look_param p)
 	case LP_DOT_SIZE:
 	case LP_DOT_SOFTNESS:
 	case LP_DOT_GAP_OPACITY:
-	case LP_DOT_MIN_BRIGHTNESS: return effect == 2;
+	case LP_DOT_MIN_BRIGHTNESS: return false;     /* LCD Dot is gone */
+	case LP_PT_STYLE:           return false;     /* its own row, on the shader's page */
 	case LP_SHADOW_DISTANCE:
 	case LP_SHADOW_DIRECTION:   return s->v[LP_SHADOW_OPACITY] > 0.005f;
 	case LP_GLARE_STRENGTH: case LP_GLARE_SPREAD: case LP_SHEEN_STRENGTH:
@@ -308,7 +334,7 @@ int look_group_rows(const look_settings *s, look_shader sh, look_group g, look_p
 
 bool look_write_cfg(const char *path, look_console c, const look_settings *s)
 {
-	look_shader sh = look_shader_of(c);
+	look_shader sh = look_shader_of(c), act = look_active_shader(c, s);
 	FILE *f;
 	int i;
 
@@ -317,8 +343,11 @@ bool look_write_cfg(const char *path, look_console c, const look_settings *s)
 	fprintf(f, "console = %s\nenabled = %d\n", look_console_name(c), s->on ? 1 : 0);
 	if (sh == LS_CRT)
 		fprintf(f, "style = %s\n", choice(s, LP_CRT_STYLE) == 1 ? "scanlines" : "crt");
+	if (sh == LS_PT)
+		fprintf(f, "style = %s\n", act == LS_LCD ? "lcd3x" : "pt");
 	for (i = 0; i < LP_COUNT; i++)
-		if (look_params[i].shader == sh && i != LP_CRT_STYLE && !other_style(s, (look_param)i))
+		if (look_params[i].shader == act && i != LP_CRT_STYLE && i != LP_PT_STYLE &&
+		    !other_style(s, (look_param)i))
 			fprintf(f, "%s = %g\n", look_params[i].name, (double)s->v[i]);
 	return fclose(f) == 0;
 }

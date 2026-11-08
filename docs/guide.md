@@ -176,7 +176,7 @@ The system menu opens on a shelf of games and applies to that system alone:
 | **Games** | how many the shelf found |
 | **Core** | which libretro core runs them |
 | **Sort By** | left/right; `Name`, `Play Time`, `Last Played` or `Recently Added` |
-| **Display Mode** | left/right cycles it; saved the moment it changes |
+| **Display Mode** | left/right cycles `Integer`, `Aspect` and `Stretch`; saved the moment it changes |
 | **Box Art** | fetch what this system is missing, and nothing else |
 | **Rescan Folder** | read the card again, for ROMs that arrived since boot |
 

@@ -4,7 +4,7 @@
 
 <p align="center">
   <b>Custom firmware for the TrimUI Brick, with shaders made for each console built in.</b><br>
-  Eleven classic consoles and your music, every game at a whole-number scale, a shader and overlays for every console.<br>
+  Eleven classic consoles and your music, a shader and overlays for every console, at whole-number, aspect or full-screen scale.<br>
   Built on <a href="https://github.com/ericreinsmidt/TortOS">TortOS</a> by Eric Reinsmidt.
 </p>
 
@@ -26,9 +26,6 @@
 
 > [!IMPORTANT]
 > **ChaOS is for the TrimUI Brick (and Brick Hammer) only at this time.**
->
-> **Every game is drawn at a whole-number (integer) scale only at this time.** There is no stretched or
-> aspect-fit mode.
 
 <div align="center">
 <table>
@@ -50,7 +47,7 @@
 - **A shader for every console,** each one made for that console's screen, drawn by the Brick's CPU. PT SkyWalker541 for the Game Boys, a CRT for the TV consoles, an LCD for the other handhelds.
 - **Overlays for every console,** with SkyWalker541's and KrutzOtrem's Brick overlays included (Game Boy, GBC, GBA, Game Gear, Neo Geo Pocket Color), and a folder for your own.
 - **See it before you choose it:** in the in-game menu, the paused game shows each shader setting and overlay as you scroll through them.
-- **Whole-number scaling** for every game, so every pixel is the same size.
+- **Display Mode** per console: **Integer** (whole-number scaling, so every pixel is the same size), **Aspect** (as large as the game's shape allows) or **Stretch** (the whole screen). Every shader works in all three.
 - **Menu colors,** starting from ChaOS's orange.
 - **Updates over Wi-Fi,** from the menu, when you choose, with what's new in each.
 - **Button mapping,** per console or per game, with turbo, and **rewind**.
@@ -98,12 +95,14 @@ Each console's menu (MENU on its shelf) and the in-game menu have a **Shader** r
 
 | Consoles | Shader | By |
 |---|---|---|
-| Game Boy, Game Boy Color, Game Boy Advance | PT SkyWalker541 | SkyWalker541 |
+| Game Boy, Game Boy Color, Game Boy Advance | PT SkyWalker541, or lcd3x | SkyWalker541; Gigaherz |
 | NES, SNES, Genesis, Master System, TurboGrafx-16 | crt-lottes-fast, or the lighter Scanlines | Timothy Lottes, adapted by hunterk; RiskyJumps |
 | Game Gear, Neo Geo Pocket, Neo Geo Pocket Color | lcd3x | Gigaherz |
 
 - **Left and right** turn it on and off. **A** opens its settings, showing only the ones that matter for what you've chosen.
 - The CRT consoles have a **Style** row: **crt-lottes-fast** (scanlines, a phosphor mask and optional curvature) or **Scanlines**, plain scanlines that cost the CPU about a tenth as much. Use Scanlines if a game slows down with the CRT shader.
+- The Game Boys have a **Style** row too: **PT SkyWalker541** or **lcd3x**, a simple LCD grid that looks the same at any size.
+- PT's **Pixel Effect** (its Grid) follows the game's pixels, so it's drawn only when Display Mode is **Integer**, where every pixel is the same size; in Aspect and Stretch its rows are hidden and the grid is left off. For a grid in Aspect or Stretch, use the lcd3x Style. (PT's LCD Dot effect is gone: it was too slow on the Brick to keep games at full speed.)
 - **Reset to Recommended** puts back the shader's own settings. For PT, that's its README's settings for that console. The CRT starts flat: curvature works, but costs the CPU about twice as much.
 - **Speed**, in the in-game Shader menu, shows whether the game keeps full speed with the shader as set:
   - **Full Speed**: the frame has room to spare.
@@ -143,6 +142,7 @@ The **Overlay** row offers **None** or any PNG in that console's folder in `Over
 - ChaOS makes a folder for every console at boot and fills it with the overlays it ships: SkyWalker541's for the three Game Boys, and KrutzOtrem's for Game Boy, GBC, GBA, Game Gear and Neo Geo Pocket Color. After each update, any of these missing from the card is put back. Your own are never touched.
 - Add your own from a computer or with ChaOS Transfer, which has the same `Overlays` folder.
 - Make an overlay **1024x768** with a transparent window where the game shows through. Another size is stretched to fit. The game is always drawn on top, so an overlay never covers it.
+- The included overlays are framed for Display Mode **Integer**. In Aspect or Stretch the game is larger and covers more of the frame.
 
 In the in-game menu, the paused game behind the menu shows the shader and overlay as you change them. **Hold Y** to hide the menu and see the whole picture (the menu says so at its foot).
 
@@ -231,7 +231,7 @@ If the Brick restarts but **About ChaOS** still shows the old version, the insta
 | Button | What it does |
 |---|---|
 | **A / B** | Choose and back |
-| **MENU** | Settings for whatever you're looking at. In a game: save, load, shader, overlay, controls, quit and more |
+| **MENU** | Settings for whatever you're looking at. In a game: save, load, display mode, shader, overlay, controls, quit and more |
 | **SELECT** | Muse, the music and audiobook player, from anywhere |
 | **MENU + R1** | Fast forward a game (2x, 3x, 4x) |
 | **MENU + L1** (hold) | Rewind, on consoles where it's turned on ("Rewind" shows while you hold it) |

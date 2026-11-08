@@ -91,11 +91,12 @@ int gm_rows(const gm_ui *u, menu_row *out, gm_bufs *b)
 {
 	static const char *label[GM_ROWS] = {
 		"Continue", "Save", "Load", "Take Screenshot", "Screenshots",
-		"Shader", "Overlay", "Controls", "Cheevos", "Reset", "Quit"
+		"Display Mode", "Shader", "Overlay", "Controls", "Cheevos", "Reset", "Quit"
 	};
 	int i;
 
 	for (i = 0; i < GM_ROWS; i++) out[i] = (menu_row){ label[i], NULL, true };
+	out[GM_DISPLAY].value = u->dmode ? u->dmode : "Integer";
 	out[GM_SHADER].value = u->shader ? u->shader : "none";
 	out[GM_SHADER].live = u->shader != NULL;
 	out[GM_OVERLAY].value = u->overlay ? u->overlay : "None";

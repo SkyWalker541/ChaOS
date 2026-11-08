@@ -627,7 +627,9 @@ static void cursor_reaches(void)
 	k = reachable(rows, n, got, MENU_MAX_ROWS);
 
 	printf("system menu, what the cursor can reach:\n");
-	ck(k == 6, "six rows, not eight");
+	ck(k == 7, "seven rows, not nine");
+	ck(reaches(rows, got, k, "Display Mode") && !strcmp(val(&rows[SM_DISPLAY]), "Integer"),
+	   "Display Mode, Integer when nothing says otherwise");
 	ck(!reaches(rows, got, k, "Shader"), "no Shader: nothing is made for the NES yet");
 	ck(n == SM_ROWS - 1 && !strcmp(rows[SM_SHADER].label, "Overlay"),
 	   "and Overlay moves up into its place");
@@ -1190,9 +1192,11 @@ static void look_rows(void)
 	ck(!strcmp(v, "10%"), "a fraction reads as a percent");
 	look_format(&st, LP_DARKEN, v, sizeof v);
 	ck(!strcmp(v, "Off"), "nothing darkened reads Off");
-	st.v[LP_PIXEL_EFFECT] = 2;
+	st.v[LP_PIXEL_EFFECT] = 1;
 	ck(look_step(&st, LP_PIXEL_EFFECT, +1, 5) && st.v[LP_PIXEL_EFFECT] == 0,
 	   "a choice goes round, one at a time even held");
+	ck(look_set_named(&st, "PT_PIXEL_EFFECT", 2) && st.v[LP_PIXEL_EFFECT] == 1,
+	   "LCD Dot, kept by an older ChaOS, comes back as Grid");
 	st.v[LP_TRANSPARENCY] = 0.98f;
 	look_step(&st, LP_TRANSPARENCY, +1, 5);
 	ck(st.v[LP_TRANSPARENCY] == 1.0f, "a number stops at its end");
@@ -1206,10 +1210,12 @@ static void look_rows(void)
 	st.v[LP_PIXEL_EFFECT] = 1;
 	n = look_group_rows(&st, LS_PT, LG_PIXELS, ps);
 	ck(n == 4 && ps[0] == LP_PIXEL_EFFECT, "Grid: the effect, gap color and two grid rows");
-	st.v[LP_PIXEL_EFFECT] = 2;
-	n = look_group_rows(&st, LS_PT, LG_PIXELS, ps);
-	for (i = 0, ok = true; i < n; i++) if (ps[i] == LP_GRID_WIDTH) ok = false;
-	ck(n == 6 && ok, "LCD Dot: the dot rows, and no grid rows");
+	for (i = 0, ok = true; i < n; i++) if (ps[i] == LP_DOT_SIZE) ok = false;
+	ck(ok, "no LCD Dot rows: it is gone");
+	st.any_size = true;
+	ck(look_group_rows(&st, LS_PT, LG_PIXELS, ps) == 0,
+	   "Aspect or Stretch: no Pixel Effect rows, as it is drawn only at Integer");
+	st.any_size = false;
 	st.v[LP_PIXEL_EFFECT] = 0;
 	ck(look_group_rows(&st, LS_PT, LG_PIXELS, ps) == 1, "Off: only the effect itself");
 	st.v[LP_GLARE_AND_SHEEN] = 0;
@@ -1279,6 +1285,29 @@ static void look_rows(void)
 	ck(look_set_named(&st, "PT_DOT_SIZE", 5.0f) && st.v[LP_DOT_SIZE] == 0.9f,
 	   "a stored value is read back within range");
 	ck(!look_set_named(&st, "PT_NO_SUCH", 1.0f), "and an unknown name is refused");
+
+	printf("a Game Boy drawn with lcd3x:\n");
+	look_recommended(LOOK_GB, &st);
+	look_step(&st, LP_PT_STYLE, +1, 1);
+	ck(look_active_shader(LOOK_GB, &st) == LS_LCD && !strcmp(look_style_name(LOOK_GB, &st), "lcd3x"),
+	   "Style lcd3x draws with lcd3x and says so");
+	ck(look_param_kept(LOOK_GB, LP_LCD_SCANLINES) && look_param_kept(LOOK_GB, LP_PT_STYLE) &&
+	   !look_param_kept(LOOK_GB, LP_CRT_MASK) && !look_param_kept(LOOK_NGP, LP_PT_STYLE),
+	   "lcd3x's settings are kept for a Game Boy, and nobody's else");
+	ok = look_write_cfg("/tmp/menu-check-look.cfg", LOOK_GB, &st);
+	n = 0;
+	if (ok && (f = fopen("/tmp/menu-check-look.cfg", "r"))) {
+		char line[128];
+		bool sty = false, pt = false;
+		while (fgets(line, sizeof line, f)) {
+			if (!strcmp(line, "style = lcd3x\n")) sty = true;
+			if (!strncmp(line, "PT_", 3) || !strncmp(line, "pt_", 3)) pt = true;
+			if (!strncmp(line, "brighten_", 9)) n++;
+		}
+		fclose(f);
+		ok = sty && !pt;
+	}
+	ck(ok && n == 2, "Diatom gets style = lcd3x and lcd3x's two, none of PT's");
 	look_overlay_label("/mnt/SDCARD/Overlays/Game Boy/Clean Frame.png", name, sizeof name);
 	ck(!strcmp(name, "Clean Frame"), "an overlay is called by its file's name");
 }
