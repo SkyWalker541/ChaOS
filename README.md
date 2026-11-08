@@ -129,7 +129,7 @@ From a game, changes apply as you make them. The **For** row picks **This game**
 Keep a picture of a password screen, a code or a map to look at later.
 
 - **Take one:** press **MENU + X** while playing ("Screenshot Saved" shows over the game), or choose **Take Screenshot** in the in-game menu, which saves the paused frame.
-- **Look at them:** **Screenshots** in the in-game menu shows the game you're playing's screenshots full screen, newest first. **Left and right** go through them, **hold Y** hides the caption, **X** deletes the one shown (press **X** again to confirm), and **B** goes back.
+- **Look at them:** **Screenshots** in the in-game menu shows the game you're playing's screenshots full screen. It opens on the one you looked at last (the newest the first time), so you can check it again quickly. **Left and right** go through them, newest first; **X** deletes the one shown (press **X** again to confirm), and **B** goes back.
 - They're saved as PNGs on the card in `Screenshots/<console>/<game>/`, named by date and time, so you can also copy them off with a computer or ChaOS Transfer. They're the game's own pixels, without the shader or overlay, and updates leave them alone.
 
 ## Overlays

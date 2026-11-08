@@ -10404,7 +10404,9 @@ static int gm_width(app *a)
  * Full screen, newest first: the picture as large as a whole-number scale
  * lets it be, as the game was drawn, and a line under it saying which and
  * when. Left and right go through them; X deletes the one shown, after X
- * again to be sure; B or MENU goes back. Y held hides the line. */
+ * again to be sure; B or MENU goes back. It opens on the one looked at
+ * last, so a password can be read again in two presses; kept per game in
+ * the library database, so it is still that one after the game is closed. */
 static int gm_count_shots(void)
 {
 	static char names[SHOTS_MAX][SHOTS_NAME];
@@ -10449,7 +10451,7 @@ static void shots_draw(app *a, SDL_Texture *tex, int tw, int th, const char *nam
 		        UI_TEXT_SOFT);
 		ui_text(a->r, ui_font(UI_F_META),
 		        asking ? "Delete this screenshot?   X  Delete    B  Keep"
-		               : "X  Delete    B  Back    Hold " CTL_PEEK_NAME "  Hide this",
+		               : "X  Delete    B  Back",
 		        TORTOS_SCREEN_W / 2, bar.y + 6 + lh, 0,
 		        asking ? (SDL_Color){ (Uint8)(a->tint >> 16), (Uint8)(a->tint >> 8),
 		                              (Uint8)a->tint, 255 }
@@ -10461,7 +10463,14 @@ static void shots_screen(app *a)
 {
 	static char names[SHOTS_MAX][SHOTS_NAME];
 	SDL_Texture *tex = NULL;
-	int n = shots_list(g_shots_dir, names, SHOTS_MAX), sel = 0, loaded = -1;
+	int n = shots_list(g_shots_dir, names, SHOTS_MAX), sel = 0, loaded = -1, i;
+	char key[LIB_PATH * 2 + 16], last[SHOTS_NAME];
+
+	/* The one looked at last, when it is still there */
+	snprintf(key, sizeof key, "shots.last:%s", g_shots_dir);
+	db_get_str(db_lib(), key, last, sizeof last, "");
+	for (i = 0; last[0] && i < n; i++)
+		if (!strcmp(names[i], last)) { sel = i; break; }
 	int tw = 0, th = 0;
 	bool asking = false, done = false;
 	char path[LIB_PATH * 2 + SHOTS_NAME];
@@ -10506,11 +10515,12 @@ static void shots_screen(app *a)
 			loaded = sel;
 		}
 
-		shots_draw(a, tex, tw, th, names[sel], sel, n, asking, a->in.down[IN_Y] && !asking);
+		shots_draw(a, tex, tw, th, names[sel], sel, n, asking, false);
 		plat_present();
 		SDL_Delay(8);
 	}
 	if (tex) SDL_DestroyTexture(tex);
+	db_set_str(db_lib(), key, n > 0 ? names[sel] : "");
 	plat_input_flush();
 	memset(&a->in, 0, sizeof a->in);
 }
