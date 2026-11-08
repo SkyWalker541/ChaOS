@@ -29,6 +29,9 @@ SDL_Texture *pn_card(SDL_Renderer *r, SDL_Texture *held, const char *name,
 void pn_overlay(SDL_Renderer *r, const char *name, unsigned accent, float t,
                 int screen_w, int screen_h);
 
+/* How long a name takes to form, or to scatter: Transition Speed. */
+void pn_speed(int ms);
+
 /* For screenshots: cards at their ends at once, or (t >= 0) all at t. */
 void pn_fix(float t);
 float pn_fixed(void);   /* what pn_fix set, -2 for animating */

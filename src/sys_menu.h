@@ -38,7 +38,7 @@
 typedef enum {
 	PM_STATS,
 	PM_WIFI, PM_BT, PM_AUDIO, PM_CHANNELS, PM_XFER, PM_CLOCK,
-	PM_SLEEP, PM_THEME, PM_DIR, PM_COLOR, PM_SCRAPE, PM_ACHIEVEMENTS, PM_SS,
+	PM_SLEEP, PM_THEME, PM_DIR, PM_SPEED, PM_COLOR, PM_SCRAPE, PM_ACHIEVEMENTS, PM_SS,
 	PM_UPDATE, PM_CONTROLS, PM_ABOUT, PM_ROWS
 } pm_row;
 
@@ -167,6 +167,9 @@ typedef struct {
 	const char *ss_name;     /* only read when ss_in */
 	const char *cards;       /* the showing card set's name, from CARD_SETS */
 	const char *cards_dir;   /* which way the shelves run, from CARD_DIRS */
+	/* ChaOS Pixel Names' Transition Speed for that direction; NULL for no
+	 * row, with any other theme */
+	const char *name_speed;
 	const char *menu_color;  /* ChaOS: the menus' accent's name, from theme.h */
 	const char *update;      /* ChaOS: Updates' value, upd_row_value */
 	bool        rewind;      /* ChaOS: this console keeps states to rewind to */

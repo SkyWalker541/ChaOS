@@ -15,7 +15,11 @@ static const char *const W_BACKING[] = { "Off", "Pocket", "Grey", "White", NULL 
 static const char *const W_ONOFF[] = { "Off", "On", NULL };
 static const char *const W_EFFECT[] = { "Off", "Grid", "LCD Dot", NULL };
 static const char *const W_GAP[] = { "Backing", "Black", "White", NULL };
-static const char *const W_DIR[] = { "Down right", "Down left", "Up right", "Up left", NULL };
+/* Shadow Direction, by where the shadow lands on screen. PT's GLSL names its
+ * values 0 Down-R, 1 Down-L, 2 Up-R, 3 Up-L, but each samples the source
+ * from that side (orig_coord + shadowDir), so the shadow falls the other way
+ * up: 0 casts up and right, as seen on the Brick. Named here as it looks. */
+static const char *const W_DIR[] = { "Up right", "Up left", "Down right", "Down left", NULL };
 /* crt-lottes-fast's masks, as its source names them: the lite aperture grille
  * dims one channel in three, the grille lights one, the shadow mask is a
  * grille shifted every row */

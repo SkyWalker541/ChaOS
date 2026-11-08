@@ -184,6 +184,7 @@ static void tortos_menu_offline(void)
 
 	memset(&u, 0, sizeof u);
 	u.ss_have = true;   /* the full menu; its hiding is checked on its own */
+	u.name_speed = "Normal";
 	u.wifi = WIFI_OFF;
 	u.cards = "Plain Jane";
 	u.cards_dir = "Horizontal";
@@ -301,6 +302,7 @@ static void tortos_menu_online(void)
 
 	memset(&u, 0, sizeof u);
 	u.ss_have = true;   /* the full menu; its hiding is checked on its own */
+	u.name_speed = "Normal";
 	u.wifi = WIFI_CONNECTED;
 	u.ssid = "kitchen";
 	u.ra_in = true;
@@ -321,6 +323,16 @@ static void tortos_menu_online(void)
 	 * so a build can exist that cannot sign anyone in at all. That state is
 	 * the one worth pinning - a row that opens a keyboard and then refuses
 	 * whatever is typed would look like a rejected password. */
+	printf("Transition Speed:\n");
+	u.name_speed = NULL;
+	n = sys_menu_build(&u, rows, &b, &heading);
+	ck(n == PM_ROWS - 1 && !has_label(rows, n, "Transition Speed"),
+	   "not there with a theme that does not move");
+	u.name_speed = "Fast";
+	n = sys_menu_build(&u, rows, &b, &heading);
+	ck(n == PM_ROWS && has_label(rows, n, "Transition Speed") &&
+	   !strcmp(val(&rows[PM_SPEED]), "Fast"), "there with ChaOS Pixel Names, saying its speed");
+
 	printf("the ScreenScraper account row:\n");
 	u.ss_have = false;
 	n = sys_menu_build(&u, rows, &b, &heading);
@@ -389,6 +401,7 @@ static void system_menu(void)
 
 	memset(&u, 0, sizeof u);
 	u.ss_have = true;   /* the full menu; its hiding is checked on its own */
+	u.name_speed = "Normal";
 	u.games = true;
 	u.wifi = WIFI_CONNECTED;
 	u.sys_name = "Game Boy";
@@ -592,6 +605,7 @@ static void cursor_reaches(void)
 
 	memset(&u, 0, sizeof u);
 	u.ss_have = true;   /* the full menu; its hiding is checked on its own */
+	u.name_speed = "Normal";
 	u.games = true;
 	u.wifi = WIFI_CONNECTED;
 	u.sys_name = "NES"; u.sys_core = "nestopia";
@@ -617,6 +631,7 @@ static void cursor_reaches(void)
 
 	memset(&u, 0, sizeof u);
 	u.ss_have = true;   /* the full menu; its hiding is checked on its own */
+	u.name_speed = "Normal";
 	u.wifi = WIFI_OFF;
 	n = sys_menu_build(&u, rows, &b, &heading);
 	k = reachable(rows, n, got, MENU_MAX_ROWS);
@@ -662,6 +677,7 @@ static void radio_less(void)
 
 	memset(&u, 0, sizeof u);
 	u.ss_have = true;   /* the full menu; its hiding is checked on its own */
+	u.name_speed = "Normal";
 	u.wifi = WIFI_OFF;
 	u.cards = "Plain Jane";
 	u.cards_dir = "Horizontal";
@@ -709,6 +725,7 @@ static void radio_less(void)
 
 	memset(&u, 0, sizeof u);
 	u.ss_have = true;   /* the full menu; its hiding is checked on its own */
+	u.name_speed = "Normal";
 	u.games = true;
 	u.no_wifi = true;
 	u.sys_name = "NES"; u.sys_core = "nestopia";

@@ -652,6 +652,33 @@ static SDL_Texture *load_image(SDL_Renderer *r, const char *path, int *w, int *h
 static int g_cards;
 static int g_dir;
 
+/* ChaOS Pixel Names' Transition Speed, one per UI Direction (CARD_DIRS), kept
+ * in the device database as pixnames.speed.<direction> so updates leave it.
+ * form: a name assembling, or scattering; hold: how long Cubic shows it. */
+static const struct { const char *id, *name; int form, hold; } PN_SPEEDS[] = {
+	{ "slow",   "Slow",   1400, 1600 },
+	{ "normal", "Normal",  950, 1100 },
+	{ "fast",   "Fast",    450,  500 },
+};
+#define PN_SPEED_COUNT 3
+static int g_pn_speed[8];
+
+static void pn_speed_load(void)
+{
+	int d, k;
+	char key[64], v[16];
+
+	for (d = 0; d < CARD_DIR_COUNT && d < 8; d++) {
+		/* Cubic shows the name over a game, so it starts quick */
+		bool cubic = !strcmp(CARD_DIRS[d].id, "both");
+		snprintf(key, sizeof key, "pixnames.speed.%s", CARD_DIRS[d].id);
+		db_get_str(db_dev(), key, v, sizeof v, cubic ? "fast" : "normal");
+		g_pn_speed[d] = 1;
+		for (k = 0; k < PN_SPEED_COUNT; k++)
+			if (!strcmp(v, PN_SPEEDS[k].id)) g_pn_speed[d] = k;
+	}
+}
+
 /* Muse: what the Music folder holds, read at boot and on every rescan, and
  * the green its card is drawn in - the iPod's own, sampled from the photograph
  * (tools/genmusecard.py draws both cards from the same value).
@@ -941,6 +968,7 @@ static SDL_Texture *sys_get_tex(void *ctx, int i, int *w, int *h, float *cb)
 	/* ChaOS Pixel Names: drawn, not loaded, and drawn again while its pixels
 	 * move - toward its name under the cursor, away from it elsewhere */
 	if (CARDS_DRAWN(g_cards)) {
+		pn_speed(PN_SPEEDS[g_pn_speed[g_dir]].form);
 		a->sys_tex[i] = pn_card(a->r, a->sys_tex[i], a->sys.systems[i].name,
 		                        a->sys.systems[i].accent, i == a->sys_cursor);
 		*w = a->sys_tex[i] ? PN_W : 0;
@@ -2667,6 +2695,17 @@ static void on_speed(int x)
 		plat_resident_line("OVERLAY\tpath=%s\tms=1500", p);
 }
 
+/* ChaOS: rewinding, said over the game the way fast forward is - for as long
+ * as it is held, since Diatom says so again each second */
+static void on_rewind(void)
+{
+	char p[CFG_STR * 2];
+
+	snprintf(p, sizeof p, "%s/notice.dtov", P_USERDATA);
+	if (notice_render("Rewind", "Rewinding", p))
+		plat_resident_line("OVERLAY\tpath=%s\tms=1200", p);
+}
+
 /* ChaOS: screenshots. The game being played's folder (shots.h), set at its
  * launch; a frame (a BMP Diatom wrote) filed there as a PNG. Returns whether
  * it was kept. */
@@ -3319,10 +3358,12 @@ furniture:
 		else if (shown != a->sys_cursor) { shown = a->sys_cursor; at = now; leave = 0; }
 		if (shown >= 0) {
 			Uint32 el = now - at;
-			t = el >= 950 ? 1.0f : (float)el / 950.0f;
-			if (!leave && ((ng > 0 && v->cf.active) || el >= 950 + 1200)) leave = now;
+			const Uint32 form = (Uint32)PN_SPEEDS[g_pn_speed[g_dir]].form;
+			const Uint32 hold = (Uint32)PN_SPEEDS[g_pn_speed[g_dir]].hold;
+			t = el >= form ? 1.0f : (float)el / (float)form;
+			if (!leave && ((ng > 0 && v->cf.active) || el >= form + hold)) leave = now;
 			if (leave) {
-				float k = 1.0f - (float)(now - leave) / 950.0f;
+				float k = 1.0f - (float)(now - leave) / (float)form;
 				if (k < t) t = k;
 			}
 			if (pn_fixed() > -2.0f) t = 1.0f;          /* --pixnames: formed */
@@ -5019,6 +5060,7 @@ static int menu_build(app *a, screen_id screen, int sys,
 		u.ss_name   = u.ss_in ? ss_user() : NULL;
 		u.cards     = CARD_SETS[g_cards].name;
 		u.cards_dir = CARD_DIRS[g_dir].name;
+		u.name_speed = CARDS_DRAWN(g_cards) ? PN_SPEEDS[g_pn_speed[g_dir]].name : NULL;
 		u.menu_color = MENU_COLORS[g_menu_color].name;
 		u.update    = upd_row_value();
 		u.auto_off  = a->auto_off;
@@ -8279,7 +8321,18 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 	/* ChaOS: the menus' accent, seen on this very menu as it changes. */
 	if (sel == PM_COLOR && (d || key == IN_ACCEPT)) {
 		g_menu_color = menu_color_step(g_menu_color, d ? d : 1);
+		notice_set_accent(MENU_ACCENT);   /* the in-game notices' border too */
 		db_set_str(db_dev(), "menu_color", MENU_COLORS[g_menu_color].id);
+		return MENU_STAY;
+	}
+
+	/* ChaOS: this direction's Transition Speed, round the three */
+	if (sel == PM_SPEED && (d || key == IN_ACCEPT)) {
+		char k[64];
+		int step = d ? d : 1;
+		g_pn_speed[g_dir] = (g_pn_speed[g_dir] + step + PN_SPEED_COUNT) % PN_SPEED_COUNT;
+		snprintf(k, sizeof k, "pixnames.speed.%s", CARD_DIRS[g_dir].id);
+		db_set_str(db_dev(), k, PN_SPEEDS[g_pn_speed[g_dir]].id);
 		return MENU_STAY;
 	}
 
@@ -10459,9 +10512,10 @@ static int gm_count_shots(void)
 }
 
 static void shots_draw(app *a, SDL_Texture *tex, int tw, int th, const char *name,
-                       int sel, int n, bool asking, bool hide)
+                       int sel, int n, int asking, float shown)
 {
-	char line[96], when[48];
+	char when[48];
+	static SDL_Texture *layer;     /* the caption, drawn here to fade as one */
 
 	SDL_SetRenderDrawColor(a->r, 0, 0, 0, 255);
 	SDL_RenderClear(a->r);
@@ -10481,26 +10535,58 @@ static void shots_draw(app *a, SDL_Texture *tex, int tw, int th, const char *nam
 		SDL_SetTextureScaleMode(tex, SDL_ScaleModeNearest);
 		SDL_RenderCopy(a->r, tex, NULL, &d);
 	}
-	if (!hide) {
-		int lh = ui_font_line(UI_F_META), fh = ui_font_height(UI_F_META);
-		SDL_Rect bar = { 0, TORTOS_SCREEN_H - lh - fh - 14, TORTOS_SCREEN_W, lh + fh + 14 };
+	if (asking) {
+		/* the menus' own question, over the picture: Keep first, so A pressed
+		 * by habit keeps it */
+		menu_row rows[2] = { { "Keep", NULL, true }, { "Delete", NULL, true } };
+		menu_draw(a, "Delete Screenshot?", rows, 2, asking - 1, 0, MENU_ACCENT);
+		return;
+	}
+	if (shown > 0.0f) {
+		/* A menu panel along the bottom: when, as a menu's row reads, then
+		 * which of how many and the buttons, as a menu's note reads. Drawn
+		 * on a layer of its own so it fades out whole, leaving the picture
+		 * clear, and back in when the picture changes or left or right is
+		 * pressed. */
+		TTF_Font *fm = ui_font(UI_F_MENU), *fn = ui_font(UI_F_META);
+		int lm = ui_font_line(UI_F_MENU), ln = ui_font_line(UI_F_META);
+		int pad = UI_PANEL_BORDER + 10, w;
+		char note[128];
+		SDL_Rect panel;
 
-		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
-		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 170);
-		SDL_RenderFillRect(a->r, &bar);
 		shots_label(name, when, sizeof when);
-		snprintf(line, sizeof line, "%s%d of %d  \xC2\xB7  %s%s",
-		         sel > 0 ? "\xE2\x80\xB9  " : "", sel + 1, n, when,
+		snprintf(note, sizeof note, "%s%d of %d%s     X  Delete     B  Back",
+		         sel > 0 ? "\xE2\x80\xB9  " : "", sel + 1, n,
 		         sel < n - 1 ? "  \xE2\x80\xBA" : "");
-		ui_text(a->r, ui_font(UI_F_META), line, TORTOS_SCREEN_W / 2, bar.y + 6, 0,
-		        UI_TEXT_SOFT);
-		ui_text(a->r, ui_font(UI_F_META),
-		        asking ? "Delete this screenshot?   X  Delete    B  Keep"
-		               : "X  Delete    B  Back",
-		        TORTOS_SCREEN_W / 2, bar.y + 6 + lh, 0,
-		        asking ? (SDL_Color){ (Uint8)(a->tint >> 16), (Uint8)(a->tint >> 8),
-		                              (Uint8)a->tint, 255 }
-		               : UI_TEXT_DIM);
+		panel.w = ui_text_width(fn, note);
+		w = ui_text_width(fm, when);
+		if (w > panel.w) panel.w = w;
+		panel.w += pad * 2 + 24;
+		panel.h = lm + ln + pad * 2 + 4;
+		panel.x = (TORTOS_SCREEN_W - panel.w) / 2;
+		panel.y = TORTOS_SCREEN_H - panel.h - 10;
+		if (!layer) {
+			layer = SDL_CreateTexture(a->r, SDL_PIXELFORMAT_RGBA8888,
+			                          SDL_TEXTUREACCESS_TARGET,
+			                          TORTOS_SCREEN_W, TORTOS_SCREEN_H);
+			if (layer) SDL_SetTextureBlendMode(layer, SDL_BLENDMODE_BLEND);
+		}
+		if (layer && shown < 1.0f && SDL_SetRenderTarget(a->r, layer) == 0) {
+			SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_NONE);
+			SDL_SetRenderDrawColor(a->r, 0, 0, 0, 0);
+			SDL_RenderClear(a->r);
+			SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+		} else {
+			shown = 1.0f;            /* straight onto the screen */
+		}
+		ui_panel(a->r, &panel, MENU_RADIUS, MENU_ACCENT);
+		ui_text(a->r, fm, when, TORTOS_SCREEN_W / 2, panel.y + pad + 2, 0, UI_TEXT);
+		ui_text(a->r, fn, note, TORTOS_SCREEN_W / 2, panel.y + pad + 2 + lm, 0, UI_TEXT_DIM);
+		if (shown < 1.0f) {
+			plat_draw_to_screen();
+			SDL_SetTextureAlphaMod(layer, (Uint8)(shown * 255));
+			SDL_RenderCopy(a->r, layer, NULL, NULL);
+		}
 	}
 }
 
@@ -10516,8 +10602,9 @@ static void shots_screen(app *a)
 	db_get_str(db_lib(), key, last, sizeof last, "");
 	for (i = 0; last[0] && i < n; i++)
 		if (!strcmp(names[i], last)) { sel = i; break; }
-	int tw = 0, th = 0;
-	bool asking = false, done = false;
+	int tw = 0, th = 0, asking = 0;     /* asking: 0, or 1 + the row on */
+	bool done = false;
+	Uint32 cap_at = SDL_GetTicks();     /* when the caption last came up */
 	char path[LIB_PATH * 2 + SHOTS_NAME];
 
 	plat_input_flush();
@@ -10525,20 +10612,22 @@ static void shots_screen(app *a)
 	while (n > 0 && !done && !want_quit) {
 		plat_input_poll(&a->in);
 		if (asking) {
-			if (a->in.pressed[IN_X]) {
-				if (shots_delete(g_shots_dir, names[sel])) {
+			if (in_repeat(&a->in, IN_UP) || in_repeat(&a->in, IN_DOWN)) asking = 3 - asking;
+			if (a->in.pressed[IN_ACCEPT]) {
+				if (asking == 2 && shots_delete(g_shots_dir, names[sel])) {
 					n = shots_list(g_shots_dir, names, SHOTS_MAX);
 					if (sel >= n) sel = n - 1;
 					loaded = -1;
 				}
-				asking = false;
-			} else if (a->in.pressed[IN_BACK] || a->in.pressed[IN_ACCEPT]) {
-				asking = false;
+				asking = 0;
+			} else if (a->in.pressed[IN_BACK] || a->in.pressed[IN_MENU]) {
+				asking = 0;
 			}
 		} else {
-			if (in_repeat(&a->in, IN_LEFT)  && sel > 0)     sel--;
-			if (in_repeat(&a->in, IN_RIGHT) && sel < n - 1) sel++;
-			if (a->in.pressed[IN_X]) asking = true;
+			/* left or right brings the caption back, at the ends too */
+			if (in_repeat(&a->in, IN_LEFT))  { if (sel > 0) sel--;     cap_at = SDL_GetTicks(); }
+			if (in_repeat(&a->in, IN_RIGHT)) { if (sel < n - 1) sel++; cap_at = SDL_GetTicks(); }
+			if (a->in.pressed[IN_X]) asking = 1;
 			if (menu_leaving(a)) done = true;
 		}
 		if (a->in.pressed[IN_POWER] || idle_due(a)) {
@@ -10560,7 +10649,13 @@ static void shots_screen(app *a)
 			loaded = sel;
 		}
 
-		shots_draw(a, tex, tw, th, names[sel], sel, n, asking, false);
+		if (asking) cap_at = SDL_GetTicks();   /* back after the question */
+		{
+			/* up for 1.5 s, then out over 0.4 s */
+			Uint32 el = SDL_GetTicks() - cap_at;
+			float shown = el < 1500 ? 1.0f : el < 1900 ? 1.0f - (float)(el - 1500) / 400.0f : 0.0f;
+			shots_draw(a, tex, tw, th, names[sel], sel, n, asking, shown);
+		}
 		plat_present();
 		SDL_Delay(8);
 	}
@@ -12973,7 +13068,7 @@ static void take_shot(app *a)
 			snprintf(p, sizeof p, "%s/%s", shot_shots, names[1]);
 			if ((sf = IMG_Load(p))) { t = SDL_CreateTextureFromSurface(a->r, sf); SDL_FreeSurface(sf); }
 			if (t) SDL_QueryTexture(t, NULL, NULL, &tw, &th);
-			shots_draw(a, t, tw, th, names[1], 1, n, shot_shots_ask, false);
+			shots_draw(a, t, tw, th, names[1], 1, n, shot_shots_ask ? 1 : 0, 1.0f);
 			if (t) SDL_DestroyTexture(t);
 		}
 	}
@@ -13656,6 +13751,7 @@ int main(int argc, char *argv[])
 		plat_resident_on_unlock(on_cheevo_unlocked);
 		plat_resident_on_speed(on_speed);
 		plat_resident_on_shot(on_shot);
+		plat_resident_on_rewind(on_rewind);
 		plat_resident_on_tick(on_game_tick);
 		plat_resident_on_battery_empty(battery_empty);
 
@@ -13719,6 +13815,8 @@ int main(int argc, char *argv[])
 		g_dir = cards_dir_index(set);
 		db_get_str(db_dev(), "menu_color", set, sizeof set, "chaos");
 		g_menu_color = menu_color_index(set);
+		notice_set_accent(MENU_ACCENT);
+		pn_speed_load();
 	}
 	a.sys_cursor = 0;
 	db_get_str(db_lib(), "startup_system", startup, sizeof startup, "");

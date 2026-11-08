@@ -62,6 +62,25 @@ static void draw_text(uint8_t *out, int ow, int oh, TTF_Font *f,
 	SDL_FreeSurface(t);
 }
 
+/* ChaOS: the menus' accent, for the border; MENU > Menu Color */
+static unsigned g_accent = 0xFF7A2F;
+void notice_set_accent(unsigned rgb) { g_accent = rgb; }
+
+/* How much of pixel x,y is inside a rounded rectangle x0,y0 w x h, radius rad:
+ * 0..1, antialiased along the arc */
+static double round_cover(int x, int y, int x0, int y0, int w, int h, int rad)
+{
+	int lx = x - x0, ly = y - y0;
+	int dx = lx < rad ? rad - lx : (lx >= w - rad ? lx - (w - rad - 1) : 0);
+	int dy = ly < rad ? rad - ly : (ly >= h - rad ? ly - (h - rad - 1) : 0);
+	double d;
+
+	if (lx < 0 || ly < 0 || lx >= w || ly >= h) return 0.0;
+	if (!dx || !dy) return 1.0;
+	d = sqrt((double)dx * dx + (double)dy * dy) - rad;
+	return d > 0.5 ? 0.0 : d > -0.5 ? 0.5 - d : 1.0;
+}
+
 bool notice_render(const char *heading, const char *body, const char *path)
 {
 	/* The NAME is the line worth reading, so it gets the larger face and the
@@ -76,8 +95,11 @@ bool notice_render(const char *heading, const char *body, const char *path)
 	uint8_t *px;
 	FILE *f;
 	unsigned char hdr[8];
-	const SDL_Color WHITE = { 235, 235, 240, 255 };
-	const SDL_Color DIM   = { 128, 168, 190, 255 };
+	/* ChaOS: the menus' look - their panel, its border in the menus' accent,
+	 * and their inks: the heading as a menu's notes, the body as its rows */
+	const SDL_Color WHITE = UI_TEXT;
+	const SDL_Color DIM   = UI_TEXT_DIM;
+	const int bw = UI_PANEL_BORDER / 2;
 
 	if (!fb) return false;
 	if (!fh) fh = fb;
@@ -92,8 +114,8 @@ bool notice_render(const char *heading, const char *body, const char *path)
 	 * outright: TTF_FontDescent is negative, and without this the gap under
 	 * the last line is a descender deep even when nothing descends. The same
 	 * trick menu_draw uses to stop its rows riding high. */
-	padx = ui_font_line(UI_F_MENU) / 3;
-	pady = ui_font_line(UI_F_MENU) / 6;
+	padx = ui_font_line(UI_F_MENU) / 3 + bw;
+	pady = ui_font_line(UI_F_MENU) / 6 + bw;
 
 	/* A margin off the panel edge as well as off Diatom's hard limit: a
 	 * notice that runs the full width of the screen stops reading as a thing
@@ -125,28 +147,20 @@ bool notice_render(const char *heading, const char *body, const char *path)
 	px = calloc((size_t)w * (size_t)h, 4);
 	if (!px) return false;
 
-	/* A dark slab at 85%, rounded the way every menu panel in the launcher is
-	 * rounded. The first version chamfered the corners - one comparison per
-	 * pixel - and the comment justified it as reading the same from a meter
-	 * away. It does not read the same. It reads as a different piece of
-	 * software borrowing the screen for a moment. */
-	corner = padx;
+	/* The menu's panel, as ui_panel draws it: a rounded border in the accent
+	 * round a near-opaque face. (TortOS's notice was a dark slab with a blue
+	 * heading, the one thing in a game that did not look like the rest.) */
+	corner = 20;
 	for (y = 0; y < h; y++) {
 		for (x = 0; x < w; x++) {
-			int dx = x < corner ? corner - x : (x >= w - corner ? x - (w - corner - 1) : 0);
-			int dy = y < corner ? corner - y : (y >= h - corner ? y - (h - corner - 1) : 0);
-			unsigned a = 217;
+			double out = round_cover(x, y, 0, 0, w, h, corner);
+			double in = round_cover(x, y, bw, bw, w - bw * 2, h - bw * 2, corner - bw);
+			uint8_t *d = px + ((size_t)y * w + x) * 4;
 
-			if (dx || dy) {
-				/* Coverage from the distance to the arc, so the curve is
-				 * antialiased rather than staircased. More than half a pixel
-				 * outside is nothing; more than half inside is solid. */
-				double d = sqrt((double)dx * dx + (double)dy * dy) - corner;
-
-				if (d > 0.5) continue;
-				if (d > -0.5) a = (unsigned)(a * (0.5 - d));
-			}
-			blend(px + ((size_t)y * w + x) * 4, 26, 22, 18, a);
+			if (out <= 0.0) continue;
+			blend(d, g_accent & 255, (g_accent >> 8) & 255, (g_accent >> 16) & 255,
+			      (unsigned)(255 * out));
+			if (in > 0.0) blend(d, 32, 24, 22, (unsigned)(250 * in));
 		}
 	}
 

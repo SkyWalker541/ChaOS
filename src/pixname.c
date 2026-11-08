@@ -8,7 +8,8 @@
 #include <string.h>
 
 #define PN_CARDS   32
-#define PN_MS      950.0f        /* to assemble, or to scatter */
+static float g_ms = 950.0f;      /* to assemble, or to scatter: pn_speed */
+#define PN_MS g_ms
 #define PN_RADIUS  28
 #define PN_BAR_Y   (PN_H * 80 / 100)
 
@@ -35,6 +36,7 @@ static bool g_moving;
 static float g_fix = -2.0f;      /* -2: animate; -1: ends at once; else that t */
 
 void pn_fix(float t) { g_fix = t; }
+void pn_speed(int ms) { if (ms > 50) g_ms = (float)ms; }
 float pn_fixed(void) { return g_fix; }
 
 static unsigned rng(unsigned *s) { *s = *s * 1103515245u + 12345u; return *s >> 8; }

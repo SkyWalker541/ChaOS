@@ -24,4 +24,7 @@
  * w*h BGRA rows. False if there is no font or the file cannot be written. */
 bool notice_render(const char *heading, const char *body, const char *path);
 
+/* ChaOS: the border's color, the menus' accent (0xRRGGBB). */
+void notice_set_accent(unsigned rgb);
+
 #endif

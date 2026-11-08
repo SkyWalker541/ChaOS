@@ -36,6 +36,8 @@ int sys_menu_tortos_rows(const sys_ui *u, pm_row *out)
 		 * Art uses libretro's thumbnails alone, and the menu says nothing of
 		 * a service it cannot reach. */
 		if (!u->ss_have && r == PM_SS) continue;
+		/* ChaOS: only with ChaOS Pixel Names, the one theme that moves */
+		if (!u->name_speed && r == PM_SPEED) continue;
 		out[n++] = (pm_row)r;
 	}
 	return n;
@@ -217,6 +219,8 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	 * offered turned out to be too narrow to matter - src/ui.c. */
 	full[PM_THEME]        = (menu_row){ "UI Theme",  u->cards,     true };
 	full[PM_DIR]          = (menu_row){ "UI Direction", u->cards_dir, true };
+	/* ChaOS: how fast the pixel names form, for this direction alone */
+	full[PM_SPEED]        = (menu_row){ "Transition Speed", u->name_speed, true };
 	/* ChaOS: the menus' accent, beside the other two rows about the look. */
 	full[PM_COLOR]        = (menu_row){ "Menu Color", u->menu_color, true };
 	/* Not "Sleep". The device has no suspend and is not getting one. This

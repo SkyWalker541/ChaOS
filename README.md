@@ -55,7 +55,7 @@
 - **Updates over Wi-Fi,** from the menu, when you choose, with what's new in each.
 - **Button mapping,** per console or per game, with turbo, and **rewind**.
 - **ChaOS Transfer,** the boot and power-off animations, and the ChaOS look throughout.
-- **ChaOS Pixel Names,** a UI Theme (**MENU > UI Theme**) where each console is its name in the logo's pixel letters, last word in the console's colour. As you scroll, the name you land on flies together pixel by pixel and the one you leave breaks apart. In Cubic, where every face is a game, the system's name flies together over the game after each turn, then scatters.
+- **ChaOS Pixel Names,** a UI Theme (**MENU > UI Theme**) where each console is its name in the logo's pixel letters, last word in the console's colour. As you scroll, the name you land on flies together pixel by pixel and the one you leave breaks apart. In Cubic, where every face is a game, the system's name flies together over the game after each turn, then scatters. **Transition Speed** (Slow, Normal or Fast) sets how quickly, separately for each UI Direction; it's in the menu while this theme is on, and Cubic starts on Fast.
 - **Screenshots** of any game with **MENU + X**, looked at again from the in-game menu.
 
 **From TortOS**
@@ -131,7 +131,7 @@ From a game, changes apply as you make them. The **For** row picks **This game**
 Keep a picture of a password screen, a code or a map to look at later.
 
 - **Take one:** press **MENU + X** while playing ("Screenshot Saved" shows over the game), or choose **Take Screenshot** in the in-game menu, which saves the paused frame.
-- **Look at them:** **Screenshots** in the in-game menu shows the game you're playing's screenshots full screen. It opens on the one you looked at last (the newest the first time), so you can check it again quickly. **Left and right** go through them, newest first; **X** deletes the one shown (press **X** again to confirm), and **B** goes back.
+- **Look at them:** **Screenshots** in the in-game menu shows the game you're playing's screenshots full screen. It opens on the one you looked at last (the newest the first time), so you can check it again quickly. **Left and right** go through them, newest first; **X** asks whether to delete the one shown (Keep or Delete), and **B** goes back. The caption fades after a moment so the whole picture shows; left or right brings it back.
 - They're saved as PNGs on the card in `Screenshots/<console>/<game>/`, named by date and time, so you can also copy them off with a computer or ChaOS Transfer. They're the game's own pixels, without the shader or overlay, and updates leave them alone.
 
 ## Overlays
@@ -232,7 +232,7 @@ If the Brick restarts but **About ChaOS** still shows the old version, the insta
 | **MENU** | Settings for whatever you're looking at. In a game: save, load, shader, overlay, controls, quit and more |
 | **SELECT** | Muse, the music and audiobook player, from anywhere |
 | **MENU + R1** | Fast forward a game (2x, 3x, 4x) |
-| **MENU + L1** (hold) | Rewind, on consoles where it's turned on |
+| **MENU + L1** (hold) | Rewind, on consoles where it's turned on ("Rewind" shows while you hold it) |
 | **MENU + X** | Take a screenshot of the game |
 | **X / Y** | In a game, turbo A and B. On the shelf, a game's details and favorite |
 | **POWER** | Save and turn off |

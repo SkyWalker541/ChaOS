@@ -143,6 +143,8 @@ void plat_resident_on_unlock(void (*fn)(int id));
 void plat_resident_on_speed(void (*fn)(int x));
 /* ChaOS: MENU+X in a game - Diatom wrote the frame to `path`, a BMP. */
 void plat_resident_on_shot(void (*fn)(const char *path));
+/* ChaOS: MENU+L1 held, rewinding - said as it starts and once a second. */
+void plat_resident_on_rewind(void (*fn)(void));
 
 /* Called from inside plat_resident_wait roughly ten times a second, which is
  * the rate its socket poll already runs at. For work the launcher wants to do
