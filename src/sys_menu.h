@@ -162,7 +162,7 @@ typedef struct {
 	 * developer key comes from the environment at build time and a build
 	 * without it cannot sign anybody in, so the row has three states rather
 	 * than two - see src/ss.h. */
-	bool        ss_have;     /* this build carries a developer key */
+	bool        ss_have;     /* a developer key: built in, or the player's */
 	bool        ss_in;
 	const char *ss_name;     /* only read when ss_in */
 	const char *cards;       /* the showing card set's name, from CARD_SETS */

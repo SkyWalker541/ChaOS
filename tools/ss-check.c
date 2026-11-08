@@ -236,6 +236,18 @@ int main(void)
 		return fails ? 1 : 0;
 	}
 
+	printf("a developer pair of the player's own:\n");
+	ck(!ss_dev_set("only-an-id", ""), "half a pair is refused");
+	if (!ss_dev_builtin()) {
+		ck(ss_dev_set("someid", "somepass"), "a whole one is kept");
+		ck(ss_have_dev(), "and then there is a developer pair");
+		ss_creds_load();
+		ck(!strcmp(ss_dev_user_id(), "someid"), "and it is still there on the next load");
+		ck(ss_dev_set("", ""), "removing it");
+		ss_creds_load();
+		ck(!ss_have_dev() && !ss_dev_user_id()[0], "removes it, stored as well");
+	}
+
 	printf("with no account stored:\n");
 	ss_creds_clear();
 	ck(!ss_creds_load(), "loading finds nothing");

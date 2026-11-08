@@ -319,8 +319,8 @@ static void tortos_menu_online(void)
 	 * whatever is typed would look like a rejected password. */
 	printf("the ScreenScraper account row:\n");
 	ck(!u.ss_have, "the fixture above has no key");
-	ck(!strcmp(val(&rows[PM_SS]), "not in this build"), "and the row says so");
-	ck(!rows[PM_SS].live, "and does not open");
+	ck(!strcmp(val(&rows[PM_SS]), "set up"), "and the row says to set it up");
+	ck(rows[PM_SS].live, "and opens, to where a developer ID goes");
 
 	u.ss_have = true;
 	n = sys_menu_build(&u, rows, &b, &heading);

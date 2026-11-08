@@ -5537,7 +5537,7 @@ static void ss_signin_screen(app *a)
 
 	if (!ss_have_dev() || !net_online()) {
 		row = (menu_row){ !ss_have_dev()
-		                  ? "This build has no ScreenScraper key."
+		                  ? "Add a Developer ID first."
 		                  : "Not on a network. Connect Wi-Fi first.", NULL, false };
 		wifi_backdrop(a);
 		menu_draw(a, "ScreenScraper", &row, 1, -1, 0, MENU_ACCENT);
@@ -5574,6 +5574,152 @@ static void ss_signin_screen(app *a)
 	SDL_Delay(1800);
 	plat_input_flush();
 	memset(&a->in, 0, sizeof a->in);
+}
+
+/* ChaOS: the ScreenScraper page, MENU > ScreenScraper. The player's account,
+ * and the developer ID every request also carries: built into an official
+ * build when there is one, otherwise the player's own, which ScreenScraper
+ * gives to anyone who asks on its forum. Both are kept in the device
+ * database, on the card outside ChaOS's own files, so an Update or a Full
+ * Install leaves them where they are. */
+enum { SSM_NONE, SSM_ACCOUNT, SSM_SIGN_OUT, SSM_DEV, SSM_DEV_REMOVE };
+
+typedef struct {
+	app  *a;
+	int   ids[16];
+	char  acct[SS_USER_MAX + 8];
+	char  dev[SS_DEVID_MAX + 8];
+} ssm_ctx;
+
+/* A line said, and gone: as the sign-in screens say how it went */
+static void ss_say(app *a, const char *text, bool ok)
+{
+	menu_row row = { text, NULL, ok };
+
+	wifi_backdrop(a);
+	menu_draw(a, "ScreenScraper", &row, 1, -1, 0, MENU_ACCENT);
+	plat_draw_osd(a->r);
+	plat_present();
+	SDL_Delay(1800);
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+}
+
+static int ssm_build(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	ssm_ctx *c = ctx;
+	int n = 0;
+
+	(void)max;
+	*heading = "ScreenScraper";
+	snprintf(c->acct, sizeof c->acct, "%s", ss_signed_in() ? ss_user() : "Sign In");
+	c->ids[n] = SSM_ACCOUNT;
+	rows[n++] = (menu_row){ "Account", c->acct, true };
+	if (ss_signed_in()) {
+		c->ids[n] = SSM_SIGN_OUT;
+		rows[n++] = (menu_row){ "Sign Out", NULL, true };
+	}
+	c->ids[n] = SSM_NONE; rows[n++] = MENU_RULE;
+	if (ss_dev_builtin()) {
+		c->ids[n] = SSM_NONE;
+		rows[n++] = (menu_row){ "Developer ID", "Built In", false };
+	} else {
+		snprintf(c->dev, sizeof c->dev, "%s", ss_dev_user_id()[0] ? ss_dev_user_id() : "Add");
+		c->ids[n] = SSM_DEV;
+		rows[n++] = (menu_row){ "Developer ID", c->dev, true };
+		if (ss_dev_user_id()[0]) {
+			c->ids[n] = SSM_DEV_REMOVE;
+			rows[n++] = (menu_row){ "Remove Developer ID", NULL, true };
+		}
+	}
+	c->ids[n] = SSM_NONE; rows[n++] = MENU_RULE;
+	c->ids[n] = SSM_NONE;
+	rows[n++] = MENU_NOTE(ss_signed_in() ? "Box Art uses ScreenScraper"
+	                      : ss_have_dev() ? "Sign in for ScreenScraper art"
+	                      : "Developer ID: screenscraper.fr");
+	c->ids[n] = SSM_NONE;
+	rows[n++] = MENU_NOTE("Kept through every update");
+	return n;
+}
+
+/* Two prompts, checked with ScreenScraper, then kept */
+static void ss_dev_screen(app *a)
+{
+	char id[SS_DEVID_MAX] = "", pass[SS_PASS_MAX] = "", err[160] = "";
+	kb_result kr;
+	bool ok;
+
+	if (!net_online()) { ss_say(a, "Not on a network. Connect Wi-Fi first.", false); return; }
+	snprintf(id, sizeof id, "%s", ss_dev_user_id());
+	kr = kb_prompt(a->r, &a->in, "Developer ID", id, (int)sizeof id, MENU_ACCENT,
+	               wifi_backdrop, idle_due_ctx, a);
+	if (kr == KB_POWER) { power_off(a); return; }
+	if (kr != KB_ACCEPT || !id[0]) return;
+	kr = kb_prompt(a->r, &a->in, "Developer Password", pass, (int)sizeof pass, MENU_ACCENT,
+	               wifi_backdrop, idle_due_ctx, a);
+	if (kr == KB_POWER) { memset(pass, 0, sizeof pass); power_off(a); return; }
+	if (kr != KB_ACCEPT || !pass[0]) { memset(pass, 0, sizeof pass); return; }
+
+	wait_panel(a, "ScreenScraper", "Checking...");
+	ok = ss_dev_check(id, pass, err, sizeof err);
+	if (ok && !ss_dev_set(id, pass)) {
+		ok = false;
+		snprintf(err, sizeof err, "accepted, but it could not be saved");
+	}
+	memset(pass, 0, sizeof pass);
+	if (ok) snprintf(err, sizeof err, "Developer ID added");
+	else if (!err[0]) snprintf(err, sizeof err, "Not accepted");
+	ss_say(a, err, ok);
+}
+
+static menu_result ssm_key(app *a, void *ctx, in_button key, int sel)
+{
+	ssm_ctx *c = ctx;
+	int id = sel >= 0 && sel < 16 ? c->ids[sel] : SSM_NONE;
+
+	if (key != IN_ACCEPT) return MENU_STAY;
+	switch (id) {
+	case SSM_ACCOUNT:
+		ss_signin_screen(a);
+		break;
+	case SSM_SIGN_OUT:
+		if (confirm_panel(a, "ScreenScraper", "Sign out of ScreenScraper?", "Sign Out"))
+			ss_say(a, ss_sign_out() ? "Signed out" : "Couldn't save that", true);
+		break;
+	case SSM_DEV:
+		ss_dev_screen(a);
+		break;
+	case SSM_DEV_REMOVE:
+		if (confirm_panel(a, "ScreenScraper", "Remove your Developer ID?", "Remove"))
+			ss_say(a, ss_dev_set("", "") ? "Developer ID removed" : "Couldn't save that", true);
+		break;
+	default:
+		break;
+	}
+	return MENU_STAY;
+}
+
+/* For screenshots (--ss): the page as it stands */
+static void ss_shot(app *a)
+{
+	ssm_ctx c;
+	menu_row rows[16];
+	const char *heading;
+	int n;
+
+	memset(&c, 0, sizeof c);
+	c.a = a;
+	n = ssm_build(&c, rows, 16, &heading);
+	menu_draw(a, heading, rows, n, 0, 0, MENU_ACCENT);
+}
+
+static void ss_screen(app *a)
+{
+	ssm_ctx c;
+
+	memset(&c, 0, sizeof c);
+	c.a = a;
+	menu_run(a, &(menu_style){ .accent = MENU_ACCENT, .fixed_w = 0 }, ssm_build, ssm_key, &c);
 }
 
 /* Over The Hare: the address, the PIN, and what is happening.
@@ -8164,7 +8310,7 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 	case PM_XFER:         xfer_screen(a); break;
 	case PM_SCRAPE:       art_screen(a, NULL, NULL, NULL, NULL, MENU_ACCENT); break;
 	case PM_ACHIEVEMENTS: ra_signin_screen(a); break;
-	case PM_SS:           ss_signin_screen(a); break;
+	case PM_SS:           ss_screen(a); break;
 	case PM_BT:           bt_screen(a); break;
 	case PM_CLOCK:        clock_screen(a); break;
 	case PM_STATS:        if (stats_screen(a)) return MENU_DONE; break;
@@ -12490,6 +12636,7 @@ static int shot_screen = -1;
 static int shot_menu, shot_menu_sel;
 /* --shader [group [row]]: the shader's page, -1, or a group's (ChaOS). */
 static int shot_shader = -2, shot_shader_sel;
+static bool shot_ss;
 static int shot_kb, shot_kb_layer;
 static const char *shot_notice;
 static const char *shot_notice_head = "Unlocked  -  5 points";
@@ -12653,6 +12800,7 @@ static void take_shot(app *a)
 	draw_shelf(a);
 	if (shot_menu) tortos_menu_draw(a, shot_menu_sel);
 	if (shot_shader > -2) shader_shot(a, shot_shader, shot_shader_sel);
+	if (shot_ss) ss_shot(a);
 	if (shot_slots) shot_draw_slots(a);
 	if (shot_kb) kb_preview(a->r, shot_kb_title, shot_kb_text,
 	                        shot_kb_layer, 1, 0, MENU_ACCENT);
@@ -12939,6 +13087,7 @@ int main(int argc, char *argv[])
 			plat_resident_demo_speed(&sp);
 			shot_speed = true;
 		}
+		else if (!strcmp(argv[i], "--ss")) shot_ss = true;
 		else if (!strcmp(argv[i], "--mode") && i + 1 < argc) shot_mode = argv[++i];
 		else if (!strcmp(argv[i], "--sysmove") && i + 1 < argc)
 			shot_sysmove = (float)atof(argv[++i]);
