@@ -57,6 +57,7 @@
 - **ChaOS Transfer,** the boot and power-off animations, and the ChaOS look throughout.
 - **ChaOS Pixel Names,** a UI Theme (**MENU > UI Theme**) where each console is its name in the logo's pixel letters, last word in the console's colour. As you scroll, the name you land on flies together pixel by pixel and the one you leave breaks apart. In Cubic, where every face is a game, the system's name flies together over the game after each turn, then scatters. **Transition Speed** (Slow, Normal or Fast) sets how quickly, separately for each UI Direction; it's in the menu while this theme is on, and Cubic starts on Fast.
 - **Screenshots** of any game with **MENU + X**, looked at again from the in-game menu.
+- **Game List View** (**MENU > Game List View**): **Normal** shows each system's games as the UI Theme draws them; **List** shows them as a scrolling list in the menus' style. Up and down move, left and right jump by letter, and L1 and R1 skip a screenful, as on the shelf. (Not in Cubic, which never opens a list.)
 
 **From TortOS**
 

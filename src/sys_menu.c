@@ -38,6 +38,7 @@ int sys_menu_tortos_rows(const sys_ui *u, pm_row *out)
 		if (!u->ss_have && r == PM_SS) continue;
 		/* ChaOS: only with ChaOS Pixel Names, the one theme that moves */
 		if (!u->name_speed && r == PM_SPEED) continue;
+		if (!u->list_view && r == PM_LISTVIEW) continue;
 		out[n++] = (pm_row)r;
 	}
 	return n;
@@ -221,6 +222,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	full[PM_DIR]          = (menu_row){ "UI Direction", u->cards_dir, true };
 	/* ChaOS: how fast the pixel names form, for this direction alone */
 	full[PM_SPEED]        = (menu_row){ "Transition Speed", u->name_speed, true };
+	full[PM_LISTVIEW]     = (menu_row){ "Game List View", u->list_view, true };
 	/* ChaOS: the menus' accent, beside the other two rows about the look. */
 	full[PM_COLOR]        = (menu_row){ "Menu Color", u->menu_color, true };
 	/* Not "Sleep". The device has no suspend and is not getting one. This

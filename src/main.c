@@ -663,6 +663,13 @@ static const struct { const char *id, *name; int form, hold; } PN_SPEEDS[] = {
 #define PN_SPEED_COUNT 3
 static int g_pn_speed[8];
 
+/* ChaOS: Game List View - Normal, the shelf as the UI Theme and Direction
+ * draw it, or List, a system's games as a menu: up and down, left and right
+ * by letter, L1 and R1 by a screenful as on the shelf. "game_view" in the
+ * device database. Cubic never opens a system, so it has no list. */
+static bool g_list_view;
+#define LIST_VIEW_ON() (g_list_view && !CARD_DIRS[g_dir].both)
+
 static void pn_speed_load(void)
 {
 	int d, k;
@@ -3791,11 +3798,69 @@ static void draw_games_face(app *a, sysview *v, const system_cfg *s, int idx)
 	draw_game_text(a, v, s, idx);
 }
 
+/* ChaOS: Game List View's List - a system's games as one of the launcher's
+ * menus, so it moves and reads as every other list does: the panel, the
+ * sliding plate, a long title running along its row, the count at the foot.
+ * A favorite carries a dot. */
+static void menu_draw(app *a, const char *heading, const menu_row *rows, int n,
+                      int sel, int fixed_w, unsigned accent);
+static unsigned menu_accent(void);
+
+static void draw_game_list(app *a, sysview *v, const system_cfg *s)
+{
+	static menu_row *rows;
+	static int cap, last_cursor = -1, last_sys = -1;
+	static Uint32 moved_at;
+	static char count[CFG_STR + 48];
+	int n = v->list.count, i, lo, hi;
+	Uint32 now = plat_now_ms();
+
+	if (n + 2 > cap) {
+		menu_row *nr = realloc(rows, (size_t)(n + 2) * sizeof *nr);
+		if (!nr) return;
+		rows = nr;
+		cap = n + 2;
+	}
+	/* favorites asked of the rows near the cursor alone: the rest are off
+	 * the panel, and asking all of a long shelf every frame costs */
+	lo = v->cursor - 24; hi = v->cursor + 24;
+	for (i = 0; i < n; i++) {
+		const char *mark = NULL;
+		if (i >= lo && i <= hi) {
+			const system_cfg *gs = &a->sys.systems[shelf_owner(a, a->sys_cursor, i)];
+			if (fav_is(gs->tag, v->list.items[i].file)) mark = "\xE2\x80\xA2";
+		}
+		/* a value, even an empty one, sets the title against the left as a
+		 * list's names are, rather than centred as a lone menu row is */
+		rows[i] = (menu_row){ v->list.items[i].title, mark ? mark : "", true };
+	}
+	/* where in the list, in the heading: a note at the foot would scroll
+	 * away with the names */
+	snprintf(count, sizeof count, "%s  \xC2\xB7  %d / %d", s->name,
+	         n > 0 ? v->cursor + 1 : 0, n);
+	menu_draw(a, count, rows, n, v->cursor, 820, menu_accent());
+
+	/* frames while the plate and the list ease to a new row, and while a
+	 * long title slides */
+	if (v->cursor != last_cursor || a->sys_cursor != last_sys) {
+		last_cursor = v->cursor;
+		last_sys = a->sys_cursor;
+		moved_at = now;
+	}
+	if (now - moved_at < 500) redraw_now();
+	else if (n > 0 && ui_text_width(ui_font(UI_F_MENU), v->list.items[v->cursor].title) > 700)
+		redraw_at(now + 33);
+}
+
 static void draw_games(app *a)
 {
 	shelf_pacing(&a->view[a->sys_cursor].cf);
 	shelf_pacing(&a->cf_sys);
 	if (CARD_DIRS[g_dir].both) { draw_both(a); return; }
+	if (LIST_VIEW_ON() && !is_muse(&a->sys.systems[a->sys_cursor])) {
+		draw_game_list(a, &a->view[a->sys_cursor], &a->sys.systems[a->sys_cursor]);
+		return;
+	}
 
 	sysview *v = &a->view[a->sys_cursor];
 	const system_cfg *s = &a->sys.systems[a->sys_cursor];
@@ -4060,6 +4125,7 @@ static void power_off(app *a)
  * changed; TortOS's was its cyan, 0x3DD6FF, which is still on the list. */
 static int g_menu_color;
 #define MENU_ACCENT (MENU_COLORS[g_menu_color].rgb)
+static unsigned menu_accent(void) { return MENU_ACCENT; }
 
 /* ChaOS: the menu being drawn is a first one, opened straight from the shelf
  * or a game (MENU, or a game's info), rather than one opened from another
@@ -5061,6 +5127,7 @@ static int menu_build(app *a, screen_id screen, int sys,
 		u.cards     = CARD_SETS[g_cards].name;
 		u.cards_dir = CARD_DIRS[g_dir].name;
 		u.name_speed = CARDS_DRAWN(g_cards) ? PN_SPEEDS[g_pn_speed[g_dir]].name : NULL;
+		u.list_view = CARD_DIRS[g_dir].both ? NULL : g_list_view ? "List" : "Normal";
 		u.menu_color = MENU_COLORS[g_menu_color].name;
 		u.update    = upd_row_value();
 		u.auto_off  = a->auto_off;
@@ -8319,7 +8386,8 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 		sys_ui dev = { .no_wifi = !plat_has_wifi(), .no_bt = !plat_has_bluetooth(),
 		               .cable_xfer = plat_cable_link(NULL, 0), .ss_have = ss_have_dev(),
 		               .name_speed = CARDS_DRAWN(g_cards) ? PN_SPEEDS[g_pn_speed[g_dir]].name
-		                                                  : NULL };
+		                                                  : NULL,
+		               .list_view = CARD_DIRS[g_dir].both ? NULL : "" };
 		pm_row ids[PM_ROWS];
 		int n = sys_menu_tortos_rows(&dev, ids);
 
@@ -8373,6 +8441,13 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 		g_menu_color = menu_color_step(g_menu_color, d ? d : 1);
 		notice_set_accent(MENU_ACCENT);   /* the in-game notices' border too */
 		db_set_str(db_dev(), "menu_color", MENU_COLORS[g_menu_color].id);
+		return MENU_STAY;
+	}
+
+	/* ChaOS: Game List View, Normal or List */
+	if (sel == PM_LISTVIEW && (d || key == IN_ACCEPT)) {
+		g_list_view = !g_list_view;
+		db_set_str(db_dev(), "game_view", g_list_view ? "list" : "normal");
 		return MENU_STAY;
 	}
 
@@ -12128,6 +12203,10 @@ static void update_games(app *a)
 	in_button jup = vert ? IN_LEFT : IN_UP, jdn = vert ? IN_RIGHT : IN_DOWN;
 	int dir = 0;
 
+	/* ChaOS: a List reads top to bottom, as every menu does: down is the
+	 * next game, and left and right the letters */
+	if (LIST_VIEW_ON()) { back = IN_UP; fwd = IN_DOWN; jup = IN_LEFT; jdn = IN_RIGHT; }
+
 	if (in_repeat(&a->in, back)) { v->cursor = (v->cursor - 1 + n) % n; dir = -1; }
 	if (in_repeat(&a->in, fwd))  { v->cursor = (v->cursor + 1) % n; dir = +1; }
 	if (in_repeat(&a->in, jdn))  v->cursor = shelf_letter_jump(v, +1);
@@ -13867,6 +13946,8 @@ int main(int argc, char *argv[])
 		g_menu_color = menu_color_index(set);
 		notice_set_accent(MENU_ACCENT);
 		pn_speed_load();
+		db_get_str(db_dev(), "game_view", set, sizeof set, "normal");
+		g_list_view = !strcmp(set, "list");
 	}
 	a.sys_cursor = 0;
 	db_get_str(db_lib(), "startup_system", startup, sizeof startup, "");
