@@ -104,14 +104,16 @@ Each console's menu (MENU on its shelf) and the in-game menu have a **Shader** r
 
 ## Button mapping and rewind
 
-**Button Mapping**, in each console's menu (MENU on its shelf), sets what each of the Brick's buttons presses:
+**Controls**, in each console's menu (MENU on its shelf) and in the in-game menu, shows that console's controls under its own name (**GB Controls**, **Genesis Controls**). It lists what each of the Brick's buttons does there now, then the shortcuts: MENU, fast forward, rewind if it's on, and power. Left and right turn the pages.
+
+**Button Mapping**, the first row of that screen, changes them. Each button can press:
 - any of that console's buttons, by the console's own names (a Genesis has A, B, C, X, Y, Z and Mode);
 - the same with **turbo**;
 - or **None**.
 
-Left and right change a button, and **Reset to Default** puts the console back. The Game Boys, NES, Master System, Game Gear, TurboGrafx-16 and Neo Geo Pockets start with X and Y as turbo A and B, as before.
+Left and right change a button, and **Reset to Default** puts it back. The Game Boys, NES, Master System, Game Gear, TurboGrafx-16 and Neo Geo Pockets start with X and Y as turbo A and B, as before.
 
-**Buttons** in the in-game menu does the same while you play, and changes apply as you make them. Its **For** row picks **This game**, a mapping for this game only, or **All its games**, the console's. The d-pad and MENU can't be remapped.
+From a game, changes apply as you make them. The **For** row picks **This game**, a mapping for this game only, or **All its games**, the console's. The d-pad and MENU can't be remapped.
 
 **Rewind**, in each console's menu, is off until you turn it on. With it on, **hold MENU + L1** in a game to step back through the last minutes of play, and let go to carry on from there. It saves the game several times a second in memory, which costs a little speed, so leave it off on consoles where you don't use it. It starts over when you load a state or reset.
 
@@ -204,7 +206,7 @@ If the Brick restarts but **About ChaOS** still shows the old version, the insta
 | Button | What it does |
 |---|---|
 | **A / B** | Choose and back |
-| **MENU** | Settings for whatever you're looking at. In a game: save, load, shader, overlay, buttons, quit and more |
+| **MENU** | Settings for whatever you're looking at. In a game: save, load, shader, overlay, controls, quit and more |
 | **SELECT** | Muse, the music and audiobook player, from anywhere |
 | **MENU + R1** | Fast forward a game (2x, 3x, 4x) |
 | **MENU + L1** (hold) | Rewind, on consoles where it's turned on |
@@ -221,7 +223,7 @@ If the Brick restarts but **About ChaOS** still shows the old version, the insta
 | **MENU** | Close every menu at once |
 | **Hold Y** | In the in-game menu: hide the menu and see the game with the shader and overlay you're on |
 
-Every button is listed on the Brick under **MENU > Controls**, including a page for the menus, and the in-game menu reminds you that holding Y shows the game. For every menu and setting in detail, see TortOS's [guide](docs/guide.md); ChaOS follows it except where this page says otherwise.
+On the Brick, **MENU > Controls** on the home screen is **Main Menu Controls**: moving, the shelf, the menus, Muse, and the buttons that work anywhere. A game's buttons are on its console's own **Controls**, from the in-game menu or the console's menu. Screens with more than one page show where you are at the bottom (**‹ Shelf · 2 of 5 ›**), with an arrow each way there's another page. The in-game menu reminds you that holding Y shows the game. For every menu and setting in detail, see TortOS's [guide](docs/guide.md); ChaOS follows it except where this page says otherwise.
 
 ## FAQ
 

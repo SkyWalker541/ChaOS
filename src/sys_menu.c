@@ -136,7 +136,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 		 * already: Y marks a favorite and Favorites is its own shelf. */
 		/* ChaOS: built at last - see src/remap.h. Rewind beside it, the
 		 * other thing about how a game is played here. */
-		full[SM_BUTTONS] = (menu_row){ "Button Mapping", NULL, true, true };
+		full[SM_BUTTONS] = (menu_row){ "Controls", NULL, true, true };
 		full[SM_REWIND]  = (menu_row){ "Rewind", u->rewind ? "On" : "Off", true };
 		/* Just this system. Needs the network like its counterpart in the
 		 * TortOS menu, and says so rather than opening a screen that can only

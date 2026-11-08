@@ -26,11 +26,15 @@
  * tools/controls-check.c can link it and read what these pages contain
  * without a renderer. */
 
-/* Six pages (In menus is ChaOS's), because six rows is what a panel holds under its heading and
- * the shelf's seven buttons do not fit on one: the pad and the shoulders move
- * you, the face buttons act on what you moved to. */
+/* Main Menu Controls: five pages, because six rows is what a panel holds
+ * under its heading and the shelf's seven buttons do not fit on one: the pad
+ * and the shoulders move you, the face buttons act on what you moved to.
+ *
+ * ChaOS: what a game's buttons do is not here but on its console's own
+ * Controls (ctl_console_rows below), from the in-game menu and the console's
+ * menu, so each screen says only what is true where it is opened. */
 typedef enum {
-	CTL_MOVING, CTL_SHELF, CTL_GAME, CTL_MENUS, CTL_MUSE, CTL_ANYWHERE, CTL_PAGES
+	CTL_MOVING, CTL_SHELF, CTL_MENUS, CTL_MUSE, CTL_ANYWHERE, CTL_PAGES
 } ctl_page;
 
 /* ChaOS: the button held in the in-game menu to see the game without the
@@ -45,8 +49,29 @@ typedef enum { CTL_HORIZONTAL, CTL_VERTICAL, CTL_CUBIC } ctl_dir;
 /* Room for the longest page and its footer, with a little spare. */
 #define CTL_MAX_ROWS 10
 
-/* What a page is called, under the heading. */
+/* What a page is called, in its footer. */
 const char *ctl_page_name(ctl_page p);
+
+/* ChaOS: every paged screen's footer - the page's name, "2 of 5", and an
+ * arrow toward each side there is a page on, none past the ends. */
+const char *ctl_pager(const char *name, int page, int pages);
+
+/* ChaOS: one console's Controls ("GB Controls"). The caller fills in what
+ * each of the Brick's buttons does there now, Button Mapping included (the
+ * console's names, "Turbo A", "None"), and whether rewind is on. Pages of its
+ * buttons that do something, then its shortcuts, each under a Button Mapping
+ * row that opens that screen (the only live row). */
+#define CTL_CC_BUTTONS 10
+typedef struct {
+	const char *button[CTL_CC_BUTTONS];   /* the Brick's: "A", "L1" */
+	const char *value[CTL_CC_BUTTONS];    /* what it presses there */
+	bool        rewind;
+} ctl_console;
+
+int ctl_console_pages(const ctl_console *cc);
+int ctl_console_rows(const ctl_console *cc, int page, menu_row *out);
+/* "GB", "SNES", "TG-16": a console in a heading */
+const char *ctl_console_short(const char *tag, const char *name);
 
 /* One page's rows, the rule and footer note included, and how many there are.
  * Every button the Brick has is named on some page, and no page names one

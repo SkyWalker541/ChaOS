@@ -108,11 +108,13 @@ console inside it, the running game in a game. Inside any of them MENU closes
 the whole menu at once - from Play Time or Wi-Fi straight back to where you
 were, or back into the game - and B goes back one screen at a time.
 
-**The device carries this table itself**, under **MENU > Controls**: six pages
-that left and right step through - moving, the shelf, a game, the menus
-(ChaOS's: A, B, left and right to change a setting, and Y held in the
-in-game menu to see the game behind it), Muse, and the buttons that work
-anywhere. It is the copy that is always to hand, and the one
+**The device carries this table itself**, under **MENU > Controls**: five pages
+that left and right step through - moving, the shelf, the menus (ChaOS's: A,
+B, left and right to change a setting, and Y held in the in-game menu to see
+the game behind it), Muse, and the buttons that work anywhere. ChaOS calls it
+Main Menu Controls; a game's buttons are on its console's own Controls (GB
+Controls, Genesis Controls), from the in-game menu and the console's menu,
+with Button Mapping under it. It is the copy that is always to hand, and the one
 that follows your UI Direction, so the page shows the axes as they are on your
 device rather than all three at once. This guide is the long version of the
 same thing.

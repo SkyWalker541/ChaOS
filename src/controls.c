@@ -3,6 +3,8 @@
 #include "controls.h"
 
 #include <stddef.h>
+#include <stdio.h>
+#include <string.h>
 
 static bool fn_volume;        /* see ctl_set_fn_volume */
 static bool battery_lights;   /* see ctl_set_battery_lights */
@@ -13,7 +15,6 @@ void ctl_set_battery_lights(bool on) { battery_lights = on; }
 static const char *const NAMES[CTL_PAGES] = {
 	[CTL_MOVING]   = "Moving",
 	[CTL_SHELF]    = "On the shelf",
-	[CTL_GAME]     = "In a game",
 	[CTL_MENUS]    = "In menus",
 	[CTL_MUSE]     = "In Muse",
 	[CTL_ANYWHERE] = "Anywhere",
@@ -22,6 +23,84 @@ static const char *const NAMES[CTL_PAGES] = {
 const char *ctl_page_name(ctl_page p)
 {
 	return NAMES[(unsigned)p < CTL_PAGES ? p : CTL_MOVING];
+}
+
+/* "‹  On the shelf · 2 of 5  ›", the arrows only toward a page there is.
+ * One buffer a page number deep, so two pagers built for a page and the
+ * next are both still good. */
+const char *ctl_pager(const char *name, int page, int pages)
+{
+	static char buf[4][64];
+	static int k;
+	char *b = buf[k = (k + 1) % 4];
+
+	snprintf(b, sizeof buf[0], "%s%s · %d of %d%s",
+	         page > 0 ? "\xe2\x80\xb9  " : "", name, page + 1, pages,
+	         page + 1 < pages ? "  \xe2\x80\xba" : "");
+	return b;
+}
+
+/* ChaOS: a console's controls (see controls.h). Its buttons that do
+ * something, four to a page, then its shortcuts; each page under the row that
+ * opens Button Mapping, so changing them is one press from reading them. */
+#define CC_PER_PAGE 4
+
+static int cc_buttons(const ctl_console *cc, int *idx)
+{
+	int n = 0, i;
+	for (i = 0; i < CTL_CC_BUTTONS; i++)
+		if (cc->value[i] && strcmp(cc->value[i], "None")) idx[n++] = i;
+	return n;
+}
+
+int ctl_console_pages(const ctl_console *cc)
+{
+	int idx[CTL_CC_BUTTONS], nb = cc_buttons(cc, idx);
+	return (nb + CC_PER_PAGE - 1) / CC_PER_PAGE + 1;
+}
+
+int ctl_console_rows(const ctl_console *cc, int page, menu_row *out)
+{
+	int idx[CTL_CC_BUTTONS], nb = cc_buttons(cc, idx);
+	int pages = (nb + CC_PER_PAGE - 1) / CC_PER_PAGE + 1, n = 0, i;
+	const char *name;
+
+	if (page < 0) page = 0;
+	if (page >= pages) page = pages - 1;
+	out[n] = (menu_row){ "Button Mapping", NULL, true };
+	out[n++].opens = true;
+	out[n++] = MENU_RULE;
+	if (page < pages - 1) {
+		for (i = page * CC_PER_PAGE; i < nb && i < (page + 1) * CC_PER_PAGE; i++)
+			out[n++] = (menu_row){ cc->button[idx[i]], cc->value[idx[i]], false };
+		name = "Buttons";
+	} else {
+		/* What no mapping changes: MENU and its chords, and POWER */
+		out[n++] = (menu_row){ "MENU",    "Menu",              false };
+		out[n++] = (menu_row){ "MENU+R1", "Fast forward",      false };
+		if (cc->rewind)
+			out[n++] = (menu_row){ "MENU+L1", "Rewind, held",  false };
+		out[n++] = (menu_row){ "POWER",   "Save and turn off", false };
+		name = "Shortcuts";
+	}
+	out[n++] = MENU_RULE;
+	out[n++] = MENU_NOTE(ctl_pager(name, page, pages));
+	return n;
+}
+
+/* The names a console goes by in a heading: the shelf's own where it is
+ * short, the everyday short form where it is not */
+const char *ctl_console_short(const char *tag, const char *name)
+{
+	static const char *const SHORT[][2] = {
+		{ "GB", "GB" }, { "GBC", "GBC" }, { "GBA", "GBA" }, { "NES", "NES" },
+		{ "SFC", "SNES" }, { "MD", "Genesis" }, { "SMS", "SMS" }, { "GG", "GG" },
+		{ "PCE", "TG-16" }, { "NGP", "NGP" }, { "NGPC", "NGPC" },
+	};
+	size_t i;
+	for (i = 0; tag && i < sizeof SHORT / sizeof SHORT[0]; i++)
+		if (!strcmp(tag, SHORT[i][0])) return SHORT[i][1];
+	return name ? name : "";
 }
 
 /* A PAIR OF BUTTONS IS WRITTEN "L1/R1", with no air around the slash. Eric's,
@@ -75,35 +154,6 @@ static int shelf(ctl_dir dir, menu_row *out)
 	 * and in one L2 and R2 are the game's */
 	if (battery_lights)
 		out[n++] = (menu_row){ "L2+R2", "Battery level", false };
-	return n;
-}
-
-static int game(menu_row *out)
-{
-	int n = 0;
-
-	/* Fast forward rides on MENU's row, because a seventh row does not fit
-	 * (PAGE_MAX in tools/controls-check.c). MENU+R1 steps 2x, 3x, 4x and back
-	 * to normal, and MENU opens the menu on release so it can be held for it.
-	 * Eric's wording, 2026-10-01, SELECT's with it. */
-	out[n++] = (menu_row){ "MENU",   "Menu, +R1 for FF",   false };
-	/* ChaOS: rewind, held, on a console it is turned on for (so the
-	 * footnote's mark). It took SELECT's row, which the Anywhere page has:
-	 * SELECT opens Muse in a game as everywhere else, from the menu. */
-	out[n++] = (menu_row){ "MENU+L1", "Rewind, held *",    false };
-	/* X and Y are Diatom's turbo on the nine two-button systems; L2 and R2
-	 * are mGBA's own Turbo L and R, which work on GBA and do nothing on GB and
-	 * GBC, which have no shoulders (found 2026-09-30, choosing a fast-forward
-	 * button). One row for both, since the page is full. */
-	out[n++] = (menu_row){ "X/Y/L2/R2", "Turbo A/B/L1/R1 *", false };
-	out[n++] = (menu_row){ "POWER",  "Save and turn off",  false };
-	/* The exceptions as a note rather than a longer row: X and Y are the pad's
-	 * own buttons on Genesis and SNES, and L2 and R2 only do anything on GBA.
-	 * Kept short - a note runs the width of the panel and is cut at about
-	 * thirty characters. An asterisk on both ends, the row's value and this
-	 * line, so the two read as a footnote and its mark rather than as two
-	 * separate claims. Eric's, 2026-09-20; reworded by him 2026-10-01. */
-	out[n++] = MENU_NOTE("* for some systems");
 	return n;
 }
 
@@ -171,18 +221,17 @@ int ctl_rows(ctl_page p, ctl_dir dir, menu_row *out)
 
 	switch (p) {
 	case CTL_SHELF:    n = shelf(dir, out);  break;
-	case CTL_GAME:     n = game(out);        break;
 	case CTL_MENUS:    n = menus(out);       break;
 	case CTL_MUSE:     n = muse(out);        break;
 	case CTL_ANYWHERE: n = anywhere(out);    break;
 	default:           n = moving(dir, out); break;
 	}
-	/* The page is one of several and says so, the way Play Time's footer names
-	 * the keys that change its window, under the same rule that divides every
-	 * other list from its footer. Eric's, 2026-09-20. The rule is a row here
-	 * but a thin one - a few pixels and the air around them, against a row's
-	 * full height - which is what lets these pages keep it and still fit. */
+	/* The page is one of several and says so, under the same rule that
+	 * divides every other list from its footer. Eric's, 2026-09-20. The rule
+	 * is a row here but a thin one, which is what lets these pages keep it
+	 * and still fit. ChaOS: the footer is the pager - the page's name, where
+	 * it is in the set, and an arrow each way there is a page to go to. */
 	out[n++] = MENU_RULE;
-	out[n++] = MENU_NOTE("Left/Right: more");
+	out[n++] = MENU_NOTE(ctl_pager(ctl_page_name(p), (int)p, CTL_PAGES));
 	return n;
 }

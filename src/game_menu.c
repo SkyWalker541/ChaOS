@@ -90,7 +90,7 @@ int gi_rows(menu_row *out, const game_info *gi, bool net)
 int gm_rows(const gm_ui *u, menu_row *out, gm_bufs *b)
 {
 	static const char *label[GM_ROWS] = {
-		"Continue", "Save", "Load", "Shader", "Overlay", "Buttons", "Cheevos", "Reset", "Quit"
+		"Continue", "Save", "Load", "Shader", "Overlay", "Controls", "Cheevos", "Reset", "Quit"
 	};
 	int i;
 

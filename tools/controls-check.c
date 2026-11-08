@@ -31,9 +31,9 @@ static void ck(int cond, const char *what)
  * D-pad axes are named as pairs because that is how they are pressed, and
  * written with no air around the slash - "L1/R1", not "L1 / R1". */
 static const char *const BUTTONS[] = {
-	"Up/Down", "Left/Right", "A", "B", "X", "Y", "L1/R1", "X/Y/L2/R2",
+	"Up/Down", "Left/Right", "A", "B", "X", "Y", "L1/R1",
 	"MENU", "SELECT", "POWER", "Volume rocker", "F1/F2", "F1+F2",
-	"FN+Vol", "FN+both Vol", "L2+R2", "MENU+L1",
+	"FN+Vol", "FN+both Vol", "L2+R2",
 };
 #define NBUTTONS ((int)(sizeof BUTTONS / sizeof BUTTONS[0]))
 
@@ -74,6 +74,14 @@ static int other_devices(const char *b)
  * SNES, X and Y are the pad's own buttons" showed thirty characters of
  * fifty-four in a shot on 2026-09-19. */
 #define NOTE_MAX 30
+
+/* Characters, not bytes: the pager's arrows are three bytes each */
+static int u8len(const char *s)
+{
+	int n = 0;
+	for (; *s; s++) if (((unsigned char)*s & 0xc0) != 0x80) n++;
+	return n;
+}
 
 static int is_button(const char *s)
 {
@@ -178,8 +186,8 @@ static void rows_fit(void)
 					snprintf(msg, sizeof msg,
 					         "%s: a note of %d characters, cut after %d",
 					         ctl_page_name((ctl_page)p),
-					         (int)strlen(rows[i].label), NOTE_MAX);
-					ck((int)strlen(rows[i].label) <= NOTE_MAX, msg);
+					         u8len(rows[i].label), NOTE_MAX);
+					ck(u8len(rows[i].label) <= NOTE_MAX, msg);
 					continue;
 				}
 				snprintf(msg, sizeof msg, "%s: \"%s\" is not a button",
@@ -243,7 +251,7 @@ static void pages_are_named(void)
 	int p, q;
 
 	printf("the pages\n");
-	ck(CTL_PAGES == 6, "six pages: In menus is ChaOS's");
+	ck(CTL_PAGES == 5, "five pages: a game's buttons are on its console's Controls");
 	for (p = 0; p < CTL_PAGES; p++) {
 		ck(ctl_page_name((ctl_page)p) && ctl_page_name((ctl_page)p)[0],
 		   "every page is named");
@@ -256,9 +264,67 @@ static void pages_are_named(void)
 	   "a page number out of range is the first one");
 }
 
+/* ChaOS: the pager, and a console's Controls */
+static void pagers_and_consoles(void)
+{
+	static const char *const BTN[CTL_CC_BUTTONS] = {
+		"A", "B", "X", "Y", "L1", "R1", "L2", "R2", "Select", "Start"
+	};
+	ctl_console gb = { .rewind = false }, md = { .rewind = true };
+	menu_row rows[CTL_MAX_ROWS];
+	char msg[160];
+	int i, p, n;
+
+	printf("the pager\n");
+	ck(!strncmp(ctl_pager("Moving", 0, 5), "Moving", 6), "the first page has no arrow left");
+	ck(strstr(ctl_pager("Moving", 0, 5), "\xe2\x80\xba") != NULL, "and one right");
+	ck(!strstr(ctl_pager("Anywhere", 4, 5), "\xe2\x80\xba") &&
+	   strstr(ctl_pager("Anywhere", 4, 5), "\xe2\x80\xb9") != NULL, "the last, one left and none right");
+	ck(strstr(ctl_pager("Shortcuts", 1, 3), "2 of 3") != NULL, "and where it is");
+
+	printf("a console's Controls\n");
+	for (i = 0; i < CTL_CC_BUTTONS; i++) {
+		gb.button[i] = md.button[i] = BTN[i];
+		gb.value[i] = i < 4 || i >= 8 ? "A" : "None";
+		md.value[i] = "C";
+	}
+	ck(ctl_console_pages(&gb) == 3, "six Game Boy buttons: two pages of them and the shortcuts");
+	ck(ctl_console_pages(&md) == 4, "ten Genesis buttons: three, and the shortcuts");
+	for (p = 0; p < ctl_console_pages(&md); p++) {
+		int text = 0, live = 0;
+		n = ctl_console_rows(&md, p, rows);
+		for (i = 0; i < n; i++) {
+			if (!rows[i].label) continue;
+			text++;
+			if (rows[i].live) live++;
+			if (ROW_IS_NOTE(rows[i])) {
+				snprintf(msg, sizeof msg, "page %d: its footer fits", p);
+				ck(u8len(rows[i].label) <= NOTE_MAX, msg);
+			}
+		}
+		snprintf(msg, sizeof msg, "page %d: %d rows of text, %d fit", p, text, PAGE_MAX);
+		ck(text <= PAGE_MAX, msg);
+		snprintf(msg, sizeof msg, "page %d: Button Mapping, first, is its one live row", p);
+		ck(live == 1 && rows[0].live && rows[0].opens && !strcmp(rows[0].label, "Button Mapping"), msg);
+	}
+	n = ctl_console_rows(&md, ctl_console_pages(&md) - 1, rows);
+	for (i = p = 0; i < n; i++) if (rows[i].label && !strcmp(rows[i].label, "MENU+L1")) p = 1;
+	ck(p, "rewind on: MENU+L1 among the shortcuts");
+	n = ctl_console_rows(&gb, ctl_console_pages(&gb) - 1, rows);
+	for (i = p = 0; i < n; i++) if (rows[i].label && !strcmp(rows[i].label, "MENU+L1")) p = 1;
+	ck(!p, "rewind off: no MENU+L1");
+	n = ctl_console_rows(&gb, 0, rows);
+	for (i = p = 0; i < n; i++)
+		if (rows[i].value && !ROW_IS_NOTE(rows[i]) && !strcmp(rows[i].value, "None")) p = 1;
+	ck(!p, "a button that does nothing is left out");
+	ck(!strcmp(ctl_console_short("PCE", "TurboGrafx-16"), "TG-16") &&
+	   !strcmp(ctl_console_short("SFC", "SNES"), "SNES"), "short names in headings");
+}
+
 int main(void)
 {
 	printf("controls: what MENU > Controls says\n");
+	pagers_and_consoles();
 	pages_are_named();
 	direction_changes_the_shelf();
 	for (int d = 0; d < 2; d++) {

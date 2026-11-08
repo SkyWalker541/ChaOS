@@ -603,8 +603,8 @@ static void cursor_reaches(void)
 	ck(reaches(rows, got, k, "Overlay"), "Overlay");
 	ck(reaches(rows, got, k, "Box Art"), "Box Art");
 	ck(reaches(rows, got, k, "Rescan Folder"), "Rescan Folder");
-	ck(reaches(rows, got, k, "Button Mapping") && reaches(rows, got, k, "Rewind"),
-	   "Button Mapping and Rewind");
+	ck(reaches(rows, got, k, "Controls") && reaches(rows, got, k, "Rewind"),
+	   "Controls (Button Mapping under it) and Rewind");
 	ck(!holds(got, k, SM_GAMES) && !holds(got, k, SM_CORE),
 	   "the reported facts are not stops");
 

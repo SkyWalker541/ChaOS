@@ -7104,8 +7104,8 @@ static int rm_build(void *ctx, menu_row *rows, int max, const char **heading)
 	int n = 0, i;
 
 	(void)max;
-	snprintf(c->heading, sizeof c->heading, "%s Buttons", sc->name);
-	*heading = c->file ? "Button Mapping" : c->heading;
+	snprintf(c->heading, sizeof c->heading, "%s Button Mapping", ctl_console_short(sc->tag, sc->name));
+	*heading = c->heading;
 	if (c->file) {
 		snprintf(c->scope, sizeof c->scope, "%s", c->own ? "This game" : "All its games");
 		c->ids[n] = RM_ROW_SCOPE;
@@ -7191,6 +7191,90 @@ static void remap_screen(app *a, int sys, const char *file, void *game,
 	st.root = false;
 	rm_load(&c);
 	menu_run(a, &st, rm_build, rm_key, &c);
+}
+
+/* ---- ChaOS: a console's Controls --------------------------------------------
+ *
+ * "GB Controls": what each of the Brick's buttons does on this console now,
+ * the player's Button Mapping included, then the shortcuts MENU and POWER
+ * keep, paged with left and right (controls.h). Its one live row opens Button
+ * Mapping, as a submenu. From the in-game menu it is the game's (its own
+ * mapping where it has one) over the paused game; from the console's menu,
+ * the console's. */
+typedef struct {
+	app        *a;
+	int         sys;
+	const char *file;          /* the game, in a game */
+	void       *game;          /* the in-game menu's gm_ctx */
+	const menu_style *over;
+	int         page;
+	char        head[64];
+	char        vals[RM_BUTTONS][24];
+	ctl_console cc;
+} cc_ctx;
+
+static void cc_fill(cc_ctx *c)
+{
+	const char *tag = c->a->sys.systems[c->sys].tag;
+	char spec[512];
+	rm_map m;
+	int i;
+
+	rm_from_spec(tag, remap_spec(tag, c->file, spec, sizeof spec), &m);
+	for (i = 0; i < RM_BUTTONS; i++) {
+		c->cc.button[i] = rm_button_label(i);
+		c->cc.value[i] = rm_choice_label(tag, m.choice[i], c->vals[i], sizeof c->vals[i]);
+	}
+	c->cc.rewind = rewind_load(tag);
+}
+
+static int cc_build(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	cc_ctx *c = ctx;
+	const system_cfg *sc = &c->a->sys.systems[c->sys];
+
+	(void)max;
+	cc_fill(c);
+	snprintf(c->head, sizeof c->head, "%s Controls", ctl_console_short(sc->tag, sc->name));
+	*heading = c->head;
+	return ctl_console_rows(&c->cc, c->page, rows);
+}
+
+static menu_result cc_key(app *a, void *ctx, in_button key, int sel)
+{
+	cc_ctx *c = ctx;
+	int pages = ctl_console_pages(&c->cc);
+
+	(void)sel;
+	if (key == IN_RIGHT && c->page + 1 < pages) c->page++;
+	if (key == IN_LEFT && c->page > 0) c->page--;
+	if (key == IN_ACCEPT) remap_screen(a, c->sys, c->file, c->game, c->over);
+	return MENU_STAY;
+}
+
+static void cc_backdrop(app *a, void *ctx)
+{
+	gm_backdrop(a, ((cc_ctx *)ctx)->game);
+}
+
+static void console_controls_screen(app *a, int sys, const char *file, void *game,
+                                    const menu_style *over)
+{
+	cc_ctx c;
+	menu_style st = { .fixed_w = menu_shelf_width(a), .follow_tint = true };
+
+	memset(&c, 0, sizeof c);
+	c.a = a;
+	c.sys = sys;
+	c.file = file;
+	c.game = game;
+	c.over = over;
+	if (game && over) {
+		st = *over;
+		st.backdrop = cc_backdrop;
+	}
+	st.root = false;
+	menu_run(a, &st, cc_build, cc_key, &c);
 }
 
 /* ---- ChaOS: Updates ---------------------------------------------------------
@@ -7500,7 +7584,7 @@ static ctl_dir controls_dir(void)
  * the whole list at once is thirty rows nobody reads. */
 static void controls_screen(app *a)
 {
-	ctl_page page = CTL_SHELF;
+	ctl_page page = CTL_MOVING;
 	bool done = false;
 
 	ctl_set_fn_volume(plat_brightness_on_volume());
@@ -7511,7 +7595,7 @@ static void controls_screen(app *a)
 		char head[80];
 		int n = ctl_rows(page, controls_dir(), rows);
 
-		snprintf(head, sizeof head, "Controls: %s", ctl_page_name(page));
+		snprintf(head, sizeof head, "Main Menu Controls");
 
 		plat_input_poll(&a->in);
 		if (a->in.quit_requested) { a->running = false; return; }
@@ -7521,9 +7605,9 @@ static void controls_screen(app *a)
 		 * which is one of the things this page exists to tell you. */
 		if (a->in.pressed[IN_SELECT]) muse_open(a, NULL, NULL);
 
-		if (in_repeat(&a->in, IN_RIGHT)) page = (ctl_page)((page + 1) % CTL_PAGES);
-		if (in_repeat(&a->in, IN_LEFT))
-			page = (ctl_page)((page + CTL_PAGES - 1) % CTL_PAGES);
+		/* ChaOS: to the ends and no further, as the footer's arrows say */
+		if (in_repeat(&a->in, IN_RIGHT) && page + 1 < CTL_PAGES) page = (ctl_page)(page + 1);
+		if (in_repeat(&a->in, IN_LEFT) && page > 0) page = (ctl_page)(page - 1);
 		if (in_repeat(&a->in, IN_VOLUP))    plat_volume_nudge(+1);
 		if (in_repeat(&a->in, IN_VOLDN))    plat_volume_nudge(-1);
 		if (in_repeat(&a->in, IN_BRIGHTUP)) plat_brightness_nudge(+1);
@@ -7875,7 +7959,7 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 			return MENU_STAY;
 		}
 		if (sel == SM_BUTTONS) {
-			if (key == IN_ACCEPT) remap_screen(a, a->sys_cursor, NULL, NULL, NULL);
+			if (key == IN_ACCEPT) console_controls_screen(a, a->sys_cursor, NULL, NULL, NULL);
 			return MENU_STAY;
 		}
 		if (sel == SM_REWIND) {
@@ -10362,7 +10446,7 @@ static menu_result gm_key(app *a, void *ctx, in_button key, int sel)
 		break;
 	case GM_BUTTONS: {
 		sysview *sv = &a->view[a->sys_cursor];
-		remap_screen(a, gm_owner(a), sv->list.items[sv->cursor].file, c, &c->st);
+		console_controls_screen(a, gm_owner(a), sv->list.items[sv->cursor].file, c, &c->st);
 		break;
 	}
 	case GM_CHEEVOS:
@@ -12339,6 +12423,7 @@ static int shot_info;
 static int shot_controls = -1;
 static int shot_updates = -1;   /* ChaOS: --updates <upd_state> */
 static const char *shot_remap;  /* ChaOS: --remap <TAG>: its Button Mapping */
+static int shot_cc_page = -1;  /* ChaOS: --cc <page>, with --remap: its Controls */
 static int shot_art;
 static const char *shot_art_now = "Legend of Zelda, The - A Link to the Past (USA)";
 static int shot_hare;
@@ -12508,7 +12593,7 @@ static void take_shot(app *a)
 		ctl_set_battery_lights(plat_battery_lights());
 		n = ctl_rows(p, controls_dir(), rows);
 
-		snprintf(head, sizeof head, "Controls: %s", ctl_page_name(p));
+		snprintf(head, sizeof head, "Main Menu Controls");
 		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
 		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
 		SDL_RenderFillRect(a->r, NULL);
@@ -12527,11 +12612,23 @@ static void take_shot(app *a)
 		c.file = "game.bin";
 		rm_load(&c);
 		n = rm_build(&c, rows, 24, &head);
+		if (shot_cc_page >= 0) {
+			cc_ctx cc;
+			memset(&cc, 0, sizeof cc);
+			cc.a = a; cc.sys = c.sys; cc.file = "game.bin"; cc.page = shot_cc_page;
+			n = cc_build(&cc, rows, 24, &head);
+			SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+			SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
+			SDL_RenderFillRect(a->r, NULL);
+			menu_draw(a, head, rows, n, 0, menu_std_width(a), MENU_ACCENT);
+			goto shot_done;
+		}
 		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
 		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
 		SDL_RenderFillRect(a->r, NULL);
 		menu_draw(a, head, rows, n, 2, 0, MENU_ACCENT);
 	}
+shot_done:
 	if (shot_updates >= 0) {
 		upd_ctx c;
 		menu_row rows[16];
@@ -12747,6 +12844,8 @@ int main(int argc, char *argv[])
 		else if (!strcmp(argv[i], "--gamemove") && i + 1 < argc)
 			shot_gamemove = (float)atof(argv[++i]);
 		else if (!strcmp(argv[i], "--info")) shot_info = 1;
+		else if (!strcmp(argv[i], "--cc") && i + 1 < argc)
+			shot_cc_page = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--remap") && i + 1 < argc)
 			shot_remap = argv[++i];
 		else if (!strcmp(argv[i], "--updates") && i + 1 < argc)
