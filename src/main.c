@@ -7498,7 +7498,7 @@ enum { UP_NONE, UP_CHECK, UP_DOWNLOAD, UP_FULL, UP_CANCEL, UP_INSTALL, UP_REMOVE
 typedef struct {
 	app  *a;
 	int   ids[16];
-	char  latest[48], size[24], full[24], pct[16], batt[32];
+	char  latest[48], size[24], full[24], pct[24], batt[32], dots[8], head[64];
 	int   last;               /* what Try Again repeats: UP_CHECK, UP_DOWNLOAD or UP_FULL */
 	bool  online;
 	wifi_state wifi;
@@ -7517,6 +7517,41 @@ static bool upd_battery_ok(char *why, size_t n)
 	if (!plat_battery(&pct, &charging) || charging || pct >= UPD_MIN_BATTERY) return true;
 	snprintf(why, n, "charge to %d%%", UPD_MIN_BATTERY);
 	return false;
+}
+
+/* ChaOS: the steps an update goes through, each saying where it is - done,
+ * how far, working (dots that move, where there is no percentage to give),
+ * or not yet - so a slow one never looks stuck */
+enum { US_DOWNLOAD, US_CHECK, US_INSTALL, US_STEPS };
+
+static int upd_steps(upd_ctx *c, upd_state s, menu_row *rows, int n)
+{
+	static const char *const LABEL[US_STEPS] = { "Download", "Check and Unpack", "Install" };
+	int at, i;
+
+	/* where it has got to */
+	at = s == UPD_DOWNLOADING ? US_DOWNLOAD : s == UPD_UNPACKING ? US_CHECK : US_INSTALL;
+	/* dots that move where there is no percentage: "working" from 1 to 3,
+	 * the gap kept by spaces the width of the dots they stand for */
+	{
+		int k = (int)((plat_now_ms() / 400) % 3) + 1;
+		snprintf(c->dots, sizeof c->dots, "%.*s", k, "...");
+	}
+	if (s == UPD_DOWNLOADING && !upd_receiving())
+		snprintf(c->pct, sizeof c->pct, "connecting%s", c->dots);
+	else
+		snprintf(c->pct, sizeof c->pct, "%d%%", upd_percent());
+	for (i = 0; i < US_STEPS; i++) {
+		const char *v;
+		if (i < at)                    v = "done";
+		else if (i > at)               v = NULL;
+		else if (i == US_DOWNLOAD)     v = c->pct;
+		else if (i == US_INSTALL)      v = "next";
+		else                           v = c->dots;
+		c->ids[n] = UP_NONE;
+		rows[n++] = (menu_row){ LABEL[i], v, false };
+	}
+	return n;
 }
 
 static int upd_build(void *ctx, menu_row *rows, int max, const char **heading)
@@ -7540,10 +7575,36 @@ static int upd_build(void *ctx, menu_row *rows, int max, const char **heading)
 
 	switch (s) {
 	case UPD_IDLE:     snprintf(c->latest, sizeof c->latest, "not checked"); break;
-	case UPD_CHECKING: snprintf(c->latest, sizeof c->latest, "checking"); break;
+	case UPD_CHECKING:
+		snprintf(c->latest, sizeof c->latest, "checking%.*s",
+		         (int)((plat_now_ms() / 400) % 4), "...");
+		break;
 	case UPD_CURRENT:  snprintf(c->latest, sizeof c->latest, "%s, up to date", o->version); break;
 	case UPD_FAILED:   snprintf(c->latest, sizeof c->latest, "%s", o->version[0] ? o->version : "unknown"); break;
 	default:           snprintf(c->latest, sizeof c->latest, "%s", o->version); break;
+	}
+	/* While one is on its way, the screen is its steps, under a heading
+	 * that says which version: room for them all without scrolling */
+	if (s == UPD_DOWNLOADING || s == UPD_UNPACKING || s == UPD_READY) {
+		snprintf(c->head, sizeof c->head, "%s %s", o->small ? "Update to" : "Full Install of",
+		         o->version);
+		*heading = c->head;
+		n = upd_steps(c, s, rows, n);
+		c->ids[n] = UP_NONE; rows[n++] = MENU_RULE;
+		if (s == UPD_DOWNLOADING) {
+			c->ids[n] = UP_CANCEL; rows[n++] = (menu_row){ "Cancel", NULL, true };
+		} else if (s == UPD_UNPACKING) {
+			c->ids[n] = UP_NONE; rows[n++] = MENU_NOTE("Keep the Brick on");
+		} else {
+			bool ok = upd_battery_ok(c->batt, sizeof c->batt);
+			c->ids[n] = UP_INSTALL;
+			rows[n++] = (menu_row){ "Install and Restart", ok ? NULL : c->batt, ok };
+			c->ids[n] = UP_REMOVE;
+			rows[n++] = (menu_row){ "Remove Download", NULL, true };
+			/* An install that could not be armed says why, and stays ready */
+			if (upd_error()[0]) { c->ids[n] = UP_NONE; rows[n++] = MENU_NOTE(upd_error()); }
+		}
+		return n;
 	}
 	c->ids[n] = UP_NONE; rows[n++] = (menu_row){ "Installed", CHAOS_VERSION, false };
 	c->ids[n] = UP_NONE; rows[n++] = (menu_row){ "Latest", c->latest, false };
@@ -7586,25 +7647,7 @@ static int upd_build(void *ctx, menu_row *rows, int max, const char **heading)
 		c->ids[n] = UP_NONE; rows[n++] = MENU_NOTE("This one needs ChaOS Installer");
 		c->ids[n] = UP_NONE; rows[n++] = MENU_NOTE("on a computer");
 		break;
-	case UPD_DOWNLOADING:
-		snprintf(c->pct, sizeof c->pct, "%d%%", upd_percent());
-		c->ids[n] = UP_NONE;   rows[n++] = (menu_row){ "Downloading", c->pct, false };
-		c->ids[n] = UP_CANCEL; rows[n++] = (menu_row){ "Cancel", NULL, true };
-		break;
-	case UPD_UNPACKING:
-		c->ids[n] = UP_NONE; rows[n++] = (menu_row){ "Checking the download", NULL, false };
-		break;
-	case UPD_READY: {
-		bool ok = upd_battery_ok(c->batt, sizeof c->batt);
-		c->ids[n] = UP_INSTALL;
-		rows[n++] = (menu_row){ "Install and Restart", ok ? NULL : c->batt, ok };
-		c->ids[n] = UP_REMOVE;
-		rows[n++] = (menu_row){ "Remove Download", NULL, true };
-		/* An install that could not be armed says why, and stays ready */
-		c->ids[n] = UP_NONE;
-		rows[n++] = MENU_NOTE(upd_error()[0] ? upd_error() : "Downloaded, and checked");
-		break;
-	}
+	/* (downloading, unpacking and ready: the steps, above) */
 	case UPD_FAILED:
 		c->ids[n] = UP_NONE; rows[n++] = MENU_NOTE(upd_error());
 		/* then Try Again, below */
@@ -7688,7 +7731,9 @@ static void update_screen(app *a)
 
 	memset(&c, 0, sizeof c);
 	c.a = a;
-	menu_run(a, &(menu_style){ .accent = MENU_ACCENT, .fixed_w = 0 }, upd_build, upd_key, &c);
+	/* A set width, so the moving dots and the percentage do not make the
+	 * panel breathe */
+	menu_run(a, &(menu_style){ .accent = MENU_ACCENT, .fixed_w = 640 }, upd_build, upd_key, &c);
 }
 
 /* The boot's check, once Wi-Fi is up, and what it found said once on the
@@ -13160,7 +13205,7 @@ shot_done:
 		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
 		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
 		SDL_RenderFillRect(a->r, NULL);
-		menu_draw(a, head, rows, n, n - 1, 0, MENU_ACCENT);
+		menu_draw(a, head, rows, n, n - 1, 640, MENU_ACCENT);
 		if (shot_updates % 100 == UPD_AVAILABLE) {
 			snprintf(g_upd_msg, sizeof g_upd_msg, "ChaOS 0.8.0 is available: MENU > Updates");
 			g_upd_msg_until = plat_now_ms() + 5000;

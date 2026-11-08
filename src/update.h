@@ -96,6 +96,9 @@ long long   upd_size(void);
 long long   upd_size_of(bool small);
 /* 0..100 while downloading or unpacking */
 int         upd_percent(void);
+/* ChaOS: whether the download has begun arriving; before that it is still
+ * connecting (GitHub's redirect, a new release's first request) */
+bool        upd_receiving(void);
 
 /* What the player asks for. Each returns false, with upd_error set, when it
  * cannot be done now. */

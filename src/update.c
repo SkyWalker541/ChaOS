@@ -298,6 +298,12 @@ long long upd_size(void)
 	return upd_size_of(g_latest.small);
 }
 
+bool upd_receiving(void)
+{
+	struct stat st;
+	return g_state == UPD_DOWNLOADING && stat(g_dl_part, &st) == 0 && st.st_size > 0;
+}
+
 int upd_percent(void)
 {
 	struct stat st;
@@ -722,6 +728,7 @@ const char *upd_row_value(void)
 		snprintf(g_row, sizeof g_row, "%s available", g_latest.version);
 		return g_row;
 	case UPD_DOWNLOADING:
+		if (!upd_receiving()) return "connecting";
 		snprintf(g_row, sizeof g_row, "downloading %d%%", upd_percent());
 		return g_row;
 	case UPD_UNPACKING:
