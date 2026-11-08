@@ -277,27 +277,22 @@ bool pn_big(SDL_Renderer *r, const char *name, unsigned accent, bool focused,
 	if (p->tb > 0.0f && p->tb < 1.0f) g_moving = true;
 	if (p->tb <= 0.0f) return false;
 
-	cell = (w * 84 / 100) / (p->cols > 0 ? p->cols : 1);
-	/* and the escaping pixels inside the screen at the right */
-	if (cell > (w * 92 / 100) / (p->cols + 5)) cell = (w * 92 / 100) / (p->cols + 5);
-	if (cell > (h / 2) / (p->rows > 0 ? p->rows : 1)) cell = (h / 2) / (p->rows > 0 ? p->rows : 1);
-	/* room above for the escaping pixels, five rows over the name */
-	if (cell > (cy - 24) / (p->rows / 2 + 6)) cell = (cy - 24) / (p->rows / 2 + 6);
-	if (cell > 40) cell = 40;
-	if (cell < 4) cell = 4;
+	/* ONE SIZE FOR EVERY NAME, so moving from NES to Neo Geo Pocket Color
+	 * changes the word and not the scale: the size the widest line any name
+	 * can have takes (PF_LINE_MAX letters, the escaping pixels beside it)
+	 * across most of the screen. Lines, not letters, are what differ. */
+	{
+		int widest = PF_LINE_MAX * 6 - 1 + 5;
+		cell = (w * 94 / 100) / widest;
+		if (cell < 4) cell = 4;
+	}
 	scale = (float)cell / 11.0f;
 	ox = (w - p->cols * cell) / 2;
 	oy = cy - p->rows * cell / 2;
 
-	/* a soft glow in the system's colour behind the whole name, as the
-	 * focused card has, coming up as the name forms */
-	{
-		SDL_Rect box = { ox, oy, p->cols * cell, p->rows * cell };
-		ui_glow(r, &box, accent, (int)(120 * p->tb), 2.0f);
-	}
 	SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
-	/* two passes: the drop shadow, then the letters */
-	for (pass = 1; pass < 3; pass++)
+	/* three passes: the reflection, the drop shadow, then the letters */
+	for (pass = 0; pass < 3; pass++)
 		for (i = 0; i < p->n; i++) {
 			float tx = (float)(ox + p->pts[i].x * cell), ty = (float)(oy + p->pts[i].y * cell);
 			float sx = tx + cosf(p->ang[i]) * p->dist[i] * scale;
@@ -309,9 +304,24 @@ bool pn_big(SDL_Renderer *r, const char *name, unsigned accent, bool focused,
 			x = sx + (tx - sx) * e;
 			y = sy + (ty - sy) * e;
 			if (pass == 0) {
-				int g = cell / 2;
-				SDL_Rect q = { (int)lroundf(x) - g, (int)lroundf(y) - g, cell + g * 2, cell + g * 2 };
-				SDL_SetRenderDrawColor(r, acc.r, acc.g, acc.b, (Uint8)(26 * e));
+				/* A blurred reflection in the system's colour, as if the name
+				 * stood on a glossy floor: mirrored under the last line,
+				 * fading as it goes down, each pixel spread wide and faint
+				 * around a fainter core so it reads soft, not drawn */
+				/* squashed to half height, and gone a line and a half down
+				 * whatever the name, so three lines reflect no deeper than one */
+				float base = (float)(oy + p->rows * cell + cell / 2);
+				float my = base + (base - y - (float)cell) * 0.5f;
+				float fade = 1.0f - (my - base) / ((float)cell * 11.0f);
+				int g = cell;
+				SDL_Rect q = { (int)lroundf(x) - g, (int)lroundf(my) - g / 2,
+				               cell + g * 2, cell / 2 + g };
+				if (fade <= 0.0f) continue;
+				fade *= fade;
+				SDL_SetRenderDrawColor(r, acc.r, acc.g, acc.b, (Uint8)(22 * fade * e));
+				SDL_RenderFillRect(r, &q);
+				q = (SDL_Rect){ (int)lroundf(x), (int)lroundf(my), cell, cell / 2 + 1 };
+				SDL_SetRenderDrawColor(r, acc.r, acc.g, acc.b, (Uint8)(28 * fade * e));
 				SDL_RenderFillRect(r, &q);
 			} else if (pass == 1) {
 				int d = cell / 4 > 2 ? cell / 4 : 2;
