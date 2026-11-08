@@ -19,6 +19,11 @@
   <a href="#credits-and-license">Credits</a>
 </p>
 
+> [!WARNING]
+> **ChaOS is still in testing and development.** Things may change from one release to the next, and some
+> may not work as they should yet. Keep a copy of your saves, and please
+> [report what you find](https://github.com/SkyWalker541/ChaOS/issues), with the logs if you can.
+
 > [!IMPORTANT]
 > **ChaOS is for the TrimUI Brick (and Brick Hammer) only at this time.**
 >
@@ -47,7 +52,8 @@
 - **See it before you choose it:** in the in-game menu, the paused game shows each shader setting and overlay as you scroll through them.
 - **Whole-number scaling** for every game, so every pixel is the same size.
 - **Menu colors,** starting from ChaOS's orange.
-- **Updates over Wi-Fi,** from the menu, when you choose.
+- **Updates over Wi-Fi,** from the menu, when you choose, with what's new in each.
+- **Button mapping,** per console or per game, with turbo, and **rewind**.
 - **ChaOS Transfer,** the boot and power-off animations, and the ChaOS look throughout.
 
 **From TortOS**
@@ -96,6 +102,19 @@ Each console's menu (MENU on its shelf) and the in-game menu have a **Shader** r
 - **Reset to Recommended** puts back the shader's own settings. For PT, that's its README's settings for that console. The CRT starts flat: curvature works, but costs the CPU about twice as much.
 - Settings are saved per console.
 
+## Button mapping and rewind
+
+**Button Mapping**, in each console's menu (MENU on its shelf), sets what each of the Brick's buttons presses:
+- any of that console's buttons, by the console's own names (a Genesis has A, B, C, X, Y, Z and Mode);
+- the same with **turbo**;
+- or **None**.
+
+Left and right change a button, and **Reset to Default** puts the console back. The Game Boys, NES, Master System, Game Gear, TurboGrafx-16 and Neo Geo Pockets start with X and Y as turbo A and B, as before.
+
+**Buttons** in the in-game menu does the same while you play, and changes apply as you make them. Its **For** row picks **This game**, a mapping for this game only, or **All its games**, the console's. The d-pad and MENU can't be remapped.
+
+**Rewind**, in each console's menu, is off until you turn it on. With it on, **hold MENU + L1** in a game to step back through the last minutes of play, and let go to carry on from there. It saves the game several times a second in memory, which costs a little speed, so leave it off on consoles where you don't use it. It starts over when you load a state or reset.
+
 ## Overlays
 
 The **Overlay** row offers **None** or any PNG in that console's folder in `Overlays/` on the card.
@@ -111,6 +130,7 @@ In the in-game menu, the paused game behind the menu shows the shader and overla
 **MENU > Updates** keeps ChaOS up to date over Wi-Fi, with no computer. Your games, music, saves and settings stay.
 
 - **Checking:** when the Brick joins Wi-Fi, it asks once whether there is a newer ChaOS. If there is, it says so once at the top of the screen, and the Updates row shows the version. It never downloads or installs anything by itself.
+- **What's New:** once a newer version is found, this row shows what it changes.
 - **Download:** the screen shows what's installed and what's latest. **Download** fetches the new version (about 40 MB) and checks it against the release's checksum. You can keep playing while it downloads.
 - **Install and Restart:** the Brick restarts and installs the update during the next start-up, which takes a few seconds longer than usual. It then comes back as it was. It needs a quarter of a charge, or the charger.
 - **Later:** a finished download waits on the card until you come back to install it, or choose **Remove Download**.
@@ -184,9 +204,10 @@ If the Brick restarts but **About ChaOS** still shows the old version, the insta
 | Button | What it does |
 |---|---|
 | **A / B** | Choose and back |
-| **MENU** | Settings for whatever you're looking at. In a game: save, load, shader, overlay, quit and more |
+| **MENU** | Settings for whatever you're looking at. In a game: save, load, shader, overlay, buttons, quit and more |
 | **SELECT** | Muse, the music and audiobook player, from anywhere |
 | **MENU + R1** | Fast forward a game (2x, 3x, 4x) |
+| **MENU + L1** (hold) | Rewind, on consoles where it's turned on |
 | **X / Y** | In a game, turbo A and B. On the shelf, a game's details and favorite |
 | **POWER** | Save and turn off |
 

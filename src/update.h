@@ -105,6 +105,11 @@ bool upd_announce(char *out, int outn);
 /* For screenshots (--updates): the screen in a state, with made-up facts. */
 void upd_demo(upd_state s, const char *version, const char *error);
 
+/* What's new in the latest release (its ChaOS-notes.txt), once fetched;
+ * NULL until then. Fetched by upd_tick whenever a newer version is known and
+ * the network is up. */
+const char *upd_notes(void);
+
 /* For the menu row: "0.8.0 available", "0.8.0 ready", "downloading 40%", or
  * NULL when there is nothing to say. */
 const char *upd_row_value(void);

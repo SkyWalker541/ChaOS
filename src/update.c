@@ -27,6 +27,8 @@
 #define OTA_URL "https://github.com/SkyWalker541/ChaOS/releases/latest/download/ChaOS-ota.txt"
 #define DL_URL  "https://github.com/SkyWalker541/ChaOS/releases/download/v%s/%s"
 #define OTA_TMP "/tmp/chaos-ota.txt"
+#define NOTES_URL "https://github.com/SkyWalker541/ChaOS/releases/download/v%s/ChaOS-notes.txt"
+#define NOTES_TMP "/tmp/chaos-notes.txt"
 #define BOOT_MNT "/tmp/chaos-boot"
 
 static char g_dev[256];          /* <card>/.dev */
@@ -45,6 +47,10 @@ static bool      g_checked;      /* answered, this boot */
 static bool      g_check_failed; /* the last FAILED was the check's */
 static time_t    g_auto_at;      /* the boot's own check, last tried */
 static char      g_announced[32];
+static pid_t     g_notes_pid = -1;
+static char      g_notes_for[32];   /* the version they are, or are being, fetched for */
+static char      g_notes[4096];
+static bool      g_notes_have;
 static char      g_row[48];
 
 /* ---- parsing -------------------------------------------------------------- */
@@ -326,9 +332,45 @@ bool upd_remove(void)
 	return true;
 }
 
+const char *upd_notes(void)
+{
+	return g_notes_have && !strcmp(g_notes_for, g_latest.version) ? g_notes : NULL;
+}
+
+/* The notes, alongside: one small GET for the version found, and again
+ * after a failure only when asked again by a later tick */
+static bool notes_tick(bool online)
+{
+	int st;
+
+	if (g_notes_pid > 0) {
+		if (waitpid(g_notes_pid, &st, WNOHANG) != g_notes_pid) return false;
+		net_spawn_done(g_notes_pid);
+		g_notes_pid = -1;
+		if (WIFEXITED(st) && WEXITSTATUS(st) == 0 &&
+		    read_small(NOTES_TMP, g_notes, sizeof g_notes)) {
+			trim(g_notes);
+			g_notes_have = g_notes[0] != '\0';
+		}
+		unlink(NOTES_TMP);
+		return g_notes_have;
+	}
+	if (online && g_latest.version[0] && ota_vercmp(g_latest.version, g_version) > 0 &&
+	    strcmp(g_notes_for, g_latest.version) != 0) {
+		char url[200];
+
+		snprintf(g_notes_for, sizeof g_notes_for, "%s", g_latest.version);
+		g_notes_have = false;
+		snprintf(url, sizeof url, NOTES_URL, g_latest.version);
+		g_notes_pid = net_get_spawn(url, NOTES_TMP, 20);
+	}
+	return false;
+}
+
 bool upd_tick(bool online)
 {
 	upd_state was = g_state;
+	bool notes = notes_tick(online);
 	int st;
 
 	/* The boot's own check: when Wi-Fi is up, and again a quarter of an hour
@@ -361,7 +403,7 @@ bool upd_tick(bool online)
 			break;
 		}
 	}
-	return g_state != was;
+	return g_state != was || notes;
 }
 
 void upd_offline(bool radio_off)

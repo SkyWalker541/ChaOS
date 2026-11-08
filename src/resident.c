@@ -17,6 +17,10 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+/* ChaOS: for the next RUN only (plat_resident_set_play) */
+static char g_play_map[512];
+static bool g_play_rewind;
+
 /* One connection, held across games. Diatom is fine with that - it is the
  * fifo pair that needed reopening per game - and holding it means peer death
  * is a POLLHUP here rather than a pid file that lies after a crash. */
@@ -354,10 +358,15 @@ bool plat_resident_send(const char *tag, const char *core, const char *rom,
 		 * not press the button - which cost an hour on 2026-08-31. Diatom logs
 		 * the receiving half for the same reason. */
 		{
-			const char *tm = plat_turbo_map(tag);
-			fprintf(stderr, "turbo: %s %s\n", tag ? tag : "?",
+			/* ChaOS: the player's Button Mapping when there is one, the
+			 * console's turbo otherwise; and rewind */
+			const char *tm = g_play_map[0] ? g_play_map : plat_turbo_map(tag);
+			fprintf(stderr, "map: %s %s\n", tag ? tag : "?",
 			        tm && *tm ? tm : "(none)");
 			if (tm && *tm) dsend("SETMAP\tmap=%s", tm);
+			dsend("SETREWIND\ton=%d", g_play_rewind ? 1 : 0);
+			g_play_map[0] = '\0';
+			g_play_rewind = false;
 		}
 
 		/* The launcher owns levels while it draws, and it is done drawing
@@ -454,6 +463,12 @@ const char *plat_resident_last_preview(void) { return d_preview; }
 static void d_note_level(const char *l);
 static void d_note_audio(const char *l);
 static void d_note_display(const char *l);
+
+void plat_resident_set_play(const char *map, bool rewind)
+{
+	snprintf(g_play_map, sizeof g_play_map, "%s", map ? map : "");
+	g_play_rewind = rewind;
+}
 
 void plat_resident_set_look(const char *shader_cfg, const char *bezel)
 {

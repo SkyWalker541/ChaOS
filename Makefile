@@ -20,7 +20,7 @@ CHECKS = check-cheevos check-hare check-httpd check-idle check-rahash \
          check-raset check-xfer check-menus check-artscrape check-artrun check-audioout \
          check-db check-stats check-sort check-bt check-ss \
          check-muselib check-musequeue check-museart check-controls check-logpack \
-         check-clock check-update
+         check-clock check-update check-remap
 
 check:
 	@fail=0; for c in $(CHECKS); do \
@@ -121,6 +121,15 @@ build-native/audioout-check: tools/audioout-check.c src/audioout.c \
 # What MENU > Controls says: every button on exactly one page, and rows short
 # enough to sit still. The page is the device's own copy of the controls list,
 # so what it omits is invisible until somebody goes looking for a button.
+# ChaOS: Button Mapping's tables
+check-remap: build-native/remap-check
+	@./build-native/remap-check
+
+build-native/remap-check: tools/remap-check.c src/remap.c src/remap.h FORCE
+	@mkdir -p build-native
+	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g \
+	      -o $@ tools/remap-check.c src/remap.c
+
 # ChaOS: updates over Wi-Fi, what src/update.c decides without the network
 check-update: build-native/update-check
 	@./build-native/update-check

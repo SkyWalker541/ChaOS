@@ -191,6 +191,9 @@ const char *plat_resident_last_preview(void);
 /* ChaOS. The shader settings file and the overlay file the next game is sent
  * before its RUN (SETSHADER and SETBEZEL), "" or NULL for none. */
 void plat_resident_set_look(const char *shader_cfg, const char *bezel);
+/* ChaOS: the next RUN's button map (a SETMAP line, NULL for the console's
+ * turbo default) and whether it keeps states to rewind to */
+void plat_resident_set_play(const char *map, bool rewind);
 /* The paused frame as the shader draws it, the size of the game's rect, or
  * NULL when the game is not shaded. Written by Diatom on the way into its
  * pause, and again after a SETSHADER with preview=. */

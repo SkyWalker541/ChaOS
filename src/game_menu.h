@@ -101,7 +101,7 @@ int gi_rows(menu_row *out, const game_info *gi, bool net);
 /* ---------- the in-game menu ---------------------------------------------- */
 
 typedef enum {
-	GM_CONTINUE, GM_SAVE, GM_LOAD, GM_SHADER, GM_OVERLAY, GM_CHEEVOS, GM_RESET,
+	GM_CONTINUE, GM_SAVE, GM_LOAD, GM_SHADER, GM_OVERLAY, GM_BUTTONS, GM_CHEEVOS, GM_RESET,
 	GM_QUIT,
 	GM_ROWS
 } gm_row;

@@ -87,7 +87,10 @@ static int game(menu_row *out)
 	 * to normal, and MENU opens the menu on release so it can be held for it.
 	 * Eric's wording, 2026-10-01, SELECT's with it. */
 	out[n++] = (menu_row){ "MENU",   "Menu, +R1 for FF",   false };
-	out[n++] = (menu_row){ "SELECT", "Muse in menu",       false };
+	/* ChaOS: rewind, held, on a console it is turned on for (so the
+	 * footnote's mark). It took SELECT's row, which the Anywhere page has:
+	 * SELECT opens Muse in a game as everywhere else, from the menu. */
+	out[n++] = (menu_row){ "MENU+L1", "Rewind, held *",    false };
 	/* X and Y are Diatom's turbo on the nine two-button systems; L2 and R2
 	 * are mGBA's own Turbo L and R, which work on GBA and do nothing on GB and
 	 * GBC, which have no shoulders (found 2026-09-30, choosing a fast-forward

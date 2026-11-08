@@ -48,6 +48,7 @@
 #include "sys_menu.h"
 #include "controls.h"
 #include "update.h"
+#include "remap.h"
 
 /* ChaOS: the button held in the in-game menu to see the game whole. Its name
  * on screen is CTL_PEEK_NAME (controls.h): change one, change both. */
@@ -2944,6 +2945,8 @@ static bool idle_due_ctx(void *ctx) { return idle_due((app *)ctx); }
 static void draw_low_battery_dot(SDL_Renderer *r);
 static void redraw_at(Uint32 t);   /* below, with the rest of the redraw clock */
 static void draw_upd_notice(app *a);   /* ChaOS: with the Updates screen */
+static bool rewind_load(const char *tag);   /* ChaOS: with Button Mapping */
+static int  menu_shelf_width(app *a);
 static void upd_poll(void);
 
 /* The dot as the battery has it: steady when low, blinking when critical, a
@@ -4903,6 +4906,7 @@ static int menu_build(app *a, screen_id screen, int sys,
 		{
 			static char ovl[256];
 
+			u.rewind  = rewind_load(sc->tag);
 			u.shader  = look_console_of(sc->tag) == LOOK_NONE ? NULL
 			          : a->view[sys].look.on ? "On" : "Off";
 			u.overlay = u.fav || u.muse ? NULL : overlay_label(a, sys, ovl, sizeof ovl);
@@ -7013,6 +7017,182 @@ static bool stats_screen(app *a)
 	return false;
 }
 
+/* ---- ChaOS: Button Mapping and Rewind ------------------------------------
+ *
+ * Kept in db_dev: remap.<TAG> for a console, remap.<TAG>:<file> for one game
+ * over it, each a whole SETMAP line (src/remap.h); rewind.<TAG> = 1 for a
+ * console that keeps states to rewind to. A game with no map of its own
+ * plays its console's, and a console with none its turbo default. */
+
+static void remap_key(char *k, size_t n, const char *tag, const char *file)
+{
+	if (file && *file) snprintf(k, n, "remap.%s:%s", tag, file);
+	else snprintf(k, n, "remap.%s", tag);
+}
+
+/* What a game plays with: its own map, its console's, or the turbo default */
+static const char *remap_spec(const char *tag, const char *file, char *buf, size_t n)
+{
+	char k[CFG_STR + LIB_PATH + 16];
+	const char *t;
+
+	remap_key(k, sizeof k, tag, file);
+	if (file && *file && db_get_str(db_dev(), k, buf, n, NULL) && buf[0]) return buf;
+	remap_key(k, sizeof k, tag, NULL);
+	if (db_get_str(db_dev(), k, buf, n, NULL) && buf[0]) return buf;
+	t = plat_turbo_map(tag);
+	snprintf(buf, n, "%s", t ? t : "");
+	return buf;
+}
+
+static bool rewind_load(const char *tag)
+{
+	char k[CFG_STR + 16];
+	snprintf(k, sizeof k, "rewind.%s", tag);
+	return db_get_int(db_dev(), k, 0) == 1;
+}
+
+static void rewind_save(const char *tag, bool on)
+{
+	char k[CFG_STR + 16];
+	snprintf(k, sizeof k, "rewind.%s", tag);
+	db_set_int(db_dev(), k, on ? 1 : 0);
+}
+
+enum { RM_ROW_SCOPE = 100, RM_ROW_RESET, RM_ROW_NONE };
+
+static void gm_backdrop(app *a, void *ctx);   /* with the in-game menu */
+
+typedef struct {
+	app        *a;
+	int         sys;          /* the console */
+	const char *file;         /* the game, in a game; NULL from the shelf */
+	void       *game;         /* the in-game menu's gm_ctx, for its backdrop */
+	bool        own;          /* the game has a map of its own */
+	rm_map      map;
+	int         ids[24];
+	char        vals[RM_BUTTONS][24];
+	char        scope[48], heading[64];
+} rm_ctx;
+
+static void rm_load(rm_ctx *c)
+{
+	const char *tag = c->a->sys.systems[c->sys].tag;
+	char spec[512], k[CFG_STR + LIB_PATH + 16];
+
+	remap_key(k, sizeof k, tag, c->file);
+	c->own = c->file && db_has(db_dev(), k);
+	rm_from_spec(tag, remap_spec(tag, c->own ? c->file : NULL, spec, sizeof spec), &c->map);
+}
+
+/* Saved where it belongs, and in a game sent at once */
+static void rm_store(rm_ctx *c)
+{
+	const char *tag = c->a->sys.systems[c->sys].tag;
+	char spec[512], k[CFG_STR + LIB_PATH + 16];
+
+	if (!rm_to_spec(tag, &c->map, spec, sizeof spec)) return;
+	remap_key(k, sizeof k, tag, c->own ? c->file : NULL);
+	db_set_str(db_dev(), k, spec);
+	if (c->file) plat_resident_line("SETMAP\tmap=%s", spec);
+}
+
+static int rm_build(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	rm_ctx *c = ctx;
+	const system_cfg *sc = &c->a->sys.systems[c->sys];
+	int n = 0, i;
+
+	(void)max;
+	snprintf(c->heading, sizeof c->heading, "%s Buttons", sc->name);
+	*heading = c->file ? "Button Mapping" : c->heading;
+	if (c->file) {
+		snprintf(c->scope, sizeof c->scope, "%s", c->own ? "This game" : "All its games");
+		c->ids[n] = RM_ROW_SCOPE;
+		rows[n++] = (menu_row){ "For", c->scope, true };
+		c->ids[n] = RM_ROW_NONE; rows[n++] = MENU_RULE;
+	}
+	for (i = 0; i < RM_BUTTONS; i++) {
+		rm_choice_label(sc->tag, c->map.choice[i], c->vals[i], sizeof c->vals[i]);
+		c->ids[n] = i;
+		rows[n++] = (menu_row){ rm_button_label(i), c->vals[i], true };
+	}
+	c->ids[n] = RM_ROW_NONE; rows[n++] = MENU_RULE;
+	c->ids[n] = RM_ROW_RESET;
+	rows[n++] = (menu_row){ "Reset to Default", NULL, true };
+	return n;
+}
+
+static menu_result rm_key(app *a, void *ctx, in_button key, int sel)
+{
+	rm_ctx *c = ctx;
+	const char *tag = a->sys.systems[c->sys].tag;
+	int id = sel >= 0 && sel < 24 ? c->ids[sel] : RM_ROW_NONE;
+	int d = key == IN_LEFT ? -1 : key == IN_RIGHT || key == IN_ACCEPT ? 1 : 0;
+	char k[CFG_STR + LIB_PATH + 16];
+
+	if (!d) return MENU_STAY;
+	if (id >= 0 && id < RM_BUTTONS) {
+		rm_choice ch[RM_CHOICES];
+		int n = rm_choices(tag, ch);
+		c->map.choice[id] = (c->map.choice[id] + d + n) % n;
+		rm_store(c);
+	} else if (id == RM_ROW_SCOPE) {
+		/* This game takes the console's map as its start; all its games
+		 * drops the game's own */
+		c->own = !c->own;
+		if (c->own) rm_store(c);
+		else {
+			remap_key(k, sizeof k, tag, c->file);
+			db_del(db_dev(), k);
+			rm_load(c);
+			rm_store(c);
+		}
+	} else if (id == RM_ROW_RESET && key == IN_ACCEPT) {
+		remap_key(k, sizeof k, tag, c->own ? c->file : NULL);
+		db_del(db_dev(), k);
+		{
+			char spec[512];
+			const char *t = remap_spec(tag, NULL, spec, sizeof spec);
+			if (c->own) t = plat_turbo_map(tag);
+			rm_from_spec(tag, t, &c->map);
+			if (c->file) {
+				rm_to_spec(tag, &c->map, spec, sizeof spec);
+				plat_resident_line("SETMAP\tmap=%s", spec);
+			}
+		}
+		if (c->own) rm_store(c);
+	}
+	return MENU_STAY;
+}
+
+static void rm_backdrop(app *a, void *ctx)
+{
+	gm_backdrop(a, ((rm_ctx *)ctx)->game);
+}
+
+/* From the console's menu (no game: file NULL) or the in-game menu (its
+ * gm_ctx and style, the game's file) */
+static void remap_screen(app *a, int sys, const char *file, void *game,
+                         const menu_style *over)
+{
+	rm_ctx c;
+	menu_style st = { .fixed_w = menu_shelf_width(a), .follow_tint = true };
+
+	memset(&c, 0, sizeof c);
+	c.a = a;
+	c.sys = sys;
+	c.file = file;
+	c.game = game;
+	if (game && over) {
+		st = *over;                 /* its width, tint, power rule and peek */
+		st.backdrop = rm_backdrop;
+	}
+	st.root = false;
+	rm_load(&c);
+	menu_run(a, &st, rm_build, rm_key, &c);
+}
+
 /* ---- ChaOS: Updates ---------------------------------------------------------
  *
  * What src/update.h does, on a screen: what is installed and what is latest,
@@ -7021,7 +7201,7 @@ static bool stats_screen(app *a)
  * check only says there is something (upd_announce, on the shelf), and a
  * finished download waits on the card until the player comes back for it. */
 
-enum { UP_NONE, UP_CHECK, UP_DOWNLOAD, UP_CANCEL, UP_INSTALL, UP_REMOVE };
+enum { UP_NONE, UP_CHECK, UP_DOWNLOAD, UP_CANCEL, UP_INSTALL, UP_REMOVE, UP_NOTES };
 
 typedef struct {
 	app  *a;
@@ -7074,6 +7254,12 @@ static int upd_build(void *ctx, menu_row *rows, int max, const char **heading)
 	}
 	c->ids[n] = UP_NONE; rows[n++] = (menu_row){ "Installed", CHAOS_VERSION, false };
 	c->ids[n] = UP_NONE; rows[n++] = (menu_row){ "Latest", c->latest, false };
+	/* What the newer one brings, once its notes are in */
+	if (s != UPD_CURRENT && s != UPD_CHECKING && upd_notes()) {
+		c->ids[n] = UP_NOTES;
+		rows[n] = (menu_row){ "What's New", NULL, true };
+		rows[n++].opens = true;
+	}
 	c->ids[n] = UP_NONE; rows[n++] = MENU_RULE;
 
 	switch (s) {
@@ -7135,6 +7321,10 @@ static menu_result upd_key(app *a, void *ctx, in_button key, int sel)
 		return MENU_STAY;
 	}
 	switch (id) {
+	case UP_NOTES:
+		snprintf(q, sizeof q, "What's New in %s", o->version);
+		if (upd_notes()) synopsis_screen(a, q, upd_notes(), MENU_ACCENT);
+		break;
 	case UP_CHECK:
 		/* After a failed download, Try Again downloads again; otherwise it
 		 * asks again */
@@ -7255,7 +7445,17 @@ static void about_screen(app *a)
 			else
 				snprintf(batt, sizeof batt, "unknown");
 		}
-		secs = now / 1000;
+		/* ChaOS: since the device started (/proc/uptime), not since this
+		 * launcher did - it is restarted after a crash, and was counting
+		 * from then. The Brick has no sleep, so on is awake. */
+		{
+			FILE *u = fopen("/proc/uptime", "r");
+			double up_s = 0;
+
+			if (!u || fscanf(u, "%lf", &up_s) != 1) up_s = now / 1000.0;
+			if (u) fclose(u);
+			secs = (unsigned)up_s;
+		}
 		snprintf(up, sizeof up, "%uh %02um", secs / 3600, (secs / 60) % 60);
 
 		rows[0] = (menu_row){ "Version",   ver,  false };
@@ -7672,6 +7872,15 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 		}
 		if (sel == SM_OVERLAY) {
 			if (d || key == IN_ACCEPT) overlay_cycle(a, a->sys_cursor, d ? d : 1);
+			return MENU_STAY;
+		}
+		if (sel == SM_BUTTONS) {
+			if (key == IN_ACCEPT) remap_screen(a, a->sys_cursor, NULL, NULL, NULL);
+			return MENU_STAY;
+		}
+		if (sel == SM_REWIND) {
+			const char *tag = a->sys.systems[a->sys_cursor].tag;
+			if (d || key == IN_ACCEPT) rewind_save(tag, !rewind_load(tag));
 			return MENU_STAY;
 		}
 		/* Sort order, on the same left/right idiom.
@@ -10151,6 +10360,11 @@ static menu_result gm_key(app *a, void *ctx, in_button key, int sel)
 	case GM_SHADER:
 		shader_screen(a, gm_owner(a), c);
 		break;
+	case GM_BUTTONS: {
+		sysview *sv = &a->view[a->sys_cursor];
+		remap_screen(a, gm_owner(a), sv->list.items[sv->cursor].file, c, &c->st);
+		break;
+	}
 	case GM_CHEEVOS:
 		cheevos_screen(a, c->bg, false);
 		break;
@@ -10663,6 +10877,15 @@ static void launch(app *a)
 
 			look_files(a, o, &lcfg, &ldtov);
 			plat_resident_set_look(lcfg, ldtov);
+		}
+		/* ChaOS: its buttons, and rewind, both by the console it belongs to */
+		{
+			char spec[512];
+			const char *otag = a->sys.systems[o].tag;
+
+			plat_resident_set_play(remap_spec(otag, v->list.items[v->cursor].file,
+			                                  spec, sizeof spec),
+			                       rewind_load(otag));
 		}
 		if (plat_resident_send(s->tag, core, rom, st, st, pv,
 		                       console, active[0] ? active : NULL)) {
@@ -12115,6 +12338,7 @@ static int shot_info;
  * to look at all three without setting the device three times. */
 static int shot_controls = -1;
 static int shot_updates = -1;   /* ChaOS: --updates <upd_state> */
+static const char *shot_remap;  /* ChaOS: --remap <TAG>: its Button Mapping */
 static int shot_art;
 static const char *shot_art_now = "Legend of Zelda, The - A Link to the Past (USA)";
 static int shot_hare;
@@ -12289,6 +12513,24 @@ static void take_shot(app *a)
 		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
 		SDL_RenderFillRect(a->r, NULL);
 		menu_draw(a, head, rows, n, -1, menu_std_width(a), MENU_ACCENT);
+	}
+	if (shot_remap) {
+		rm_ctx c;
+		menu_row rows[24];
+		const char *head;
+		int n, i;
+
+		memset(&c, 0, sizeof c);
+		c.a = a;
+		for (i = 0; i < a->sys.count; i++)
+			if (!strcmp(a->sys.systems[i].tag, shot_remap)) c.sys = i;
+		c.file = "game.bin";
+		rm_load(&c);
+		n = rm_build(&c, rows, 24, &head);
+		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
+		SDL_RenderFillRect(a->r, NULL);
+		menu_draw(a, head, rows, n, 2, 0, MENU_ACCENT);
 	}
 	if (shot_updates >= 0) {
 		upd_ctx c;
@@ -12505,6 +12747,8 @@ int main(int argc, char *argv[])
 		else if (!strcmp(argv[i], "--gamemove") && i + 1 < argc)
 			shot_gamemove = (float)atof(argv[++i]);
 		else if (!strcmp(argv[i], "--info")) shot_info = 1;
+		else if (!strcmp(argv[i], "--remap") && i + 1 < argc)
+			shot_remap = argv[++i];
 		else if (!strcmp(argv[i], "--updates") && i + 1 < argc)
 			shot_updates = atoi(argv[++i]);   /* an upd_state, +100 offline */
 		else if (!strcmp(argv[i], "--controls")) {

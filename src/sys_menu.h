@@ -53,7 +53,10 @@ typedef enum {
 	 * overlay. They took Display Mode's place: every game is drawn at a
 	 * whole-number scale now, so there is no mode to choose. Shader is left
 	 * out for a console with no shader made for it. */
-	SM_SHADER, SM_OVERLAY, /* SM_BUTTONS, */ SM_BOXART, SM_RESCAN, SM_ROWS
+	SM_SHADER, SM_OVERLAY,
+	/* ChaOS: what each of the Brick's buttons presses (src/remap.h), and
+	 * whether MENU+L1 can step the game back */
+	SM_BUTTONS, SM_REWIND, SM_BOXART, SM_RESCAN, SM_ROWS
 } sm_row;
 
 /* What the Favorites shelf's menu is, which is two of those rows.
@@ -166,6 +169,7 @@ typedef struct {
 	const char *cards_dir;   /* which way the shelves run, from CARD_DIRS */
 	const char *menu_color;  /* ChaOS: the menus' accent's name, from theme.h */
 	const char *update;      /* ChaOS: Updates' value, upd_row_value */
+	bool        rewind;      /* ChaOS: this console keeps states to rewind to */
 	int         auto_off;    /* seconds, 0 for off */
 	const char *clock;       /* the local date and time, "Oct 3, 6:12 AM" */
 	/* Where sound goes: the policy the player set, and where it actually ends

@@ -593,7 +593,7 @@ static void cursor_reaches(void)
 	k = reachable(rows, n, got, MENU_MAX_ROWS);
 
 	printf("system menu, what the cursor can reach:\n");
-	ck(k == 4, "four rows, not six");
+	ck(k == 6, "six rows, not eight");
 	ck(!reaches(rows, got, k, "Shader"), "no Shader: nothing is made for the NES yet");
 	ck(n == SM_ROWS - 1 && !strcmp(rows[SM_SHADER].label, "Overlay"),
 	   "and Overlay moves up into its place");
@@ -603,6 +603,8 @@ static void cursor_reaches(void)
 	ck(reaches(rows, got, k, "Overlay"), "Overlay");
 	ck(reaches(rows, got, k, "Box Art"), "Box Art");
 	ck(reaches(rows, got, k, "Rescan Folder"), "Rescan Folder");
+	ck(reaches(rows, got, k, "Button Mapping") && reaches(rows, got, k, "Rewind"),
+	   "Button Mapping and Rewind");
 	ck(!holds(got, k, SM_GAMES) && !holds(got, k, SM_CORE),
 	   "the reported facts are not stops");
 
@@ -914,7 +916,7 @@ static void ingame_rows(void)
 	n = gm_rows(&u, rows, &b);
 
 	printf("in-game menu, a game with a set:\n");
-	ck(n == GM_SHOWN, "eight rows, then a rule and a note");
+	ck(n == GM_SHOWN, "nine rows, then a rule and a note");
 	ck(ROW_IS_NOTE(rows[GM_ROWS + 1]) && !strcmp(rows[GM_ROWS + 1].label, "Hold " CTL_PEEK_NAME " to see the game"),
 	   "the note names the button that shows the game");
 	ck(!strcmp(rows[GM_CONTINUE].label, "Continue"), "Continue leads");

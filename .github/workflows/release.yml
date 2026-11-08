@@ -75,6 +75,10 @@ jobs:
           EOF
           sed -i 's/^          //' out/ChaOS-ota.txt
           cat out/ChaOS-ota.txt
+          # What's new, for the Updates screen: the release's commit message
+          # without its trailers
+          git log -1 --format=%B | grep -v -e '^Co-Authored-By:' -e '^Claude-Session:' \
+            | head -c 4000 > out/ChaOS-notes.txt
 
       - name: Its source
         if: steps.v.outputs.out != '1'
@@ -82,7 +86,7 @@ jobs:
           V=${{ steps.v.outputs.version }}
           B=${{ steps.v.outputs.base }}
           sh tools/chaos-sources.sh tortos/TortOS-v$B-brick-sources.tar out/ChaOS-v$V-brick-sources.tar
-          cd out && sha256sum ChaOS-v* ChaOS-ota.txt > SHA256SUMS && cat SHA256SUMS
+          cd out && sha256sum ChaOS-v* ChaOS-ota.txt ChaOS-notes.txt > SHA256SUMS && cat SHA256SUMS
 
       - name: Release
         if: steps.v.outputs.out != '1'

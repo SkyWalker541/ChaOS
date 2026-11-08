@@ -90,7 +90,7 @@ int gi_rows(menu_row *out, const game_info *gi, bool net)
 int gm_rows(const gm_ui *u, menu_row *out, gm_bufs *b)
 {
 	static const char *label[GM_ROWS] = {
-		"Continue", "Save", "Load", "Shader", "Overlay", "Cheevos", "Reset", "Quit"
+		"Continue", "Save", "Load", "Shader", "Overlay", "Buttons", "Cheevos", "Reset", "Quit"
 	};
 	int i;
 
@@ -103,6 +103,7 @@ int gm_rows(const gm_ui *u, menu_row *out, gm_bufs *b)
 	out[GM_SAVE].opens = out[GM_LOAD].opens = true;
 	out[GM_SHADER].opens = u->shader != NULL;
 	out[GM_CHEEVOS].opens = true;
+	out[GM_BUTTONS].opens = true;   /* ChaOS: Button Mapping, for this game */
 
 	/* Most of a library has no set, and a row that says so plainly is better
 	 * than one that is missing: "none" answers the question the player opened

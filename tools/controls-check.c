@@ -33,7 +33,7 @@ static void ck(int cond, const char *what)
 static const char *const BUTTONS[] = {
 	"Up/Down", "Left/Right", "A", "B", "X", "Y", "L1/R1", "X/Y/L2/R2",
 	"MENU", "SELECT", "POWER", "Volume rocker", "F1/F2", "F1+F2",
-	"FN+Vol", "FN+both Vol", "L2+R2",
+	"FN+Vol", "FN+both Vol", "L2+R2", "MENU+L1",
 };
 #define NBUTTONS ((int)(sizeof BUTTONS / sizeof BUTTONS[0]))
 
