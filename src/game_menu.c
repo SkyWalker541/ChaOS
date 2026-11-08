@@ -97,6 +97,10 @@ int gm_rows(const gm_ui *u, menu_row *out, gm_bufs *b)
 
 	for (i = 0; i < GM_ROWS; i++) out[i] = (menu_row){ label[i], NULL, true };
 	out[GM_DISPLAY].value = u->dmode ? u->dmode : "Integer";
+	/* ChaOS: left and right change these: Display Mode and Overlay go
+	 * round their choices, Shader is a switch */
+	out[GM_DISPLAY].cycles = out[GM_OVERLAY].cycles = true;
+	out[GM_SHADER].toggle = u->shader != NULL;
 	out[GM_SHADER].value = u->shader ? u->shader : "none";
 	out[GM_SHADER].live = u->shader != NULL;
 	out[GM_OVERLAY].value = u->overlay ? u->overlay : "None";

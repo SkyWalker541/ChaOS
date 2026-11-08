@@ -18,6 +18,13 @@ typedef struct {
 	 * the row says so with a chevron at its right. Last, so every existing
 	 * { label, value, live } initializer stays valid and false. */
 	bool opens;
+	/* ChaOS: what left and right do on this row, shown so it need not be
+	 * guessed. A toggle is drawn as a switch, its value "On" or "Off" (any
+	 * case) saying which way it is set; a row that cycles through choices
+	 * or steps a number gets a small arrow either side of its value while
+	 * the cursor is on it. */
+	bool toggle;
+	bool cycles;
 } menu_row;
 
 /* A row that is only a rule, separating a list from a footer that is not part

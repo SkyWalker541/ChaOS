@@ -136,6 +136,9 @@ look_shader look_active_shader(look_console c, const look_settings *s);
  * and for a Game Boy console lcd3x's too)? */
 bool look_param_kept(look_console c, look_param p);
 
+/* Is p an Off/On choice, drawn as a switch (menu.h, toggle)? */
+bool look_param_is_switch(look_param p);
+
 /* The file Diatom's SETSHADER reads: console, enabled, the style for a CRT
  * console, every parameter of the shader in use. Returns false when it could
  * not be written. */

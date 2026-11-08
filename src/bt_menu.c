@@ -44,7 +44,7 @@ int bt_menu_build(const bt_ui *u, menu_row *out, int max, int visible)
 	out[nrows++] = (menu_row){ "Bluetooth",
 	                           u->state == BT_NO_ADAPTER ? "no adapter"
 	                           : u->state == BT_READY ? "on" : "off",
-	                           true };
+	                           true, .toggle = u->state != BT_NO_ADAPTER };
 
 	for (i = u->top; i < u->n && nrows < max - 2 && i < u->top + visible; i++)
 		out[nrows++] = (menu_row){ u->dev[i].name, u->vals[i], true };

@@ -4238,6 +4238,37 @@ static SDL_Color col_mix(SDL_Color a, SDL_Color b, float t)
 	                    (Uint8)(a.a + (b.a - a.a) * t) };
 }
 
+/* ChaOS: an on/off switch for a toggle row (menu_row.toggle), right-aligned
+ * at `right`, centred on `cy`, sized from the text: a rounded track, filled
+ * with the menu's accent when on, and a knob at the end it is set to.
+ * Brighter as the row is selected (`sel`, 0 to 1), as a value's text is. */
+static int menu_switch_w(int text_h) { return text_h * 17 / 10; }
+
+static void draw_switch(SDL_Renderer *r, int right, float cy, int text_h, bool on,
+                        bool live, float sel, unsigned accent)
+{
+	int w = menu_switch_w(text_h), h = text_h * 9 / 10, k = h - 6;
+	SDL_Rect track = { right - w, (int)(cy - h / 2.0f), w, h };
+	SDL_Rect knob  = { on ? right - 3 - k : right - w + 3, track.y + 3, k, k };
+	SDL_Color acc = { (Uint8)(accent >> 16), (Uint8)(accent >> 8), (Uint8)accent, 255 };
+	SDL_Color tc, kc;
+
+	if (!live) sel = 0.0f;
+	if (on) {
+		tc = acc;
+		tc.a = (Uint8)((live ? 170 : 90) + (live ? 85 : 0) * sel);
+		kc = (SDL_Color){ 245, 245, 250, (Uint8)(live ? 255 : 150) };
+	} else {
+		tc = (SDL_Color){ 255, 255, 255, (Uint8)(28 + 22 * sel) };
+		kc = col_mix(UI_TEXT_DIM, UI_TEXT_SOFT, sel);
+		if (!live) kc.a = 150;
+	}
+	SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+	ui_round_rect(r, &track, h / 2, tc);
+	ui_round_rect(r, &knob, k / 2, kc);
+}
+
+
 static int menu_row_h(void) { return ui_font_line(UI_F_MENU) * 3 / 2; }
 /* The air between the panel edge and its content, on each side. menu_draw
  * draws it and menu_std_width subtracts it, and a panel width means nothing
@@ -4399,7 +4430,9 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 		if (!rows[i].label) continue;          /* a rule measures nothing */
 		w = ui_text_width(fm, rows[i].label);
 		if (two_col && rows[i].value && !ROW_IS_NOTE(rows[i]))
-			w += gap + ui_text_width(fm, rows[i].value);
+			w += gap + (rows[i].toggle ? menu_switch_w(text_h)
+			                           : ui_text_width(fm, rows[i].value));
+		if (rows[i].cycles) w += text_h * 3 / 2;   /* the left arrow */
 		if (w > content_w) content_w = w;
 	}
 	if (head2) {
@@ -4975,12 +5008,32 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 			 * on whether the player had earned it. */
 			bool moves = menu_row_moves(rows[i], i == sel, visits_all);
 
+			if (rows[i].toggle && rows[i].value) vw = menu_switch_w(text_h);
 			if (lw + (vw ? gap + vw : 0) <= content_w) {
 				ui_fit_text(fm, rows[i].label, lbl, sizeof lbl, content_w);
 				ui_text(a->r, fm, lbl, content_x, ty, -1, lc);
-				if (rows[i].value)
+				if (rows[i].value && rows[i].toggle)
+					draw_switch(a->r, content_x + content_w,
+					            y + ROW_H(rows[i]) / 2.0f, text_h,
+					            !strcasecmp(rows[i].value, "on"), rows[i].live,
+					            sel_w, accent);
+				else if (rows[i].value)
 					ui_text(a->r, fm, rows[i].value,
 					        content_x + content_w, ty, 1, vc);
+				/* ChaOS: left and right change it - an arrow either side,
+				 * on the row the cursor is on */
+				if (rows[i].cycles && rows[i].live && rows[i].value &&
+				    !rows[i].toggle && sel_w > 0.02f) {
+					SDL_Color ac = vc;
+					float cy = y + ROW_H(rows[i]) / 2.0f, ah = (float)text_h * 0.5f;
+
+					ac.a = (Uint8)(ac.a * sel_w);
+					draw_chevron(a->r, (float)(content_x + content_w - vw) - ah * 1.2f,
+					             cy, ah, -1, ac);
+					if (!rows[i].opens)
+						draw_chevron(a->r, (float)(content_x + content_w + pad / 2),
+						             cy, ah, +1, ac);
+				}
 			} else if (vw > lw) {
 				/* The VALUE is the long one. The label keeps its width and
 				 * the value takes everything left of the right edge. */
@@ -11196,13 +11249,13 @@ static int shader_build(void *ctx, menu_row *rows, int max, const char **heading
 	if (c->group < 0) {
 		snprintf(c->heading, sizeof c->heading, "%s Shader", c->a->sys.systems[c->sys].name);
 		c->ids[n] = SH_SWITCH;
-		rows[n++] = (menu_row){ "Shader", ls->on ? "On" : "Off", true };
+		rows[n++] = (menu_row){ "Shader", ls->on ? "On" : "Off", true, .toggle = true };
 		if (ls->on) {
 			/* A CRT console chooses between two, and so does a Game Boy
 			 * console; the others have one. */
 			if (own == LS_CRT || own == LS_PT) {
 				c->ids[n] = SH_NONE + 1 + (int)(own == LS_CRT ? LP_CRT_STYLE : LP_PT_STYLE);
-				rows[n++] = (menu_row){ "Style", look_style_name(lc, ls), true };
+				rows[n++] = (menu_row){ "Style", look_style_name(lc, ls), true, .cycles = true };
 			} else {
 				c->ids[n] = SH_NAME;
 				rows[n++] = (menu_row){ "Style", look_style_name(lc, ls), false };
@@ -11216,14 +11269,16 @@ static int shader_build(void *ctx, menu_row *rows, int max, const char **heading
 				for (k = 0; k < np; k++) {
 					c->ids[n] = SH_NONE + 1 + (int)ps[k];
 					look_format(ls, ps[k], c->vals[n], sizeof c->vals[n]);
-					rows[n] = (menu_row){ look_params[ps[k]].label, c->vals[n], true };
+					rows[n] = (menu_row){ look_params[ps[k]].label, c->vals[n], true,
+			                     .toggle = look_param_is_switch(ps[k]),
+			                     .cycles = !look_param_is_switch(ps[k]) };
 					n++;
 				}
 			}
 			if (sh == LS_PT) {
 				c->ids[n] = SH_SYSTEM;
 				look_format(ls, LP_GAME_SYSTEM, c->vals[n], sizeof c->vals[n]);
-				rows[n] = (menu_row){ "Game System", c->vals[n], true };
+				rows[n] = (menu_row){ "Game System", c->vals[n], true, .cycles = true };
 				n++;
 				c->ids[n] = SH_NONE; rows[n++] = MENU_RULE;
 			}
@@ -11251,7 +11306,9 @@ static int shader_build(void *ctx, menu_row *rows, int max, const char **heading
 		for (k = 0; k < np; k++) {
 			c->ids[n] = SH_NONE + 1 + (int)ps[k];
 			look_format(ls, ps[k], c->vals[n], sizeof c->vals[n]);
-			rows[n] = (menu_row){ look_params[ps[k]].label, c->vals[n], true };
+			rows[n] = (menu_row){ look_params[ps[k]].label, c->vals[n], true,
+			                     .toggle = look_param_is_switch(ps[k]),
+			                     .cycles = !look_param_is_switch(ps[k]) };
 			n++;
 		}
 	}

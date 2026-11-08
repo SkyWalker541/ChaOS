@@ -83,7 +83,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 		 * them and it has none. See SM_FAV_ROWS. */
 		if (u->fav) {
 			out[0] = (menu_row){ "Games",   b->a,                      false };
-			out[1] = (menu_row){ "Sort By", u->sort ? u->sort : "Name", true };
+			out[1] = (menu_row){ "Sort By", u->sort ? u->sort : "Name", true, .cycles = true };
 			return SM_FAV_ROWS;
 		}
 		if (u->muse) {
@@ -99,11 +99,13 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 					break;
 				case SMM_SHOW:
 					out[k] = (menu_row){ "Show",
-					                     u->muse_books ? "Audiobooks" : "Music", true };
+					                     u->muse_books ? "Audiobooks" : "Music", true,
+					                     .cycles = true };
 					break;
 				case SMM_SORT:
 					out[k] = (menu_row){ "Sort By", u->sort ? u->sort
-					                     : u->muse_books ? "Author" : "Artist", true };
+					                     : u->muse_books ? "Author" : "Artist", true,
+					                     .cycles = true };
 					break;
 				case SMM_LOCK:
 					out[k] = (menu_row){ "Lock Screen",
@@ -158,6 +160,10 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 		 * is the one you came here to refresh, so the name still describes
 		 * what you asked for. */
 		full[SM_RESCAN]  = (menu_row){ "Rescan Folder", NULL,        true  };
+		/* ChaOS: what left and right do (menu.h): go round the choices, or
+		 * flip a switch */
+		full[SM_SORT].cycles = full[SM_DISPLAY].cycles = full[SM_OVERLAY].cycles = true;
+		full[SM_SHADER].toggle = full[SM_REWIND].toggle = true;
 		{
 			sm_row ids[SM_ROWS];
 			int k, n = sys_menu_system_rows(u, ids);
@@ -261,6 +267,10 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	full[PM_ACHIEVEMENTS].opens = full[PM_SS].opens = true;
 	full[PM_CONTROLS].opens = full[PM_ABOUT].opens = true;
 	full[PM_UPDATE].opens = true;
+	/* ChaOS: the rows left and right go round (menu.h, cycles) */
+	full[PM_AUDIO].cycles = full[PM_CHANNELS].cycles = full[PM_SLEEP].cycles = true;
+	full[PM_THEME].cycles = full[PM_DIR].cycles = full[PM_SPEED].cycles = true;
+	full[PM_LISTVIEW].cycles = full[PM_COLOR].cycles = true;
 	{
 		pm_row ids[PM_ROWS];
 		int k, n = sys_menu_tortos_rows(u, ids);

@@ -122,6 +122,11 @@ look_shader look_active_shader(look_console c, const look_settings *s)
 	return sh;
 }
 
+bool look_param_is_switch(look_param p)
+{
+	return p >= 0 && p < LP_COUNT && look_params[p].words == W_ONOFF;
+}
+
 bool look_param_kept(look_console c, look_param p)
 {
 	look_shader sh = look_shader_of(c);
