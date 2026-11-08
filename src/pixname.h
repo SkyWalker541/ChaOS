@@ -30,7 +30,7 @@ void pn_overlay(SDL_Renderer *r, const char *name, unsigned accent, float t,
                 int screen_w, int screen_h);
 
 /* ChaOS Pixel Names: the system's name alone, large, centred on cy, flying
- * together while `focused` and apart after; call it for every system each
+ * together while `focused`, gone at once after; call it for every system each
  * frame (it draws only those still showing). True when it drew. */
 bool pn_big(SDL_Renderer *r, const char *name, unsigned accent, bool focused,
             int w, int h, int cy);

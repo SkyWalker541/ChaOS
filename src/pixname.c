@@ -248,8 +248,9 @@ bool pn_animating(void)
 /* ---- ChaOS Pixel Names ----------------------------------------------------------
  *
  * The name alone, large: as wide as most of the screen allows and no taller
- * than half of it, in the same letters and the same flight, with a glow and a
- * drop shadow in the system's colour under it in place of a card. The loose
+ * than half of it, in the same letters, with a drop shadow and a reflection in
+ * the system's colour in place of a card. It only ever flies in: the name
+ * left goes at once, there being no card on screen for it to leave from. The loose
  * pixels start unseen here - there is no card to keep them in - and fly from
  * further out, scaled to the size of the letters. */
 bool pn_big(SDL_Renderer *r, const char *name, unsigned accent, bool focused,
@@ -273,7 +274,9 @@ bool pn_big(SDL_Renderer *r, const char *name, unsigned accent, bool focused,
 	if (g_fix == -1.0f) p->tb = focused ? 1.0f : 0.0f;
 	else if (g_fix >= 0.0f) p->tb = focused ? g_fix : 0.0f;
 	else if (focused && p->tb < 1.0f) { p->tb += step; if (p->tb > 1.0f) p->tb = 1.0f; }
-	else if (!focused && p->tb > 0.0f) { p->tb -= step; if (p->tb < 0.0f) p->tb = 0.0f; }
+	/* Only coming in: the console left is not on screen to go anywhere, as
+	 * a card is, so it goes at once and the next one starts from nothing */
+	else if (!focused) p->tb = 0.0f;
 	if (p->tb > 0.0f && p->tb < 1.0f) g_moving = true;
 	if (p->tb <= 0.0f) return false;
 
