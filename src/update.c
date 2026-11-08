@@ -39,6 +39,7 @@ static char g_stamp[300];        /* which version that is */
 static char g_version[32];       /* running */
 static char g_system[24];        /* this card's ChaOS/SYSTEM, "" before 0.9.2 */
 static char g_app_dir[300];      /* the small update, unpacked: ChaOS/, Licenses/ */
+static char g_root_dir[256];     /* the card's ChaOS/ */
 static char g_base[32];          /* this card's TortOS base */
 
 static upd_state g_state = UPD_IDLE;
@@ -216,14 +217,17 @@ static void look_on_card(void)
 	char v[48], elf[340], *nl;
 	struct stat st;
 
-	/* The stamp: the version, then "app" for a small one */
+	/* The stamp: the version, then "app" for a small one or "full" */
 	if (read_small(g_stamp, v, sizeof v)) {
 		bool small = (nl = strchr(v, '\n')) && !strncmp(nl + 1, "app", 3);
+		bool full = nl && !strncmp(nl + 1, "full", 4);   /* said so: 0.9.3 on */
 		if (nl) *nl = '\0';
 		trim(v);
 		snprintf(elf, sizeof elf, "%s/ChaOS/tortos.elf", g_app_dir);
+		/* A full install of the version running is a repair, and still
+		 * waiting while its root is (rootswitch removes it once written) */
 		if ((small ? stat(elf, &st) : stat(g_root_upd, &st)) == 0 && version_ok(v) &&
-		    ota_vercmp(v, g_version) > 0) {
+		    (ota_vercmp(v, g_version) > 0 || (full && ota_vercmp(v, g_version) == 0))) {
 			snprintf(g_latest.version, sizeof g_latest.version, "%s", v);
 			snprintf(g_latest.base, sizeof g_latest.base, "%s", g_base);
 			g_latest.small = small;
@@ -244,6 +248,9 @@ void upd_init(const char *card, const char *root, const char *version,
 {
 	char path[300], b[32];
 
+	g_state = UPD_IDLE;
+	memset(&g_latest, 0, sizeof g_latest);
+
 	snprintf(g_dev, sizeof g_dev, "%s/.dev", card);
 	snprintf(g_dl, sizeof g_dl, "%s/chaos-update.squashfs.xz", g_dev);
 	snprintf(g_dl_part, sizeof g_dl_part, "%s.part", g_dl);
@@ -252,6 +259,7 @@ void upd_init(const char *card, const char *root, const char *version,
 	snprintf(g_app_dir, sizeof g_app_dir, "%s/chaos-app", g_dev);
 	snprintf(g_app_mark, sizeof g_app_mark, "%s/chaos-app.installing", g_dev);
 	snprintf(g_card, sizeof g_card, "%s", card);
+	snprintf(g_root_dir, sizeof g_root_dir, "%s", root);
 	/* A small update the power cut short: finished now, before it is
 	 * mistaken for installed (the new launcher may be in place already) */
 	if (access(g_app_mark, F_OK) == 0) {
@@ -280,9 +288,14 @@ const ota_info *upd_latest(void) { return &g_latest; }
 const char *upd_error(void) { return g_err; }
 const char *upd_base(void) { return g_base; }
 
+long long upd_size_of(bool small)
+{
+	return small && g_latest.can_small ? g_latest.app_size : g_latest.size;
+}
+
 long long upd_size(void)
 {
-	return g_latest.small ? g_latest.app_size : g_latest.size;
+	return upd_size_of(g_latest.small);
 }
 
 int upd_percent(void)
@@ -325,25 +338,29 @@ static void checked(bool ok)
 	g_checked = true;
 	/* The small one when this card's system is the release's: ChaOS's
 	 * own files, a few megabytes, rather than the whole system */
-	o.small = o.app[0] && g_system[0] && !strcmp(o.system, g_system);
+	o.can_small = o.app[0] && g_system[0] && !strcmp(o.system, g_system);
+	o.small = o.can_small;
 	g_latest = o;
 	if (ota_vercmp(o.version, g_version) <= 0) g_state = UPD_CURRENT;
 	else if (strcmp(o.base, g_base) != 0) g_state = UPD_INSTALLER;
 	else g_state = UPD_AVAILABLE;
 	fprintf(stderr, "update: running %s on %s (system %s), latest %s on %s (system %s): %s\n",
 	        g_version, g_base, g_system[0] ? g_system : "?", o.version, o.base,
-	        o.system[0] ? o.system : "?", o.small ? "small" : "whole");
+	        o.system[0] ? o.system : "?", o.can_small ? "small or full" : "full");
 }
 
-bool upd_download(void)
+bool upd_download(bool small)
 {
 	char url[400];
 	struct statvfs vs;
 
 	if (!g_latest.root[0]) return false;
-	if (g_state != UPD_AVAILABLE && !(g_state == UPD_FAILED && g_latest.version[0] &&
-	                                  !strcmp(g_latest.base, g_base)))
+	if (strcmp(g_latest.base, g_base) != 0) return false;   /* ChaOS Installer's */
+	/* A newer one either way; the one installed, only in full (a repair) */
+	if (g_state == UPD_CURRENT) small = false;
+	else if (g_state != UPD_AVAILABLE && !(g_state == UPD_FAILED && g_latest.version[0]))
 		return false;
+	g_latest.small = small && g_latest.can_small;
 	g_check_failed = false;
 	g_err[0] = '\0';
 	mkdir(g_dev, 0755);
@@ -396,7 +413,7 @@ static void unpack(void)
 		      "xz -dc \"$1\" > \"$3.part\" || exit 4\n"
 		      "head -c 4 \"$3.part\" | grep -q hsqs || exit 5\n"
 		      "sync\n"
-		      "mv -f \"$3.part\" \"$3\" && echo \"$4\" > \"$5\" && rm -f \"$1\" && sync\n",
+		      "mv -f \"$3.part\" \"$3\" && printf '%s\\nfull\\n' \"$4\" > \"$5\" && rm -f \"$1\" && sync\n",
 		      "unpack", g_dl, g_latest.sha256, g_root_upd, g_latest.version, g_stamp,
 		      (char *)NULL);
 		_exit(127);
@@ -654,6 +671,17 @@ bool upd_arm(void)
 		g_state = UPD_READY;   /* still on the card, to try again */
 		return false;
 	}
+	/* Full: the card's ChaOS/VERSION goes, so init.d/tortos copies every one
+	 * of ChaOS's files fresh from the new system at that boot, the version
+	 * already installed too. Its seed only adds and replaces ChaOS's own
+	 * files: where the shelf was, what was playing, and everything outside
+	 * ChaOS/ - games, saves, settings - stay. */
+	{
+		char vf[300];
+		snprintf(vf, sizeof vf, "%s/VERSION", g_root_dir);
+		unlink(vf);
+		sync();
+	}
 	fprintf(stderr, "update: %s armed for the next boot\n", g_latest.version);
 	return true;
 #else
@@ -667,7 +695,9 @@ void upd_demo(upd_state s, const char *version, const char *error)
 	snprintf(g_latest.version, sizeof g_latest.version, "%s", version);
 	snprintf(g_latest.base, sizeof g_latest.base, "%s", g_base);
 	snprintf(g_latest.root, sizeof g_latest.root, "ChaOS-v%s-brick-root.squashfs.xz", version);
-	g_latest.size = 37680452;
+	g_latest.size = 38213248;
+	g_latest.app_size = 5663336;
+	g_latest.can_small = g_latest.small = true;
 	snprintf(g_err, sizeof g_err, "%s", error ? error : "");
 	g_state = s;
 }

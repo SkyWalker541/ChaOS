@@ -133,10 +133,12 @@ In the in-game menu, the paused game behind the menu shows the shader and overla
 
 - **Checking:** when the Brick joins Wi-Fi, it asks once whether there is a newer ChaOS. If there is, it says so once at the top of the screen, and the Updates row shows the version. It never downloads or installs anything by itself.
 - **What's New:** once a newer version is found, this row shows what it changes.
-- **Small updates:** most releases change only ChaOS's own files (the launcher, the emulator, overlays), and the Brick downloads just those, a few MB, and puts them in place before restarting. A release that also changes the system underneath sends the whole system, about 40 MB, and installs it during the restart. The Updates screen shows the size before you download.
+- **Two ways to install,** and your games, music, saves and settings stay with either:
+  - **Update** downloads only ChaOS's own files that the release changes (the launcher, the emulator, overlays), a few MB, and puts them in place before restarting. It's offered when the release keeps the system underneath the same as yours, which is most of the time.
+  - **Full Install** downloads the whole system, about 40 MB, installs it during the restart, and copies all of ChaOS's files fresh from it. It's always offered, even when you're up to date, so it also repairs a card whose ChaOS files have gone wrong. When a release changes the system underneath, it's the only option.
 - **Overlays come back:** after each update, any overlay ChaOS ships that's missing from your card's `Overlays` folders is put back, from this release or any earlier one. Overlays you've added or changed are never touched.
-- **Download:** the screen shows what's installed and what's latest. **Download** fetches the new version and checks it against the release's checksum. You can keep playing while it downloads.
-- **Install and Restart:** the Brick restarts and installs the update during the next start-up, which takes a few seconds longer than usual. It then comes back as it was. It needs a quarter of a charge, or the charger.
+- **Downloading:** the screen shows what's installed, what's latest, and each option's size. The download is checked against the release's checksum, and you can keep playing while it downloads.
+- **Install and Restart:** for an Update, the Brick copies the new files into place and restarts. For a Full Install, it restarts and installs the system during start-up, which takes a few seconds longer than usual. It then comes back as it was. It needs a quarter of a charge, or the charger.
 - **Later:** a finished download waits on the card until you come back to install it, or choose **Remove Download**.
 - **Big updates:** a release built on a newer TortOS can change parts of the card that only [ChaOS Installer](https://github.com/SkyWalker541/ChaOS-Installer/releases/latest) writes. The Brick tells you to use the installer instead of offering the download.
 
@@ -148,8 +150,8 @@ If an update can't go ahead, the Updates screen says why in one line:
 
 | Message | What it means | What to do |
 |---|---|---|
-| needs Wi-Fi | Shown beside **Check Now** and **Download** when the Brick isn't online. | Join a network under **MENU > Wi-Fi**. |
-| Wi-Fi is off | You pressed **Check Now** or **Download** with Wi-Fi turned off. | Turn Wi-Fi on under **MENU > Wi-Fi**, then **Try Again**. |
+| needs Wi-Fi | Shown beside **Check Now**, **Update** and **Full Install** when the Brick isn't online. | Join a network under **MENU > Wi-Fi**. |
+| Wi-Fi is off | You pressed **Check Now**, **Update** or **Full Install** with Wi-Fi turned off. | Turn Wi-Fi on under **MENU > Wi-Fi**, then **Try Again**. |
 | Wi-Fi isn't connected | Wi-Fi is on, but the Brick isn't connected to a network, or has no internet address yet. | Connect under **MENU > Wi-Fi**, wait a moment, then **Try Again**. |
 | charge to 25% | The battery is too low to install safely. | Charge to 25%, or plug in the charger. |
 | This one needs ChaOS Installer | The new version changes parts of the card the Brick can't update by itself. | Update with ChaOS Installer on a computer. |

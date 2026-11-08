@@ -117,6 +117,15 @@ int main(void)
 	upd_init(dir, dir, "0.8.0", "2.1.1");
 	ck(upd_get() != UPD_READY && access(p, F_OK) != 0 && access(q, F_OK) != 0,
 	   "one already installed is cleared away");
+	printf("a full install of the version running, a repair:\n");
+	snprintf(p, sizeof p, "%s/.dev/root-update.squashfs", dir); put(p, "hsqs....");
+	put(q, "0.8.0\nfull\n");
+	upd_init(dir, dir, "0.8.0", "2.1.1");
+	ck(upd_get() == UPD_READY && !upd_latest()->small, "waits while its root does");
+	unlink(p);
+	upd_init(dir, dir, "0.8.0", "2.1.1");
+	ck(upd_get() != UPD_READY && access(q, F_OK) != 0, "and is done once the boot has written it");
+
 	snprintf(p, sizeof p, "%s/BASE", dir); put(p, "2.2.0\n");
 	upd_init(dir, dir, "0.8.0", "2.1.1");
 	ck(!strcmp(upd_base(), "2.2.0"), "the card's BASE says which TortOS it is on");

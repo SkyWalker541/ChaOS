@@ -52,7 +52,8 @@ typedef struct {
 	char app[160];
 	char app_sha256[65];
 	long long app_size;
-	bool small;       /* this card takes the small one (upd_latest) */
+	bool can_small;   /* this card can take the small one (its system is the release's) */
+	bool small;       /* the one chosen: upd_download's */
 } ota_info;
 
 /* Parse ChaOS-ota.txt. False when a field it needs is missing or wrong; the
@@ -92,13 +93,18 @@ const char *upd_base(void);         /* the base this card is on */
 /* The bytes the update to the latest downloads: the small one's or the
  * whole system's */
 long long   upd_size(void);
+long long   upd_size_of(bool small);
 /* 0..100 while downloading or unpacking */
 int         upd_percent(void);
 
 /* What the player asks for. Each returns false, with upd_error set, when it
  * cannot be done now. */
 bool upd_check(void);
-bool upd_download(void);
+/* Update (small: ChaOS's own files, when can_small) or Full Install (the
+ * whole system, ChaOS's files copied fresh from it at the next boot). Full
+ * Install is offered for the version already installed too, to repair it.
+ * Either keeps games, saves and settings: they are not ChaOS's files. */
+bool upd_download(bool small);
 void upd_cancel(void);               /* a download or unpack in progress */
 bool upd_remove(void);               /* a finished download, unwanted */
 /* The boot partition told to install it at the next boot. The caller then

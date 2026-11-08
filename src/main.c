@@ -7296,12 +7296,13 @@ static void console_controls_screen(app *a, int sys, const char *file, void *gam
  * check only says there is something (upd_announce, on the shelf), and a
  * finished download waits on the card until the player comes back for it. */
 
-enum { UP_NONE, UP_CHECK, UP_DOWNLOAD, UP_CANCEL, UP_INSTALL, UP_REMOVE, UP_NOTES };
+enum { UP_NONE, UP_CHECK, UP_DOWNLOAD, UP_FULL, UP_CANCEL, UP_INSTALL, UP_REMOVE, UP_NOTES };
 
 typedef struct {
 	app  *a;
 	int   ids[16];
-	char  latest[48], size[24], pct[16], batt[32];
+	char  latest[48], size[24], full[24], pct[16], batt[32];
+	int   last;               /* what Try Again repeats: UP_CHECK, UP_DOWNLOAD or UP_FULL */
 	bool  online;
 	wifi_state wifi;
 	Uint32 next_look;
@@ -7359,14 +7360,30 @@ static int upd_build(void *ctx, menu_row *rows, int max, const char **heading)
 
 	switch (s) {
 	case UPD_AVAILABLE:
-		/* The small update is a few MB, the whole system tens */
-		if (upd_size() < 10000000)
-			snprintf(c->size, sizeof c->size, "%.1f MB", (double)upd_size() / 1e6);
-		else
-			snprintf(c->size, sizeof c->size, "%.0f MB", (double)upd_size() / 1e6);
-		c->ids[n] = UP_DOWNLOAD;
-		rows[n++] = (menu_row){ "Download", c->online ? c->size : "needs Wi-Fi", true };
-		c->ids[n] = UP_NONE; rows[n++] = MENU_NOTE("Games and saves stay");
+		/* Two ways in: Update, ChaOS's own files that changed, a few MB,
+		 * when this card's system is the release's; Full Install, the whole
+		 * system and every one of ChaOS's files fresh, tens of MB. Games,
+		 * saves and settings stay with either. */
+		snprintf(c->size, sizeof c->size, "%.1f MB", (double)upd_size_of(true) / 1e6);
+		snprintf(c->full, sizeof c->full, "%.0f MB", (double)upd_size_of(false) / 1e6);
+		if (o->can_small) {
+			c->ids[n] = UP_DOWNLOAD;
+			rows[n++] = (menu_row){ "Update", c->online ? c->size : "needs Wi-Fi", true };
+		}
+		c->ids[n] = UP_FULL;
+		rows[n++] = (menu_row){ "Full Install", c->online ? c->full : "needs Wi-Fi", true };
+		c->ids[n] = UP_NONE; rows[n++] = MENU_NOTE("Games, saves, settings stay");
+		break;
+	case UPD_CURRENT:
+		/* Up to date: Full Install puts this version back whole, to repair
+		 * a card whose ChaOS files have gone wrong */
+		snprintf(c->full, sizeof c->full, "%.0f MB", (double)upd_size_of(false) / 1e6);
+		c->ids[n] = UP_FULL;
+		rows[n++] = (menu_row){ "Full Install", c->online ? c->full : "needs Wi-Fi",
+		                        o->root[0] != '\0' };
+		c->ids[n] = UP_CHECK;
+		rows[n++] = (menu_row){ "Check Now", c->online ? NULL : "needs Wi-Fi", true };
+		c->ids[n] = UP_NONE; rows[n++] = MENU_NOTE("Full Install reinstalls this one");
 		break;
 	case UPD_INSTALLER:
 		c->ids[n] = UP_NONE; rows[n++] = MENU_NOTE("This one needs ChaOS Installer");
@@ -7415,7 +7432,9 @@ static menu_result upd_key(app *a, void *ctx, in_button key, int sel)
 	char q[64];
 
 	if (key != IN_ACCEPT) return MENU_STAY;
-	if ((id == UP_CHECK || id == UP_DOWNLOAD) && !c->online) {
+	if (id == UP_DOWNLOAD || id == UP_FULL) c->last = id;
+	else if (id == UP_CHECK && upd_get() != UPD_FAILED) c->last = UP_CHECK;
+	if ((id == UP_CHECK || id == UP_DOWNLOAD || id == UP_FULL) && !c->online) {
 		upd_offline(c->wifi == WIFI_OFF);
 		return MENU_STAY;
 	}
@@ -7425,15 +7444,18 @@ static menu_result upd_key(app *a, void *ctx, in_button key, int sel)
 		if (upd_notes()) synopsis_screen(a, q, upd_notes(), MENU_ACCENT);
 		break;
 	case UP_CHECK:
-		/* After a failed download, Try Again downloads again; otherwise it
-		 * asks again */
-		if (upd_get() == UPD_FAILED && o->root[0] && !strcmp(o->base, upd_base()) &&
-		    ota_vercmp(o->version, CHAOS_VERSION) > 0 && upd_download())
+		/* Try Again repeats what failed: the download it was (Update or Full
+		 * Install), or else the check */
+		if (upd_get() == UPD_FAILED && (c->last == UP_DOWNLOAD || c->last == UP_FULL) &&
+		    o->root[0] && upd_download(c->last == UP_DOWNLOAD))
 			break;
 		upd_check();
 		break;
 	case UP_DOWNLOAD:
-		upd_download();
+		upd_download(true);
+		break;
+	case UP_FULL:
+		upd_download(false);
 		break;
 	case UP_CANCEL:
 		if (confirm_panel(a, "Updates", "Stop the download?", "Stop")) upd_cancel();
@@ -7442,7 +7464,8 @@ static menu_result upd_key(app *a, void *ctx, in_button key, int sel)
 		if (confirm_panel(a, "Updates", "Remove the download?", "Remove")) upd_remove();
 		break;
 	case UP_INSTALL:
-		snprintf(q, sizeof q, "Install ChaOS %s now?", o->version);
+		snprintf(q, sizeof q, o->small ? "Update to ChaOS %s now?" : "Full Install of ChaOS %s now?",
+		         o->version);
 		if (!confirm_panel(a, "Updates", q, "Install and Restart")) break;
 		if (o->small) wait_panel(a, "Updates", "Installing...");
 		if (!upd_arm()) break;
