@@ -106,6 +106,10 @@ typedef enum {
 	GM_ROWS
 } gm_row;
 
+/* What gm_rows gives: the rows, then a rule and a note naming the button
+ * that shows the game behind the menu (controls.h, CTL_PEEK_NAME). */
+#define GM_SHOWN (GM_ROWS + 2)
+
 /* What the in-game menu needs to know, gathered by the caller. */
 typedef struct {
 	/* ChaOS. The shader's state, "On" or "Off", or NULL when the game's

@@ -243,7 +243,7 @@ static void pages_are_named(void)
 	int p, q;
 
 	printf("the pages\n");
-	ck(CTL_PAGES == 5, "five pages");
+	ck(CTL_PAGES == 6, "six pages: In menus is ChaOS's");
 	for (p = 0; p < CTL_PAGES; p++) {
 		ck(ctl_page_name((ctl_page)p) && ctl_page_name((ctl_page)p)[0],
 		   "every page is named");

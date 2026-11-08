@@ -26,12 +26,18 @@
  * tools/controls-check.c can link it and read what these pages contain
  * without a renderer. */
 
-/* Five pages, because six rows is what a panel holds under its heading and
+/* Six pages (In menus is ChaOS's), because six rows is what a panel holds under its heading and
  * the shelf's seven buttons do not fit on one: the pad and the shoulders move
  * you, the face buttons act on what you moved to. */
 typedef enum {
-	CTL_MOVING, CTL_SHELF, CTL_GAME, CTL_MUSE, CTL_ANYWHERE, CTL_PAGES
+	CTL_MOVING, CTL_SHELF, CTL_GAME, CTL_MENUS, CTL_MUSE, CTL_ANYWHERE, CTL_PAGES
 } ctl_page;
+
+/* ChaOS: the button held in the in-game menu to see the game without the
+ * menu, as every page and note that names it says it. The key itself is
+ * PEEK_KEY in main.c, beside the code that reads it: the two change together,
+ * and a remapped button would change both. */
+#define CTL_PEEK_NAME "Y"
 
 /* Which way the shelves run - UI Direction, as cards.h stores it. */
 typedef enum { CTL_HORIZONTAL, CTL_VERTICAL, CTL_CUBIC } ctl_dir;

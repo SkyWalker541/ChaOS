@@ -14,6 +14,7 @@ static const char *const NAMES[CTL_PAGES] = {
 	[CTL_MOVING]   = "Moving",
 	[CTL_SHELF]    = "On the shelf",
 	[CTL_GAME]     = "In a game",
+	[CTL_MENUS]    = "In menus",
 	[CTL_MUSE]     = "In Muse",
 	[CTL_ANYWHERE] = "Anywhere",
 };
@@ -103,6 +104,22 @@ static int game(menu_row *out)
 	return n;
 }
 
+/* ChaOS: the menus' own buttons, which no screen named: A and B are in every
+ * menu, Left/Right changes a setting in place (held, it keeps going), and in
+ * the in-game menu one button held hides the menu to show the game as the
+ * shader and overlay chosen draw it. MENU's row stays on Anywhere. */
+static int menus(menu_row *out)
+{
+	int n = 0;
+
+	out[n++] = (menu_row){ "A",          "Choose or open",   false };
+	out[n++] = (menu_row){ "B",          "Back",             false };
+	out[n++] = (menu_row){ "Left/Right", "Change a setting", false };
+	out[n++] = (menu_row){ CTL_PEEK_NAME, "Held: see the game *", false };
+	out[n++] = MENU_NOTE("* in the in-game menu");
+	return n;
+}
+
 static int muse(menu_row *out)
 {
 	int n = 0;
@@ -152,6 +169,7 @@ int ctl_rows(ctl_page p, ctl_dir dir, menu_row *out)
 	switch (p) {
 	case CTL_SHELF:    n = shelf(dir, out);  break;
 	case CTL_GAME:     n = game(out);        break;
+	case CTL_MENUS:    n = menus(out);       break;
 	case CTL_MUSE:     n = muse(out);        break;
 	case CTL_ANYWHERE: n = anywhere(out);    break;
 	default:           n = moving(dir, out); break;

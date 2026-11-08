@@ -47,6 +47,10 @@
 #include "ssrun.h"
 #include "sys_menu.h"
 #include "controls.h"
+
+/* ChaOS: the button held in the in-game menu to see the game whole. Its name
+ * on screen is CTL_PEEK_NAME (controls.h): change one, change both. */
+#define PEEK_KEY IN_Y
 #include "cards.h"
 #include "game_menu.h"
 #include "look.h"
@@ -5243,7 +5247,7 @@ static menu_exit menu_run_body(app *a, const menu_style *st,
 			SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
 			SDL_RenderFillRect(a->r, NULL);
 		}
-		if (!(st->peek && a->in.down[IN_Y])) {
+		if (!(st->peek && a->in.down[PEEK_KEY])) {
 			g_menu_root = st->root;
 			menu_draw(a, heading, rows, n, sel, st->fixed_w,
 			          st->follow_tint ? a->tint : st->accent);
@@ -10048,7 +10052,7 @@ static int shader_build(void *ctx, menu_row *rows, int max, const char **heading
 	}
 	if (c->game) {
 		c->ids[n] = SH_NONE;
-		rows[n++] = MENU_NOTE("Hold Y to see the game");
+		rows[n++] = MENU_NOTE("Hold " CTL_PEEK_NAME " to see the game");
 	}
 	return n;
 }

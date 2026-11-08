@@ -102,7 +102,7 @@ The **Overlay** row offers **None** or any PNG in that console's folder in `Over
 - Add your own from a computer or with ChaOS Transfer, which has the same `Overlays` folder.
 - Make an overlay **1024x768** with a transparent window where the game shows through. Another size is stretched to fit. The game is always drawn on top, so an overlay never covers it.
 
-In the in-game menu, the paused game behind the menu shows the shader and overlay as you change them. **Hold Y** to hide the menu and see the whole picture.
+In the in-game menu, the paused game behind the menu shows the shader and overlay as you change them. **Hold Y** to hide the menu and see the whole picture (the menu says so at its foot).
 
 ## Adding games
 
@@ -146,7 +146,17 @@ In the in-game menu, the paused game behind the menu shows the shader and overla
 | **X / Y** | In a game, turbo A and B. On the shelf, a game's details and favorite |
 | **POWER** | Save and turn off |
 
-Every button is listed under **MENU > Controls**. For every menu and setting in detail, see TortOS's [guide](docs/guide.md); ChaOS follows it except where this page says otherwise.
+**In menus**
+
+| Button | What it does |
+|---|---|
+| **A** | Choose, or open a row marked **›** |
+| **B** | Back one screen (**‹** beside a heading means there is one to go back to). In the in-game menu, back to the game |
+| **Left / Right** | Change a setting; hold to keep changing it |
+| **MENU** | Close every menu at once |
+| **Hold Y** | In the in-game menu: hide the menu and see the game with the shader and overlay you're on |
+
+Every button is listed on the Brick under **MENU > Controls**, including a page for the menus, and the in-game menu reminds you that holding Y shows the game. For every menu and setting in detail, see TortOS's [guide](docs/guide.md); ChaOS follows it except where this page says otherwise.
 
 ## FAQ
 

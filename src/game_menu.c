@@ -3,6 +3,7 @@
 #include <stdio.h>
 
 #include "game_menu.h"
+#include "controls.h"
 
 int gi_rows(menu_row *out, const game_info *gi, bool net)
 {
@@ -114,5 +115,10 @@ int gm_rows(const gm_ui *u, menu_row *out, gm_bufs *b)
 		out[GM_CHEEVOS].live = false;
 	}
 	out[GM_CHEEVOS].value = b->cheevos;
-	return GM_ROWS;
+	/* ChaOS: the shader and the overlay change the game behind this menu,
+	 * and a button held hides the menu to show it whole. Said here, where
+	 * it works, and named from the one place that names it. */
+	out[GM_ROWS] = MENU_RULE;
+	out[GM_ROWS + 1] = MENU_NOTE("Hold " CTL_PEEK_NAME " to see the game");
+	return GM_SHOWN;
 }

@@ -13,6 +13,7 @@
 #include "../src/sys_menu.h"
 #include "../src/cards.h"
 #include "../src/game_menu.h"
+#include "../src/controls.h"
 #include "../src/look.h"
 
 #include <stdio.h>
@@ -905,14 +906,16 @@ static void ingame_rows(void)
 {
 	gm_ui u;
 	gm_bufs b;
-	menu_row rows[GM_ROWS];
-	int got[GM_ROWS], n, k;
+	menu_row rows[GM_SHOWN];
+	int got[GM_SHOWN], n, k;
 
 	u.shader = "On"; u.overlay = NULL; u.earned = 12; u.total = 40;
 	n = gm_rows(&u, rows, &b);
 
 	printf("in-game menu, a game with a set:\n");
-	ck(n == GM_ROWS, "eight rows");
+	ck(n == GM_SHOWN, "eight rows, then a rule and a note");
+	ck(ROW_IS_NOTE(rows[GM_ROWS + 1]) && !strcmp(rows[GM_ROWS + 1].label, "Hold " CTL_PEEK_NAME " to see the game"),
+	   "the note names the button that shows the game");
 	ck(!strcmp(rows[GM_CONTINUE].label, "Continue"), "Continue leads");
 	ck(!strcmp(val(&rows[GM_SHADER]), "On"), "Shader carries its state");
 	ck(!strcmp(val(&rows[GM_OVERLAY]), "None"), "Overlay says None with none chosen");
