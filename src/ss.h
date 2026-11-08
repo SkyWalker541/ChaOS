@@ -14,11 +14,7 @@
  * The developer pair is built in: mk/cross.mk reads SS_DEVID and SS_DEVPASS
  * from the environment into a generated header, so they never enter the
  * repository. An unset environment is a supported build - ss_have_dev() is
- * then false, and the launcher scrapes from libretro alone - unless the
- * player has entered a developer pair of their own (ChaOS: MENU >
- * ScreenScraper > Developer ID), which ScreenScraper issues to anyone who asks
- * on its forum. Kept beside the player pair in the device database, so it
- * outlives every update: a built-in pair, when there is one, comes first. That is the whole
+ * then false, and the launcher scrapes from libretro alone. That is the whole
  * of the protection and it is worth being exact about what it is not: the
  * binary still contains both strings, `strings` finds them in seconds, and
  * encrypting them with a key shipped beside them would be the same secret with
@@ -42,28 +38,11 @@
 
 #define SS_USER_MAX 64
 #define SS_PASS_MAX 96
-#define SS_DEVID_MAX 64
 
 /* Whether this build carries a developer pair. False is not an error: it is a
  * build made without the environment set, and every caller falls back to
  * libretro the same way it does for a player who has not signed in. */
 bool ss_have_dev(void);
-
-/* ChaOS: whose developer pair it is. True when the build carries one, which
- * then is the one used; otherwise the player's, if they entered one. */
-bool ss_dev_builtin(void);
-/* The player's developer id, "" for none. */
-const char *ss_dev_user_id(void);
-/* Keep the player's developer pair (both, or both empty to remove it). False
- * when either is over-long or one is missing, or it could not be saved. */
-bool ss_dev_set(const char *id, const char *password);
-
-/* Whether ScreenScraper answers to a developer pair, before keeping it: its
- * infrastructure record, which asks for nothing else. err as ss_sign_in's. */
-bool ss_dev_check(const char *id, const char *password, char *err, size_t errn);
-
-/* Forget the player's account, stored and in memory. */
-bool ss_sign_out(void);
 
 bool ss_creds_load(void);
 bool ss_creds_save(void);
