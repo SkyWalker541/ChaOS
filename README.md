@@ -90,16 +90,23 @@ Take the card out: the Brick boots its own system again. Everything ChaOS keeps 
 
 ## Shaders
 
-Each console's menu (MENU on its shelf) and the in-game menu have a **Shader** row. Each console offers only the shader made for it:
+Each console's menu (MENU on its shelf) and the in-game menu have a **Shader** row. Each console offers only the shaders made for it:
 
 | Consoles | Shader | By |
 |---|---|---|
 | Game Boy, Game Boy Color, Game Boy Advance | PT SkyWalker541 | SkyWalker541 |
-| NES, SNES, Genesis, Master System, TurboGrafx-16 | crt-lottes-fast | Timothy Lottes, adapted by hunterk |
+| NES, SNES, Genesis, Master System, TurboGrafx-16 | crt-lottes-fast, or the lighter Scanlines | Timothy Lottes, adapted by hunterk; RiskyJumps |
 | Game Gear, Neo Geo Pocket, Neo Geo Pocket Color | lcd3x | Gigaherz |
 
 - **Left and right** turn it on and off. **A** opens its settings, showing only the ones that matter for what you've chosen.
+- The CRT consoles have a **Style** row: **crt-lottes-fast** (scanlines, a phosphor mask and optional curvature) or **Scanlines**, plain scanlines that cost the CPU about a tenth as much. Use Scanlines if a game slows down with the CRT shader.
 - **Reset to Recommended** puts back the shader's own settings. For PT, that's its README's settings for that console. The CRT starts flat: curvature works, but costs the CPU about twice as much.
+- **Speed**, in the in-game Shader menu, shows whether the game keeps full speed with the shader as set:
+  - **Full Speed**: the frame has room to spare.
+  - **Near the Limit**: it fits, just; a busy scene may slow down.
+  - **Too Slow**: the game is slowing down. Try a lighter style or setting, or turn off curvature.
+
+  **Shader Time** is the shader's share of each frame, and **Frame Time** the whole frame's work (the game, the shader and the screen) against the time a frame has at that console's rate, 16.6 ms on most. If Frame Time is high but Shader Time small, the console's emulator is the slow part, not the shader. The figures are measured while you play. Right after you change a setting, before the game has run with it, they're an estimate, marked **(est.)**; resume for a moment and pause again for the measured figures.
 - Settings are saved per console.
 
 ## Button mapping and rewind
@@ -291,7 +298,7 @@ ChaOS is **TortOS by Eric Reinsmidt** ([TortOS](https://github.com/ericreinsmidt
 ChaOS is free software under the **GNU General Public License, version 3 or any later version** ([LICENSE](LICENSE)), as TortOS is: anyone may change it, share it and sell it, and whoever gets it, changed or not, gets its source and the same rights. TortOS is Copyright (c) 2026 Eric Reinsmidt; ChaOS's changes are Copyright (c) 2026 SkyWalker541.
 
 - ChaOS-diatom is under the Mozilla Public License 2.0.
-- PT SkyWalker541 is MIT; crt-lottes-fast and lcd3x are public domain.
+- PT SkyWalker541 is MIT; crt-lottes-fast, lcd3x and Scanlines are public domain.
 - SkyWalker541's overlays are CC0; KrutzOtrem's are MIT.
 - The cores keep their own licenses, two of them non-commercial.
 

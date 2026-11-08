@@ -11,7 +11,10 @@
  *   Game Boy, Game Boy Color, Game Boy Advance   PT SkyWalker541 (MIT, by
  *                                                SkyWalker541)
  *   NES, SNES, Genesis, Master System,           crt-lottes-fast (Timothy
- *   TurboGrafx-16                                Lottes, public domain)
+ *   TurboGrafx-16                                Lottes, public domain), or
+ *                                                the lighter Scanlines
+ *                                                (RiskyJumps, public domain):
+ *                                                the Style row
  *   Game Gear, Neo Geo Pocket (Color)            lcd3x (Gigaherz, public
  *                                                domain)
  *
@@ -60,6 +63,9 @@ typedef enum {
 	LP_CRT_CURVATURE, LP_CRT_TRINITRON, LP_CRT_CORNER, LP_CRT_GAMMA,
 	/* lcd3x */
 	LP_LCD_SCANLINES, LP_LCD_STRIPES,
+	/* a CRT console's Style: crt-lottes-fast (0) or Scanlines (1), and the
+	 * Scanlines' own (res-independent-scanlines.glsl) */
+	LP_CRT_STYLE, LP_SCAN_AMP, LP_SCAN_LINES_BLACK,
 	LP_COUNT
 } look_param;
 
@@ -110,8 +116,12 @@ bool look_param_shown(const look_settings *s, look_param p);
  * LG_PAGE, the rows on its own page). Returns how many. */
 int look_group_rows(const look_settings *s, look_shader sh, look_group g, look_param *out);
 
-/* The file Diatom's SETSHADER reads: console, enabled, every parameter of the
- * console's shader. Returns false when it could not be written. */
+/* The shader's name as the Style row shows it: a CRT console's choice. */
+const char *look_style_name(look_console c, const look_settings *s);
+
+/* The file Diatom's SETSHADER reads: console, enabled, the style for a CRT
+ * console, every parameter of the shader in use. Returns false when it could
+ * not be written. */
 bool look_write_cfg(const char *path, look_console c, const look_settings *s);
 
 /* A stored value back into the settings, by GLSL name. False for a name the

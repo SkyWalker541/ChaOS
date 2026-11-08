@@ -10542,11 +10542,14 @@ typedef struct {
 	Uint32      last_ms;
 } shader_ctx;
 
+static int shader_speed_rows(shader_ctx *c, menu_row *rows, int n);
+
 static int shader_build(void *ctx, menu_row *rows, int max, const char **heading)
 {
 	shader_ctx *c = ctx;
 	look_settings *ls = &c->a->view[c->sys].look;
-	look_shader sh = look_shader_of(look_console_of(c->a->sys.systems[c->sys].tag));
+	look_console lc = look_console_of(c->a->sys.systems[c->sys].tag);
+	look_shader sh = look_shader_of(lc);
 	int n = 0, g;
 
 	(void)max;
@@ -10556,8 +10559,15 @@ static int shader_build(void *ctx, menu_row *rows, int max, const char **heading
 		c->ids[n] = SH_SWITCH;
 		rows[n++] = (menu_row){ "Shader", ls->on ? "On" : "Off", true };
 		if (ls->on) {
-			c->ids[n] = SH_NAME;
-			rows[n++] = (menu_row){ "Style", look_shader_name(sh), false };
+			/* A CRT console chooses between two; the others have one. */
+			if (sh == LS_CRT) {
+				c->ids[n] = SH_NONE + 1 + (int)LP_CRT_STYLE;
+				rows[n++] = (menu_row){ "Style", look_style_name(lc, ls), true };
+			} else {
+				c->ids[n] = SH_NAME;
+				rows[n++] = (menu_row){ "Style", look_style_name(lc, ls), false };
+			}
+			n = shader_speed_rows(c, rows, n);
 			if (sh != LS_PT) {
 				look_param ps[LP_COUNT];
 				int k, np = look_group_rows(ls, sh, LG_PAGE, ps);
@@ -10605,6 +10615,41 @@ static int shader_build(void *ctx, menu_row *rows, int max, const char **heading
 	if (c->game) {
 		c->ids[n] = SH_NONE;
 		rows[n++] = MENU_NOTE("Hold " CTL_PEEK_NAME " to see the game");
+	}
+	return n;
+}
+
+/* ChaOS's speed check, in a game: whether it keeps its speed with the shader
+ * as set, from what Diatom measured (plat_resident_shade_speed). The whole
+ * frame against the console's frame time decides; the shader's own share is
+ * beside it, so a slow core is not taken for a slow shader. Just after a
+ * change, before the game has run with it, Diatom's figures are an estimate,
+ * and say so. */
+static int shader_speed_rows(shader_ctx *c, menu_row *rows, int n)
+{
+	plat_shade_speed sp;
+	char *v;
+
+	if (!c->game || !plat_resident_shade_speed(&sp)) return n;
+	v = c->vals[n];
+	if (sp.busy_ms < 0)
+		snprintf(v, sizeof c->vals[n], "%s", "Unknown");
+	else
+		snprintf(v, sizeof c->vals[n], "%s%s",
+		         sp.busy_ms <= sp.frame_ms * 0.85 ? "Full Speed"
+		         : sp.busy_ms <= sp.frame_ms ? "Near the Limit" : "Too Slow",
+		         sp.measured ? "" : " (est.)");
+	c->ids[n] = SH_NONE;
+	rows[n++] = (menu_row){ "Speed", v, false };
+	v = c->vals[n];
+	snprintf(v, sizeof c->vals[n], "%.1f ms", sp.shade_ms);
+	c->ids[n] = SH_NONE;
+	rows[n++] = (menu_row){ "Shader Time", v, false };
+	if (sp.busy_ms >= 0) {
+		v = c->vals[n];
+		snprintf(v, sizeof c->vals[n], "%.1f of %.1f ms", sp.busy_ms, sp.frame_ms);
+		c->ids[n] = SH_NONE;
+		rows[n++] = (menu_row){ "Frame Time", v, false };
 	}
 	return n;
 }
@@ -10687,6 +10732,8 @@ static void shader_screen(app *a, int sys, void *game)
 
 /* For a shot: one frame of the shader's page (group -1) or a group's, over
  * the shelf, with row `sel` selected. */
+static bool shot_speed;          /* --speed: the in-game page, with figures */
+
 static void shader_shot(app *a, int group, int sel)
 {
 	shader_ctx c;
@@ -10698,6 +10745,10 @@ static void shader_shot(app *a, int group, int sel)
 	c.a = a;
 	c.sys = a->sys_cursor;
 	c.group = group;
+	{
+		static gm_ctx g;
+		if (shot_speed) c.game = &g;   /* only its being there is asked */
+	}
 	n = shader_build(&c, rows, MENU_RUN_ROWS, &heading);
 	SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
 	SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
@@ -12876,6 +12927,17 @@ int main(int argc, char *argv[])
 				shot_shader = atoi(argv[++i]);
 			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9')
 				shot_shader_sel = atoi(argv[++i]);
+		}
+		/* --speed SHADE BUSY FRAME MEASURED: the speed check's rows, as if
+		 * Diatom had said so (BUSY -1 for not known) */
+		else if (!strcmp(argv[i], "--speed") && i + 4 < argc) {
+			plat_shade_speed sp;
+			sp.shade_ms = atof(argv[++i]);
+			sp.busy_ms  = atof(argv[++i]);
+			sp.frame_ms = atof(argv[++i]);
+			sp.measured = atoi(argv[++i]) != 0;
+			plat_resident_demo_speed(&sp);
+			shot_speed = true;
 		}
 		else if (!strcmp(argv[i], "--mode") && i + 1 < argc) shot_mode = argv[++i];
 		else if (!strcmp(argv[i], "--sysmove") && i + 1 < argc)

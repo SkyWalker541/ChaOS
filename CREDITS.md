@@ -64,6 +64,12 @@ in the original's header, kept beside the port.
 the Neo Geo Pocket and Pocket Color, ported the same way (ChaOS-diatom,
 `shaders/lcd/`). Licence: **public domain**, as its header says.
 
+**Scanlines**: **Resolution-Independent Scanlines**, based on **"Scanlines
+Sine Absolute Value"** by **RiskyJumps**, from libretro's glsl-shaders
+(`scanlines/shaders/res-independent-scanlines.glsl`). The lighter CRT
+choice, ported the same way (ChaOS-diatom, `shaders/scan/`). Licence:
+**public domain**, as its header says.
+
 ---
 
 ## Boot animation

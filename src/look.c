@@ -20,6 +20,7 @@ static const char *const W_DIR[] = { "Down right", "Down left", "Up right", "Up 
  * dims one channel in three, the grille lights one, the shadow mask is a
  * grille shifted every row */
 static const char *const W_MASK[] = { "Off", "Grille Lite", "Grille", "Shadow Mask", NULL };
+static const char *const W_CRT_STYLE[] = { "crt-lottes-fast", "Scanlines", NULL };
 
 /* The shader's parameter list (PT_SkyWalker541.glsl, and pt_shader.c in
  * ChaOS-diatom, which match): name, default, range and step are its own. */
@@ -71,7 +72,38 @@ const look_param_info look_params[LP_COUNT] = {
 	/* lcd3x.glsl's: more is brighter, so fainter lines */
 	[LP_LCD_SCANLINES]          = { "brighten_scanlines", "Brighten Scanlines", 16, 1, 32, 0.5f, LG_PAGE, F_NUM1, NULL, LS_LCD },
 	[LP_LCD_STRIPES]            = { "brighten_lcd", "Brighten LCD", 4, 1, 12, 0.1f, LG_PAGE, F_NUM1, NULL, LS_LCD },
+	/* The Style row, kept as a number like the rest but written to Diatom as
+	 * `style = scanlines`. Then res-independent-scanlines.glsl's own: its
+	 * amplitude, which past 100% brightens between the lines, and how light
+	 * the lines are; Diatom keeps the rest at their defaults, with Automatic
+	 * Scale on (one line a game row). */
+	[LP_CRT_STYLE]              = { "style", "Style", 0, 0, 1, 1, LG_PAGE, F_WORDS, W_CRT_STYLE, LS_CRT },
+	[LP_SCAN_AMP]               = { "amp", "Brightness", 1.25f, 0, 2, 0.05f, LG_PAGE, F_PCT, NULL, LS_CRT },
+	[LP_SCAN_LINES_BLACK]       = { "lines_black", "Line Brightness", 0, 0, 1, 0.05f, LG_PAGE, F_PCT, NULL, LS_CRT },
 };
+
+/* A CRT console's parameter that belongs to the other Style */
+static bool other_style(const look_settings *s, look_param p)
+{
+	bool scan = (int)floorf(s->v[LP_CRT_STYLE] + 0.5f) == 1;
+	switch (p) {
+	case LP_SCAN_AMP: case LP_SCAN_LINES_BLACK:
+		return !scan;
+	case LP_CRT_MASK: case LP_CRT_MASK_INTENSITY: case LP_CRT_SCANLINE_THINNESS:
+	case LP_CRT_SCAN_BLUR: case LP_CRT_CURVATURE: case LP_CRT_TRINITRON:
+	case LP_CRT_CORNER: case LP_CRT_GAMMA:
+		return scan;
+	default:
+		return false;
+	}
+}
+
+const char *look_style_name(look_console c, const look_settings *s)
+{
+	look_shader sh = look_shader_of(c);
+	if (sh == LS_CRT && (int)floorf(s->v[LP_CRT_STYLE] + 0.5f) == 1) return "Scanlines";
+	return look_shader_name(sh);
+}
 
 static const char *const GROUP_LABEL[LG_COUNT] = {
 	"Screen", "Pixels", "Shadows", "Glare and Sheen"
@@ -216,6 +248,7 @@ bool look_param_shown(const look_settings *s, look_param p)
 	int effect = choice(s, LP_PIXEL_EFFECT);
 	bool light = choice(s, LP_GLARE_AND_SHEEN) != 0;
 
+	if (other_style(s, p)) return false;
 	switch (p) {
 	case LP_WHITE_LEVEL:        return choice(s, LP_GAME_SYSTEM) == 0;
 	case LP_BACKING_STRENGTH:   return choice(s, LP_BACKING_COLOR) != 0;
@@ -254,6 +287,7 @@ static const look_param ORDER[] = {
 	LP_CRT_MASK, LP_CRT_MASK_INTENSITY, LP_CRT_SCANLINE_THINNESS, LP_CRT_SCAN_BLUR,
 	LP_CRT_GAMMA, LP_CRT_CURVATURE, LP_CRT_TRINITRON, LP_CRT_CORNER,
 	LP_LCD_SCANLINES, LP_LCD_STRIPES,
+	LP_SCAN_AMP, LP_SCAN_LINES_BLACK,
 };
 
 int look_group_rows(const look_settings *s, look_shader sh, look_group g, look_param *out)
@@ -275,10 +309,12 @@ bool look_write_cfg(const char *path, look_console c, const look_settings *s)
 	int i;
 
 	if (sh == LS_NONE || !(f = fopen(path, "w"))) return false;
-	fprintf(f, "# Written by ChaOS for Diatom's SETSHADER: %s\n", look_shader_name(sh));
+	fprintf(f, "# Written by ChaOS for Diatom's SETSHADER: %s\n", look_style_name(c, s));
 	fprintf(f, "console = %s\nenabled = %d\n", look_console_name(c), s->on ? 1 : 0);
+	if (sh == LS_CRT)
+		fprintf(f, "style = %s\n", choice(s, LP_CRT_STYLE) == 1 ? "scanlines" : "crt");
 	for (i = 0; i < LP_COUNT; i++)
-		if (look_params[i].shader == sh)
+		if (look_params[i].shader == sh && i != LP_CRT_STYLE && !other_style(s, (look_param)i))
 			fprintf(f, "%s = %g\n", look_params[i].name, (double)s->v[i]);
 	return fclose(f) == 0;
 }

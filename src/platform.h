@@ -200,6 +200,15 @@ void plat_resident_set_play(const char *map, bool rewind);
 const char *plat_resident_last_shaded(void);
 /* After a SETSHADER with preview=, while paused: wait for its answer. */
 bool plat_resident_sync_shaded(int timeout_ms);
+/* ChaOS's speed check, from the last SHADED: what the shader costs a frame,
+ * what the whole frame costs (busy_ms, < 0 when Diatom could not tell), the
+ * frame's time at the console's rate, and whether it was measured in play or,
+ * just after a change in the pause menu, judged from the paused frame. False
+ * when the last SHADED said nothing of speed. */
+typedef struct { double shade_ms, busy_ms, frame_ms; bool measured; } plat_shade_speed;
+bool plat_resident_shade_speed(plat_shade_speed *out);
+/* For screenshots (--speed): as if the last SHADED had said so. */
+void plat_resident_demo_speed(const plat_shade_speed *s);
 /* Core options the launcher wants applied to every game, read once from
  * the coreopt. namespace. Diatom keeps no per-core knowledge (its register
  * section 12), so the per-core opinions live here. Each entry is a whole

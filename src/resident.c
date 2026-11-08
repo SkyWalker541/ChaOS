@@ -36,6 +36,8 @@ static bool     d_rect_known;
  * last wrote, empty when the game is not shaded. */
 static char     d_look_cfg[512], d_look_dtov[512];
 static char     d_shaded[1024];
+static plat_shade_speed d_speed;
+static bool     d_speed_known;
 static int    d_pend_vol = -1, d_pend_vol_n;      /* LEVEL events, held until */
 static int    d_pend_bri = -1, d_pend_bri_n;      /* EXIT hands levels back  */
 /* Diatom's QUIET: what the launcher wants, and what this connection was last
@@ -286,6 +288,7 @@ bool plat_resident_send(const char *tag, const char *core, const char *rom,
 		if (!dconnect()) return false;
 		d_preview[0] = '\0';
 		d_shaded[0] = '\0';
+		d_speed_known = false;
 		d_rect_known = false;
 		d_pend_vol = d_pend_bri = -1;
 
@@ -478,13 +481,40 @@ void plat_resident_set_look(const char *shader_cfg, const char *bezel)
 
 const char *plat_resident_last_shaded(void) { return d_shaded[0] ? d_shaded : NULL; }
 
-/* "SHADED\tpath=/tmp/x.bmp\tx=..." or a bare "SHADED" for none. */
+bool plat_resident_shade_speed(plat_shade_speed *out)
+{
+	if (!d_speed_known) return false;
+	*out = d_speed;
+	return true;
+}
+
+void plat_resident_demo_speed(const plat_shade_speed *s)
+{
+	d_speed = *s;
+	d_speed_known = true;
+}
+
+/* A field's number, or def when the line has none. */
+static double d_field(const char *l, const char *key, double def)
+{
+	const char *p = strstr(l, key);
+	return p ? atof(p + strlen(key)) : def;
+}
+
+/* "SHADED\tpath=/tmp/x.bmp\tx=...\tshade_ms=4.10\tbusy_ms=9.80\tframe_ms=16.74
+ * \tmeasured=1", or a bare "SHADED" for none. An older Diatom sends no speed. */
 static void d_note_shaded(const char *l)
 {
 	const char *p = strstr(l, "path=");
 
 	d_shaded[0] = '\0';
+	d_speed_known = false;
 	if (!p) return;
+	d_speed.shade_ms = d_field(l, "\tshade_ms=", -1);
+	d_speed.busy_ms  = d_field(l, "\tbusy_ms=", -1);
+	d_speed.frame_ms = d_field(l, "\tframe_ms=", -1);
+	d_speed.measured = d_field(l, "\tmeasured=", 0) != 0;
+	d_speed_known = d_speed.shade_ms >= 0 && d_speed.frame_ms > 0;
 	snprintf(d_shaded, sizeof d_shaded, "%s", p + 5);
 	d_shaded[strcspn(d_shaded, "\t\r\n")] = '\0';
 }
