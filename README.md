@@ -4,7 +4,7 @@
 
 <p align="center">
   <b>Custom firmware for the TrimUI Brick, with shaders made for each console built in.</b><br>
-  Eleven classic consoles and your music, a shader and overlays for every console, at whole-number, aspect or full-screen scale.<br>
+  Eleven classic consoles and your music, a shader for every console, overlays for the handhelds, at whole-number, aspect or full-screen scale.<br>
   Built on <a href="https://github.com/ericreinsmidt/TortOS">TortOS</a> by Eric Reinsmidt.
 </p>
 
@@ -45,7 +45,7 @@
 **From ChaOS**
 
 - **A shader for every console,** each one made for that console's screen, drawn by the Brick's CPU. PT SkyWalker541 for the Game Boys, a CRT for the TV consoles, an LCD for the other handhelds.
-- **Overlays for every console,** with SkyWalker541's and KrutzOtrem's Brick overlays included (Game Boy, GBC, GBA, Game Gear, Neo Geo Pocket Color), and a folder for your own.
+- **Overlays for Game Boy, Game Boy Color, Game Boy Advance, Game Gear and Neo Geo Pocket Color,** by SkyWalker541 and KrutzOtrem, and a folder on the card for every console where you can add your own.
 - **See it before you choose it:** in the in-game menu, the paused game shows each shader setting and overlay as you scroll through them.
 - **Display Mode** per console: **Integer** (whole-number scaling, so every pixel is the same size), **Aspect** (as large as the game's shape allows) or **Stretch** (the whole screen). Every shader works in all three.
 - **Menu colors,** starting from ChaOS's orange.
@@ -139,8 +139,15 @@ Keep a picture of a password screen, a code or a map to look at later.
 
 The **Overlay** row offers **None** or any PNG in that console's folder in `Overlays/` on the card.
 
-- ChaOS makes a folder for every console at boot and fills it with the overlays it ships: SkyWalker541's for the three Game Boys, and KrutzOtrem's for Game Boy, GBC, GBA, Game Gear and Neo Geo Pocket Color. After each update, any of these missing from the card is put back. Your own are never touched.
-- Add your own from a computer or with ChaOS Transfer, which has the same `Overlays` folder.
+ChaOS includes overlays for these consoles:
+
+| Console | Overlays by |
+|---|---|
+| Game Boy, Game Boy Color, Game Boy Advance | [SkyWalker541](https://github.com/SkyWalker541/TrimUI-Brick-Overlays), [KrutzOtrem](https://github.com/KrutzOtrem/Trimui-Brick-Overlays) |
+| Game Gear, Neo Geo Pocket Color | [KrutzOtrem](https://github.com/KrutzOtrem/Trimui-Brick-Overlays) |
+
+- ChaOS makes a folder for **every** console at boot, so you can add overlays for the others too. The included ones are put in their folders, and after each update any of them missing from the card is put back. Your own are never touched.
+- **Add your own** from a computer or with ChaOS Transfer, which has the same `Overlays` folder. For more, see both creators' pages above and the [NextUI Community Overlays](https://github.com/LoveRetro/nextui-community-overlays) collection, which gathers Brick overlays from many creators.
 - Make an overlay **1024x768** with a transparent window where the game shows through. Another size is stretched to fit. The game is always drawn on top, so an overlay never covers it.
 - The included overlays are framed for Display Mode **Integer**. In Aspect or Stretch the game is larger and covers more of the frame.
 
