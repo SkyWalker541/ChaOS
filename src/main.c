@@ -321,37 +321,30 @@ static void overlay_dir(const app *a, int sys, char *out, size_t n)
 	snprintf(out, n, "%s/%s/%s", P_CARD, OVERLAYS_DIR, a->sys.systems[sys].folder);
 }
 
-/* The overlays ChaOS ships (ChaOS/overlays/<console folder>/, this device's
- * only - res/overlays/<device>/, see its SOURCE.md), put in the card's folder
- * for that console, so they sit with the player's own and can be deleted like
- * them. Each file once per card: a deleted one is not put back, a file of the
- * same name already there is left as it is, and one a later release adds
- * arrives then (overlays.seeded.<TAG>/<file>).
+/* The overlays ChaOS ships (ChaOS/overlays/<console folder>/, see
+ * res/overlays/SOURCE.md), put in the card's folder for that console, so they
+ * sit with the player's own and can be deleted like them.
  *
- * Before that was per file it was per console (overlays.seeded.<TAG>, ChaOS
- * 0.5 to 0.9): a card seeded then had every overlay of the time, all named
- * without an author (" - "), so those count as seeded already. */
+ * Every one missing from the card is put back once per ChaOS version - at the
+ * first start after an install or an update - whether a release before this
+ * one shipped it or this one adds it: an overlay deleted by accident comes
+ * back with the next update, and until then stays deleted. A file of the same
+ * name already there is left as it is, so nothing of the player's is ever
+ * overwritten. Only what is missing is copied, so a start with nothing to do
+ * reads two folders and writes nothing. */
 static void copy_file(const char *from, const char *to);
 
-static void overlay_seed(const app *a, int sys, const char *dest)
+static int overlay_seed(const app *a, int sys, const char *dest)
 {
-	char key[CFG_STR + LIB_PATH + 32], old[CFG_STR + 32];
 	char src[LIB_PATH * 2], from[LIB_PATH * 3], to[LIB_PATH * 3];
 	struct dirent *e;
 	DIR *dir;
-	bool legacy;
 	int n = 0;
 
-	snprintf(old, sizeof old, "overlays.seeded.%s", a->sys.systems[sys].tag);
-	legacy = db_get_int(db_lib(), old, 0) == 1;
 	snprintf(src, sizeof src, "%s/overlays/%s", P_ROOT, a->sys.systems[sys].folder);
-	if (!(dir = opendir(src))) return;
+	if (!(dir = opendir(src))) return 0;
 	while ((e = readdir(dir))) {
 		if (e->d_name[0] == '.') continue;
-		snprintf(key, sizeof key, "overlays.seeded.%s/%s", a->sys.systems[sys].tag, e->d_name);
-		if (db_get_int(db_lib(), key, 0)) continue;
-		db_set_int(db_lib(), key, 1);
-		if (legacy && !strstr(e->d_name, " - ")) continue;
 		snprintf(from, sizeof from, "%s/%s", src, e->d_name);
 		snprintf(to, sizeof to, "%s/%s", dest, e->d_name);
 		if (access(to, F_OK) == 0) continue;
@@ -360,6 +353,7 @@ static void overlay_seed(const app *a, int sys, const char *dest)
 	}
 	closedir(dir);
 	if (n) fprintf(stderr, "overlays: %d put in %s\n", n, dest);
+	return n;
 }
 
 static void overlay_dirs_ensure(const app *a)
@@ -367,14 +361,21 @@ static void overlay_dirs_ensure(const app *a)
 	char d[LIB_PATH * 2];
 	int i;
 
+	char was[32];
+	bool seed;
+
 	snprintf(d, sizeof d, "%s/%s", P_CARD, OVERLAYS_DIR);
 	mkdir(d, 0755);
+	/* Once a version (see overlay_seed) */
+	seed = !db_get_str(db_lib(), "overlays.seeded.version", was, sizeof was, NULL) ||
+	       strcmp(was, CHAOS_VERSION) != 0;
 	for (i = 0; i < a->sys.count; i++) {
 		if (!a->sys.systems[i].folder[0]) continue;
 		overlay_dir(a, i, d, sizeof d);
 		mkdir(d, 0755);
-		overlay_seed(a, i, d);
+		if (seed) overlay_seed(a, i, d);
 	}
+	if (seed) db_set_str(db_lib(), "overlays.seeded.version", CHAOS_VERSION);
 }
 
 static int overlay_name_cmp(const void *x, const void *y)
@@ -7358,7 +7359,11 @@ static int upd_build(void *ctx, menu_row *rows, int max, const char **heading)
 
 	switch (s) {
 	case UPD_AVAILABLE:
-		snprintf(c->size, sizeof c->size, "%.0f MB", (double)o->size / 1e6);
+		/* The small update is a few MB, the whole system tens */
+		if (upd_size() < 10000000)
+			snprintf(c->size, sizeof c->size, "%.1f MB", (double)upd_size() / 1e6);
+		else
+			snprintf(c->size, sizeof c->size, "%.0f MB", (double)upd_size() / 1e6);
 		c->ids[n] = UP_DOWNLOAD;
 		rows[n++] = (menu_row){ "Download", c->online ? c->size : "needs Wi-Fi", true };
 		c->ids[n] = UP_NONE; rows[n++] = MENU_NOTE("Games and saves stay");
@@ -7439,6 +7444,7 @@ static menu_result upd_key(app *a, void *ctx, in_button key, int sel)
 	case UP_INSTALL:
 		snprintf(q, sizeof q, "Install ChaOS %s now?", o->version);
 		if (!confirm_panel(a, "Updates", q, "Install and Restart")) break;
+		if (o->small) wait_panel(a, "Updates", "Installing...");
 		if (!upd_arm()) break;
 		/* The restart: as the power button does it, with launch.sh told to
 		 * boot again rather than power off. The boot writes the new system

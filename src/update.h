@@ -46,9 +46,17 @@ typedef struct {
 	char sha256[65];
 	long long size;
 	char notes[160];
+	/* The small update (ChaOS 0.9.2 on): ChaOS's own files alone, for a card
+	 * whose system (ChaOS/SYSTEM) is the release's - see chaos-image.sh */
+	char system[24];
+	char app[160];
+	char app_sha256[65];
+	long long app_size;
+	bool small;       /* this card takes the small one (upd_latest) */
 } ota_info;
 
-/* Parse ChaOS-ota.txt. False when a field it needs is missing or wrong. */
+/* Parse ChaOS-ota.txt. False when a field it needs is missing or wrong; the
+ * small update's fields are optional, and dropped when not all good. */
 bool ota_parse(const char *text, ota_info *o);
 
 /* Compare dotted versions, "0.10.0" after "0.9.2": <0, 0, >0. */
@@ -81,6 +89,9 @@ upd_state   upd_get(void);
 const ota_info *upd_latest(void);   /* valid from UPD_AVAILABLE on */
 const char *upd_error(void);
 const char *upd_base(void);         /* the base this card is on */
+/* The bytes the update to the latest downloads: the small one's or the
+ * whole system's */
+long long   upd_size(void);
 /* 0..100 while downloading or unpacking */
 int         upd_percent(void);
 

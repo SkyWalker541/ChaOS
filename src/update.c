@@ -37,6 +37,8 @@ static char g_dl_part[310];
 static char g_root_upd[300];     /* what rootswitch looks for */
 static char g_stamp[300];        /* which version that is */
 static char g_version[32];       /* running */
+static char g_system[24];        /* this card's ChaOS/SYSTEM, "" before 0.9.2 */
+static char g_app_dir[300];      /* the small update, unpacked: ChaOS/, Licenses/ */
 static char g_base[32];          /* this card's TortOS base */
 
 static upd_state g_state = UPD_IDLE;
@@ -99,11 +101,24 @@ bool ota_parse(const char *text, ota_info *o)
 		else FIELD(root);
 		else FIELD(sha256);
 		else FIELD(notes);
+		else FIELD(system);
+		else FIELD(app);
+		else FIELD(app_sha256);
 		else if (!strcmp(line, "size")) o->size = atoll(eq + 1);
+		else if (!strcmp(line, "app_size")) o->app_size = atoll(eq + 1);
 #undef FIELD
 	}
 	for (i = 0; i < 64; i++)
 		if (!isxdigit((unsigned char)o->sha256[i])) hex = false;
+	/* The small one, whole or not at all */
+	{
+		bool ok = o->system[0] && o->app[0] && !strchr(o->app, '/') &&
+		          strstr(o->app, ".tar.xz") && strlen(o->app_sha256) == 64 &&
+		          o->app_size > 0;
+		for (i = 0; ok && i < 64; i++)
+			if (!isxdigit((unsigned char)o->app_sha256[i])) ok = false;
+		if (!ok) o->system[0] = o->app[0] = o->app_sha256[0] = '\0', o->app_size = 0;
+	}
 	/* The root's name is a file name in the release, nothing else */
 	return version_ok(o->version) && o->base[0] && o->root[0] &&
 	       !strchr(o->root, '/') && strstr(o->root, ".squashfs.xz") &&
@@ -142,18 +157,76 @@ static void fail(const char *why)
 	fprintf(stderr, "update: %s\n", why);
 }
 
+/* A folder and what is in it, by the device's own rm */
+static void rm_tree(const char *dir)
+{
+	pid_t pid;
+	struct stat st;
+
+	if (!dir[0] || stat(dir, &st) != 0) return;
+	pid = fork();
+	if (pid == 0) {
+		execl("/bin/rm", "rm", "-rf", dir, (char *)NULL);
+		_exit(127);
+	}
+	if (pid > 0) waitpid(pid, NULL, 0);
+}
+
+/* The small update put in place: each of its files copied beside the card's
+ * and renamed over it, launch.sh and VERSION last, so a copy cut short by the
+ * power leaves the old ones saying it did not finish. A marker beside it
+ * (chaos-app.installing) is there from before the first file to after the
+ * last, and upd_init finishes a copy it finds cut short before anything else
+ * runs. card is the games partition. 0 when it all went. */
+static char g_app_mark[320];
+
+static int app_copy(const char *card)
+{
+	pid_t pid;
+	int st = -1;
+
+	pid = fork();
+	if (pid < 0) return -1;
+	if (pid == 0) {
+		execl("/bin/sh", "sh", "-c",
+		      "cd \"$1\" || exit 2\n"
+		      "find . -type f ! -path ./ChaOS/launch.sh ! -path ./ChaOS/VERSION | "
+		      "while IFS= read -r f; do\n"
+		      "  d=\"$2/${f#./}\"; mkdir -p \"${d%/*}\" || exit 3\n"
+		      "  cp -p \"$f\" \"$d.chaos-new\" && mv -f \"$d.chaos-new\" \"$d\" || exit 3\n"
+		      "done || exit 3\n"
+		      "sync\n"
+		      "for f in ChaOS/launch.sh ChaOS/VERSION; do\n"
+		      "  [ -f \"$f\" ] || continue\n"
+		      "  cp -p \"$f\" \"$2/$f.chaos-new\" && mv -f \"$2/$f.chaos-new\" \"$2/$f\" || exit 3\n"
+		      "done\n"
+		      "sync\n",
+		      "install", g_app_dir, card, (char *)NULL);
+		_exit(127);
+	}
+	waitpid(pid, &st, 0);
+	return WIFEXITED(st) ? WEXITSTATUS(st) : -1;
+}
+
+static char g_card[256];
+
 /* A finished download waiting from before, or leftovers of an installed one */
 static void look_on_card(void)
 {
-	char v[32];
+	char v[48], elf[340], *nl;
 	struct stat st;
 
+	/* The stamp: the version, then "app" for a small one */
 	if (read_small(g_stamp, v, sizeof v)) {
+		bool small = (nl = strchr(v, '\n')) && !strncmp(nl + 1, "app", 3);
+		if (nl) *nl = '\0';
 		trim(v);
-		if (stat(g_root_upd, &st) == 0 && version_ok(v) &&
+		snprintf(elf, sizeof elf, "%s/ChaOS/tortos.elf", g_app_dir);
+		if ((small ? stat(elf, &st) : stat(g_root_upd, &st)) == 0 && version_ok(v) &&
 		    ota_vercmp(v, g_version) > 0) {
 			snprintf(g_latest.version, sizeof g_latest.version, "%s", v);
 			snprintf(g_latest.base, sizeof g_latest.base, "%s", g_base);
+			g_latest.small = small;
 			g_state = UPD_READY;
 			return;
 		}
@@ -161,6 +234,7 @@ static void look_on_card(void)
 		unlink(g_root_upd);
 		unlink(g_stamp);
 	}
+	rm_tree(g_app_dir);
 	unlink(g_dl);
 	unlink(g_dl_part);
 }
@@ -175,6 +249,25 @@ void upd_init(const char *card, const char *root, const char *version,
 	snprintf(g_dl_part, sizeof g_dl_part, "%s.part", g_dl);
 	snprintf(g_root_upd, sizeof g_root_upd, "%s/root-update.squashfs", g_dev);
 	snprintf(g_stamp, sizeof g_stamp, "%s/chaos-update.version", g_dev);
+	snprintf(g_app_dir, sizeof g_app_dir, "%s/chaos-app", g_dev);
+	snprintf(g_app_mark, sizeof g_app_mark, "%s/chaos-app.installing", g_dev);
+	snprintf(g_card, sizeof g_card, "%s", card);
+	/* A small update the power cut short: finished now, before it is
+	 * mistaken for installed (the new launcher may be in place already) */
+	if (access(g_app_mark, F_OK) == 0) {
+		char elf[340];
+		snprintf(elf, sizeof elf, "%s/ChaOS/tortos.elf", g_app_dir);
+		int code = access(elf, F_OK) == 0 ? app_copy(card) : 0;
+		fprintf(stderr, "update: a small update cut short, finished: %d\n", code);
+		if (code == 0) {
+			rm_tree(g_app_dir);
+			unlink(g_stamp);
+			unlink(g_app_mark);
+			sync();
+		}
+	}
+	snprintf(path, sizeof path, "%s/SYSTEM", root);
+	if (read_small(path, g_system, sizeof g_system)) trim(g_system);
 	snprintf(g_version, sizeof g_version, "%s", version);
 	snprintf(path, sizeof path, "%s/BASE", root);
 	if (read_small(path, b, sizeof b)) { trim(b); snprintf(g_base, sizeof g_base, "%s", b); }
@@ -187,11 +280,16 @@ const ota_info *upd_latest(void) { return &g_latest; }
 const char *upd_error(void) { return g_err; }
 const char *upd_base(void) { return g_base; }
 
+long long upd_size(void)
+{
+	return g_latest.small ? g_latest.app_size : g_latest.size;
+}
+
 int upd_percent(void)
 {
 	struct stat st;
-	if (g_state == UPD_DOWNLOADING && g_latest.size > 0 && stat(g_dl_part, &st) == 0) {
-		long long p = (long long)st.st_size * 100 / g_latest.size;
+	if (g_state == UPD_DOWNLOADING && upd_size() > 0 && stat(g_dl_part, &st) == 0) {
+		long long p = (long long)st.st_size * 100 / (upd_size() > 0 ? upd_size() : 1);
 		return p > 99 ? 99 : (int)p;
 	}
 	return 0;
@@ -225,12 +323,16 @@ static void checked(bool ok)
 	if (!ota_parse(text, &o)) { fail("Update info unreadable"); return; }
 	g_check_failed = false;
 	g_checked = true;
+	/* The small one when this card's system is the release's: ChaOS's
+	 * own files, a few megabytes, rather than the whole system */
+	o.small = o.app[0] && g_system[0] && !strcmp(o.system, g_system);
 	g_latest = o;
 	if (ota_vercmp(o.version, g_version) <= 0) g_state = UPD_CURRENT;
 	else if (strcmp(o.base, g_base) != 0) g_state = UPD_INSTALLER;
 	else g_state = UPD_AVAILABLE;
-	fprintf(stderr, "update: running %s on %s, latest %s on %s\n",
-	        g_version, g_base, o.version, o.base);
+	fprintf(stderr, "update: running %s on %s (system %s), latest %s on %s (system %s): %s\n",
+	        g_version, g_base, g_system[0] ? g_system : "?", o.version, o.base,
+	        o.system[0] ? o.system : "?", o.small ? "small" : "whole");
 }
 
 bool upd_download(void)
@@ -248,12 +350,13 @@ bool upd_download(void)
 	/* The download, then the root it unpacks to (about 1.4 times as big),
 	 * with room to spare */
 	if (statvfs(g_dev, &vs) == 0 &&
-	    (long long)vs.f_bavail * (long long)vs.f_frsize < g_latest.size * 4 + (64LL << 20)) {
+	    (long long)vs.f_bavail * (long long)vs.f_frsize < upd_size() * 4 + (64LL << 20)) {
 		fail("Not enough space on the card");
 		return false;
 	}
 	unlink(g_dl_part);
-	snprintf(url, sizeof url, DL_URL, g_latest.version, g_latest.root);
+	snprintf(url, sizeof url, DL_URL, g_latest.version,
+	         g_latest.small ? g_latest.app : g_latest.root);
 	g_pid = net_get_spawn(url, g_dl_part, 1800);
 	if (g_pid <= 0) { fail("Couldn't start the download"); return false; }
 	g_state = UPD_DOWNLOADING;
@@ -271,6 +374,21 @@ static void unpack(void)
 	if (rename(g_dl_part, g_dl) != 0) { fail("The download went missing"); return; }
 	pid = fork();
 	if (pid < 0) { fail("Couldn't check the download"); return; }
+	if (pid == 0 && g_latest.small) {
+		/* The small one: unpacked beside the card's ChaOS, and only the
+		 * launcher there taken as proof it is whole */
+		execl("/bin/sh", "sh", "-c",
+		      "h=$(sha256sum \"$1\" | cut -d' ' -f1) || exit 2\n"
+		      "[ \"$h\" = \"$2\" ] || exit 3\n"
+		      "rm -rf \"$3.part\" \"$3\" && mkdir -p \"$3.part\" || exit 4\n"
+		      "xz -dc \"$1\" | tar -x -C \"$3.part\" || exit 4\n"
+		      "[ -f \"$3.part/ChaOS/tortos.elf\" ] && [ -f \"$3.part/ChaOS/VERSION\" ] || exit 5\n"
+		      "sync\n"
+		      "mv \"$3.part\" \"$3\" && printf '%s\\napp\\n' \"$4\" > \"$5\" && rm -f \"$1\" && sync\n",
+		      "unpack", g_dl, g_latest.app_sha256, g_app_dir, g_latest.version, g_stamp,
+		      (char *)NULL);
+		_exit(127);
+	}
 	if (pid == 0) {
 		execl("/bin/sh", "sh", "-c",
 		      "h=$(sha256sum \"$1\" | cut -d' ' -f1) || exit 2\n"
@@ -293,6 +411,8 @@ static void unpacked(int code)
 
 	snprintf(part, sizeof part, "%s.part", g_root_upd);
 	unlink(part);
+	snprintf(part, sizeof part, "%s.part", g_app_dir);
+	rm_tree(part);
 	if (code == 0) {
 		g_state = UPD_READY;
 		fprintf(stderr, "update: %s checked and ready\n", g_latest.version);
@@ -319,6 +439,8 @@ void upd_cancel(void)
 		unlink(g_dl_part);
 		unlink(g_dl);
 		unlink(part);
+		snprintf(part, sizeof part, "%s.part", g_app_dir);
+		rm_tree(part);
 		g_state = UPD_AVAILABLE;
 	}
 }
@@ -327,6 +449,7 @@ bool upd_remove(void)
 {
 	if (g_state != UPD_READY) return false;
 	unlink(g_root_upd);
+	rm_tree(g_app_dir);
 	unlink(g_stamp);
 	g_state = g_latest.root[0] ? UPD_AVAILABLE : UPD_IDLE;
 	return true;
@@ -459,6 +582,31 @@ bool upd_arm(void)
 
 	if (g_state != UPD_READY) return false;
 	g_err[0] = '\0';
+	/* The small one goes in now, while the launcher waits: a few megabytes
+	 * of files, then the restart starts the new ones */
+	if (g_latest.small) {
+		int fd = open(g_app_mark, O_WRONLY | O_CREAT | O_TRUNC, 0644), code;
+		if (fd < 0) {
+			fail("Couldn't write to the card");
+			g_state = UPD_READY;
+			return false;
+		}
+		fsync(fd);
+		close(fd);
+		code = app_copy(g_card);
+		if (code != 0) {
+			/* The marker stays: the next start finishes it */
+			fail("Couldn't copy the update");
+			g_state = UPD_READY;
+			return false;
+		}
+		rm_tree(g_app_dir);
+		unlink(g_stamp);
+		unlink(g_app_mark);
+		sync();
+		fprintf(stderr, "update: %s's files in place\n", g_latest.version);
+		return true;
+	}
 	if (stat(g_root_upd, &st) != 0 || !(f = fopen(g_root_upd, "rb"))) {
 		fail("The download is gone");
 		unlink(g_stamp);

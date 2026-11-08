@@ -84,6 +84,14 @@ folder at first boot. Renamed for the menu, pictures unchanged; the list is in
 `res/overlays/SOURCE.md`. Licence: **CC0 1.0** (public domain dedication), in
 `res/overlays/LICENSE-SkyWalker541.txt`.
 
+**Brick overlays** by **KrutzOtrem** - https://github.com/KrutzOtrem/Trimui-Brick-Overlays,
+as collected in NextUI Community Overlays. His Brick designs made for a
+whole-number scale ("native", the Blank version of each) for Game Boy, Game
+Boy Color, Game Boy Advance, Game Gear and Neo Geo Pocket Color, named
+"KrutzOtrem - <design>" in the menu, pictures unchanged; which file is which
+is in `res/overlays/SOURCE.md`. Licence: **MIT**, Copyright (c) 2025
+KrutzOtrem, in `res/overlays/LICENSE-KrutzOtrem.txt`.
+
 ---
 
 ## Emulator cores

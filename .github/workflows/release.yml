@@ -51,8 +51,9 @@ jobs:
           B=${{ steps.v.outputs.base }}
           mkdir -p out
           sudo TORTOS_ELF=dist/brick/tortos.elf DIATOM_NOTICE=dist/brick/ChaOS-diatom-THIRD-PARTY.md \
-            ROOT_OUT=$PWD/root.squashfs \
-            sh tools/chaos-image.sh tortos/TortOS-v$B-brick.img.xz out/ChaOS-v$V-brick.img.xz dist/brick/diatom
+            ROOT_OUT=$PWD/root.squashfs APP_OUT=$PWD/out/ChaOS-v$V-brick-app.tar.xz \
+            sh tools/chaos-image.sh tortos/TortOS-v$B-brick.img.xz out/ChaOS-v$V-brick.img.xz dist/brick/diatom \
+            | tee image.log
           sudo chown -R "$(id -u):$(id -g)" out root.squashfs
 
       - name: The update over Wi-Fi
@@ -63,6 +64,9 @@ jobs:
           V=${{ steps.v.outputs.version }}
           B=${{ steps.v.outputs.base }}
           R=ChaOS-v$V-brick-root.squashfs.xz
+          A=ChaOS-v$V-brick-app.tar.xz
+          S=$(sed -n 's/^system //p' image.log)
+          [ -n "$S" ] || { echo "no system id from chaos-image.sh"; exit 1; }
           xz -T0 -9 -c root.squashfs > out/$R
           cat > out/ChaOS-ota.txt <<EOF
           # ChaOS: an update over Wi-Fi. Read by the Brick (src/update.h).
@@ -71,6 +75,10 @@ jobs:
           root = $R
           sha256 = $(sha256sum out/$R | cut -d' ' -f1)
           size = $(stat -c%s out/$R)
+          system = $S
+          app = $A
+          app_sha256 = $(sha256sum out/$A | cut -d' ' -f1)
+          app_size = $(stat -c%s out/$A)
           notes = $(git log -1 --format=%s | tr -d '\n' | cut -c1-150)
           EOF
           sed -i 's/^          //' out/ChaOS-ota.txt

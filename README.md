@@ -48,7 +48,7 @@
 **From ChaOS**
 
 - **A shader for every console,** each one made for that console's screen, drawn by the Brick's CPU. PT SkyWalker541 for the Game Boys, a CRT for the TV consoles, an LCD for the other handhelds.
-- **Overlays for every console,** with SkyWalker541's Brick overlays for the Game Boys included, and a folder for your own.
+- **Overlays for every console,** with SkyWalker541's and KrutzOtrem's Brick overlays included (Game Boy, GBC, GBA, Game Gear, Neo Geo Pocket Color), and a folder for your own.
 - **See it before you choose it:** in the in-game menu, the paused game shows each shader setting and overlay as you scroll through them.
 - **Whole-number scaling** for every game, so every pixel is the same size.
 - **Menu colors,** starting from ChaOS's orange.
@@ -121,7 +121,7 @@ From a game, changes apply as you make them. The **For** row picks **This game**
 
 The **Overlay** row offers **None** or any PNG in that console's folder in `Overlays/` on the card.
 
-- ChaOS makes a folder for every console at boot and puts in SkyWalker541's Brick overlays for the three Game Boys the first time.
+- ChaOS makes a folder for every console at boot and fills it with the overlays it ships: SkyWalker541's for the three Game Boys, and KrutzOtrem's for Game Boy, GBC, GBA, Game Gear and Neo Geo Pocket Color. After each update, any of these missing from the card is put back. Your own are never touched.
 - Add your own from a computer or with ChaOS Transfer, which has the same `Overlays` folder.
 - Make an overlay **1024x768** with a transparent window where the game shows through. Another size is stretched to fit. The game is always drawn on top, so an overlay never covers it.
 
@@ -133,7 +133,9 @@ In the in-game menu, the paused game behind the menu shows the shader and overla
 
 - **Checking:** when the Brick joins Wi-Fi, it asks once whether there is a newer ChaOS. If there is, it says so once at the top of the screen, and the Updates row shows the version. It never downloads or installs anything by itself.
 - **What's New:** once a newer version is found, this row shows what it changes.
-- **Download:** the screen shows what's installed and what's latest. **Download** fetches the new version (about 40 MB) and checks it against the release's checksum. You can keep playing while it downloads.
+- **Small updates:** most releases change only ChaOS's own files (the launcher, the emulator, overlays), and the Brick downloads just those, a few MB, and puts them in place before restarting. A release that also changes the system underneath sends the whole system, about 40 MB, and installs it during the restart. The Updates screen shows the size before you download.
+- **Overlays come back:** after each update, any overlay ChaOS ships that's missing from your card's `Overlays` folders is put back, from this release or any earlier one. Overlays you've added or changed are never touched.
+- **Download:** the screen shows what's installed and what's latest. **Download** fetches the new version and checks it against the release's checksum. You can keep playing while it downloads.
 - **Install and Restart:** the Brick restarts and installs the update during the next start-up, which takes a few seconds longer than usual. It then comes back as it was. It needs a quarter of a charge, or the charger.
 - **Later:** a finished download waits on the card until you come back to install it, or choose **Remove Download**.
 - **Big updates:** a release built on a newer TortOS can change parts of the card that only [ChaOS Installer](https://github.com/SkyWalker541/ChaOS-Installer/releases/latest) writes. The Brick tells you to use the installer instead of offering the download.
@@ -166,6 +168,8 @@ If an update can't go ahead, the Updates screen says why in one line:
 | Too big for this card | The new system doesn't fit this card's system partition. Nothing was changed. | Update with ChaOS Installer. |
 | No boot partition found | The Brick couldn't find the card's boot partition. Nothing was changed. | Update with ChaOS Installer. |
 | Couldn't open the boot files | The boot partition wouldn't open. Nothing was changed. | Restart and try again. If it keeps happening, update with ChaOS Installer. |
+| Couldn't write to the card | The Brick couldn't write to the card to start installing a small update. Nothing was changed. | Restart and try again. If it keeps happening, check the card on a computer. |
+| Couldn't copy the update | A small update stopped partway through copying its files. The download stays on the card. | Choose **Install and Restart** again. If the Brick restarted in between, it finishes the copy itself when it starts. |
 | Needs ChaOS Installer | This card's start-up files can't install updates by themselves. Nothing was changed. | Update with ChaOS Installer once. Later updates can then come over Wi-Fi. |
 
 If the Brick restarts but **About ChaOS** still shows the old version, the install didn't finish. Start the Brick again to let it retry, and if it still doesn't take, update with ChaOS Installer. Every step is also written to the logs, on lines starting `update:`. See *How do I send the logs?* in the FAQ.
@@ -286,7 +290,7 @@ ChaOS is free software under the **GNU General Public License, version 3 or any 
 
 - ChaOS-diatom is under the Mozilla Public License 2.0.
 - PT SkyWalker541 is MIT; crt-lottes-fast and lcd3x are public domain.
-- SkyWalker541's overlays are CC0.
+- SkyWalker541's overlays are CC0; KrutzOtrem's are MIT.
 - The cores keep their own licenses, two of them non-commercial.
 
 Full notices are in [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md) and [CREDITS.md](CREDITS.md), and every release carries the source of everything in its image.

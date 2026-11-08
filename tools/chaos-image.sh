@@ -20,8 +20,9 @@
 # DIATOM defaults to ../chaos-diatom/build/brick/diatom; tortos.elf is
 # build/tortos.elf (make -f mk/cross.mk DEVICE=brick), or TORTOS_ELF. The
 # release (.github/workflows/release.yml) uses dist/brick's, with
-# DIATOM_NOTICE naming ChaOS-diatom's THIRD-PARTY.md, and ROOT_OUT, where the
-# new root squashfs is copied for updates over Wi-Fi.
+# DIATOM_NOTICE naming ChaOS-diatom's THIRD-PARTY.md, ROOT_OUT, where the
+# new root squashfs is copied for updates over Wi-Fi, and APP_OUT, where ChaOS's
+# own files go for the small ones.
 set -e
 IN=$1 OUT=$2
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -138,6 +139,28 @@ cat >> "$L" <<'EOF2'
 # than power off
 if [ -f /tmp/chaos_reboot ]; then reboot; else poweroff; fi
 EOF2
+# Updates over Wi-Fi come in two sizes (src/update.h). Most releases change
+# only ChaOS's own files on the card - the launcher, the emulator, overlays,
+# the web page - and send just those (APP_OUT: ChaOS/ without the cores, which
+# are TortOS's and change only with it, and ChaOS's notices in Licenses/). One
+# that changes the system around them (the kernel's modules, init scripts,
+# the boot animation) sends the whole root. Which is which: SYSTEM, a hash of
+# the root with ChaOS's copy left out and the version it seeds blanked, in
+# ChaOS/SYSTEM on the card and in ChaOS-ota.txt; the same on both, and only
+# the files are needed.
+SYS_ID=$(cd "$W/root" && find . -path ./usr/share/tortos/card -prune -o \( -type f -o -type l \) -print \
+	| LC_ALL=C sort | while read -r f; do
+		if [ -L "$f" ]; then printf '%s -> %s\n' "$f" "$(readlink "$f")"
+		elif [ "$f" = ./etc/init.d/tortos ]; then printf '%s ' "$f"; sed 's/^SEED_V=.*/SEED_V=/' "$f" | sha256sum
+		else printf '%s ' "$f"; sha256sum < "$f"; fi
+	done | sha256sum | cut -c1-16)
+echo "$SYS_ID" > "$C/ChaOS/SYSTEM"
+chmod 644 "$C/ChaOS/SYSTEM"
+if [ -n "$APP_OUT" ]; then
+	tar -C "$C" --owner=0 --group=0 --sort=name --exclude=ChaOS/cores -cf - ChaOS \
+		$(cd "$C" && ls Licenses/ChaOS*.md 2>/dev/null) | xz -T0 -9 > "$APP_OUT"
+fi
+echo "system $SYS_ID"
 chown -R 0:0 "$C"
 
 mksquashfs "$W/root" "$W/new.sqfs" -comp lz4 -Xhc -b 131072 -noappend -no-xattrs -quiet > /dev/null

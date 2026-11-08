@@ -53,6 +53,52 @@ int main(void)
 	ck(ota_vercmp("0.7.1", "0.7.1") == 0, "the same is the same");
 	ck(ota_vercmp("0.7", "0.7.1") < 0 && ota_vercmp("1.0.0", "0.99.9") > 0, "and the rest");
 
+	printf("the small update:\n");
+	ck(ota_parse("version = 0.9.3\nbase = 2.1.1\nroot = r.squashfs.xz\nsha256 = " SHA "\nsize = 9\n"
+	             "system = 0123abcd4567ef89\napp = ChaOS-v0.9.3-brick-app.tar.xz\napp_sha256 = " SHA
+	             "\napp_size = 4000000\n", &o) && o.app_size == 4000000 && !strcmp(o.system, "0123abcd4567ef89"),
+	   "its fields read");
+	ck(ota_parse("version = 0.9.3\nbase = 2.1.1\nroot = r.squashfs.xz\nsha256 = " SHA "\nsize = 9\n"
+	             "system = 0123abcd4567ef89\napp = ../x.tar.xz\napp_sha256 = " SHA "\napp_size = 4\n", &o) &&
+	   !o.app[0] && !o.system[0] && !o.app_size, "a bad one is dropped, the whole one still good");
+	ck(ota_parse("version = 0.9.3\nbase = 2.1.1\nroot = r.squashfs.xz\nsha256 = " SHA "\nsize = 9\n", &o) &&
+	   !o.app[0], "and a release without one has none");
+
+	printf("a small update installed:\n");
+	{
+		char d[] = "/tmp/update-app-XXXXXX", q2[2048], buf[64];
+		FILE *f;
+		if (!mkdtemp(d)) return 1;
+		snprintf(q2, sizeof q2, "mkdir -p %s/ChaOS/overlays/GB %s/.dev/chaos-app/ChaOS/overlays/GB "
+		         "%s/.dev/chaos-app/Licenses && echo old > %s/ChaOS/tortos.elf && echo 0.9.2 > %s/ChaOS/VERSION "
+		         "&& echo mine > %s/ChaOS/keep && echo new > %s/.dev/chaos-app/ChaOS/tortos.elf "
+		         "&& echo 0.9.3 > %s/.dev/chaos-app/ChaOS/VERSION && echo sh > %s/.dev/chaos-app/ChaOS/launch.sh "
+		         "&& echo png > %s/.dev/chaos-app/ChaOS/overlays/GB/n.png && echo lic > %s/.dev/chaos-app/Licenses/ChaOS.md "
+		         "&& printf '0.9.3\\napp\\n' > %s/.dev/chaos-update.version",
+		         d, d, d, d, d, d, d, d, d, d, d, d);
+		if (system(q2) != 0) fails++;
+		snprintf(q2, sizeof q2, "%s/ChaOS", d);
+		upd_init(d, q2, "0.9.2", "2.1.1");
+		ck(upd_get() == UPD_READY && upd_latest()->small, "found waiting, small");
+		ck(upd_arm(), "installed");
+		snprintf(q2, sizeof q2, "%s/ChaOS/tortos.elf", d);
+		f = fopen(q2, "r"); buf[0] = 0; if (f) { if (!fgets(buf, sizeof buf, f)) buf[0] = 0; fclose(f); }
+		ck(!strcmp(buf, "new\n"), "the new launcher in place");
+		snprintf(q2, sizeof q2, "%s/ChaOS/VERSION", d);
+		f = fopen(q2, "r"); buf[0] = 0; if (f) { if (!fgets(buf, sizeof buf, f)) buf[0] = 0; fclose(f); }
+		ck(!strcmp(buf, "0.9.3\n"), "and its version");
+		snprintf(q2, sizeof q2, "%s/ChaOS/keep", d);
+		ck(access(q2, F_OK) == 0, "a file it doesn't carry left alone");
+		snprintf(q2, sizeof q2, "%s/ChaOS/overlays/GB/n.png", d);
+		ck(access(q2, F_OK) == 0, "subfolders too");
+		snprintf(q2, sizeof q2, "%s/Licenses/ChaOS.md", d);
+		ck(access(q2, F_OK) == 0, "and the notices beside ChaOS/");
+		snprintf(q2, sizeof q2, "%s/.dev/chaos-app", d);
+		ck(access(q2, F_OK) != 0, "the download cleared away");
+		snprintf(q2, sizeof q2, "rm -rf %s", d);
+		if (system(q2) != 0) fails++;
+	}
+
 	printf("a card with a download on it:\n");
 	if (!mkdtemp(dir)) { perror("mkdtemp"); return 1; }
 	snprintf(p, sizeof p, "%s/.dev", dir); mkdir(p, 0755);
