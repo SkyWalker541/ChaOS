@@ -36,7 +36,7 @@ int sys_menu_tortos_rows(const sys_ui *u, pm_row *out)
 		 * Art uses libretro's thumbnails alone, and the menu says nothing of
 		 * a service it cannot reach. */
 		if (!u->ss_have && r == PM_SS) continue;
-		/* ChaOS: only with ChaOS Pixel Names, the one theme that moves */
+		/* ChaOS: only with the ChaOS pixel themes, the ones that move */
 		if (!u->name_speed && r == PM_SPEED) continue;
 		if (!u->list_view && r == PM_LISTVIEW) continue;
 		out[n++] = (pm_row)r;

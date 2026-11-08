@@ -1093,8 +1093,12 @@ static void card_sets(void)
 	ck(ok, "every set has a non-empty id, dir and name, and no separators");
 	for (i = 0, ok = 0; i < CARD_SET_COUNT; i++)
 		if (!strcmp(CARD_SETS[i].id, "pixel") && CARDS_DRAWN(i) && CARD_SETS[i].labeled &&
-		    !strcmp(CARD_SETS[i].name, "ChaOS Pixel Names")) ok = 1;
-	ck(ok, "ChaOS Pixel Names is a drawn set whose cards name their systems");
+		    !strcmp(CARD_SETS[i].name, "ChaOS Pixel Cards") && !CARDS_BIG(i)) ok++;
+	ck(ok == 1, "ChaOS Pixel Cards is a drawn set whose cards name their systems");
+	for (i = 0, ok = 0; i < CARD_SET_COUNT; i++)
+		if (CARDS_BIG(i) && CARDS_DRAWN(i) && CARD_SETS[i].labeled &&
+		    !strcmp(CARD_SETS[i].name, "ChaOS Pixel Names")) ok++;
+	ck(ok == 1, "ChaOS Pixel Names is the names alone, drawn");
 
 	/* Ids and names must be unique - one is what gets written down and the
 	 * other is what gets read off the row. Directories must NOT have to be:

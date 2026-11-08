@@ -652,7 +652,7 @@ static SDL_Texture *load_image(SDL_Renderer *r, const char *path, int *w, int *h
 static int g_cards;
 static int g_dir;
 
-/* ChaOS Pixel Names' Transition Speed, one per UI Direction (CARD_DIRS), kept
+/* The ChaOS pixel themes' Transition Speed, one per UI Direction (CARD_DIRS), kept
  * in the device database as pixnames.speed.<direction> so updates leave it.
  * form: a name assembling, or scattering; hold: how long Cubic shows it. */
 static const struct { const char *id, *name; int form, hold; } PN_SPEEDS[] = {
@@ -981,7 +981,7 @@ static SDL_Texture *sys_get_tex(void *ctx, int i, int *w, int *h, float *cb)
 {
 	app *a = ctx;
 
-	/* ChaOS Pixel Names: drawn, not loaded, and drawn again while its pixels
+	/* ChaOS Pixel Cards: drawn, not loaded, and drawn again while its pixels
 	 * move - toward its name under the cursor, away from it elsewhere */
 	if (CARDS_DRAWN(g_cards)) {
 		pn_speed(PN_SPEEDS[g_pn_speed[g_dir]].form);
@@ -3361,7 +3361,7 @@ static void draw_both(app *a)
 	}
 
 furniture:
-	/* ChaOS Pixel Names: no face is a console here, so after a turn to a
+	/* The ChaOS pixel themes: no face is a console here, so after a turn to a
 	 * system its name flies together over the game, stays a moment, and
 	 * scatters again - at once if the games start turning. */
 	if (CARDS_DRAWN(g_cards)) {
@@ -3452,12 +3452,29 @@ static void draw_systems(app *a)
 	cf_layout lay = sys_layout(CARD_DIRS[g_dir].vertical
 	                           ? &CF_LAYOUT_SYSTEMS_V : &CF_LAYOUT_SYSTEMS);
 
+	if (CARDS_BIG(g_cards)) {
+		/* ChaOS Pixel Names: no cards - the name under the cursor flies
+		 * together large in the middle of the screen as the one left
+		 * scatters. The shelf still moves underneath, unseen, for the rail
+		 * and for everything that reads where it is. */
+		int i;
+		cf_tick(&a->cf_sys, a->sys.count);
+		if (a->cf_sys.active) redraw_now();
+		pn_speed(PN_SPEEDS[g_pn_speed[g_dir]].form);
+		for (i = 0; i < a->sys.count; i++)
+			if (i != a->sys_cursor)
+				pn_big(a->r, a->sys.systems[i].name, a->sys.systems[i].accent, false,
+				       TORTOS_SCREEN_W, TORTOS_SCREEN_H, TORTOS_SCREEN_H * 44 / 100);
+		pn_big(a->r, s->name, s->accent, true,
+		       TORTOS_SCREEN_W, TORTOS_SCREEN_H, TORTOS_SCREEN_H * 44 / 100);
+	} else {
 	cf_focus_rect(&lay, TORTOS_SCREEN_W, TORTOS_SCREEN_H, &focus);
 	ui_glow(a->r, &focus, s->accent, 110, 2.4f);
 	if (cf_draw(&a->cf_sys, a->r, TORTOS_SCREEN_W, TORTOS_SCREEN_H, a->sys.count,
 	            sys_get_tex, a, &lay))
 		redraw_now();
-	/* ChaOS Pixel Names: a name still forming or scattering */
+	}
+	/* ChaOS Pixel Cards: a name still forming or scattering */
 	if (pn_animating()) redraw_now();
 
 	/* WHICH SYSTEM THE WORDS BELOW DESCRIBE, and how visible they are.
@@ -3943,7 +3960,7 @@ static void draw_shelf(app *a)
 	/* And any system card still missing is asked for again: a game list
 	 * draws none, so nothing else would ask, and a full queue turns an ask
 	 * away. Thirteen checks once they are all in. */
-	for (int i = 0; i < a->sys.count; i++)
+	for (int i = 0; i < a->sys.count && !CARDS_BIG(g_cards); i++)
 		if (!a->sys_tex[i]) {
 			int w, h;
 			sys_get_tex(a, i, &w, &h, NULL);
@@ -13629,7 +13646,7 @@ int main(int argc, char *argv[])
 			g_lp_last = plat_now_ms() ? plat_now_ms() : 1;
 			g_lp_since = g_lp_last - 500;
 		}
-		/* --pixnames T: ChaOS Pixel Names with the focused card at T (0..1),
+		/* --pixnames T: the ChaOS pixel themes with the focused card at T (0..1),
 		 * the one leaving at 1-T; -1 for both at their ends */
 		else if (!strcmp(argv[i], "--pixnames") && i + 1 < argc) pn_fix((float)atof(argv[++i]));
 		else if (!strcmp(argv[i], "--shots") && i + 1 < argc) {

@@ -3,7 +3,7 @@
 #define CHAOS_PIXFONT_H
 
 /* ChaOS: the logo's pixel letters (tools/genlogo.py draws "ChaOS" in them),
- * for the ChaOS Pixel Names theme: every capital, the digits and a few marks,
+ * for the ChaOS Pixel Cards and Pixel Names themes: every capital, the digits and a few marks,
  * 5x7 (I and 1 and the marks narrower), a column between letters.
  *
  * A name is laid out in capitals, at most PF_LINE_MAX letters to a line,

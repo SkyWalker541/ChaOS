@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-/* ChaOS Pixel Names. See pixname.h. */
+/* ChaOS Pixel Cards and Pixel Names. See pixname.h. */
 #include "pixname.h"
 #include "pixfont.h"
+#include "ui.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -25,6 +26,8 @@ typedef struct {
 	float        t;              /* 0 scattered .. 1 assembled */
 	float        drawn;          /* the t it was last drawn at, or -1 */
 	Uint32       at;             /* when t was last moved */
+	float        tb;             /* ChaOS Pixel Names: its own t, and when moved */
+	Uint32       atb;
 	int          n, cols, rows;
 	pf_pt        pts[PF_PTS_MAX];
 	float        ang[PF_PTS_MAX], dist[PF_PTS_MAX], delay[PF_PTS_MAX];
@@ -240,4 +243,88 @@ bool pn_animating(void)
 	bool m = g_moving;
 	g_moving = false;
 	return m;
+}
+
+/* ---- ChaOS Pixel Names ----------------------------------------------------------
+ *
+ * The name alone, large: as wide as most of the screen allows and no taller
+ * than half of it, in the same letters and the same flight, with a glow and a
+ * drop shadow in the system's colour under it in place of a card. The loose
+ * pixels start unseen here - there is no card to keep them in - and fly from
+ * further out, scaled to the size of the letters. */
+bool pn_big(SDL_Renderer *r, const char *name, unsigned accent, bool focused,
+            int w, int h, int cy)
+{
+	static const struct { int dx, dy, cyan; } SPARK[] = {
+		{ 2, -2, 0 }, { 4, -3, 1 }, { 5, -1, 0 }, { 7, -4, 1 }, { 3, -5, 0 },
+	};
+	pn_state *p = state_for(name ? name : "");
+	SDL_Color acc = { (Uint8)(accent >> 16), (Uint8)(accent >> 8), (Uint8)accent, 255 };
+	SDL_Color deep = { (Uint8)(acc.r * 55 / 100), (Uint8)(acc.g * 55 / 100),
+	                   (Uint8)(acc.b * 55 / 100), 255 };
+	Uint32 now = SDL_GetTicks();
+	float step, scale;
+	int cell, ox, oy, i, pass;
+
+	if (!p || p->n <= 0) return false;
+	step = (float)(now - p->atb) / PN_MS;
+	if (step > 0.1f) step = 0.1f;
+	p->atb = now;
+	if (g_fix == -1.0f) p->tb = focused ? 1.0f : 0.0f;
+	else if (g_fix >= 0.0f) p->tb = focused ? g_fix : 0.0f;
+	else if (focused && p->tb < 1.0f) { p->tb += step; if (p->tb > 1.0f) p->tb = 1.0f; }
+	else if (!focused && p->tb > 0.0f) { p->tb -= step; if (p->tb < 0.0f) p->tb = 0.0f; }
+	if (p->tb > 0.0f && p->tb < 1.0f) g_moving = true;
+	if (p->tb <= 0.0f) return false;
+
+	cell = (w * 84 / 100) / (p->cols > 0 ? p->cols : 1);
+	/* and the escaping pixels inside the screen at the right */
+	if (cell > (w * 92 / 100) / (p->cols + 5)) cell = (w * 92 / 100) / (p->cols + 5);
+	if (cell > (h / 2) / (p->rows > 0 ? p->rows : 1)) cell = (h / 2) / (p->rows > 0 ? p->rows : 1);
+	/* room above for the escaping pixels, five rows over the name */
+	if (cell > (cy - 24) / (p->rows / 2 + 6)) cell = (cy - 24) / (p->rows / 2 + 6);
+	if (cell > 40) cell = 40;
+	if (cell < 4) cell = 4;
+	scale = (float)cell / 11.0f;
+	ox = (w - p->cols * cell) / 2;
+	oy = cy - p->rows * cell / 2;
+
+	/* a soft glow in the system's colour behind the whole name, as the
+	 * focused card has, coming up as the name forms */
+	{
+		SDL_Rect box = { ox, oy, p->cols * cell, p->rows * cell };
+		ui_glow(r, &box, accent, (int)(120 * p->tb), 2.0f);
+	}
+	SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+	/* two passes: the drop shadow, then the letters */
+	for (pass = 1; pass < 3; pass++)
+		for (i = 0; i < p->n; i++) {
+			float tx = (float)(ox + p->pts[i].x * cell), ty = (float)(oy + p->pts[i].y * cell);
+			float sx = tx + cosf(p->ang[i]) * p->dist[i] * scale;
+			float sy = ty + sinf(p->ang[i]) * p->dist[i] * scale;
+			float k = (p->tb - p->delay[i]) / (1.0f - p->delay[i]), e, x, y;
+			if (k < 0.0f) k = 0.0f;
+			if (k > 1.0f) k = 1.0f;
+			e = 1.0f - (1.0f - k) * (1.0f - k) * (1.0f - k);
+			x = sx + (tx - sx) * e;
+			y = sy + (ty - sy) * e;
+			if (pass == 0) {
+				int g = cell / 2;
+				SDL_Rect q = { (int)lroundf(x) - g, (int)lroundf(y) - g, cell + g * 2, cell + g * 2 };
+				SDL_SetRenderDrawColor(r, acc.r, acc.g, acc.b, (Uint8)(26 * e));
+				SDL_RenderFillRect(r, &q);
+			} else if (pass == 1) {
+				int d = cell / 4 > 2 ? cell / 4 : 2;
+				square(r, x + (float)d, y + (float)d, cell, deep, 0.85f * e);
+			} else {
+				square(r, x, y, cell, p->pts[i].accent ? acc : CREAM, e);
+			}
+		}
+	/* the logo's escaping pixels, once it has formed */
+	if (p->tb > 0.6f)
+		for (i = 0; i < (int)(sizeof SPARK / sizeof SPARK[0]); i++)
+			square(r, (float)(ox + (p->cols + SPARK[i].dx - 3) * cell),
+			       (float)(oy + SPARK[i].dy * cell), cell,
+			       SPARK[i].cyan ? CYAN : acc, (p->tb - 0.6f) / 0.4f);
+	return true;
 }
