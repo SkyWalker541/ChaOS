@@ -13212,6 +13212,7 @@ static const char *shot_kb_text = "correct horse";
 static const char *shot_kb_title = "Wi-Fi password";
 static int shot_slots, shot_slot_sel;
 static int shot_jump;               /* letter-jumps to apply before drawing */
+static int shot_sys = -1;           /* ChaOS: --sys N */
 /* --nowplaying ALBUM [TRACK [SECONDS]], and --paused with it. */
 static int   shot_np = -1, shot_np_track, shot_np_paused;
 static float shot_np_at = 83.0f;
@@ -13593,6 +13594,7 @@ int main(int argc, char *argv[])
 		/* --jump N applies N letter-jumps before the shot (negative for up),
 		 * so the d-pad's behavior on a real library can be checked without a
 		 * device or a hand on it. */
+		else if (!strcmp(argv[i], "--sys") && i + 1 < argc) shot_sys = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--jump") && i + 1 < argc) {
 			shot_jump = atoi(argv[++i]);
 		}
@@ -14190,6 +14192,12 @@ int main(int argc, char *argv[])
 	last_tint_ms = plat_now_ms();
 
 	if (shot_path) {
+		/* --sys N: the shelf on its Nth system */
+		if (shot_sys >= 0 && a.sys.count > 0) {
+			a.sys_cursor = shot_sys % a.sys.count;
+			cf_reset(&a.cf_sys, a.sys_cursor);
+			a.tint = a.sys.systems[a.sys_cursor].accent;
+		}
 		if (shot_screen >= 0) a.screen = (screen_id)shot_screen;
 		if (shot_jump) {
 			sysview *v = &a.view[a.sys_cursor];
