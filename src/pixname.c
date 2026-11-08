@@ -35,6 +35,7 @@ static bool g_moving;
 static float g_fix = -2.0f;      /* -2: animate; -1: ends at once; else that t */
 
 void pn_fix(float t) { g_fix = t; }
+float pn_fixed(void) { return g_fix; }
 
 static unsigned rng(unsigned *s) { *s = *s * 1103515245u + 12345u; return *s >> 8; }
 static float frand(unsigned *s) { return (float)(rng(s) & 0xFFFF) / 65535.0f; }
@@ -100,15 +101,45 @@ static void square(SDL_Renderer *r, float x, float y, int cell, SDL_Color c, flo
 	SDL_RenderFillRect(r, &q);
 }
 
+/* The name's pixels at t, the block's top left at ox,oy, the loose ones kept
+ * inside w x h */
+static void pixels(SDL_Renderer *r, const pn_state *p, SDL_Color acc, float t,
+                   int ox, int oy, int cell, int w, int h, float dim)
+{
+	static const struct { int dx, dy, cyan; } SPARK[] = {
+		{ 2, -2, 0 }, { 4, -3, 1 }, { 5, -1, 0 }, { 7, -4, 1 }, { 3, -5, 0 },
+	};
+	int i;
+
+	SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+	for (i = 0; i < p->n; i++) {
+		float tx = (float)(ox + p->pts[i].x * cell), ty = (float)(oy + p->pts[i].y * cell);
+		float sx = tx + cosf(p->ang[i]) * p->dist[i], sy = ty + sinf(p->ang[i]) * p->dist[i];
+		float k = (t - p->delay[i]) / (1.0f - p->delay[i]), e;
+		if (k < 0.0f) k = 0.0f;
+		if (k > 1.0f) k = 1.0f;
+		e = 1.0f - (1.0f - k) * (1.0f - k) * (1.0f - k);
+		/* kept inside: a loose pixel past the edge folds back in rather than
+		 * being drawn over the next card */
+		sx = sx < 8 ? 8 + fmodf(8 - sx, 40) : sx > w - 8 - cell ? w - 8 - cell - fmodf(sx, 40) : sx;
+		sy = sy < 8 ? 8 + fmodf(8 - sy, 40) : sy > h - 8 - cell ? h - 8 - cell - fmodf(sy, 40) : sy;
+		square(r, sx + (tx - sx) * e, sy + (ty - sy) * e, cell,
+		       p->pts[i].accent ? acc : CREAM, (dim + (1.0f - dim) * e));
+	}
+	/* the logo's escaping pixels, top right of the name, once it has formed */
+	if (t > 0.6f)
+		for (i = 0; i < (int)(sizeof SPARK / sizeof SPARK[0]); i++)
+			square(r, (float)(ox + (p->cols + SPARK[i].dx - 3) * cell),
+			       (float)(oy + SPARK[i].dy * cell), cell,
+			       SPARK[i].cyan ? CYAN : acc, (t - 0.6f) / 0.4f);
+}
+
 static void draw(SDL_Renderer *r, pn_state *p, SDL_Color acc)
 {
 	/* 53 columns at most (pixfont-check): 11 pixels each */
 	const int cell = 11;
-	int ox = (PN_W - p->cols * cell) / 2, oy = (PN_H * 42 / 100) - p->rows * cell / 2, i;
+	int ox = (PN_W - p->cols * cell) / 2, oy = (PN_H * 42 / 100) - p->rows * cell / 2;
 	SDL_Rect bar = { 48, PN_BAR_Y, PN_W - 96, 8 };
-	static const struct { int dx, dy, cyan; } SPARK[] = {
-		{ 2, -2, 0 }, { 4, -3, 1 }, { 5, -1, 0 }, { 7, -4, 1 }, { 3, -5, 0 },
-	};
 
 	SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_NONE);
 	SDL_SetRenderDrawColor(r, 0, 0, 0, 0);
@@ -117,29 +148,31 @@ static void draw(SDL_Renderer *r, pn_state *p, SDL_Color acc)
 		SDL_SetTextureBlendMode(g_ground, SDL_BLENDMODE_NONE);
 		SDL_RenderCopy(r, g_ground, NULL, NULL);
 	}
-	SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
-	for (i = 0; i < p->n; i++) {
-		float tx = (float)(ox + p->pts[i].x * cell), ty = (float)(oy + p->pts[i].y * cell);
-		float sx = tx + cosf(p->ang[i]) * p->dist[i], sy = ty + sinf(p->ang[i]) * p->dist[i];
-		float k = (p->t - p->delay[i]) / (1.0f - p->delay[i]), e;
-		if (k < 0.0f) k = 0.0f;
-		if (k > 1.0f) k = 1.0f;
-		e = 1.0f - (1.0f - k) * (1.0f - k) * (1.0f - k);
-		/* kept inside the card: a loose pixel past its edge is cut, not drawn
-		 * over the next card */
-		sx = sx < 8 ? 8 + fmodf(8 - sx, 40) : sx > PN_W - 8 - cell ? PN_W - 8 - cell - fmodf(sx, 40) : sx;
-		sy = sy < 8 ? 8 + fmodf(8 - sy, 40) : sy > PN_H - 8 - cell ? PN_H - 8 - cell - fmodf(sy, 40) : sy;
-		square(r, sx + (tx - sx) * e, sy + (ty - sy) * e, cell,
-		       p->pts[i].accent ? acc : CREAM, 0.22f + 0.78f * e);
-	}
-	/* the logo's escaping pixels, top right of the name, once it has formed */
-	if (p->t > 0.6f)
-		for (i = 0; i < (int)(sizeof SPARK / sizeof SPARK[0]); i++)
-			square(r, (float)(ox + (p->cols + SPARK[i].dx - 3) * cell),
-			       (float)(oy + SPARK[i].dy * cell), cell,
-			       SPARK[i].cyan ? CYAN : acc, (p->t - 0.6f) / 0.4f);
+	pixels(r, p, acc, p->t, ox, oy, cell, PN_W, PN_H, 0.22f);
 	SDL_SetRenderDrawColor(r, acc.r, acc.g, acc.b, 255);
 	SDL_RenderFillRect(r, &bar);
+}
+
+void pn_overlay(SDL_Renderer *r, const char *name, unsigned accent, float t,
+                int screen_w, int screen_h)
+{
+	pn_state *p = state_for(name ? name : "");
+	SDL_Color acc = { (Uint8)(accent >> 16), (Uint8)(accent >> 8), (Uint8)accent, 255 };
+	const int cell = 14;
+	int ox, oy;
+	SDL_Rect band;
+
+	if (!p || t <= 0.0f) return;
+	if (t > 1.0f) t = 1.0f;
+	ox = (screen_w - p->cols * cell) / 2;
+	oy = (screen_h - p->rows * cell) / 2;
+	/* a dark band under the name, so it reads over any box art */
+	band = (SDL_Rect){ 0, oy - cell * 7, screen_w, p->rows * cell + cell * 14 };
+	SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+	SDL_SetRenderDrawColor(r, BOT.r, BOT.g, BOT.b, (Uint8)(200 * t));
+	SDL_RenderFillRect(r, &band);
+	/* loose pixels start unseen here: there is a game under them */
+	pixels(r, p, acc, t, ox, oy, cell, screen_w, screen_h, 0.0f);
 }
 
 SDL_Texture *pn_card(SDL_Renderer *r, SDL_Texture *held, const char *name,

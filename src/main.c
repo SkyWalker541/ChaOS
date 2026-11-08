@@ -3306,6 +3306,32 @@ static void draw_both(app *a)
 	}
 
 furniture:
+	/* ChaOS Pixel Names: no face is a console here, so after a turn to a
+	 * system its name flies together over the game, stays a moment, and
+	 * scatters again - at once if the games start turning. */
+	if (CARDS_DRAWN(g_cards)) {
+		static int shown = -1;
+		static Uint32 at, leave;
+		Uint32 now = SDL_GetTicks();
+		float t = 0.0f;
+
+		if (a->cf_sys.active) shown = -1;
+		else if (shown != a->sys_cursor) { shown = a->sys_cursor; at = now; leave = 0; }
+		if (shown >= 0) {
+			Uint32 el = now - at;
+			t = el >= 950 ? 1.0f : (float)el / 950.0f;
+			if (!leave && ((ng > 0 && v->cf.active) || el >= 950 + 1200)) leave = now;
+			if (leave) {
+				float k = 1.0f - (float)(now - leave) / 950.0f;
+				if (k < t) t = k;
+			}
+			if (pn_fixed() > -2.0f) t = 1.0f;          /* --pixnames: formed */
+			if (t > 0.0f) {
+				pn_overlay(a->r, s->name, s->accent, t, TORTOS_SCREEN_W, TORTOS_SCREEN_H);
+				redraw_now();
+			}
+		}
+	}
 	/* Two rails, because there are two positions to be in. The system rail
 	 * runs down the left on its own axis; the game rail sits under the screen
 	 * where it always has. Both from `pos` rather than the cursor, so they

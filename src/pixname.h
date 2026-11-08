@@ -24,8 +24,14 @@
 SDL_Texture *pn_card(SDL_Renderer *r, SDL_Texture *held, const char *name,
                      unsigned accent, bool focused);
 
+/* ChaOS Pixel Names in Cubic, where every face is a game: the system's name
+ * over the face after a turn to it, t 0..1 assembling and back to scatter. */
+void pn_overlay(SDL_Renderer *r, const char *name, unsigned accent, float t,
+                int screen_w, int screen_h);
+
 /* For screenshots: cards at their ends at once, or (t >= 0) all at t. */
 void pn_fix(float t);
+float pn_fixed(void);   /* what pn_fix set, -2 for animating */
 
 /* Whether any card is still moving: the shelf keeps drawing while one is. */
 bool pn_animating(void);

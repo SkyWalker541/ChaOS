@@ -55,7 +55,7 @@
 - **Updates over Wi-Fi,** from the menu, when you choose, with what's new in each.
 - **Button mapping,** per console or per game, with turbo, and **rewind**.
 - **ChaOS Transfer,** the boot and power-off animations, and the ChaOS look throughout.
-- **ChaOS Pixel Names,** a UI Theme (**MENU > UI Theme**) where each console is its name in the logo's pixel letters, last word in the console's colour. As you scroll, the name you land on flies together pixel by pixel and the one you leave breaks apart.
+- **ChaOS Pixel Names,** a UI Theme (**MENU > UI Theme**) where each console is its name in the logo's pixel letters, last word in the console's colour. As you scroll, the name you land on flies together pixel by pixel and the one you leave breaks apart. In Cubic, where every face is a game, the system's name flies together over the game after each turn, then scatters.
 - **Screenshots** of any game with **MENU + X**, looked at again from the in-game menu.
 
 **From TortOS**
