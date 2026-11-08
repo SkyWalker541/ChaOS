@@ -669,6 +669,9 @@ static int g_pn_speed[8];
  * device database. Cubic never opens a system, so it has no list. */
 static bool g_list_view;
 #define LIST_VIEW_ON() (g_list_view && !CARD_DIRS[g_dir].both)
+/* ChaOS: a menu drawn to fill the screen, this far from its edges, for the
+ * one draw it is set around (the game List); -1 for the usual */
+static int g_menu_fill = -1;
 
 /* ChaOS: the letter popup, with the letter jumps, further down */
 static void letter_note(sysview *v);
@@ -3844,7 +3847,10 @@ static void draw_game_list(app *a, sysview *v, const system_cfg *s)
 	 * away with the names */
 	snprintf(count, sizeof count, "%s  \xC2\xB7  %d / %d", s->name,
 	         n > 0 ? v->cursor + 1 : 0, n);
-	menu_draw(a, count, rows, n, v->cursor, 820, menu_accent());
+	/* the whole screen, its border and rounded corners kept a little in */
+	g_menu_fill = 10;
+	menu_draw(a, count, rows, n, v->cursor, 4096, menu_accent());
+	g_menu_fill = -1;
 
 	/* frames while the plate and the list ease to a new row, and while a
 	 * long title slides */
@@ -4329,7 +4335,7 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 	 * up, and this menu is meant to gain rows - so the panel is capped to the
 	 * screen and the rows window around the selection when they do not all
 	 * fit. A menu that runs off the top is worse than one that scrolls. */
-	const int margin = MENU_MARGIN;
+	const int margin = g_menu_fill >= 0 ? g_menu_fill : MENU_MARGIN;
 	int vis = n, first = 0;
 
 	for (i = 0; i < n; i++)
@@ -4470,6 +4476,10 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 		if (!scroll_h && last >= 0 && last < n && rows[last].label &&
 		    ROW_IS_NOTE(rows[last]) && !ROW_IS_BODY(rows[last]))
 			panel.h -= pad * 5 / 12;
+	}
+	if (g_menu_fill >= 0) {                   /* ChaOS: the whole screen */
+		panel.w = TORTOS_SCREEN_W - margin * 2;
+		panel.h = TORTOS_SCREEN_H - margin * 2;
 	}
 	panel.x = (TORTOS_SCREEN_W - panel.w) / 2;
 	panel.y = (TORTOS_SCREEN_H - panel.h) / 2;
@@ -4743,6 +4753,13 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 		SDL_Rect rc = { panel.x + UI_PANEL_BORDER, content_y,
 		                panel.w - UI_PANEL_BORDER * 2,
 		                panel.y + panel.h - pad - content_y };
+		/* ChaOS: a panel stretched to the screen is taller than its rows;
+		 * the clip stays at the rows, or the row past the window shows */
+		if (g_menu_fill >= 0) {
+			int rh = 0, j2;
+			for (j2 = first; j2 < first + vis && j2 < n; j2++) rh += ROW_H(rows[j2]);
+			if (rh < rc.h) rc.h = rh;
+		}
 		SDL_RenderSetClipRect(a->r, &rc);
 	}
 	for (k = 0, i = (first > 0 ? first - 1 : first);
