@@ -50,6 +50,7 @@
 #include "update.h"
 #include "remap.h"
 #include "shots.h"
+#include "pixname.h"
 
 /* ChaOS: the button held in the in-game menu to see the game whole. Its name
  * on screen is CTL_PEEK_NAME (controls.h): change one, change both. */
@@ -936,6 +937,20 @@ static void sys_card_load_now(app *a, int i)
 static SDL_Texture *sys_get_tex(void *ctx, int i, int *w, int *h, float *cb)
 {
 	app *a = ctx;
+
+	/* ChaOS Pixel Names: drawn, not loaded, and drawn again while its pixels
+	 * move - toward its name under the cursor, away from it elsewhere */
+	if (CARDS_DRAWN(g_cards)) {
+		a->sys_tex[i] = pn_card(a->r, a->sys_tex[i], a->sys.systems[i].name,
+		                        a->sys.systems[i].accent, i == a->sys_cursor);
+		*w = a->sys_tex[i] ? PN_W : 0;
+		*h = a->sys_tex[i] ? PN_H : 0;
+		a->sys_w[i] = *w;
+		a->sys_h[i] = *h;
+		a->sys_cb[i] = 1.0f;
+		if (cb) *cb = 1.0f;
+		return a->sys_tex[i];
+	}
 	if (!a->sys_tex[i]) {
 		char set[CFG_STR * 2], def[CFG_STR * 2];
 		bool other = sys_card_paths(a, i, set, def, sizeof set);
@@ -1222,7 +1237,8 @@ static void texload_drain(app *a)
 		sysview *v;
 
 		if (s == SYS_CARDS_SHELF) {
-			if (i >= 0 && i < a->sys.count && !a->sys_tex[i]) {
+			/* a card asked for before the theme became a drawn one */
+			if (i >= 0 && i < a->sys.count && !a->sys_tex[i] && !CARDS_DRAWN(g_cards)) {
 				if (surf) {
 					a->sys_cb[i] = content_bottom(surf);
 					a->sys_tex[i] = SDL_CreateTextureFromSurface(a->r, surf);
@@ -1396,6 +1412,7 @@ static void sys_cards_ask_visible(app *a)
 	char set[CFG_STR * 2], def[CFG_STR * 2];
 	int n, i;
 
+	if (CARDS_DRAWN(g_cards)) return;      /* nothing to load: drawn */
 	for (n = 0; sys_card_visible(a, n, &i); n++) {
 		bool other = sys_card_paths(a, i, set, def, sizeof set);
 		texload_want(SYS_CARDS_SHELF, i, set, other ? def : NULL);
@@ -3357,6 +3374,8 @@ static void draw_systems(app *a)
 	if (cf_draw(&a->cf_sys, a->r, TORTOS_SCREEN_W, TORTOS_SCREEN_H, a->sys.count,
 	            sys_get_tex, a, &lay))
 		redraw_now();
+	/* ChaOS Pixel Names: a name still forming or scattering */
+	if (pn_animating()) redraw_now();
 
 	/* WHICH SYSTEM THE WORDS BELOW DESCRIBE, and how visible they are.
 	 *
@@ -13219,6 +13238,9 @@ int main(int argc, char *argv[])
 			shot_speed = true;
 		}
 		else if (!strcmp(argv[i], "--ss")) shot_ss = true;
+		/* --pixnames T: ChaOS Pixel Names with the focused card at T (0..1),
+		 * the one leaving at 1-T; -1 for both at their ends */
+		else if (!strcmp(argv[i], "--pixnames") && i + 1 < argc) pn_fix((float)atof(argv[++i]));
 		else if (!strcmp(argv[i], "--shots") && i + 1 < argc) {
 			shot_shots = argv[++i];
 			if (i + 1 < argc && !strcmp(argv[i + 1], "ask")) { shot_shots_ask = 1; i++; }

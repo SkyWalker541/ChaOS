@@ -132,7 +132,7 @@ than any one console:
 | **Over The Hare** | the file server; needs Wi-Fi and says so when there is none. While a computer is on the USB cable it is **Down To The Wire** instead, always at `10.55.0.2` on the Brick and `10.42.0.1` on the Pixel 2 |
 | **Date & Time** | the clock and the time zone, set with left and right - see below |
 | **Auto Off** | how long without a button before the device powers itself down |
-| **UI Theme** | `Plain Jane` or `Fancy Pants` - which art the shelves wear |
+| **UI Theme** | `Plain Jane`, `Fancy Pants` or `ChaOS Pixel Names` - which art the shelves wear |
 | **UI Direction** | `Horizontal`, `Vertical` or `Cubic` - see below |
 | **Box Art** | fetch what the whole library is missing |
 | **Cheevos** | the RetroAchievements account, or `sign in` |
@@ -444,7 +444,9 @@ Two things about that are yours to choose, and they are independent.
 **UI Theme** picks the art. `Plain Jane` is a drawn card per system, with the
 name on it. `Fancy Pants` is a photograph of the console itself, background
 removed, and because a photograph does not name itself the shelf writes the
-name underneath.
+name underneath. `ChaOS Pixel Names` (ChaOS) is each system's name in the
+logo's pixel letters, its last word in the system's colour; the name under
+the cursor flies together pixel by pixel, and the one you leave scatters.
 
 **UI Direction** picks how you move. `Horizontal` is the row above.
 

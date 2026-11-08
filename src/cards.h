@@ -68,7 +68,12 @@ typedef struct {
 static const card_set CARD_SETS[] = {
 	{ "classic", "classic", "Plain Jane",  true,  0.00f },
 	{ "fancy",   "fancy",   "Fancy Pants", false, 0.21f },   /* about 50px */
+	/* ChaOS: no files - each card is drawn, its name in the logo's pixel
+	 * letters, assembling under the cursor (pixname.h). CARDS_DRAWN. */
+	{ "pixel",   "",        "ChaOS Pixel Names", true, 0.00f },
 };
+/* A set drawn by the launcher rather than loaded: no directory */
+#define CARDS_DRAWN(i) (!CARD_SETS[i].dir[0])
 #define CARD_SET_COUNT ((int)(sizeof CARD_SETS / sizeof CARD_SETS[0]))
 
 /* The set a stored name selects, by index. An unknown name is the default

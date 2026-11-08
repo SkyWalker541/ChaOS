@@ -55,13 +55,15 @@
 - **Updates over Wi-Fi,** from the menu, when you choose, with what's new in each.
 - **Button mapping,** per console or per game, with turbo, and **rewind**.
 - **ChaOS Transfer,** the boot and power-off animations, and the ChaOS look throughout.
+- **ChaOS Pixel Names,** a UI Theme (**MENU > UI Theme**) where each console is its name in the logo's pixel letters, last word in the console's colour. As you scroll, the name you land on flies together pixel by pixel and the one you leave breaks apart.
+- **Screenshots** of any game with **MENU + X**, looked at again from the in-game menu.
 
 **From TortOS**
 
 - **Games start the moment you press A.** The emulator is already running, so nothing loads between you and the game.
 - **Pick up where you left off.** Quit from the menu or press the power button: the game is saved on the way out and continues from that moment next time. Six save slots too.
 - **Everything on the handheld:** Wi-Fi, box art, RetroAchievements, Bluetooth headphones and sending games over from your phone. You need a computer once, to set up the card.
-- **Three ways to browse** (a row, a column or a cube) and two looks (Plain Jane or Fancy Pants).
+- **Three ways to browse** (a row, a column or a cube) and two looks (Plain Jane or Fancy Pants), plus ChaOS Pixel Names.
 - **Muse,** a music and audiobook player, on SELECT from anywhere.
 - **Turbo buttons, fast forward, mono audio, Play Time, favorites and sorting.**
 - **Your Brick stays yours.** ChaOS runs from the SD card and changes nothing on the Brick. Take the card out and it boots its own system again.

@@ -1049,13 +1049,19 @@ static void card_sets(void)
 	ck(CARD_SETS[0].labeled, "the default set's art names its systems");
 
 	for (i = 0, ok = 1; i < CARD_SET_COUNT; i++) {
-		if (!CARD_SETS[i].id[0] || !CARD_SETS[i].dir[0] || !CARD_SETS[i].name[0])
+		/* a drawn set (ChaOS Pixel Names) has no directory, and says so */
+		if (!CARD_SETS[i].id[0] || (!CARD_SETS[i].dir[0] && !CARDS_DRAWN(i)) ||
+		    !CARD_SETS[i].name[0])
 			ok = 0;
 		/* The directory goes into a path. A separator in it would build a
 		 * path nobody meant. */
 		if (strchr(CARD_SETS[i].dir, '/') || strchr(CARD_SETS[i].dir, '\\')) ok = 0;
 	}
 	ck(ok, "every set has a non-empty id, dir and name, and no separators");
+	for (i = 0, ok = 0; i < CARD_SET_COUNT; i++)
+		if (!strcmp(CARD_SETS[i].id, "pixel") && CARDS_DRAWN(i) && CARD_SETS[i].labeled &&
+		    !strcmp(CARD_SETS[i].name, "ChaOS Pixel Names")) ok = 1;
+	ck(ok, "ChaOS Pixel Names is a drawn set whose cards name their systems");
 
 	/* Ids and names must be unique - one is what gets written down and the
 	 * other is what gets read off the row. Directories must NOT have to be:
