@@ -1149,6 +1149,24 @@ static void card_sets(void)
 	ck(cards_dir_step(0, 1) == 1 && cards_dir_step(2, 1) == 0, "stepping wraps");
 	ck(cards_dir_step(0, -1) == CARD_DIR_COUNT - 1, "in both directions");
 
+	/* The ChaOS themes leave some directions out. */
+	{
+		int pix = cards_index("pixel"), big = cards_index("pixelbig");
+		int cls = cards_index("classic");
+		ck(CARD_DIRS[2].both && cards_dir_allowed(cls, 2) && cards_dir_allowed(cls, 1),
+		   "the plain themes keep all three");
+		ck(!cards_dir_allowed(pix, 2) && cards_dir_allowed(pix, 1),
+		   "Pixel Cards has no Cubic but keeps Vertical");
+		ck(!cards_dir_allowed(big, 2) && !cards_dir_allowed(big, 1) && cards_dir_allowed(big, 0),
+		   "Pixel Names is Horizontal only");
+		ck(cards_dir_step_for(pix, 1, 1) == 0 && cards_dir_step_for(pix, 0, 1) == 1,
+		   "stepping on Pixel Cards skips Cubic");
+		ck(cards_dir_step_for(big, 0, 1) == 0 && cards_dir_step_for(big, 0, -1) == 0,
+		   "Pixel Names has nowhere else to step");
+		ck(cards_dir_fit(pix, 2) == 0 && cards_dir_fit(big, 1) == 0 && cards_dir_fit(cls, 2) == 2,
+		   "a direction the set cannot show falls back to Horizontal, and no other");
+	}
+
 	printf("stepping through them:\n");
 	ck(cards_step(0, 1) == 1, "forward");
 	ck(cards_step(CARD_SET_COUNT - 1, 1) == 0, "and wraps at the end");

@@ -3,9 +3,9 @@
 #define CHAOS_SHOTS_H
 
 /* ChaOS: screenshots, per game, for looking back at - a password screen, a
- * code, a map. Taken from the in-game menu (the paused frame, as the game drew
- * it, before any shader), and looked at from there, full screen, one game's
- * at a time: only the game being played.
+ * code, a map. Taken with MENU + X, or from the in-game menu, as the panel
+ * showed it - the game with its shader and overlay - and looked at from
+ * there, full screen, one game's at a time: only the game being played.
  *
  * Kept on the card at Screenshots/<console folder>/<game>/, one PNG each,
  * named by when it was taken, "2026-11-08 06.45.12.png" (FAT has no colons),

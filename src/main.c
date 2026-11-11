@@ -892,13 +892,15 @@ static int g_dir;
 
 /* The ChaOS pixel themes' Transition Speed, one per UI Direction (CARD_DIRS), kept
  * in the device database as pixnames.speed.<direction> so updates leave it.
- * form: a name assembling, or scattering; hold: how long Cubic shows it. */
+ * form: a name assembling, or scattering - 0 for Static, where nothing moves;
+ * hold: how long a name stays over a game when a system is turned to. */
 static const struct { const char *id, *name; int form, hold; } PN_SPEEDS[] = {
 	{ "slow",   "Slow",   1400, 1600 },
 	{ "normal", "Normal",  950, 1100 },
 	{ "fast",   "Fast",    450,  500 },
+	{ "static", "Static",    0, 1100 },
 };
-#define PN_SPEED_COUNT 3
+#define PN_SPEED_COUNT 4
 static int g_pn_speed[8];
 
 /* ChaOS: Game List View - Normal, the shelf as the UI Theme and Direction
@@ -923,10 +925,8 @@ static void pn_speed_load(void)
 	char key[64], v[16];
 
 	for (d = 0; d < CARD_DIR_COUNT && d < 8; d++) {
-		/* Cubic shows the name over a game, so it starts quick */
-		bool cubic = !strcmp(CARD_DIRS[d].id, "both");
 		snprintf(key, sizeof key, "pixnames.speed.%s", CARD_DIRS[d].id);
-		db_get_str(db_dev(), key, v, sizeof v, cubic ? "fast" : "normal");
+		db_get_str(db_dev(), key, v, sizeof v, "normal");
 		g_pn_speed[d] = 1;
 		for (k = 0; k < PN_SPEED_COUNT; k++)
 			if (!strcmp(v, PN_SPEEDS[k].id)) g_pn_speed[d] = k;
@@ -3614,11 +3614,18 @@ furniture:
 			Uint32 el = now - at;
 			const Uint32 form = (Uint32)PN_SPEEDS[g_pn_speed[g_dir]].form;
 			const Uint32 hold = (Uint32)PN_SPEEDS[g_pn_speed[g_dir]].hold;
-			t = el >= form ? 1.0f : (float)el / (float)form;
-			if (!leave && ((ng > 0 && v->cf.active) || el >= form + hold)) leave = now;
-			if (leave) {
-				float k = 1.0f - (float)(now - leave) / (float)form;
-				if (k < t) t = k;
+			if (form == 0) {
+				/* Static: the name is there at once, and gone at once */
+				t = 1.0f;
+				if (!leave && ((ng > 0 && v->cf.active) || el >= hold)) leave = now;
+				if (leave) t = 0.0f;
+			} else {
+				t = el >= form ? 1.0f : (float)el / (float)form;
+				if (!leave && ((ng > 0 && v->cf.active) || el >= form + hold)) leave = now;
+				if (leave) {
+					float k = 1.0f - (float)(now - leave) / (float)form;
+					if (k < t) t = k;
+				}
 			}
 			if (pn_fixed() > -2.0f) t = 1.0f;          /* --pixnames: formed */
 			if (t > 0.0f) {
@@ -8775,7 +8782,17 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 		int k = cards_step(g_cards, d ? d : 1);
 
 		if (k != g_cards) {
+			int fit;
+
 			g_cards = k;
+			/* A set that cannot show the direction in use falls back to
+			 * Horizontal, and the saved direction follows, so the row and
+			 * the shelf agree on the next launch too. */
+			fit = cards_dir_fit(g_cards, g_dir);
+			if (fit != g_dir) {
+				g_dir = fit;
+				db_set_str(db_dev(), "cards_dir", CARD_DIRS[g_dir].id);
+			}
 			free_all_textures(a);
 			prime_sys_window(a);
 			db_set_str(db_dev(), "cards", CARD_SETS[g_cards].id);
@@ -8811,7 +8828,7 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 	}
 
 	if (sel == PM_DIR && (d || key == IN_ACCEPT)) {
-		g_dir = cards_dir_step(g_dir, d ? d : 1);
+		g_dir = cards_dir_step_for(g_cards, g_dir, d ? d : 1);
 		db_set_str(db_dev(), "cards_dir", CARD_DIRS[g_dir].id);
 		return MENU_STAY;
 	}
@@ -11368,9 +11385,13 @@ static menu_result gm_key(app *a, void *ctx, in_button key, int sel)
 		break;
 	}
 	case GM_SHOT:
-		/* The paused frame, as the game drew it: Diatom wrote it on the
-		 * way into the pause */
-		c->shot_ok = shot_keep(plat_resident_last_preview());
+		/* What the screen showed as the pause began: the game with its
+		 * shader and overlay. The bare frame only when Diatom sent no
+		 * panel capture (an older Diatom). */
+		{
+			const char *g = plat_resident_last_glass();
+			c->shot_ok = shot_keep(g && *g ? g : plat_resident_last_preview());
+		}
 		c->shot_said = SDL_GetTicks();
 		c->shots = gm_count_shots();
 		break;
@@ -14471,7 +14492,7 @@ int main(int argc, char *argv[])
 		db_get_str(db_dev(), "cards", set, sizeof set, CARDS_DEFAULT);
 		g_cards = cards_index(set);
 		db_get_str(db_dev(), "cards_dir", set, sizeof set, CARDS_DIR_DEFAULT);
-		g_dir = cards_dir_index(set);
+		g_dir = cards_dir_fit(g_cards, cards_dir_index(set));
 		db_get_str(db_dev(), "menu_color", set, sizeof set, "chaos");
 		g_menu_color = menu_color_index(set);
 		notice_set_accent(MENU_ACCENT);

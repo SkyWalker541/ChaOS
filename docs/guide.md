@@ -459,6 +459,11 @@ bottom edges. It is laid out the way `Horizontal` is and moves at the row's
 pace; only `Cubic` turns a solid.
 
 `Cubic` turns that cube both ways and merges the two shelves into one surface.
+It is not offered with the ChaOS pixel themes, and ChaOS Pixel Names is
+`Horizontal` only; a theme that cannot show the direction in use goes back to
+`Horizontal` when chosen.
+
+`Cubic` turns that cube both ways and merges the two shelves into one surface.
 **Up and down change system, left and right move through that system's
 games.** There is no entering and no going back, because what you are looking
 at is already the thing you can act on - so B, which has nothing to return to,

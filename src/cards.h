@@ -166,4 +166,37 @@ static inline int cards_dir_step(int i, int d)
 	return i < 0 ? i + n : i;
 }
 
+/* Which directions a card set can show. The ChaOS themes are drawn, not
+ * loaded, and each leaves some out: Pixel Cards has no Cubic, because its
+ * cards are not built for two axes, and Pixel Names has only Horizontal -
+ * names alone, large, read left to right. The other sets offer all three. */
+static inline bool cards_dir_allowed(int set, int dir)
+{
+	if (set < 0 || set >= CARD_SET_COUNT || dir < 0 || dir >= CARD_DIR_COUNT)
+		return false;
+	if (CARDS_DRAWN(set))
+		return CARDS_BIG(set) ? !CARD_DIRS[dir].vertical : !CARD_DIRS[dir].both;
+	return true;
+}
+
+/* The nearest allowed direction to `dir` for this set, moving by `d`, or
+ * `dir` itself when none is. Wraps like cards_dir_step. */
+static inline int cards_dir_step_for(int set, int dir, int d)
+{
+	int n = CARD_DIR_COUNT, k, step = d < 0 ? -1 : 1;
+
+	for (k = 0; k < n; k++) {
+		dir = (dir + step + n) % n;
+		if (cards_dir_allowed(set, dir)) return dir;
+	}
+	return dir;
+}
+
+/* A direction the set can show: `dir` if allowed, else Horizontal, which
+ * every set can show. Used when the set changes under a stored direction. */
+static inline int cards_dir_fit(int set, int dir)
+{
+	return cards_dir_allowed(set, dir) ? dir : 0;
+}
+
 #endif

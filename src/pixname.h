@@ -35,7 +35,8 @@ void pn_overlay(SDL_Renderer *r, const char *name, unsigned accent, float t,
 bool pn_big(SDL_Renderer *r, const char *name, unsigned accent, bool focused,
             int w, int h, int cy);
 
-/* How long a name takes to form, or to scatter: Transition Speed. */
+/* How long a name takes to form, or to scatter: Transition Speed. Zero is
+ * Static: no pixels move, a name or card is at its end at once. */
 void pn_speed(int ms);
 
 /* For screenshots: cards at their ends at once, or (t >= 0) all at t. */

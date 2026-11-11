@@ -29,6 +29,9 @@ static int    dsock = -1;
 static char   dbuf[4096];
 static size_t dused;
 static char   d_preview[1024];
+/* ChaOS: the panel as it stood at the pause, with shader and overlay, or
+ * "" for none this pause. Take Screenshot keeps it. */
+static char   d_glass[1024];
 static SDL_Rect d_rect;
 static bool     d_rect_known;
 
@@ -292,6 +295,7 @@ bool plat_resident_send(const char *tag, const char *core, const char *rom,
 		 * Diatom restarted, or after something displaced this connection. */
 		if (!dconnect()) return false;
 		d_preview[0] = '\0';
+		d_glass[0] = '\0';
 		d_shaded[0] = '\0';
 		d_speed_known = false;
 		d_rect_known = false;
@@ -470,6 +474,9 @@ bool plat_resident_line(const char *fmt, ...)
 }
 
 const char *plat_resident_last_preview(void) { return d_preview; }
+
+/* ChaOS: the panel at the last pause, or "" when Diatom sent none. */
+const char *plat_resident_last_glass(void) { return d_glass; }
 
 static void d_note_level(const char *l);
 static void d_note_audio(const char *l);
@@ -721,8 +728,12 @@ static int diatom_wait(void)
 			 * first press went to 3. */
 			else if (strncmp(l, "PAUSED", 6) == 0)  { d_apply_levels(); return RES_PAUSED; }
 			else if (strncmp(l, "SHADED", 6) == 0) d_note_shaded(l);
-			else if (strncmp(l, "PREVIEW\tpath=", 13) == 0)
+			else if (strncmp(l, "PREVIEW\tpath=", 13) == 0) {
 				snprintf(d_preview, sizeof d_preview, "%s", l + 13);
+				d_glass[0] = '\0';   /* this pause's, until GLASS says */
+			}
+			else if (strncmp(l, "GLASS\tpath=", 12) == 0)
+				snprintf(d_glass, sizeof d_glass, "%s", l + 12);
 			else if (strncmp(l, "LEVEL\t", 6) == 0) d_note_level(l);
 			else if (strncmp(l, "AUDIO\t", 6) == 0) d_note_audio(l);
 			else if (strncmp(l, "DISPLAY\t", 8) == 0) d_note_display(l);

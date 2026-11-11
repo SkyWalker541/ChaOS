@@ -39,7 +39,14 @@ static bool g_moving;
 static float g_fix = -2.0f;      /* -2: animate; -1: ends at once; else that t */
 
 void pn_fix(float t) { g_fix = t; }
-void pn_speed(int ms) { if (ms > 50) g_ms = (float)ms; }
+/* 0 is Static: nothing flies, a name or card is at its end at once. */
+static bool g_static;
+void pn_speed(int ms)
+{
+	if (ms <= 0) { g_static = true; return; }
+	g_static = false;
+	if (ms > 50) g_ms = (float)ms;
+}
 float pn_fixed(void) { return g_fix; }
 
 static unsigned rng(unsigned *s) { *s = *s * 1103515245u + 12345u; return *s >> 8; }
@@ -213,6 +220,7 @@ SDL_Texture *pn_card(SDL_Renderer *r, SDL_Texture *held, const char *name,
 	 * not drawn) is one step, not a jump */
 	step = (float)(now - p->at) / PN_MS;
 	if (step > 0.1f) step = 0.1f;
+	if (g_static) step = 1.0f;      /* Static: at its end this frame */
 	p->at = now;
 	if (focused && p->t < 1.0f) { p->t += step; if (p->t > 1.0f) p->t = 1.0f; }
 	if (!focused && p->t > 0.0f) { p->t -= step; if (p->t < 0.0f) p->t = 0.0f; }
@@ -270,6 +278,7 @@ bool pn_big(SDL_Renderer *r, const char *name, unsigned accent, bool focused,
 	if (!p || p->n <= 0) return false;
 	step = (float)(now - p->atb) / PN_MS;
 	if (step > 0.1f) step = 0.1f;
+	if (g_static) step = 1.0f;      /* Static: at its end this frame */
 	p->atb = now;
 	if (g_fix == -1.0f) p->tb = focused ? 1.0f : 0.0f;
 	else if (g_fix >= 0.0f) p->tb = focused ? g_fix : 0.0f;

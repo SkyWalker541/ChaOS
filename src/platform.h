@@ -193,6 +193,10 @@ int  plat_resident_volume(int *count);
 unsigned plat_resident_generation(void);
 /* Path from the most recent PREVIEW message, or "" - the menu's backdrop. */
 const char *plat_resident_last_preview(void);
+
+/* ChaOS: the panel as it stood at the last pause - the game with its
+ * shader and overlay, no menu - or "" when Diatom sent none. */
+const char *plat_resident_last_glass(void);
 /* ChaOS. The shader settings file and the overlay file the next game is sent
  * before its RUN (SETSHADER and SETBEZEL), "" or NULL for none. */
 void plat_resident_set_look(const char *shader_cfg, const char *bezel);
