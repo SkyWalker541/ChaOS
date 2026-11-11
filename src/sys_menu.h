@@ -202,6 +202,7 @@ typedef struct {
 	const char *shader;
 	const char *overlay;
 	const char *dmode;      /* ChaOS: Display Mode's label, "Integer" */
+	bool no_overlays;       /* ChaOS: none fits the Display Mode: Overlay dims */
 	/* The label of the shelf's sort order. A label rather than an index: this
 	 * file must not know the table, or a check that links it would have to
 	 * link the table too. */

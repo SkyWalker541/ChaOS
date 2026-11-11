@@ -163,6 +163,9 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 		/* ChaOS: what left and right do (menu.h): go round the choices, or
 		 * flip a switch */
 		full[SM_SORT].cycles = full[SM_DISPLAY].cycles = full[SM_OVERLAY].cycles = true;
+		/* no overlay fits this Display Mode (Stretch, say): nothing to
+		 * choose, and the row says so by being dim */
+		if (u->no_overlays) full[SM_OVERLAY].live = full[SM_OVERLAY].cycles = false;
 		full[SM_SHADER].toggle = full[SM_REWIND].toggle = true;
 		{
 			sm_row ids[SM_ROWS];

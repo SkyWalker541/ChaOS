@@ -118,6 +118,7 @@ typedef struct {
 	const char *shader;
 	const char *overlay;
 	const char *dmode;    /* ChaOS: Display Mode's label, "Integer" */
+	bool no_overlays;     /* ChaOS: none fits the Display Mode: Overlay dims */
 	int         earned;
 	int         total;    /* 0: this game has no achievement set */
 	/* ChaOS: this game's screenshots (shots.h), and what Take Screenshot

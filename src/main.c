@@ -242,7 +242,10 @@ static void present_black(app *a)
  * Keyed on the system's tag, as saves are: "shader.<TAG>.on", one
  * "shader.<TAG>.<PT_NAME>" per setting that differs from the recommended one
  * (so a better recommendation in a later release reaches everyone who never
- * changed it), and "overlay.<TAG>" for the overlay's file name. */
+ * changed it), and the overlay's file name for each Display Mode:
+ * "overlay.<TAG>" for Integer, "overlay.<TAG>.aspect" and ".stretch" for the
+ * others (ChaOS: an overlay fits one picture size, see overlay_fits). */
+static void overlay_key(const app *a, int i, char *key, size_t n);
 static void look_load_one(app *a, int i);
 
 static bool look_load_param(const char *key, const char *value, void *ctx)
@@ -299,9 +302,9 @@ static void look_load_one(app *a, int i)
 	/* every stored parameter, by its GLSL name (".on" is no parameter's) */
 	snprintf(key, sizeof key, "shader.%s.", sc->tag);
 	db_each_prefix(db_dev(), key, look_load_param, &v->look);
-	snprintf(key, sizeof key, "overlay.%s", sc->tag);
-	db_get_str(db_dev(), key, v->overlay, sizeof v->overlay, "");
 	display_load_one(a, i);
+	overlay_key(a, i, key, sizeof key);
+	db_get_str(db_dev(), key, v->overlay, sizeof v->overlay, "");
 }
 
 static void look_load(app *a)
@@ -334,7 +337,7 @@ static void look_save(app *a, int i)
 			db_set_str(db_dev(), key, val);
 		}
 	}
-	snprintf(key, sizeof key, "overlay.%s", sc->tag);
+	overlay_key(a, i, key, sizeof key);
 	if (v->overlay[0]) db_set_str(db_dev(), key, v->overlay);
 	else               db_del(db_dev(), key);
 }
@@ -394,6 +397,39 @@ static int overlay_seed(const app *a, int sys, const char *dest)
 	return n;
 }
 
+/* Overlays an older ChaOS shipped and this one does not: the STN and
+ * PixelPop designs, which lay a grid over the game. Taken off the card, and
+ * out of ChaOS's own folder, where an update leaves them - but only a file
+ * of the very size ChaOS shipped, so a player's own of the same name stays. */
+static const struct { const char *folder, *file; long size; } OVERLAYS_RETIRED[] = {
+	{ "Game Boy",       "DMG STN.png",             378765 },
+	{ "Game Boy Color", "DMGBC STN.png",           377916 },
+	{ "Game Boy Color", "Cool STN.png",             74586 },
+	{ "Game Boy Color", "Warm STN.png",             75144 },
+	{ "Game Boy Color", "Pokemon STN.png",         130648 },
+	{ "Game Boy Color", "Cool PixelPop.png",        65239 },
+	{ "Game Boy Color", "Warm PixelPop.png",        64650 },
+	{ "Game Boy Color", "OG Warm PixelPop.png",    411025 },
+};
+
+static void overlays_retire(void)
+{
+	char p[LIB_PATH * 3];
+	struct stat st;
+	size_t i;
+	int k;
+
+	for (i = 0; i < sizeof OVERLAYS_RETIRED / sizeof OVERLAYS_RETIRED[0]; i++)
+		for (k = 0; k < 2; k++) {
+			snprintf(p, sizeof p, "%s/%s/%s/%s", k ? P_CARD : P_ROOT,
+			         k ? OVERLAYS_DIR : "overlays",
+			         OVERLAYS_RETIRED[i].folder, OVERLAYS_RETIRED[i].file);
+			if (stat(p, &st) == 0 && (long)st.st_size == OVERLAYS_RETIRED[i].size &&
+			    unlink(p) == 0)
+				fprintf(stderr, "overlays: %s retired\n", p);
+		}
+}
+
 static void overlay_dirs_ensure(const app *a)
 {
 	char d[LIB_PATH * 2];
@@ -407,6 +443,7 @@ static void overlay_dirs_ensure(const app *a)
 	/* Once a version (see overlay_seed) */
 	seed = !db_get_str(db_lib(), "overlays.seeded.version", was, sizeof was, NULL) ||
 	       strcmp(was, CHAOS_VERSION) != 0;
+	if (seed) overlays_retire();
 	for (i = 0; i < a->sys.count; i++) {
 		if (!a->sys.systems[i].folder[0]) continue;
 		overlay_dir(a, i, d, sizeof d);
@@ -416,12 +453,167 @@ static void overlay_dirs_ensure(const app *a)
 	if (seed) db_set_str(db_lib(), "overlays.seeded.version", CHAOS_VERSION);
 }
 
+static void overlay_key(const app *a, int i, char *key, size_t n)
+{
+	int m = a->view[i].dmode;
+
+	if (m <= 0 || m >= DMODE_COUNT)
+		snprintf(key, n, "overlay.%s", a->sys.systems[i].tag);
+	else
+		snprintf(key, n, "overlay.%s.%s", a->sys.systems[i].tag, DMODES[m].name);
+}
+
+/* The console's overlay for its Display Mode, read again: after the mode
+ * changes, it is that mode's. */
+static void overlay_reload(app *a, int i)
+{
+	char key[CFG_STR + 64];
+
+	overlay_key(a, i, key, sizeof key);
+	db_get_str(db_dev(), key, a->view[i].overlay, sizeof a->view[i].overlay, "");
+}
+
+/* ---- which overlays fit (ChaOS) ---------------------------------------------
+ *
+ * An overlay frames one picture: its window - where it is see-through - is the
+ * size and place of the game at one Display Mode. The game is drawn over it,
+ * so a window a little smaller than the picture is fine (the picture covers
+ * the inside of the frame, as the collection's designs expect), but a picture
+ * smaller than the window leaves a gap, and one much larger hides the frame.
+ * So an overlay is offered, and drawn, only at a mode whose picture lies over
+ * its window to within OVL_UNDER px short of it and OVL_OVER px past it, on
+ * every side.
+ *
+ * Measured against the collection's Brick overlays: native ones are 0 to 20
+ * px inside the Integer picture and 24 to 49 inside Aspect's, aspect ones 14
+ * to 20 inside Aspect's and 4 to 15 outside Integer's; none fits Stretch.
+ *
+ * The picture's size is known for the handhelds, whose screens are one size
+ * whatever the game. A console whose picture changes with the game (NES, SNES
+ * and the rest) has no one size to measure against, and every overlay is
+ * offered for it, as before. */
+#define OVL_UNDER 2
+#define OVL_OVER  24
+
+static const struct { const char *tag; int w, h; double aspect; } OVL_SCREENS[] = {
+	{ "GB",   160, 144, 10.0 / 9.0 },
+	{ "GBC",  160, 144, 10.0 / 9.0 },
+	{ "GBA",  240, 160, 3.0 / 2.0 },
+	{ "GG",   160, 144, 10.0 / 9.0 },
+	{ "NGP",  160, 152, 160.0 / 152.0 },
+	{ "NGPC", 160, 152, 160.0 / 152.0 },
+};
+
+/* Where the game is drawn at `mode`, as ChaOS-diatom works it out
+ * (src/scale.c). False for a console with no one picture size. */
+static bool overlay_game_rect(const app *a, int sys, int mode, SDL_Rect *r)
+{
+	const int W = TORTOS_SCREEN_W, H = TORTOS_SCREEN_H;
+	size_t i;
+
+	for (i = 0; i < sizeof OVL_SCREENS / sizeof OVL_SCREENS[0]; i++) {
+		int w = OVL_SCREENS[i].w, h = OVL_SCREENS[i].h, f;
+		double asp = OVL_SCREENS[i].aspect;
+
+		if (strcmp(OVL_SCREENS[i].tag, a->sys.systems[sys].tag)) continue;
+		if (!strcmp(DMODES[mode].name, "integer")) {
+			f = W / w < H / h ? W / w : H / h;
+			if (f < 1) f = 1;
+			r->w = w * f; r->h = h * f;
+		} else if (!strcmp(DMODES[mode].name, "aspect")) {
+			if ((double)W / asp <= (double)H) { r->w = W; r->h = (int)((double)W / asp + 0.5); }
+			else                              { r->w = (int)((double)H * asp + 0.5); r->h = H; }
+		} else {
+			r->w = W; r->h = H;
+		}
+		r->x = (W - r->w) / 2;
+		r->y = (H - r->h) / 2;
+		return true;
+	}
+	return false;
+}
+
+/* An overlay's window: the box round every pixel less than half opaque, in
+ * screen pixels (an overlay of another size is scaled to the screen). False
+ * for one with none, or that will not load. Kept in the library database by
+ * file, size and time, so a PNG is read once, not at every menu. */
+static bool overlay_window(const char *path, SDL_Rect *win)
+{
+	struct stat st;
+	char key[LIB_PATH * 3 + 32], val[96];
+	long long mt, sz;
+	SDL_Surface *raw, *img;
+	int x, y, x0, y0, x1, y1;
+
+	if (stat(path, &st) != 0) return false;
+	snprintf(key, sizeof key, "overlay.window.%s", path);
+	if (db_get_str(db_lib(), key, val, sizeof val, NULL) &&
+	    sscanf(val, "%lld %lld %d %d %d %d", &mt, &sz, &win->x, &win->y, &win->w, &win->h) == 6 &&
+	    mt == (long long)st.st_mtime && sz == (long long)st.st_size)
+		return win->w > 0 && win->h > 0;
+
+	win->x = win->y = win->w = win->h = 0;
+	if ((raw = IMG_Load(path))) {
+		img = SDL_ConvertSurfaceFormat(raw, SDL_PIXELFORMAT_ARGB8888, 0);
+		SDL_FreeSurface(raw);
+		if (img) {
+			x0 = img->w; y0 = img->h; x1 = y1 = -1;
+			SDL_LockSurface(img);
+			for (y = 0; y < img->h; y++) {
+				const uint32_t *row = (const uint32_t *)((const uint8_t *)img->pixels +
+				                                         (size_t)y * img->pitch);
+				for (x = 0; x < img->w; x++)
+					if ((row[x] >> 24) < 128) {
+						if (x < x0) x0 = x;
+						if (x > x1) x1 = x;
+						if (y < y0) y0 = y;
+						if (y > y1) y1 = y;
+					}
+			}
+			SDL_UnlockSurface(img);
+			if (x1 >= x0 && y1 >= y0) {
+				win->x = x0 * TORTOS_SCREEN_W / img->w;
+				win->y = y0 * TORTOS_SCREEN_H / img->h;
+				win->w = (x1 + 1) * TORTOS_SCREEN_W / img->w - win->x;
+				win->h = (y1 + 1) * TORTOS_SCREEN_H / img->h - win->y;
+			}
+			SDL_FreeSurface(img);
+		}
+	}
+	snprintf(val, sizeof val, "%lld %lld %d %d %d %d", (long long)st.st_mtime,
+	         (long long)st.st_size, win->x, win->y, win->w, win->h);
+	db_set_str(db_lib(), key, val);
+	return win->w > 0 && win->h > 0;
+}
+
+/* Does the overlay `file` (in the console's folder) frame the console's
+ * picture at Display Mode `mode`? */
+static bool overlay_fits(const app *a, int sys, int mode, const char *file)
+{
+	char path[LIB_PATH * 3];
+	SDL_Rect g, w;
+	int d[4], k;
+
+	if (!overlay_game_rect(a, sys, mode, &g)) return true;
+	overlay_dir(a, sys, path, sizeof path);
+	snprintf(path + strlen(path), sizeof path - strlen(path), "/%s", file);
+	if (!overlay_window(path, &w)) return false;
+	d[0] = w.x - g.x;
+	d[1] = w.y - g.y;
+	d[2] = (g.x + g.w) - (w.x + w.w);
+	d[3] = (g.y + g.h) - (w.y + w.h);
+	for (k = 0; k < 4; k++)
+		if (d[k] < -OVL_UNDER || d[k] > OVL_OVER) return false;
+	return true;
+}
+
 static int overlay_name_cmp(const void *x, const void *y)
 {
 	return strcasecmp((const char *)x, (const char *)y);
 }
 
-/* The PNGs in a console's folder, by name. Returns how many. */
+/* The PNGs in a console's folder that fit its Display Mode (overlay_fits),
+ * by name. Returns how many. */
 static int overlay_list(const app *a, int sys, char (*out)[256], int max)
 {
 	char d[LIB_PATH * 2];
@@ -436,6 +628,7 @@ static int overlay_list(const app *a, int sys, char (*out)[256], int max)
 
 		if (e->d_name[0] == '.' || !dot || strcasecmp(dot, ".png")) continue;
 		if (strlen(e->d_name) >= 256) continue;
+		if (!overlay_fits(a, sys, a->view[sys].dmode, e->d_name)) continue;
 		snprintf(out[n++], 256, "%s", e->d_name);
 	}
 	closedir(dir);
@@ -443,8 +636,16 @@ static int overlay_list(const app *a, int sys, char (*out)[256], int max)
 	return n;
 }
 
+/* How many overlays fit the console's Display Mode. */
+static int overlay_count(const app *a, int sys)
+{
+	static char names[OVERLAY_MAX][256];
+	return overlay_list(a, sys, names, OVERLAY_MAX);
+}
+
 /* The console's overlay as its row says it: its name, or NULL for none - and
- * for one whose file has gone from the card, which draws as none. */
+ * for one whose file has gone from the card, or that does not fit the
+ * Display Mode, which draw as none. */
 static const char *overlay_label(const app *a, int sys, char *buf, size_t n)
 {
 	const sysview *v = &a->view[sys];
@@ -454,6 +655,7 @@ static const char *overlay_label(const app *a, int sys, char *buf, size_t n)
 	overlay_dir(a, sys, path, sizeof path);
 	snprintf(path + strlen(path), sizeof path - strlen(path), "/%s", v->overlay);
 	if (!file_nonempty(path)) return NULL;
+	if (!overlay_fits(a, sys, v->dmode, v->overlay)) return NULL;
 	look_overlay_label(v->overlay, buf, n);
 	return buf;
 }
@@ -491,7 +693,7 @@ static bool overlay_write_dtov(const app *a, int sys, const char *out)
 	FILE *f;
 	int y;
 
-	if (!v->overlay[0]) return false;
+	if (!v->overlay[0] || !overlay_fits(a, sys, v->dmode, v->overlay)) return false;
 	overlay_dir(a, sys, path, sizeof path);
 	snprintf(path + strlen(path), sizeof path - strlen(path), "/%s", v->overlay);
 	if (!(raw = IMG_Load(path))) {
@@ -5009,7 +5211,7 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 			bool moves = menu_row_moves(rows[i], i == sel, visits_all);
 
 			if (rows[i].toggle && rows[i].value) vw = menu_switch_w(text_h);
-			if (lw + (vw ? gap + vw : 0) <= content_w) {
+			if (lw + (vw ? gap + vw : 0) + (rows[i].cycles ? text_h * 3 / 2 : 0) <= content_w) {
 				ui_fit_text(fm, rows[i].label, lbl, sizeof lbl, content_w);
 				ui_text(a->r, fm, lbl, content_x, ty, -1, lc);
 				if (rows[i].value && rows[i].toggle)
@@ -5244,6 +5446,7 @@ static int menu_build(app *a, screen_id screen, int sys,
 			          : a->view[sys].look.on ? "On" : "Off";
 			u.overlay = u.fav || u.muse ? NULL : overlay_label(a, sys, ovl, sizeof ovl);
 			u.dmode   = DMODES[a->view[sys].dmode].label;
+			u.no_overlays = !u.fav && !u.muse && !overlay_count(a, sys);
 		}
 		u.muse_books = u.muse && muse_books_shown();
 		u.muse_both  = u.muse && ml_count(&g_muse, true) && ml_count(&g_muse, false);
@@ -7518,13 +7721,13 @@ static int rm_build(void *ctx, menu_row *rows, int max, const char **heading)
 	if (c->file) {
 		snprintf(c->scope, sizeof c->scope, "%s", c->own ? "This game" : "All its games");
 		c->ids[n] = RM_ROW_SCOPE;
-		rows[n++] = (menu_row){ "For", c->scope, true };
+		rows[n++] = (menu_row){ "For", c->scope, true, .cycles = true };
 		c->ids[n] = RM_ROW_NONE; rows[n++] = MENU_RULE;
 	}
 	for (i = 0; i < RM_BUTTONS; i++) {
 		rm_choice_label(sc->tag, c->map.choice[i], c->vals[i], sizeof c->vals[i]);
 		c->ids[n] = i;
-		rows[n++] = (menu_row){ rm_button_label(i), c->vals[i], true };
+		rows[n++] = (menu_row){ rm_button_label(i), c->vals[i], true, .cycles = true };
 	}
 	c->ids[n] = RM_ROW_NONE; rows[n++] = MENU_RULE;
 	c->ids[n] = RM_ROW_RESET;
@@ -8126,7 +8329,9 @@ static int menu_measure(const menu_row *rows, int n, const char *heading)
 		if (!rows[i].label) continue;          /* a rule measures nothing */
 		rw = ui_text_width(fm, rows[i].label);
 		if (two_col && rows[i].value && !ROW_IS_NOTE(rows[i]))
-			rw += gap + ui_text_width(fm, rows[i].value);
+			rw += gap + (rows[i].toggle ? menu_switch_w(TTF_FontHeight(fm))
+			                            : ui_text_width(fm, rows[i].value));
+		if (rows[i].cycles) rw += TTF_FontHeight(fm) * 3 / 2;   /* the left arrow */
 		if (rw > w) w = rw;
 	}
 	if (heading) {
@@ -8446,6 +8651,7 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 			if (d || key == IN_ACCEPT) {
 				v->dmode = (v->dmode + (d ? d : 1) + DMODE_COUNT) % DMODE_COUNT;
 				display_save(a, a->sys_cursor);
+				overlay_reload(a, a->sys_cursor);   /* that mode's */
 			}
 			return MENU_STAY;
 		}
@@ -8990,6 +9196,7 @@ static int gm_build(app *a, menu_row *out, gm_bufs *b, int shots, const char *sh
 		          : a->view[o].look.on ? "On" : "Off";
 		u.overlay = overlay_label(a, o, ovl, sizeof ovl);
 		u.dmode   = DMODES[a->view[o].dmode].label;
+		u.no_overlays = !overlay_count(a, o);
 	}
 	u.earned = chv_earned();
 	u.total  = chv_count();
@@ -11026,6 +11233,8 @@ static void gm_apply_shader(gm_ctx *c)
  * rect (DISPLAY), which is where the backdrop is drawn; with a shader on, the
  * shaded frame is drawn again at the new size, and the speed check starts
  * over, as the shader's cost moves with the size. */
+static void gm_apply_overlay(gm_ctx *c);
+
 static void gm_cycle_display(gm_ctx *c, int d)
 {
 	app *a = c->a;
@@ -11034,8 +11243,10 @@ static void gm_cycle_display(gm_ctx *c, int d)
 
 	v->dmode = (v->dmode + d + DMODE_COUNT) % DMODE_COUNT;
 	display_save(a, o);
+	overlay_reload(a, o);                  /* that mode's overlay, if any */
 	plat_resident_line("SETDISPLAY\tmode=%s", DMODES[v->dmode].name);
 	plat_resident_sync_rect(1000);
+	gm_apply_overlay(c);
 	if (look_console_of(a->sys.systems[o].tag) != LOOK_NONE && v->look.on) gm_apply_shader(c);
 	else gm_load_bg(c);
 }
@@ -11407,6 +11618,29 @@ static menu_result shader_key(app *a, void *ctx, in_button key, int sel)
 	return MENU_STAY;
 }
 
+/* The shader pages' width: the menus' own, widened if a row of these would
+ * not fit at its longest - "Game System  < Game Boy Color >" - so a value is
+ * never cut short and the panel does not change size as one is cycled. */
+static int shader_width(app *a, int sys, int base)
+{
+	look_console lc = look_console_of(a->sys.systems[sys].tag);
+	char head[96];
+	int i, k, w = base;
+
+	for (i = 0; i < LP_COUNT; i++) {
+		const look_param_info *in = &look_params[i];
+		if (!in->words || !look_param_kept(lc, (look_param)i)) continue;
+		for (k = 0; in->words[k]; k++) {
+			menu_row r = { in->label, in->words[k], true, .cycles = true };
+			int rw = menu_measure(&r, 1, NULL);
+			if (rw > w) w = rw;
+		}
+	}
+	snprintf(head, sizeof head, "%s Shader", a->sys.systems[sys].name);
+	k = menu_measure(NULL, 0, head);
+	return k > w ? k : w;
+}
+
 static void shader_screen(app *a, int sys, void *game)
 {
 	shader_ctx *c = calloc(1, sizeof *c);
@@ -11422,8 +11656,9 @@ static void shader_screen(app *a, int sys, void *game)
 		c->st = c->game->st;           /* its width, tint, power rule and peek */
 		c->st.backdrop = shader_backdrop;
 		c->st.root = false;
+		c->st.fixed_w = shader_width(a, sys, c->st.fixed_w);
 	} else {
-		c->st.fixed_w = menu_shelf_width(a);
+		c->st.fixed_w = shader_width(a, sys, menu_shelf_width(a));
 		c->st.follow_tint = true;
 	}
 	menu_run(a, &c->st, shader_build, shader_key, c);
@@ -11453,7 +11688,7 @@ static void shader_shot(app *a, int group, int sel)
 	SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
 	SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
 	SDL_RenderFillRect(a->r, NULL);
-	menu_draw(a, heading, rows, n, sel, menu_shelf_width(a), a->tint);
+	menu_draw(a, heading, rows, n, sel, shader_width(a, c.sys, menu_shelf_width(a)), a->tint);
 }
 
 static void game_menu(app *a)
@@ -13552,7 +13787,7 @@ static void take_shot(app *a)
 		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
 		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
 		SDL_RenderFillRect(a->r, NULL);
-		menu_draw(a, head, rows, n, 2, 0, MENU_ACCENT);
+		menu_draw(a, head, rows, n, 2, menu_shelf_width(a), MENU_ACCENT);
 	}
 shot_done:
 	if (shot_updates >= 0) {
@@ -13566,7 +13801,7 @@ shot_done:
 		c.next_look = ~0u;              /* as found, not asked */
 		c.online = shot_updates < 100;
 		c.wifi = c.online ? WIFI_CONNECTED : WIFI_OFF;
-		upd_demo((upd_state)(shot_updates % 100), "0.8.0",
+		upd_demo((upd_state)(shot_updates % 100), "1.1.0",
 		         shot_updates % 100 == UPD_FAILED ? "Wi-Fi is off" : NULL);
 		n = upd_build(&c, rows, 16, &head);
 		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
@@ -13574,7 +13809,7 @@ shot_done:
 		SDL_RenderFillRect(a->r, NULL);
 		menu_draw(a, head, rows, n, n - 1, 640, MENU_ACCENT);
 		if (shot_updates % 100 == UPD_AVAILABLE) {
-			snprintf(g_upd_msg, sizeof g_upd_msg, "ChaOS 0.8.0 is available: MENU > Updates");
+			snprintf(g_upd_msg, sizeof g_upd_msg, "ChaOS 1.1.0 is available: MENU > Updates");
 			g_upd_msg_until = plat_now_ms() + 5000;
 			draw_upd_notice(a);
 		}

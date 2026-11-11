@@ -957,6 +957,7 @@ static void ingame_rows(void)
 	menu_row rows[GM_SHOWN];
 	int got[GM_SHOWN], n, k;
 
+	memset(&u, 0, sizeof u);
 	u.shader = "On"; u.overlay = NULL; u.earned = 12; u.total = 40;
 	u.shots = 3; u.shot_said = NULL;
 	n = gm_rows(&u, rows, &b);
@@ -986,6 +987,11 @@ static void ingame_rows(void)
 	   "Screenshots says none, and does nothing");
 	k = reachable(rows, n, got, GM_ROWS);
 	ck(k == GM_ROWS - 2, "so the cursor steps over both");
+
+	u.no_overlays = true;
+	n = gm_rows(&u, rows, &b);
+	ck(!rows[GM_OVERLAY].live && !rows[GM_OVERLAY].cycles,
+	   "no overlay fits the Display Mode: Overlay is dim, with nothing to choose");
 	ck(!holds(got, k, GM_SHOTS), "never resting on Screenshots");
 	ck(!holds(got, k, GM_CHEEVOS), "and never rests on it");
 	ck(holds(got, k, GM_QUIT) && holds(got, k, GM_CONTINUE),

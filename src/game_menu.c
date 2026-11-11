@@ -104,6 +104,7 @@ int gm_rows(const gm_ui *u, menu_row *out, gm_bufs *b)
 	out[GM_SHADER].value = u->shader ? u->shader : "none";
 	out[GM_SHADER].live = u->shader != NULL;
 	out[GM_OVERLAY].value = u->overlay ? u->overlay : "None";
+	if (u->no_overlays) out[GM_OVERLAY].live = out[GM_OVERLAY].cycles = false;
 	/* ChaOS: the rows A opens a screen from: the save slots, the shader's
 	 * settings, the achievements */
 	out[GM_SAVE].opens = out[GM_LOAD].opens = true;

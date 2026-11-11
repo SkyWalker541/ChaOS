@@ -11,33 +11,34 @@ NextUI Community Overlays collection:
 https://github.com/LoveRetro/nextui-community-overlays
 (originally https://github.com/SkyWalker541/TrimUI-Brick-Overlays).
 
-Only the TrimUI Brick's (768p) overlays made for a whole-number scale
-("native") are here, because ChaOS draws every game at a whole-number scale;
-the "aspect" ones frame a picture ChaOS never draws. Renamed for the menu, the
-pictures unchanged:
+The TrimUI Brick's (768p) overlays, "native" ones for Display Mode Integer
+and "aspect" ones (named "... (Aspect)") for Aspect. ChaOS offers each only
+at the mode whose picture it frames (src/main.c, overlay_fits). Left out:
+the STN and PixelPop designs, which lay a grid over the game. Renamed for the
+menu, the pictures unchanged:
 
 | Console | Name in ChaOS | File in the collection |
 | :--- | :--- | :--- |
-| Game Boy | DMG STN | GB/768p/SkyWalker541/native/BRICK_DMG_NATIVE_STN.png |
 | Game Boy | Blue LED | GB/768p/SkyWalker541/native/BRICK_GB_NATIVE_BLUE_LED.png |
 | Game Boy | Red LED | GB/768p/SkyWalker541/native/BRICK_GB_NATIVE_RED_LED.png |
-| Game Boy Color | DMGBC STN | GBC/768p/SkyWalker541/native/BRICK_DMGBC_NATIVE_STN.png |
 | Game Boy Color | Blue LED | GBC/768p/SkyWalker541/native/BRICK_GBC_NATIVE_BLUE_LED.png |
 | Game Boy Color | Blue LED Japanese | GBC/768p/SkyWalker541/native/BRICK_GBC_NATIVE_BLUE_LED_JAPANESE.png |
-| Game Boy Color | Cool PixelPop | GBC/768p/SkyWalker541/native/BRICK_GBC_NATIVE_COOL_PIXELPOP.png |
-| Game Boy Color | Cool STN | GBC/768p/SkyWalker541/native/BRICK_GBC_NATIVE_COOL_STN.png |
 | Game Boy Color | Pokemon | GBC/768p/SkyWalker541/native/BRICK_GBC_NATIVE_POKEMON.png |
-| Game Boy Color | Pokemon STN | GBC/768p/SkyWalker541/native/BRICK_GBC_NATIVE_POKEMON_STN.png |
 | Game Boy Color | Red LED | GBC/768p/SkyWalker541/native/BRICK_GBC_NATIVE_RED_LED.png |
 | Game Boy Color | Red LED Japanese | GBC/768p/SkyWalker541/native/BRICK_GBC_NATIVE_RED_LED_JAPANESE.png |
-| Game Boy Color | Warm PixelPop | GBC/768p/SkyWalker541/native/BRICK_GBC_NATIVE_WARM_PIXELPOP.png |
-| Game Boy Color | Warm STN | GBC/768p/SkyWalker541/native/BRICK_GBC_NATIVE_WARM_STN.png |
 | Game Boy Color | OG | GBC/768p/SkyWalker541/native/BRICK_NATIVE_GBC_OG.png |
-| Game Boy Color | OG Warm PixelPop | GBC/768p/SkyWalker541/native/BRICK_NATIVE_GBC_OG_WARM_PIXELPOP.png |
 | Game Boy Advance | Holographic | GBA/768p/SkyWalker541/native/BRICK_GBA_NATIVE_HOLOGRAPHIC.png |
 | Game Boy Advance | Holographic Pokemon | GBA/768p/SkyWalker541/native/BRICK_GBA_NATIVE_HOLOGRAPHIC_POKEMON.png |
 | Game Boy Advance | OG | GBA/768p/SkyWalker541/native/BRICK_GBA_NATIVE_OG.png |
 | Game Boy Advance | OG Pokemon | GBA/768p/SkyWalker541/native/BRICK_GBA_NATIVE_OG_POKEMON.png |
+| Game Boy | Blue LED (Aspect) | GB/768p/SkyWalker541/aspect/BRICK_GB_ASPECT_BLUE_LED.png |
+| Game Boy | Red LED (Aspect) | GB/768p/SkyWalker541/aspect/BRICK_GB_ASPECT_RED_LED.png |
+| Game Boy Color | Blue LED (Aspect) | GBC/768p/SkyWalker541/aspect/BRICK_GBC_ASPECT_BLUE_LED.png |
+| Game Boy Color | Blue LED Japanese (Aspect) | GBC/768p/SkyWalker541/aspect/BRICK_GBC_ASPECT_BLUE_LED_JAPANESE.png |
+| Game Boy Color | Red LED (Aspect) | GBC/768p/SkyWalker541/aspect/BRICK_GBC_ASPECT_RED_LED.png |
+| Game Boy Color | Red LED Japanese (Aspect) | GBC/768p/SkyWalker541/aspect/BRICK_GBC_ASPECT_RED_LED_JAPANESE.png |
+| Game Boy Advance | Holographic (Aspect) | GBA/768p/SkyWalker541/aspect/BRICK_GBA_ASPECT_HOLOGRAPHIC.png |
+| Game Boy Advance | OG (Aspect) | GBA/768p/SkyWalker541/aspect/BRICK_GBA_ASPECT_OG.png |
 
 ## KrutzOtrem
 
@@ -46,7 +47,8 @@ of his folders in the collection, all the same), from the NextUI Community
 Overlays collection (https://github.com/LoveRetro/nextui-community-overlays;
 originally https://github.com/KrutzOtrem/Trimui-Brick-Overlays).
 
-His Brick (768p) "native" designs, Blank only: ChaOS draws the game over the
+His Brick (768p) "native" designs, and his "aspect" ones (named "...
+(Aspect)"), Blank only: ChaOS draws the game over the
 overlay, so his Grid and Background versions of each look the same as its
 Blank one there. His GBA "(20 Y)" designs frame the game 20 pixels higher than
 ChaOS centres it, and are left out. Renamed "KrutzOtrem - <design>" for the
@@ -86,3 +88,17 @@ menu, the pictures unchanged:
 | Neo Geo Pocket Color | KrutzOtrem - Next Pixel | NGPC/768p/KrutzOtrem/native/Native - Next Pixel - Blank.png |
 | Neo Geo Pocket Color | KrutzOtrem - Pearly Gate | NGPC/768p/KrutzOtrem/native/Native - Pearly Gate - Blank.png |
 | Neo Geo Pocket Color | KrutzOtrem - Vanilla | NGPC/768p/KrutzOtrem/native/Native - Vanilla - Blank.png |
+| Game Boy | KrutzOtrem - Deep Space (Aspect) | GB/768p/KrutzOtrem/aspect/Aspect - Deep Space - Blank.png |
+| Game Boy | KrutzOtrem - Pearly Gate (Aspect) | GB/768p/KrutzOtrem/aspect/Aspect - Pearly Gate - Blank.png |
+| Game Boy | KrutzOtrem - Vanilla (Aspect) | GB/768p/KrutzOtrem/aspect/Aspect - Vanilla - Blank.png |
+| Game Boy Color | KrutzOtrem - Deep Space (Aspect) | GBC/768p/KrutzOtrem/aspect/Aspect - Deep Space - Blank.png |
+| Game Boy Color | KrutzOtrem - Jusco Mario Special E. (Aspect) | GBC/768p/KrutzOtrem/aspect/Aspect - Jusco Mario Special E. - Blank.png |
+| Game Boy Color | KrutzOtrem - Pearly Gate (Aspect) | GBC/768p/KrutzOtrem/aspect/Aspect - Pearly Gate - Blank.png |
+| Game Boy Color | KrutzOtrem - Pokémon Special E. (Aspect) | GBC/768p/KrutzOtrem/aspect/Aspect - Pokémon Special E. - Blank.png |
+| Game Boy Color | KrutzOtrem - Vanilla (Aspect) | GBC/768p/KrutzOtrem/aspect/Aspect - Vanilla - Blank.png |
+| Game Boy Advance | KrutzOtrem - Deep Space (Aspect) | GBA/768p/KrutzOtrem/aspect/Aspect - Deep Space - Blank.png |
+| Game Boy Advance | KrutzOtrem - Pearly Gate (Aspect) | GBA/768p/KrutzOtrem/aspect/Aspect - Pearly Gate - Blank.png |
+| Game Boy Advance | KrutzOtrem - Vanilla (Aspect) | GBA/768p/KrutzOtrem/aspect/Aspect - Vanilla - Blank.png |
+| Game Gear | KrutzOtrem - Deep Space (Aspect) | GG/768p/KrutzOtrem/aspect/Aspect - Deep Space - Blank.png |
+| Game Gear | KrutzOtrem - Pearly Gate (Aspect) | GG/768p/KrutzOtrem/aspect/Aspect - Pearly Gate - Blank.png |
+| Game Gear | KrutzOtrem - Vanilla (Aspect) | GG/768p/KrutzOtrem/aspect/Aspect - Vanilla - Blank.png |

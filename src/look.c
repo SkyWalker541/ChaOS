@@ -384,6 +384,8 @@ void look_overlay_label(const char *file, char *out, size_t n)
 	if (slash) file = slash + 1;
 	dot = strrchr(file, '.');
 	len = dot && dot != file ? (size_t)(dot - file) : strlen(file);
+	/* "... (Aspect)": only ever offered at Aspect, so said there already */
+	if (len > 9 && !strncmp(file + len - 9, " (Aspect)", 9)) len -= 9;
 	if (len >= n) len = n - 1;
 	memcpy(out, file, len);
 	out[len] = '\0';
