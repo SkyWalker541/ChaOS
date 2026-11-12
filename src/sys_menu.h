@@ -120,7 +120,7 @@ _Static_assert(MENU_MAX_ROWS >= SM_ROWS, "MENU_MAX_ROWS < SM_ROWS");
  * and the server stay the hare's, one for both. */
 /* ChaOS: one name, over Wi-Fi and over the cable alike. */
 #define XFER_NAME_WIFI  "ChaOS Transfer"
-#define XFER_NAME_CABLE "ChaOS Transfer"
+#define XFER_NAME_CABLE "ChaOS Wire"
 
 /* Where the built rows' text lives. A row holds pointers, not copies, so the
  * strings a build formats have to outlive the build; the caller owns this and

@@ -292,8 +292,10 @@ static void list_dir(const char *dir, names *dirs, names *files)
 		else if (files && ml_is_audio(e->d_name)) names_add(files, e->d_name);
 	}
 	closedir(d);
-	if (dirs)  qsort(dirs->v, (size_t)dirs->n, sizeof *dirs->v, cmp_name);
-	if (files) qsort(files->v, (size_t)files->n, sizeof *files->v, cmp_name);
+	/* Not with nothing found: an empty list's v is NULL, which qsort may not
+	 * be given even for no items (glibc's UBSan says so; macOS's didn't) */
+	if (dirs && dirs->n > 0)   qsort(dirs->v, (size_t)dirs->n, sizeof *dirs->v, cmp_name);
+	if (files && files->n > 0) qsort(files->v, (size_t)files->n, sizeof *files->v, cmp_name);
 }
 
 /* ---- the library ---------------------------------------------------------- */

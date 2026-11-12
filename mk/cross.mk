@@ -5,6 +5,8 @@ BUILD := build
 # Every device shares src/*.c; DEVICE picks the one device file built with it.
 DEVICE ?= brick
 SRC := $(wildcard src/*.c) src/device/$(DEVICE).c
+# The updater's SHA-256, for System Update to check a download the same way
+SRC += tools/tortos-update/sha256.c
 CC ?= aarch64-linux-gnu-gcc
 
 VERSION ?= 0.0
@@ -70,6 +72,21 @@ $(BUILD)/muse: $(MUSE_SRC) $(wildcard src/muse/*.h)
 	$(CC) -O2 -mcpu=cortex-a53 -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -std=gnu11 \
 	      -D_GNU_SOURCE -I$(SYSROOT)/usr/include $(LDFLAGS) -o $@ $(MUSE_SRC) \
 	      -lavformat -lavcodec -lavfilter -lswresample -lavutil -lasound -lpthread
+
+# The updater (tools/tortos-update/, TortOS#69): one static program, as it runs
+# after the root it was started from is gone and no library is left to load.
+# Installed on the root by plastron, not on the card, and started by init's
+# ::restart: line. Unpacks a release's .img.xz with XZ Embedded, from
+# vendor/xz-embedded (mk/fetch-vendor.sh); plastron passes its own mount of
+# vendor/ as XZ_DIR. The device is picked at build time, as src/device/ is.
+XZ_DIR ?= vendor/xz-embedded
+UPDATE_SRC := $(wildcard tools/tortos-update/*.c)
+XZ_SRC := $(addprefix $(XZ_DIR)/,xz_crc32.c xz_crc64.c xz_dec_stream.c xz_dec_lzma2.c)
+UPDATE_DEVICE := $(if $(filter brick,$(DEVICE)),UPDATE_BRICK,UPDATE_PIXEL2)
+$(BUILD)/tortos-update: $(UPDATE_SRC) $(wildcard tools/tortos-update/*.h) $(XZ_SRC)
+	mkdir -p $(BUILD)
+	$(CC) -O2 -mcpu=cortex-a53 -Wall -Wextra -std=gnu11 -D_GNU_SOURCE -static \
+	      -D$(UPDATE_DEVICE) -DXZ_USE_CRC64 -I$(XZ_DIR) -o $@ $(UPDATE_SRC) $(XZ_SRC)
 
 # Registers a do-nothing media player with BlueZ so a headset's absolute
 # volume is not dropped, and hands a headset's keys to Muse; see the file.

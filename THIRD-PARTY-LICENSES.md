@@ -28,8 +28,10 @@ Diatom and of plastron, the system TortOS runs on.
 
 Each core is its authors' work, built by the libretro project's buildbot
 (https://buildbot.libretro.com) unless noted, pinned by sha256 in
-`mk/fetch-vendor.sh`. The commit is the one the binary names as its source,
-or, for Beetle PCE Fast, the one it was rebuilt from identically.
+`mk/fetch-vendor.sh`, which fetches them from scutes
+(https://github.com/ericreinsmidt/scutes), where the exact files are kept. The
+commit is the one the binary names as its source, or, for Beetle PCE Fast, the
+one it was rebuilt from identically.
 
 | Core | Systems | License | Source |
 |------|---------|---------|--------|
@@ -71,6 +73,25 @@ glibc. Their versions and licenses are in plastron's package list,
   (https://curl.se/ca/cacert.pem), Mozilla Public License 2.0. It lets TortOS
   check the servers it talks to over HTTPS; `res/ssl/README.md` says when it
   was fetched.
+
+---
+
+## Code built into the updater
+
+- **XZ Embedded**, by Lasse Collin and the XZ Embedded authors and
+  contributors (https://github.com/tukaani-project/xz-embedded), its own
+  license: permission to use, copy, modify and distribute for any purpose,
+  with or without fee, and no conditions. Compiled into `tortos-update`,
+  the program that writes a new TortOS release onto the card, to unpack the
+  release's card image. Taken at commit
+  ae63ae3a36ed01724674e8f3d750dc47bf125410 (tag v2024-12-30); each file is
+  pinned by its SHA-256 in `mk/fetch-vendor.sh`, which fetches them into
+  `vendor/xz-embedded/` with the license, `COPYING`.
+- **Josefin Sans**, as above, SIL Open Font License 1.1: the words the
+  updater shows while it writes (Writing, Checking, and the screen it shows
+  if writing stops partway) are drawn ahead of time in it, by TortOS's own
+  menu code, and carried in `tortos-update` as pictures
+  (`tools/tortos-update/art.h`), since it runs with no font library.
 
 ---
 

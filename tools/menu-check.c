@@ -809,8 +809,9 @@ static void radio_less(void)
 	ck(n == k && n == TOP_ROWS - 7, "seven rows fewer (Updates too), and the build agrees with the list");
 	ck(!has_label(rows, n, "Wi-Fi") && !has_label(rows, n, "Bluetooth"),
 	   "no Wi-Fi, no Bluetooth");
-	ck(!has_label(rows, n, "ChaOS Transfer") && !has_label(rows, n, "Box Art"),
-	   "no ChaOS Transfer, no Box Art");
+	ck(!has_label(rows, n, XFER_NAME_WIFI) && !has_label(rows, n, XFER_NAME_CABLE) &&
+	   !has_label(rows, n, "Box Art"),
+	   "no ChaOS Transfer or ChaOS Wire, no Box Art");
 	ck(!has_label(rows, n, "Cheevos") && !has_label(rows, n, "ScreenScraper"),
 	   "and no sign-ins");
 	ck(!has_label(rows, n, "Updates"), "and no Updates, which come over Wi-Fi");
@@ -829,8 +830,8 @@ static void radio_less(void)
 	printf("ChaOS menu, no radio, files over the cable:\n");
 	ck(n == k && n == TOP_ROWS - 6, "six rows fewer: the transfer row stays");
 	for (i = 0; i < k && pm[i] != PM_XFER; i++) { }
-	ck(i < k && !strcmp(rows[i].label, "ChaOS Transfer"),
-	   "as ChaOS Transfer, where the list says it is");
+	ck(i < k && !strcmp(rows[i].label, XFER_NAME_CABLE),
+	   "as ChaOS Wire, where the list says it is");
 	ck(i < k && rows[i].live && !rows[i].value, "live, and not asking for Wi-Fi");
 
 	memset(&u, 0, sizeof u);

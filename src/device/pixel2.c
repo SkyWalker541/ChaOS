@@ -865,6 +865,11 @@ void plat_cable_reconnect(void)
 	closedir(d);
 }
 
+/* Not needed here: the Pixel 2's data over the cable hasn't shown the
+ * Brick's trouble while charging, though it hasn't been tried charging hard
+ * from low either. */
+void plat_cable_slow_charge(bool on) { (void)on; }
+
 /* No mute switch on this device. */
 bool plat_mute_poll(bool own_volume) { (void)own_volume; return false; }
 bool plat_muted(void) { return false; }
@@ -914,6 +919,18 @@ void plat_brightness_set(int level)
 bool plat_has_wifi(void)      { return access("/sys/class/net/wlan0", F_OK) == 0; }
 bool plat_has_bluetooth(void) { return false; }
 
+const char *plat_device_name(void) { return "pixel2"; }
+
+/* busybox init runs its ::shutdown: lines on SIGQUIT and then execs the
+ * ::restart: one, plastron's /usr/sbin/tortos-update. Only where that is on
+ * the root: a system from before the updater has no such line to run. */
+bool plat_update_handoff(void)
+{
+	if (access("/usr/sbin/tortos-update", X_OK) != 0) return false;
+	sync();
+	return kill(1, SIGQUIT) == 0;
+}
+
 /* FUNCTION with volume up or down (key_event). */
 bool plat_brightness_on_volume(void) { return true; }
 
@@ -950,3 +967,23 @@ bool plat_battery(int *pct, bool *charging)
 	}
 	return true;
 }
+
+bool plat_battery_mv(int *mv)
+{
+	int v = read_int("/tmp/tortos_fake_batt_mv");
+
+	if (v <= 0) {
+		/* The RK817's gauge has no voltage_now, only this */
+		if ((v = read_int("/sys/class/power_supply/battery/voltage_avg")) <= 0) return false;
+		v /= 1000;
+	}
+	if (mv) *mv = v;
+	return true;
+}
+
+/* By the gauge's level: it counts the charge going out, so its percentage
+ * falls steadily to the end, and 2% came 22 minutes before the power cut
+ * under a game. Its voltage holds and then, under a game, drops off a cliff
+ * in the last 15, which leaves little to go by. */
+int plat_battery_critical_mv(void) { return 0; }
+int plat_battery_empty_mv(void)    { return 0; }

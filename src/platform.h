@@ -324,6 +324,20 @@ bool plat_cable_link(char *addr, size_t n);
  * link while the device goes on believing it is up. Nothing on a device with
  * no cable link. */
 void plat_cable_reconnect(void);
+/* The charger held to a gentle rate while files move over that cable (on),
+ * and back to what it was (off): for a device whose data over the cable breaks
+ * while it charges hard (the Brick). Nothing elsewhere. */
+void plat_cable_slow_charge(bool on);
+
+/* This device's name as TortOS's releases spell it in their file names:
+ * "brick", "pixel2". */
+const char *plat_device_name(void);
+
+/* Hand the device to the updater once .update/request is written: init runs
+ * the shutdown and then the updater in its place (tools/tortos-update). True
+ * once init has been told; false, with nothing done, where there is no
+ * updater to hand to (a system from before it, or the desktop build). */
+bool plat_update_handoff(void);
 /* kind: 1 = brightness, 2 = volume */
 void plat_osd_show(int kind, int val, int max);
 void plat_draw_osd(SDL_Renderer *r);
@@ -337,6 +351,18 @@ void plat_draw_osd(SDL_Renderer *r);
 Uint32 plat_osd_until(void);
 
 bool plat_battery(int *pct, bool *charging);
+
+/* The battery's voltage in mV, false if it can't be read. A voltage written
+ * to /tmp/tortos_fake_batt_mv stands in for it, as /tmp/tortos_fake_batt does
+ * for the level. */
+bool plat_battery_mv(int *mv);
+
+/* The device's last minutes by voltage, in mV: the low-battery dot blinks at
+ * or below the first, and the device saves a running game and powers off at
+ * or below the second. 0 where the device goes by the gauge's level instead
+ * (BATT_CRITICAL_PCT, BATT_EMPTY_PCT in main.c). */
+int plat_battery_critical_mv(void);
+int plat_battery_empty_mv(void);
 
 /* Whether the device has a Wi-Fi or Bluetooth radio at all - not whether it
  * is on. A radio that is off is the player's to turn on; a device without one

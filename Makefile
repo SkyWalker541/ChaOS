@@ -8,7 +8,8 @@
 .PHONY: all clean native vendor boot chaosboot checkmark \
         check check-cheevos check-hare check-httpd check-idle check-rahash \
         check-raset check-xfer check-menus check-artscrape check-artrun check-audioout \
-        check-db check-stats check-sort check-bt check-ss
+        check-db check-stats check-sort check-bt check-ss check-update check-asan \
+        check-release check-updater
 
 all: check
 
@@ -20,7 +21,8 @@ CHECKS = check-cheevos check-hare check-httpd check-idle check-rahash \
          check-raset check-xfer check-menus check-artscrape check-artrun check-audioout \
          check-db check-stats check-sort check-bt check-ss \
          check-muselib check-musequeue check-museart check-controls check-logpack \
-         check-clock check-update check-remap check-shots check-pixfont
+         check-clock check-update check-remap check-shots check-pixfont \
+         check-release check-updater
 
 check:
 	@fail=0; for c in $(CHECKS); do \
@@ -30,9 +32,20 @@ check:
 	if [ $$fail -ne 0 ]; then printf '\nsome checks FAILED\n' >&2; exit 1; fi; \
 	printf '\nok: every check passed\n'
 
+# The same checks, built with AddressSanitizer and UndefinedBehaviorSanitizer,
+# so an overrun, a use after free or undefined behavior fails a check instead
+# of passing it. Not part of `check`: it takes about 20 s where `check` takes a
+# few. Run it before a release and after touching a parser. Leaks aren't
+# caught: macOS's AddressSanitizer has no leak detection. The binaries land in
+# build-native/ as usual, and the next `make check` rebuilds them plain.
+SANITIZE = -fsanitize=address,undefined -fno-omit-frame-pointer \
+           -fno-sanitize-recover=undefined
+check-asan:
+	@$(MAKE) --no-print-directory check CC="$(CC) $(SANITIZE)"
+
 # One version number: plastron reads it from here for the card and the About
 # page (its package/tortos/tortos.mk).
-VERSION ?= 2.1.1
+VERSION ?= 2.2.0
 
 # The ScreenScraper developer pair, from .screenscraper.env in this directory
 # (gitignored, never committed). A value already in the environment wins, and
@@ -74,10 +87,13 @@ build-native/cheevos-check: tools/cheevos-check.c src/cheevos.c src/cheevos.h \
 check-hare: build-native/hare-check
 	@./build-native/hare-check
 
-build-native/hare-check: tools/hare-check.c src/hare.c src/httpd.c src/xfer.c src/muselib.c FORCE
+build-native/hare-check: tools/hare-check.c src/hare.c src/httpd.c src/xfer.c src/muselib.c \
+                         src/release.c src/rajson.c src/net.c src/atomic.c FORCE
 	@mkdir -p build-native
 	$(CC) -std=gnu11 -Wall -Wextra -Wno-unused-parameter -D_GNU_SOURCE -O1 -g \
-	      -o $@ tools/hare-check.c src/hare.c src/httpd.c src/xfer.c src/muselib.c
+	      -DTORTOS_VERSION='"check"' -DUPDATE_IMAGE_PREFIX='"TortOS"' \
+	      -o $@ tools/hare-check.c src/hare.c src/httpd.c src/xfer.c src/muselib.c \
+	      src/release.c src/rajson.c src/net.c src/atomic.c
 
 # Hare's transport, driven by a real client over a real socket. An HTTP parser
 # is where "looks right" and "is right" part company: every browser sends the
@@ -205,6 +221,45 @@ build-native/clock-check: tools/clock-check.c src/clock.c src/clock.h FORCE
 	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g \
 	      -o $@ tools/clock-check.c src/clock.c
 
+# The updater against the installer's rules: what an update writes on each
+# device's card, every card it refuses, writing and reading back a small card
+# in a file, and its SHA-256 against the standard's vectors - see
+# tools/updater-check.c. (TortOS's check-update.)
+check-updater: build-native/updater-check
+	@./build-native/updater-check
+
+build-native/updater-check: tools/updater-check.c tools/tortos-update/plan.c \
+                           tools/tortos-update/plan.h tools/tortos-update/write.c \
+                           tools/tortos-update/write.h tools/tortos-update/sha256.c \
+                           tools/tortos-update/sha256.h FORCE
+	@mkdir -p build-native
+	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g -Itools \
+	      -o $@ tools/updater-check.c tools/tortos-update/plan.c tools/tortos-update/write.c \
+	      tools/tortos-update/sha256.c
+
+# The updater's own screens (tools/tortos-update/screen.c), as BMPs in
+# build-native/updater-shots, to look at beside their mockups. Not part of
+# check: it needs vendor/xz-embedded (make vendor).
+updater-shots:
+	@mkdir -p build-native/updater-shots
+	$(CC) -std=gnu11 -Wall -Wextra -O1 -g -Itools/tortos-update -Ivendor/xz-embedded \
+	      -o build-native/updater-shots-tool tools/updater-shots.c tools/tortos-update/screen.c \
+	      vendor/xz-embedded/xz_crc32.c vendor/xz-embedded/xz_dec_stream.c \
+	      vendor/xz-embedded/xz_dec_lzma2.c
+	@./build-native/updater-shots-tool build-native/updater-shots
+
+# TortOS's half of updating over Wi-Fi: reading GitHub's answer for the
+# latest release, the version rule, and the answer kept on the card, from
+# saved replies in tools/fixtures/release. No network.
+check-release: build-native/release-check
+	@./build-native/release-check
+
+build-native/release-check: tools/release-check.c src/release.c src/release.h src/rajson.c \
+                            src/net.c src/atomic.c FORCE
+	@mkdir -p build-native
+	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g -DTORTOS_VERSION='"check"' -DUPDATE_IMAGE_PREFIX='"TortOS"' \
+	      -o $@ tools/release-check.c src/release.c src/rajson.c src/net.c src/atomic.c
+
 # The device's title matcher against the host tool's. A drift here does not
 # fail, it just finds fewer games - see tools/artscrape-check.c.
 check-artscrape: build-native/artscrape-check
@@ -267,9 +322,9 @@ build-native/ss-check: tools/ss-check.c src/ss.c src/ss.h src/ssfetch.c src/ssfe
 native:
 	$(MAKE) -f mk/native.mk VERSION=$(VERSION)
 
-# The libretro cores TortOS redistributes, hash-pinned from libretro's own
-# buildbot. Needed once, before the first payload. No runtime libraries: the
-# cores need only what the device's firmware already has.
+# The libretro cores TortOS redistributes, hash-pinned, from scutes
+# (github.com/ericreinsmidt/scutes). Needed once, before the first payload. No
+# runtime libraries: the cores need only what the device's firmware already has.
 vendor:
 	./mk/fetch-vendor.sh
 

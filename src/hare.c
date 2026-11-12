@@ -55,6 +55,16 @@ static void   (*g_after_write)(const char *abs);
 static char  *(*g_albums_wanted)(size_t *len, char *why, size_t wn);
 static char  *(*g_albums_pick)(int id, const char *json, size_t n,
                                size_t *len, char *why, size_t wn);
+/* What a request has put on the screen, so on_end knows it has more to say. */
+enum { TAG_SENDING = 1, TAG_RECEIVING = 2, TAG_UPDATE = 3 };
+
+static bool room_for(const char *path, long want);   /* below */
+
+/* Updating over Down To The Wire: hare_set_update. */
+static char   g_up_dir[XFER_PATH_MAX];
+static char   g_up_version[24], g_up_device[24];
+static void (*g_up_received)(const update_release *offer);
+static char   g_up_state[16] = "idle", g_up_why[128];
 
 /* A MusicBrainz search reply, as the page passes it on: 25 releases is tens
  * of kilobytes. */
@@ -383,6 +393,235 @@ void hare_set_albums(char *(*wanted)(size_t *len, char *why, size_t wn),
 void hare_set_after_write(void (*fn)(const char *abs)) { g_after_write = fn; }
 
 void hare_set_page(const char *page) { g_page = page ? page : "index.html"; }
+
+void hare_set_update(const char *dir, const char *version, const char *device,
+                     void (*received)(const update_release *offer))
+{
+	snprintf(g_up_dir, sizeof g_up_dir, "%s", dir ? dir : "");
+	snprintf(g_up_version, sizeof g_up_version, "%s", version ? version : "");
+	snprintf(g_up_device, sizeof g_up_device, "%s", device ? device : "");
+	g_up_received = dir ? received : NULL;
+	hare_update_state("idle", NULL);
+}
+
+/* Kept to what can go between JSON's quotes as it is: the reasons are this
+ * program's own words, but a quote or a backslash in one would break the
+ * reply rather than show. */
+static void json_safe(char *out, size_t n, const char *in)
+{
+	size_t i = 0;
+
+	for (; in && *in && i + 1 < n; in++)
+		out[i++] = (*in == '"' || *in == '\\' || (unsigned char)*in < 0x20) ? ' ' : *in;
+	out[i] = '\0';
+}
+
+void hare_update_state(const char *state, const char *why)
+{
+	json_safe(g_up_state, sizeof g_up_state, state ? state : "idle");
+	json_safe(g_up_why, sizeof g_up_why, why ? why : "");
+}
+
+/* Whether the launcher is busy with an update it was sent, so another can't
+ * be started over it. */
+static bool update_busy(void)
+{
+	return !strcmp(g_up_state, "receiving") || !strcmp(g_up_state, "checking") ||
+	       !strcmp(g_up_state, "asking") || !strcmp(g_up_state, "updating");
+}
+
+/* The version of an image of this device's already in the folder, or "". */
+static void update_have(char *out, size_t n)
+{
+	char tail[48];
+	struct dirent *e;
+	DIR *d;
+
+	out[0] = '\0';
+	snprintf(tail, sizeof tail, "-%s.img.xz", g_up_device);
+	if (!g_up_dir[0] || !(d = opendir(g_up_dir))) return;
+	while ((e = readdir(d))) {
+		/* ChaOS: the prefix's own length, "ChaOS-v" being 7 where
+		 * "TortOS-v" was 8 */
+		const size_t pl = strlen(UPDATE_IMAGE_PREFIX "-v");
+		size_t len = strlen(e->d_name), tl = strlen(tail);
+
+		if (len > pl + tl && !strncmp(e->d_name, UPDATE_IMAGE_PREFIX "-v", pl) &&
+		    !strcmp(e->d_name + len - tl, tail) && len - pl - tl < n) {
+			memcpy(out, e->d_name + pl, len - pl - tl);
+			out[len - pl - tl] = '\0';
+			break;
+		}
+	}
+	closedir(d);
+}
+
+/* Whether update_tidy clears this: everything in the folder but the updater's
+ * log and its last result, and `keep`. An older image, a part-file, a request
+ * nobody acted on. */
+static bool update_clears(const char *name, const char *keep)
+{
+	return !(name[0] == '.' || !strcmp(name, "update.log") || !strcmp(name, "result") ||
+	         (keep && !strcmp(name, keep)));
+}
+
+/* The bytes an update has to go in: what is free where the folder is, or on
+ * the card under it before the first update has made it, and what update_tidy
+ * would clear first. -1 if the card can't say. */
+static long long update_room(void)
+{
+	char parent[XFER_PATH_MAX], path[XFER_PATH_MAX], *slash;
+	struct statvfs vfs;
+	struct dirent *e;
+	struct stat st;
+	long long room;
+	DIR *d;
+
+	snprintf(parent, sizeof parent, "%s", g_up_dir);
+	if ((slash = strrchr(parent, '/'))) *slash = '\0';
+	if (statvfs(g_up_dir, &vfs) != 0 && statvfs(parent, &vfs) != 0) return -1;
+	room = (long long)vfs.f_bavail * (long long)vfs.f_frsize;
+	if (!(d = opendir(g_up_dir))) return room;
+	while ((e = readdir(d)))
+		if (update_clears(e->d_name, NULL) &&
+		    snprintf(path, sizeof path, "%s/%s", g_up_dir, e->d_name) < (int)sizeof path &&
+		    stat(path, &st) == 0 && S_ISREG(st.st_mode))
+			room += st.st_size;
+	closedir(d);
+	return room;
+}
+
+static void update_tidy(const char *keep)
+{
+	char path[XFER_PATH_MAX];
+	struct dirent *e;
+	DIR *d;
+
+	if (!(d = opendir(g_up_dir))) return;
+	while ((e = readdir(d))) {
+		if (update_clears(e->d_name, keep) &&
+		    snprintf(path, sizeof path, "%s/%s", g_up_dir, e->d_name) < (int)sizeof path)
+			unlink(path);
+	}
+	closedir(d);
+}
+
+/* The offer in a request's query, held to update_offer's rules. */
+static bool update_offer_of(httpd_req *r, update_release *offer, char *why, size_t wn)
+{
+	char file[128], version[32], size[32], sha[80];
+
+	httpd_query(r, "file", file, sizeof file);
+	httpd_query(r, "version", version, sizeof version);
+	httpd_query(r, "size", size, sizeof size);
+	httpd_query(r, "sha256", sha, sizeof sha);
+	return update_offer(file, version, size, sha, g_up_device, g_up_version,
+	                    offer, why, wn);
+}
+
+/* /api/update, all three ways: see hare_set_update. */
+static void route_update(httpd_req *r, bool done)
+{
+	const char *m = httpd_method(r);
+	update_release offer;
+	char why[128] = "", path[XFER_PATH_MAX], part[XFER_PATH_MAX], pad[4];
+	struct stat st;
+
+	if (!g_up_dir[0]) {
+		if (!done) httpd_want_body(r, HTTPD_BODY_NONE, NULL);
+		httpd_reply_status(r, 404, "no updates here");
+		return;
+	}
+	if (!strcmp(m, "GET")) {
+		char json[1024], have[32];
+
+		if (!done) httpd_want_body(r, HTTPD_BODY_NONE, NULL);
+		update_have(have, sizeof have);
+		/* feed and files: where the page asks about a release and downloads
+		 * it, so a development build points both elsewhere (update.h). */
+		snprintf(json, sizeof json,
+		         "{\"version\":\"%s\",\"device\":\"%s\",\"state\":\"%s\","
+		         "\"why\":\"%s\",\"have\":\"%s\",\"feed\":\"%s\",\"files\":\"%s\","
+		         "\"room\":%lld}",
+		         g_up_version, g_up_device, g_up_state, g_up_why, have,
+		         UPDATE_FEED, UPDATE_FILES, update_room());
+		httpd_reply(r, 200, "application/json", json, strlen(json), NULL);
+		return;
+	}
+	if (strcmp(m, "PUT") && strcmp(m, "POST")) {
+		if (!done) httpd_want_body(r, HTTPD_BODY_NONE, NULL);
+		httpd_reply_status(r, 405, "GET, PUT or POST");
+		return;
+	}
+	if (!update_offer_of(r, &offer, why, sizeof why) ||
+	    snprintf(path, sizeof path, "%s/%s", g_up_dir, offer.file) >= (int)sizeof path ||
+	    snprintf(part, sizeof part, "%s.part", path) >= (int)sizeof part) {
+		if (!done) httpd_want_body(r, HTTPD_BODY_NONE, NULL);
+		httpd_reply_status(r, 400, why[0] ? why : "that name is too long");
+		return;
+	}
+	httpd_query(r, "pad", pad, sizeof pad);
+
+	/* POST: the copy already in the folder, sent before. */
+	if (!strcmp(m, "POST")) {
+		if (!done) { httpd_want_body(r, HTTPD_BODY_NONE, NULL); return; }
+		if (update_busy()) { httpd_reply_status(r, 409, "an update is under way"); return; }
+		if (stat(path, &st) != 0 || st.st_size != offer.size) {
+			httpd_reply_status(r, 404, "that update isn't on the device");
+			return;
+		}
+		hare_update_state("checking", NULL);
+		note("checking " UPDATE_IMAGE_PREFIX " %s", offer.version);
+		if (g_up_received) g_up_received(&offer);
+		httpd_reply(r, 200, "text/plain", "ok", 2, NULL);
+		return;
+	}
+
+	/* PUT, first call: whether to take the body at all. */
+	if (!done) {
+		long long want = offer.size + (pad[0] == '1' ? 1 : 0);
+
+		if (update_busy()) {
+			httpd_want_body(r, HTTPD_BODY_NONE, NULL);
+			httpd_reply_status(r, 409, "an update is under way");
+			return;
+		}
+		if (httpd_content_len(r) != want) {
+			httpd_want_body(r, HTTPD_BODY_NONE, NULL);
+			httpd_reply_status(r, 400, "not the size it says");
+			return;
+		}
+		mkdir(g_up_dir, 0777);
+		update_tidy(NULL);
+		if (!room_for(path, (long)(want + (1 << 20)))) {
+			httpd_want_body(r, HTTPD_BODY_NONE, NULL);
+			httpd_reply_status(r, 507, "not enough room on the card");
+			return;
+		}
+		httpd_want_body(r, HTTPD_BODY_FILE, part);
+		httpd_set_tag(r, TAG_UPDATE);
+		hare_update_state("receiving", NULL);
+		note("receiving " UPDATE_IMAGE_PREFIX " %s", offer.version);
+		return;
+	}
+
+	/* PUT, the body is here: in place under its own name, then the launcher's
+	 * to check. The pad byte comes off first, as for any upload. */
+	httpd_set_tag(r, 0);
+	if ((pad[0] == '1' && (stat(part, &st) != 0 || st.st_size < 1 ||
+	                       truncate(part, st.st_size - 1) != 0)) ||
+	    stat(part, &st) != 0 || st.st_size != offer.size || rename(part, path) != 0) {
+		remove(part);
+		hare_update_state("refused", "it didn't arrive whole");
+		note("update didn't arrive whole");
+		httpd_reply_status(r, 500, "it didn't arrive whole");
+		return;
+	}
+	hare_update_state("checking", NULL);
+	note("checking " UPDATE_IMAGE_PREFIX " %s", offer.version);
+	if (g_up_received) g_up_received(&offer);
+	httpd_reply(r, 200, "text/plain", "ok", 2, NULL);
+}
 
 /* A hook's JSON answer, or its reason as a 500. */
 static void reply_json(httpd_req *r, char *json, size_t len, const char *why,
@@ -725,8 +964,6 @@ static bool room_for(const char *path, long want)
 
 /* ---- the entry points httpd calls ------------------------------------ */
 
-/* What a request has put on the screen, so on_end knows it has more to say. */
-enum { TAG_SENDING = 1, TAG_RECEIVING = 2 };
 
 /* A request is over. Only the two that put something on the screen have
  * anything to add to it.
@@ -742,6 +979,13 @@ static void on_end(httpd_req *r, bool whole, void *ctx)
 
 	(void)ctx;
 	if (!tag) return;
+	/* An update that stopped coming: the page cancelled it or went away. Its
+	 * part-file goes with the request, as any upload's does. */
+	if (tag == TAG_UPDATE) {
+		hare_update_state("idle", NULL);
+		note("the update stopped");
+		return;
+	}
 	httpd_query(r, "p", req, sizeof req);
 	if (!xfer_resolve(req, abs, sizeof abs)) return;
 	if (tag == TAG_RECEIVING) {
@@ -830,6 +1074,11 @@ static void on_request(httpd_req *r, bool done, void *ctx)
 	if (!session_valid(r)) {
 		if (!done) httpd_want_body(r, HTTPD_BODY_NONE, NULL);
 		httpd_reply_status(r, 401, "sign in first");
+		return;
+	}
+
+	if (!strcmp(path, "/api/update")) {
+		route_update(r, done);
 		return;
 	}
 
@@ -1401,6 +1650,7 @@ bool hare_start(const char *roms_dir, const char *card_dir,
 	g_shelf_changed = false;
 	g_in = g_out = 0;
 	g_last[0] = '\0';
+	hare_update_state("idle", NULL);
 
 	/* A root that is missing is one nobody can make: the page does not edit
 	 * the roots themselves, and the card's top level is not a root. v1.0

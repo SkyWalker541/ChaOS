@@ -826,6 +826,71 @@ void plat_cable_reconnect(void)
 	fprintf(stderr, "wire: the cable connection made fresh\n");
 }
 
+/* The charger's input held at 1 A at most while files move over the cable:
+ * the Brick's data over it breaks while it charges hard. On a Mac's Type-C
+ * port, which offers 3 A, 50 MiB from the Brick came damaged and four to five
+ * times slower at a limit of 1.5 A and up, or the link stopped; at 1 A it came
+ * clean (2026-11-06). What was there goes back after, but only while the limit
+ * still reads 1 A: a replug in between has the PMIC and the USB driver set it
+ * afresh, and that stands. plastron's kernel takes a write in uA from here
+ * whatever the source offers (its patch 0045); an older one ignores it, which
+ * the read back catches. */
+#define CABLE_LIMIT   "/sys/class/power_supply/axp2202-usb/input_current_limit"
+#define CABLE_SLOW_UA 1000000
+
+static int cable_limit_ua(void)
+{
+	char buf[16] = "";
+	int fd = open(CABLE_LIMIT, O_RDONLY | O_CLOEXEC);
+
+	if (fd < 0) return -1;
+	if (read(fd, buf, sizeof buf - 1) < 0) buf[0] = '\0';
+	close(fd);
+	return buf[0] ? atoi(buf) : -1;
+}
+
+static bool cable_set_limit_ua(int ua)
+{
+	char buf[16];
+	int  n  = snprintf(buf, sizeof buf, "%d", ua);
+	int  fd = open(CABLE_LIMIT, O_WRONLY | O_CLOEXEC);
+	bool ok;
+
+	if (fd < 0) return false;
+	ok = write(fd, buf, (size_t)n) == n;
+	close(fd);
+	return ok;
+}
+
+void plat_cable_slow_charge(bool on)
+{
+	static int put_back;   /* the limit to restore, 0 when nothing was lowered */
+
+	if (on && !put_back) {
+		int ua = cable_limit_ua();
+
+		if (ua > CABLE_SLOW_UA && cable_set_limit_ua(CABLE_SLOW_UA) &&
+		    cable_limit_ua() == CABLE_SLOW_UA) {
+			put_back = ua;
+			fprintf(stderr, "wire: charging held at 1 A (was %d mA)\n", ua / 1000);
+		}
+	} else if (!on && put_back) {
+		if (cable_limit_ua() == CABLE_SLOW_UA)
+			cable_set_limit_ua(put_back);
+		put_back = 0;
+	}
+}
+
+/* busybox init runs its ::shutdown: lines on SIGQUIT and then execs the
+ * ::restart: one, plastron's /usr/sbin/tortos-update. Only where that is on
+ * the root: a system from before the updater has no such line to run. */
+bool plat_update_handoff(void)
+{
+	if (access("/usr/sbin/tortos-update", X_OK) != 0) return false;
+	sync();
+	return kill(1, SIGQUIT) == 0;
+}
+
 /* The switch, checked wherever the jack is and for the same reason: this is
  * the one thing every screen does once a frame.
  *
@@ -1005,6 +1070,8 @@ bool plat_cable_link(char *addr, size_t n)
 	return false;
 }
 void plat_cable_reconnect(void) { }
+void plat_cable_slow_charge(bool on) { (void)on; }
+bool plat_update_handoff(void) { return false; }
 static void jack_forget(void) { }
 static void mute_forget(void) { }
 void plat_backlight(bool on) { (void)on; }
@@ -1067,6 +1134,8 @@ void plat_brightness_set(int level)
 bool plat_has_wifi(void)      { return true; }
 bool plat_has_bluetooth(void) { return true; }
 
+const char *plat_device_name(void) { return "brick"; }
+
 /* F1 and F2, the front function keys. */
 bool plat_brightness_on_volume(void) { return false; }
 
@@ -1117,3 +1186,40 @@ bool plat_battery(int *pct, bool *charging)
 	return false;
 #endif
 }
+
+bool plat_battery_mv(int *mv)
+{
+	FILE *f = fopen("/tmp/tortos_fake_batt_mv", "r");
+	int v = -1;
+
+	if (f) {
+		if (fscanf(f, "%d", &v) != 1) v = -1;
+		fclose(f);
+		if (v > 0) {
+			if (mv) *mv = v;
+			return true;
+		}
+	}
+#ifdef __linux__
+	f = fopen("/sys/class/power_supply/axp2202-battery/voltage_now", "r");
+	if (!f) return false;
+	v = -1;
+	if (fscanf(f, "%d", &v) != 1) v = -1;
+	fclose(f);
+	if (v <= 0) return false;
+	if (mv) *mv = v / 1000;
+	return true;
+#else
+	(void)mv;
+	return false;
+#endif
+}
+
+/* By voltage, as the gauge reads 0% for the last 45 minutes or more before
+ * the power cut, falling from 25% in about 20. From two drains to the cut, Kirby
+ * at full brightness and music with the screen off: 3.31 V came 24 and 26
+ * minutes before it, 3.27 V 16 and 20. A heavier game sags more and leaves
+ * less; Kirby to music, a much bigger change in load, moved it only 3 to 5
+ * minutes. */
+int plat_battery_critical_mv(void) { return 3310; }
+int plat_battery_empty_mv(void)    { return 3270; }
