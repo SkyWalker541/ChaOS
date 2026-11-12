@@ -1850,26 +1850,10 @@ static void muse_show(sysview *v, bool books)
 	cf_reset(&v->cf, 0);
 }
 
-/* ---- The update toast (#69 step 4) -----------------------------------------
- *
- * "Update available" over the shelf for as long as an achievement shows, the
- * first time in a boot one is known to be waiting (upbg_poll decides). The
- * panel a game's notices use, from notice_pixels, where Diatom puts them:
- * drawn by the shelf itself, since no game is running to draw it. */
-#define TOAST_MS 4000            /* the achievement notice's OVERLAY ms */
-static SDL_Texture *g_toast;
-
-static void toast_end(void)
-{
-	if (g_toast) SDL_DestroyTexture(g_toast);
-	g_toast = NULL;
-}
-
 static void free_all_textures(app *a)
 {
 	/* Anything in flight was asked for against the shelf as it was. */
 	texload_bump();
-	toast_end();
 	for (int i = 0; i < 2; i++)
 		if (g_face[i]) { SDL_DestroyTexture(g_face[i]); g_face[i] = NULL; }
 	faces_stale();
@@ -8929,13 +8913,10 @@ static void image_update_screen(app *a)
 	upbg_abandon();     /* the shelf's check, if it is asking: this screen asks */
 	up_known();
 	up_cache_path(cache, sizeof cache);
-	{
-		update_state st;
-		update_release r;
-
-		/* No answer from the last day: ask, once Wi-Fi is up */
-		if (!update_cache_read(cache, time(NULL), CHAOS_VERSION, &st, &r)) phase = UP_CHECKING;
-	}
+	/* ChaOS: asked every time it opens. It opens from Updates, whose own
+	 * check has just found a release on another base, so the answer kept from
+	 * up to a day ago may not know of it yet. */
+	phase = UP_CHECKING;
 
 	while (!done && !want_quit && a->running) {
 		unsigned now = plat_now_ms();

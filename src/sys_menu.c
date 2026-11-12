@@ -221,7 +221,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	 * quiet listening at night. Only where the device has the ladder to give. */
 	full[PM_NIGHT]        = (menu_row){ "Night Mode", u->night, true };
 	full[PM_NIGHT].toggle = true;
-	full[PM_NIGHT].hint   = "quieter steps";
+	full[PM_NIGHT].hint   = "quieter volume";
 	/* Files onto and off the device over Wi-Fi: a small web server on the LAN
 	 * that a phone or a laptop opens. Named for OTA, which is what everyone
 	 * already calls this, and for the other half of the fable - the tortoise

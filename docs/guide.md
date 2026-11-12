@@ -129,7 +129,7 @@ than any one console:
 | **Bluetooth** | the connected headset, or `not connected` - pair, connect and forget |
 | **Audio Output** | `Auto` or `Speaker`, and where Auto landed - see **Audio** below |
 | **Audio Channels** | `stereo`, `mono`, `mono left` or `mono right` - see **Audio** below |
-| **Night Mode** | `On` or `Off`, on the Brick only - eight quieter steps under the volume floor, see **Night Mode** below |
+| **Night Mode** | `On` or `Off`, on the Brick only - eight quieter volume steps under the floor (its hint reads "quieter volume"), see **Night Mode** below |
 | **Over The Hare** | the file server; needs Wi-Fi and says so when there is none. While a computer is on the USB cable it is **Down To The Wire** instead, always at `10.55.0.2` on the Brick and `10.42.0.1` on the Pixel 2 |
 | **Date & Time** | the clock and the time zone, set with left and right - see below |
 | **Auto Off** | how long without a button before the device powers itself down |

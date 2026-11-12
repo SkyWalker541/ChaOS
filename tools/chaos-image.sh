@@ -37,7 +37,12 @@ UPDATER=${TORTOS_UPDATE:-$ROOT/build/tortos-update}
 NOTICE=${DIATOM_NOTICE:-$(dirname "$DIATOM")/../../THIRD-PARTY.md}
 [ -f "$ELF" ] && [ -f "$DIATOM" ] || { echo "build tortos.elf and diatom first" >&2; exit 1; }
 [ -f "$UPDATER" ] || { echo "build tortos-update first (mk/cross.mk)" >&2; exit 1; }
-grep -q 'ChaOS-v%s-%s.img.xz' "$UPDATER" || { echo "$UPDATER isn't ChaOS's updater" >&2; exit 1; }
+# ChaOS's, for the Brick: static (it runs once the root is gone), aarch64,
+# with the request it reads and ChaOS's image names. The launcher has the
+# names too, so they alone don't tell the two apart.
+grep -q 'ChaOS-v%s-%s.img.xz' "$UPDATER" && grep -q '/games/.update/request' "$UPDATER" &&
+	file "$UPDATER" | grep -q 'ARM aarch64.*statically linked' ||
+	{ echo "$UPDATER isn't ChaOS's updater for the Brick" >&2; exit 1; }
 
 W=$(mktemp -d)
 trap 'rm -rf "$W"' EXIT
