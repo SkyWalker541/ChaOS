@@ -46,9 +46,16 @@ static upd_state g_state = UPD_IDLE;
 static ota_info  g_latest;
 static char      g_err[120];
 static pid_t     g_pid = -1;     /* the check, the download or the unpack */
-static bool      g_checked;      /* answered, this boot */
 static bool      g_check_failed; /* the last FAILED was the check's */
-static time_t    g_auto_at;      /* the boot's own check, last tried */
+static time_t    g_auto_at;      /* the automatic check, last tried */
+
+/* The automatic check: once Wi-Fi is up, and then again every half hour for as
+ * long as the Brick is on, so a release shows up without a restart. A check
+ * that could not reach GitHub is tried again sooner, in a quarter of an hour.
+ * Nothing is asked while a download or an install is running. A version that
+ * was already announced is not announced again. */
+#define UPD_AUTO_EVERY  (30 * 60)
+#define UPD_RETRY_EVERY (15 * 60)
 static char      g_announced[32];
 static pid_t     g_notes_pid = -1;
 static char      g_notes_for[32];   /* the version they are, or are being, fetched for */
@@ -341,7 +348,6 @@ static void checked(bool ok)
 	unlink(OTA_TMP);
 	if (!ota_parse(text, &o)) { fail("Update info unreadable"); return; }
 	g_check_failed = false;
-	g_checked = true;
 	/* The small one when this card's system is the release's: ChaOS's
 	 * own files, a few megabytes, rather than the whole system */
 	o.can_small = o.app[0] && g_system[0] && !strcmp(o.system, g_system);
@@ -519,13 +525,18 @@ bool upd_tick(bool online)
 	bool notes = notes_tick(online);
 	int st;
 
-	/* The boot's own check: when Wi-Fi is up, and again a quarter of an hour
-	 * after one that could not reach GitHub, until one answers */
-	if (!g_checked && online && g_pid <= 0 &&
-	    (g_state == UPD_IDLE || (g_state == UPD_FAILED && g_check_failed)) &&
-	    time(NULL) - g_auto_at >= 15 * 60) {
-		g_auto_at = time(NULL);
-		upd_check();
+	/* The automatic check, from the shelf and the menus: the launcher's loop
+	 * does not run while a game does, so a game is never interrupted */
+	{
+		bool settled = g_state == UPD_IDLE || g_state == UPD_CURRENT ||
+		               g_state == UPD_AVAILABLE || g_state == UPD_INSTALLER ||
+		               (g_state == UPD_FAILED && g_check_failed);
+		int every = g_check_failed ? UPD_RETRY_EVERY : UPD_AUTO_EVERY;
+
+		if (online && g_pid <= 0 && settled && time(NULL) - g_auto_at >= every) {
+			g_auto_at = time(NULL);
+			upd_check();
+		}
 	}
 	if (g_pid > 0 && waitpid(g_pid, &st, WNOHANG) == g_pid) {
 		int code = WIFEXITED(st) ? WEXITSTATUS(st) : -1;
