@@ -9,7 +9,7 @@
         check check-cheevos check-hare check-httpd check-idle check-rahash \
         check-raset check-xfer check-menus check-artscrape check-artrun check-audioout \
         check-db check-stats check-sort check-bt check-ss check-update check-asan \
-        check-release check-updater
+        check-release check-updater check-chaos-names
 
 all: check
 
@@ -22,7 +22,7 @@ CHECKS = check-cheevos check-hare check-httpd check-idle check-rahash \
          check-db check-stats check-sort check-bt check-ss \
          check-muselib check-musequeue check-museart check-controls check-logpack \
          check-clock check-update check-remap check-shots check-pixfont \
-         check-release check-updater
+         check-release check-updater check-chaos-names
 
 check:
 	@fail=0; for c in $(CHECKS); do \
@@ -259,6 +259,32 @@ build-native/release-check: tools/release-check.c src/release.c src/release.h sr
 	@mkdir -p build-native
 	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g -DTORTOS_VERSION='"check"' -DUPDATE_IMAGE_PREFIX='"TortOS"' \
 	      -o $@ tools/release-check.c src/release.c src/rajson.c src/net.c src/atomic.c
+
+# ChaOS: check-release and check-hare again, with ChaOS's image names, as the
+# device builds them. Those two build with UPDATE_IMAGE_PREFIX TortOS, as their
+# saved replies are TortOS's; here the checks and the replies are copied with
+# every TortOS-v made ChaOS-v (and the updater's "updated to ChaOS"), so the
+# name ChaOS ships with is the one checked: its 7 letters where TortOS's were
+# 8, in hare.c's scan of .update/ and in release.c's.
+CHAOS_NAMES = build-native/chaos-names
+check-chaos-names: FORCE
+	@rm -rf $(CHAOS_NAMES) && mkdir -p $(CHAOS_NAMES)/fixtures/release
+	@for f in tools/fixtures/release/*; do \
+		sed 's/TortOS-v/ChaOS-v/g' "$$f" > $(CHAOS_NAMES)/fixtures/release/$${f##*/}; \
+	done
+	@sed 's/TortOS-v/ChaOS-v/g; s/updated to TortOS/updated to ChaOS/g; s|#include "../src/|#include "../../src/|; s|"tools/fixtures/release/%s"|"$(CHAOS_NAMES)/fixtures/release/%s"|' \
+		tools/release-check.c > $(CHAOS_NAMES)/release-check.c
+	@sed 's/TortOS-v/ChaOS-v/g; s/updated to TortOS/updated to ChaOS/g; s|#include "../src/|#include "../../src/|' \
+		tools/hare-check.c > $(CHAOS_NAMES)/hare-check.c
+	@grep -q 'ChaOS-v' $(CHAOS_NAMES)/release-check.c && grep -q 'ChaOS-v' $(CHAOS_NAMES)/hare-check.c
+	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g -DTORTOS_VERSION='"check"' -Isrc \
+	      -o $(CHAOS_NAMES)/release-check $(CHAOS_NAMES)/release-check.c src/release.c src/rajson.c \
+	      src/net.c src/atomic.c
+	$(CC) -std=gnu11 -Wall -Wextra -Wno-unused-parameter -D_GNU_SOURCE -O1 -g -DTORTOS_VERSION='"check"' -Isrc \
+	      -o $(CHAOS_NAMES)/hare-check $(CHAOS_NAMES)/hare-check.c src/hare.c src/httpd.c src/xfer.c \
+	      src/muselib.c src/release.c src/rajson.c src/net.c src/atomic.c
+	@./$(CHAOS_NAMES)/release-check
+	@./$(CHAOS_NAMES)/hare-check
 
 # The device's title matcher against the host tool's. A drift here does not
 # fail, it just finds fewer games - see tools/artscrape-check.c.
