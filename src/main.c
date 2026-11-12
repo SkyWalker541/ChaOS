@@ -928,8 +928,6 @@ static int  g_status_batt = STATUS_BATT_ICON;
 static const char *const STATUS_BATT_NAMES[STATUS_BATT_COUNT] = {
 	"Off", "Icon", "Percent", "Icon and percent",
 };
-#define STATUS_MARGIN 20
-#define STATUS_Y      6
 #define LIST_VIEW_ON() (g_list_view && !CARD_DIRS[g_dir].both)
 /* ChaOS: a menu drawn to fill the screen, this far from its edges, for the
  * one draw it is set around (the game List); -1 for the usual */
@@ -3351,31 +3349,45 @@ static bool battery_state(int *pct, bool *charging)
 	return got_pct >= 0;
 }
 
-/* The status bar: the clock top left, the battery top right (icon, percent or
- * both), and the low-battery dot. The dot keeps its own place when the battery
- * is not drawn, and moves in beside it when it is, so the two never overlap.
- * The dot is steady when low and blinks when critical, a second on and a
- * second off, slow enough not to pull at the eye. Returns how long until
- * something here changes by itself, in ms (-1 never), so a screen that only
- * draws when something moves still updates the minute and blinks the dot.
- * Diatom blinks its own over a game on the same rhythm. */
-static unsigned draw_status_bar(SDL_Renderer *r)
+/* The low-battery dot on its own, for the screens with no status line of their
+ * own: the shelf and Muse. Steady when low, blinking when critical, a second on
+ * and a second off, slow enough not to pull at the eye. Returns how long until
+ * it changes by itself, in ms (-1 never), so a screen that only draws when
+ * something moves still blinks it. Diatom blinks its own over a game on the
+ * same rhythm. */
+static unsigned draw_low_battery_chrome(SDL_Renderer *r)
+{
+	Uint32 now, flip;
+	int level = battery_level();
+
+	if (level == 0) return (unsigned)-1;
+	if (level == 1) { draw_low_battery_dot(r, TORTOS_SCREEN_W - 34, 34); return (unsigned)-1; }
+	now = plat_now_ms();
+	flip = 1000 - now % 1000;
+	redraw_at(now + flip);
+	if ((now / 1000) % 2 == 0) draw_low_battery_dot(r, TORTOS_SCREEN_W - 34, 34);
+	return flip;
+}
+
+/* The status line in a menu's heading band: the clock from `left`, the battery
+ * ending at `right`, both centred on the heading's line at y. Anything that
+ * would run into the heading, between head_l and head_r, is left out rather
+ * than drawn over it. The low-battery dot sits beside the battery, or at the
+ * right edge when no battery is drawn. */
+static void draw_menu_status(SDL_Renderer *r, int left, int right, int y,
+                             int head_l, int head_r)
 {
 	TTF_Font *f = ui_font(UI_F_META);
-	unsigned wait = (unsigned)-1;
-	int dot_x = TORTOS_SCREEN_W - 34, dot_y = 34;
+	int mid = y + ui_font_height(UI_F_META) / 2;
+	int dot_x = right - 9;
 	int level = battery_level();
-	Uint32 now = plat_now_ms();
 
 	if (g_status_clock) {
 		char s[16];
-		time_t t = time(NULL);
-		unsigned to_minute = (unsigned)(60 - t % 60) * 1000u;
 
-		clock_hhmm(t, g_status_clock24, s, sizeof s);
-		ui_text(r, f, s, STATUS_MARGIN, STATUS_Y, -1, UI_TEXT_DIM);
-		redraw_at(now + to_minute);
-		wait = to_minute;
+		clock_hhmm(time(NULL), g_status_clock24, s, sizeof s);
+		if (left + ui_text_width(f, s) <= head_l)
+			ui_text(r, f, s, left, y, -1, UI_TEXT_DIM);
 	}
 
 	if (g_status_batt != STATUS_BATT_OFF) {
@@ -3383,50 +3395,46 @@ static unsigned draw_status_bar(SDL_Renderer *r)
 		bool charging = false;
 
 		if (battery_state(&pct, &charging)) {
-			bool icon = g_status_batt == STATUS_BATT_ICON || g_status_batt == STATUS_BATT_BOTH;
+			bool icon  = g_status_batt == STATUS_BATT_ICON || g_status_batt == STATUS_BATT_BOTH;
 			bool words = g_status_batt == STATUS_BATT_PCT || g_status_batt == STATUS_BATT_BOTH;
-			int right = TORTOS_SCREEN_W - STATUS_MARGIN, left = right, mid_y = STATUS_Y + 7;
+			char s[12] = "";
+			int tw = 0, gap = icon && words ? 6 : 0;
+			int iw = icon ? 33 : 0;         /* a 30px body and a 3px nub */
+			int total, ix;
 			SDL_Color fill = pct <= BATT_LOW_PCT ? (SDL_Color){ 224, 72, 72, 255 }
 			               : charging ? (SDL_Color){ 120, 200, 120, 255 }
 			               : UI_TEXT_SOFT;
 
 			if (words) {
-				char s[12];
-
 				snprintf(s, sizeof s, "%d%%", pct);
-				left = right - ui_text_width(f, s);
-				ui_text(r, f, s, right, STATUS_Y, 1, UI_TEXT_DIM);
+				tw = ui_text_width(f, s);
 			}
-			if (icon) {
-				/* A body and a nub on its right, the fill to the level */
-				int bw = 30, bh = 14, nub = 3;
-				int bx = (words ? left - 6 : right) - nub - bw;
-				int inner = bw - 4, w = inner * pct / 100;
-				SDL_Rect body = { bx, STATUS_Y, bw, bh };
-				SDL_Rect cap  = { bx + bw, STATUS_Y + 4, nub, 6 };
-				SDL_Rect in   = { bx + 2, STATUS_Y + 2, w, bh - 4 };
+			total = tw + gap + iw;
+			if (total > 0 && right - total > head_r) {
+				ix = words ? right - tw - gap : right;
+				if (words) ui_text(r, f, s, right, y, 1, UI_TEXT_DIM);
+				if (icon) {
+					int bw = 30, bh = 14, nub = 3, inner = bw - 4;
+					int w = inner * pct / 100, bx = ix - nub - bw;
+					SDL_Rect body = { bx, mid - bh / 2, bw, bh };
+					SDL_Rect cap  = { bx + bw, mid - 3, nub, 6 };
+					SDL_Rect in   = { bx + 2, mid - bh / 2 + 2, w, bh - 4 };
 
-				SDL_SetRenderDrawColor(r, UI_TEXT_DIM.r, UI_TEXT_DIM.g, UI_TEXT_DIM.b, 255);
-				SDL_RenderDrawRect(r, &body);
-				SDL_RenderFillRect(r, &cap);
-				SDL_SetRenderDrawColor(r, fill.r, fill.g, fill.b, 255);
-				if (w > 0) SDL_RenderFillRect(r, &in);
-				left = bx;
+					SDL_SetRenderDrawColor(r, UI_TEXT_DIM.r, UI_TEXT_DIM.g, UI_TEXT_DIM.b, 255);
+					SDL_RenderDrawRect(r, &body);
+					SDL_RenderFillRect(r, &cap);
+					SDL_SetRenderDrawColor(r, fill.r, fill.g, fill.b, 255);
+					if (w > 0) SDL_RenderFillRect(r, &in);
+					dot_x = bx - 18;
+				} else {
+					dot_x = right - tw - 18;
+				}
 			}
-			dot_x = left - 18;
-			dot_y = mid_y;
 		}
 	}
 
-	if (level == 1) draw_low_battery_dot(r, dot_x, dot_y);
-	else if (level == 2) {
-		unsigned flip = 1000 - now % 1000;
-
-		redraw_at(now + flip);
-		if (wait == (unsigned)-1 || flip < wait) wait = flip;
-		if ((now / 1000) % 2 == 0) draw_low_battery_dot(r, dot_x, dot_y);
-	}
-	return wait;
+	if (level == 1 || (level == 2 && (plat_now_ms() / 1000) % 2 == 0))
+		draw_low_battery_dot(r, dot_x, mid);
 }
 
 static void draw_low_battery_dot(SDL_Renderer *r, int cx, int cy)
@@ -4321,7 +4329,7 @@ static void draw_shelf(app *a)
 	 * games screen, or Cubic, whose faces are games */
 	if (a->sys.count > 0 && (a->screen != SCREEN_SYSTEMS || CARD_DIRS[g_dir].both))
 		draw_letter_popup(a);
-	draw_status_bar(a->r);
+	draw_low_battery_chrome(a->r);
 }
 
 static void render(app *a)
@@ -4978,6 +4986,18 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 		                       (Uint8)(accent >> 8), (Uint8)accent, 70);
 		SDL_RenderFillRect(a->r, &(SDL_Rect){ content_x, panel.y + head_h,
 		                                      content_w, 2 });
+		/* ChaOS: the clock and the battery, in the heading's band, so every
+		 * menu shows them with no screen of its own. A submenu's back chevron
+		 * takes the left, so its clock starts a step further in. */
+		{
+			int hw = ui_text_width(fh, head1);
+			int left = panel.x + pad * (g_menu_root ? 1 : 2);
+			int right = panel.x + panel.w - pad;
+
+			draw_menu_status(a->r, left, right,
+			                 hy + (line_head - ui_font_height(UI_F_META)) / 2,
+			                 cx - hw / 2 - pad, cx + hw / 2 + pad);
+		}
 		/* ChaOS: a submenu says so, and that B goes back, with a chevron
 		 * pointing back at the heading's left, in the margin */
 		if (!g_menu_root)
@@ -5929,9 +5949,6 @@ static menu_exit menu_run_body(app *a, const menu_style *st,
 			          st->follow_tint ? a->tint : st->accent);
 			g_menu_root = false;
 		}
-		/* The status bar over the panel, so the clock in its corner is not
-		 * hidden behind a menu, as it is on the shelf. */
-		draw_status_bar(a->r);
 		plat_draw_osd(a->r);
 		plat_present();
 		SDL_Delay(8);
@@ -10096,7 +10113,7 @@ static unsigned np_draw(app *a, const mu_now *mn, const char *next)
 	                 : "A: pause    L1/R1: track    Left/Right: seek    Y: mode"),
 	        TORTOS_SCREEN_W / 2, TORTOS_SCREEN_H - 72, 0, UI_TEXT_DIM);
 	{
-		unsigned dot = draw_status_bar(r);
+		unsigned dot = draw_low_battery_chrome(r);
 		if (dot < wait) wait = dot;
 	}
 	return wait;
@@ -11488,7 +11505,6 @@ static void gm_backdrop(app *a, void *ctx)
 	/* The low-battery disc, as on the shelf: this menu is drawn by this
 	 * process, so it is drawn here; in the game Diatom draws it. This loop
 	 * draws every frame, so the blink needs nothing more. */
-	draw_status_bar(a->r);
 }
 
 /* Power here stops the GAME. The device is not going anywhere, and the wait
