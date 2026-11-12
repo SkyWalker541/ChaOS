@@ -29,8 +29,15 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 DIATOM=${3:-$ROOT/../chaos-diatom/build/brick/diatom}
 [ -n "$IN" ] && [ -n "$OUT" ] || { echo "usage: $0 TortOS-brick.img.xz OUT.img.xz [diatom]" >&2; exit 2; }
 ELF=${TORTOS_ELF:-$ROOT/build/tortos.elf}
+# The updater init runs for an update (TortOS 2.2.0's, /usr/sbin/tortos-update
+# on the root), built from tools/tortos-update/ to take ChaOS's images:
+# TortOS's own takes only TortOS-v<version>-<device>.img.xz and would refuse
+# every ChaOS release. make -f mk/cross.mk build/tortos-update DEVICE=brick.
+UPDATER=${TORTOS_UPDATE:-$ROOT/build/tortos-update}
 NOTICE=${DIATOM_NOTICE:-$(dirname "$DIATOM")/../../THIRD-PARTY.md}
 [ -f "$ELF" ] && [ -f "$DIATOM" ] || { echo "build tortos.elf and diatom first" >&2; exit 1; }
+[ -f "$UPDATER" ] || { echo "build tortos-update first (mk/cross.mk)" >&2; exit 1; }
+grep -q 'ChaOS-v%s-%s.img.xz' "$UPDATER" || { echo "$UPDATER isn't ChaOS's updater" >&2; exit 1; }
 
 W=$(mktemp -d)
 trap 'rm -rf "$W"' EXIT
@@ -57,6 +64,10 @@ C=$W/root/usr/share/tortos/card
 INIT=$W/root/etc/init.d/tortos
 
 install -m 755 "$ELF" "$C/TortOS/tortos.elf"
+# ChaOS's updater in place of TortOS's, where init's ::restart: line runs it
+[ -f "$W/root/usr/sbin/tortos-update" ] || { echo "no updater in this image's root: is it TortOS 2.2.0 or later?" >&2; exit 1; }
+grep -q '::restart:/usr/sbin/tortos-update' "$W/root/etc/inittab" || { echo "inittab has changed: check the updater" >&2; exit 1; }
+install -m 755 "$UPDATER" "$W/root/usr/sbin/tortos-update"
 install -m 755 "$DIATOM" "$C/TortOS/diatom"
 rm -rf "$C/TortOS/overlays"
 cp -R "$ROOT/res/overlays" "$C/TortOS/overlays"
@@ -66,7 +77,9 @@ find "$C/TortOS/overlays" -type f -exec chmod 644 {} +
 # card's copy that has to be ChaOS's (mk/payload.sh does the same)
 rm -f "$C/TortOS/res/web/"*.html "$C/TortOS/res/web/"*.svg "$C/TortOS/res/web/"*.js "$C/TortOS/res/web/"*.css
 install -m 644 "$ROOT/res/web/"* "$C/TortOS/res/web/"
-install -m 644 "$ROOT/res/web/index.html" "$C/TortOS/res/web/wire.html"
+# Over the cable the page wears the cable's name, ChaOS Wire (sys_menu.h)
+sed 's/ChaOS Transfer/ChaOS Wire/g' "$ROOT/res/web/index.html" > "$C/TortOS/res/web/wire.html"
+chmod 644 "$C/TortOS/res/web/wire.html"
 # The boot: ChaOS's logo flying together (tools/genchaosmotion.py), in
 # place of TortOS's flyby, for plastron's splash
 install -m 644 "$ROOT/res/boot/chaos-splash-brick.bin" "$W/root/usr/share/splash/frames.bin"

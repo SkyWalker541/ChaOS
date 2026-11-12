@@ -1,15 +1,18 @@
-# Puts the latest release's images and SHA256SUMS on GitHub Pages, at
-# https://ericreinsmidt.github.io/TortOS/, where Down To The Wire's page
-# downloads an update (src/update.h, UPDATE_FILES). A web page can't read a
-# release download itself, as GitHub sends no CORS header with one; Pages
-# does. Nothing is committed: each run replaces the whole site with one
-# release's files, so the repository doesn't grow. The device checks the
-# image against the SHA-256 GitHub's API gives, never against this copy.
+# Puts the latest release's Brick image and SHA256SUMS on GitHub Pages, at
+# https://skywalker541.github.io/ChaOS/, where ChaOS Wire's page downloads an
+# update (src/release.h, UPDATE_FILES). A web page can't read a release
+# download itself, as GitHub sends no CORS header with one; Pages does.
+# Nothing is committed: each run replaces the whole site with one release's
+# files, so the repository doesn't grow. The device checks the image against
+# the SHA-256 GitHub's API gives, never against this copy.
 #
-# Set up once, on GitHub:
-#   gh api -X POST repos/ericreinsmidt/TortOS/pages -f build_type=workflow
-#   gh api -X POST repos/ericreinsmidt/TortOS/environments/github-pages/deployment-branch-policies -f name='v*' -f type=tag
-# The second lets a release's tag deploy: by default only the main branch may.
+# From TortOS 2.2.0. A ChaOS release is made by release.yml with the
+# workflow's own token, whose events start no other workflow, so release.yml
+# starts this one itself (workflow_dispatch, which that token may do), on
+# main, with no tag: the latest release.
+#
+# Set up once, on GitHub (Settings > Pages > Source: GitHub Actions, or):
+#   gh api -X POST repos/SkyWalker541/ChaOS/pages -f build_type=workflow
 name: Release files to Pages
 
 on:
@@ -43,7 +46,7 @@ jobs:
         run: |
           mkdir site
           gh release download $TAG --repo "$GITHUB_REPOSITORY" --dir site \
-            --pattern 'TortOS-v*.img.xz' --pattern SHA256SUMS
+            --pattern 'ChaOS-v*-brick.img.xz' --pattern SHA256SUMS
           ls -l site
       - name: Check them against SHA256SUMS
         working-directory: site

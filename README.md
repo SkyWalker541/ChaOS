@@ -30,12 +30,16 @@
 <div align="center">
 <table>
   <tr>
-    <td align="center"><img src="res/readme/chaos-shelf.png" width="380" alt="The ChaOS shelf"><br><sub>The shelf</sub></td>
-    <td align="center"><img src="res/readme/chaos-shader.png" width="380" alt="The NES's shader settings"><br><sub>Each console's shader and its settings</sub></td>
+    <td align="center"><img src="res/readme/chaos-pixel-names.png" width="380" alt="The ChaOS Pixel Names theme"><br><sub>ChaOS Pixel Names: each console in the logo's pixel letters</sub></td>
+    <td align="center"><img src="res/readme/chaos-pixel-cards.png" width="380" alt="The ChaOS Pixel Cards theme"><br><sub>ChaOS Pixel Cards</sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="res/readme/chaos-menu.png" width="380" alt="The ChaOS menu"><br><sub>The Brick's settings in one menu, in your color</sub></td>
-    <td align="center"><img src="res/readme/chaos-transfer.png" width="380" alt="ChaOS Transfer in a browser"><br><sub>ChaOS Transfer, from any browser</sub></td>
+    <td align="center"><img src="res/readme/chaos-menu.png" width="380" alt="The ChaOS menu with Night Mode, the clock and the battery"><br><sub>Night Mode, and the clock and battery in every menu</sub></td>
+    <td align="center"><img src="res/readme/chaos-appearance.png" width="380" alt="The Appearance page"><br><sub>The look, on one page, in your color</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="res/readme/chaos-shader.png" width="380" alt="The NES's shader settings"><br><sub>Each console's shader and its settings</sub></td>
+    <td align="center"><img src="res/readme/chaos-transfer.png" width="380" alt="ChaOS Transfer in a browser"><br><sub>ChaOS Transfer and ChaOS Wire, from any browser</sub></td>
   </tr>
 </table>
 </div>
@@ -55,6 +59,11 @@
 - **Two ChaOS UI Themes** (**MENU > Appearance > UI Theme**) where each console is its name in the logo's pixel letters, last word in the console's colour. **ChaOS Pixel Cards** puts the name on a card; **ChaOS Pixel Names** has no cards, just the name, large and the same size for every console, with a drop shadow and a soft reflection beneath it in the console's colour. As you scroll, the name you land on flies together pixel by pixel; with Pixel Cards the one you leave breaks apart too, and with Pixel Names it simply makes way for the next. The two themes leave out some directions: Pixel Cards has no Cubic, and Pixel Names runs horizontally only. **Transition Speed** (Slow, Normal, Fast or **Static**) sets how quickly, separately for each UI Direction; it's in the menu while either theme is on. Static turns the pixel movement off: each name or card appears in place at once, and a name over a game still shows for the same moment.
 - **Screenshots** of any game with **MENU + X**, looked at again from the in-game menu.
 - **Game List View** (**MENU > Appearance > Game List View**): **Normal** shows each system's games as the UI Theme draws them; **List** shows them as a scrolling list in the menus' style. Up and down move, left and right jump by letter, and L1 and R1 skip a screenful, as on the shelf. (Not in Cubic, which never opens a list.)
+- **Night Mode** (**MENU > Night Mode**): eight extra volume steps below the quietest, for playing in bed. The volume buttons reach them while it's on.
+- **The clock and battery in every menu,** in the menu's heading, on the main menu and in games. **MENU > Date & Time** sets 12- or 24-hour time, and whether the battery shows as an icon, a percentage or both.
+- **Appearance** (**MENU > Appearance**): the UI Theme, UI Direction, Transition Speed, Game List View and Menu Color on one page.
+- **Recently Played,** a shelf at the front of the systems row with the last twelve games you played across every system. Turn it off under **MENU > Recently Played**.
+- **ChaOS Wire:** ChaOS Transfer over the USB cable, which can also update ChaOS from your computer.
 - **Letter scrubbing:** on any game shelf, in every theme, Game List View and Cubic, **L2** and **R2** jump to the first game of the previous or next letter with each press, and a square with the letter you're on fades in over the shelf. Hold the d-pad to scroll and after two seconds the same square shows the letter you're passing through. It fades out a moment after you stop.
 
 **From TortOS**
@@ -64,7 +73,8 @@
 - **Everything on the handheld:** Wi-Fi, box art, RetroAchievements, Bluetooth headphones and sending games over from your phone. You need a computer once, to set up the card.
 - **Three ways to browse** (a row, a column or a cube) and two looks (Plain Jane or Fancy Pants), plus ChaOS Pixel Cards and ChaOS Pixel Names.
 - **Muse,** a music and audiobook player, on SELECT from anywhere.
-- **Turbo buttons, fast forward, mono audio, Play Time, favorites and sorting.** Two shelves sit at the front of the systems row while they have games: **Favorites**, and **Recently Played**, the last twelve games you played across every system. Favorites appear once a game is favorited. Recently Played can be turned off in the menu, under **Recently Played**.
+- **Turbo buttons, fast forward, mono audio, Play Time, favorites and sorting.** **Favorites** sits at the front of the systems row once a game is favorited.
+- **The battery to the end:** a game is saved and the Brick turns off when the battery is truly empty, judged by its voltage, about half an hour later than its gauge's 2% allowed. The red dot blinks for the last stretch.
 - **Your Brick stays yours.** ChaOS runs from the SD card and changes nothing on the Brick. Take the card out and it boots its own system again.
 
 ## Install
@@ -83,7 +93,10 @@ You need a TrimUI Brick or Brick Hammer, a microSD card and, just this once, a c
 
 ### Updating
 
-On the Brick: **MENU > Updates**, over Wi-Fi (see [Updates](#updates)). Or put the card in the computer and choose **Update** in ChaOS Installer. Your games, music, saves and settings stay. A TortOS card becomes a ChaOS card the same way. Writing the image by hand erases the card, so use the installer to update.
+On the Brick: **MENU > Updates**, over Wi-Fi (see [Updates](#updates)). Over the USB cable: **MENU > ChaOS Wire**, then its page on your computer. Or put the card in the computer and choose **Update** in ChaOS Installer. Your games, music, saves and settings stay. A TortOS card becomes a ChaOS card the same way. Writing the image by hand erases the card, so use the installer to update.
+
+> [!NOTE]
+> **Coming from ChaOS 1.0.0 or earlier?** ChaOS 1.1.0 is built on TortOS 2.2.0, and an earlier Brick can't install it by itself: its Updates screen says **This one needs ChaOS Installer**. Update with [ChaOS Installer](https://github.com/SkyWalker541/ChaOS-Installer/releases/latest) once: put the card in the computer and choose **Update**. Your games, music, saves and settings stay. From 1.1.0 on, the Brick updates itself again, even when a release moves to a newer TortOS.
 
 ### Removing
 
@@ -166,7 +179,7 @@ In the in-game menu, the paused game behind the menu shows the shader and overla
 - **Downloading:** the screen shows what's installed, what's latest, and each option's size. Once you start, it shows each step and where it's at: **Download** ("connecting..." until data arrives, then a percentage), **Check and Unpack** (moving dots while it works), then **Install**, each marked done as it finishes. The download is checked against the release's checksum, and you can keep playing while it downloads.
 - **Install and Restart:** for an Update, the Brick copies the new files into place and restarts. For a Full Install, it restarts and installs the system during start-up, which takes a few seconds longer than usual. It then comes back as it was. It needs a quarter of a charge, or the charger.
 - **Later:** a finished download waits on the card until you come back to install it, or choose **Remove Download**.
-- **Big updates:** a release built on a newer TortOS can change parts of the card that only [ChaOS Installer](https://github.com/SkyWalker541/ChaOS-Installer/releases/latest) writes. The Brick tells you to use the installer instead of offering the download.
+- **Big updates:** a release built on a newer TortOS changes the whole system, start-up files included. From 1.1.0, Updates offers it as one **Update**: the Brick downloads the release's image (about 45 MB), checks it twice, against GitHub's checksum and the release's `SHA256SUMS`, and restarts to write it, showing **Writing** and then **Checking** with a bar. Once it comes back it says **Updated** and the version. It needs the charger or more than 10% battery. If the power goes out while it writes, the Brick says so and turns off; update with [ChaOS Installer](https://github.com/SkyWalker541/ChaOS-Installer/releases/latest), and your games and saves are safe. A card on ChaOS 1.0.0 or earlier is told to use the installer for this, once.
 
 If the power goes out while the update installs, nothing is lost: the Brick starts the install again on the next start-up. **About ChaOS** shows the version you're on.
 
@@ -213,7 +226,9 @@ If the Brick restarts but **About ChaOS** still shows the old version, the insta
 3. Open the address in a browser on your phone or computer and type the PIN.
 4. Drag games into their console's folder, albums into `Music` or books into `Audiobooks`. They're on the shelf when you leave the screen.
 
-**Over the USB cable** (Mac, Linux or Windows 11; Windows 10 lacks the driver): plug the Brick into the computer, open **MENU > ChaOS Transfer**, then open `http://10.55.0.2` in a browser on that computer and type the PIN.
+**Over the USB cable, with ChaOS Wire** (Mac, Linux or Windows 11; Windows 10 lacks the driver): plug the Brick into the computer, open **MENU > ChaOS Wire** (it takes ChaOS Transfer's place while a computer is on the cable), then open `http://10.55.0.2` in a browser on that computer and type the PIN. The Brick charges more slowly while it's open, as the cable's data breaks while it charges hard.
+
+ChaOS Wire's page also updates ChaOS: when a newer release is out, its first page offers it with what's new. **Update** downloads it on the computer and sends it to the Brick, which checks it and asks on its own screen; **Update now** there writes it, and **Not now** keeps it on the card for next time.
 
 ## Supported systems
 

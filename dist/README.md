@@ -9,6 +9,7 @@ release it is built on (`TORTOS_BASE`), and this repository, when a version in
 | File | What it is |
 | :--- | :--- |
 | `tortos.elf` | ChaOS's launcher, built from this commit's `src/` (`make -f mk/cross.mk build/tortos.elf DEVICE=brick VERSION=$(cat TORTOS_BASE)`, aarch64, against the libraries in TortOS's image) |
+| `tortos-update` | The updater the image's root runs for an update, built from this commit's `tools/tortos-update/` to take ChaOS's images (`make -f mk/cross.mk build/tortos-update DEVICE=brick`, static, aarch64); `tools/chaos-image.sh` puts it in place of TortOS's |
 | `diatom` | ChaOS-diatom, the emulator, built from `ChaOS-diatom-source.tar.gz` (`make PORT=brick`) |
 | `ChaOS-diatom-source.tar.gz` | ChaOS-diatom's source at the commit `diatom` was built from (MPL-2.0) |
 | `ChaOS-diatom-THIRD-PARTY.md` | What ChaOS-diatom is built from, and their licenses |

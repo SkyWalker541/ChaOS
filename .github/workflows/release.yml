@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: write
+  actions: write     # to start pages.yml once the release is out
 
 jobs:
   release:
@@ -50,7 +51,7 @@ jobs:
           V=${{ steps.v.outputs.version }}
           B=${{ steps.v.outputs.base }}
           mkdir -p out
-          sudo TORTOS_ELF=dist/brick/tortos.elf DIATOM_NOTICE=dist/brick/ChaOS-diatom-THIRD-PARTY.md \
+          sudo TORTOS_ELF=dist/brick/tortos.elf TORTOS_UPDATE=dist/brick/tortos-update DIATOM_NOTICE=dist/brick/ChaOS-diatom-THIRD-PARTY.md \
             ROOT_OUT=$PWD/root.squashfs APP_OUT=$PWD/out/ChaOS-v$V-brick-app.tar.xz \
             sh tools/chaos-image.sh tortos/TortOS-v$B-brick.img.xz out/ChaOS-v$V-brick.img.xz dist/brick/diatom \
             | tee image.log
@@ -112,3 +113,11 @@ jobs:
           sed -i 's/^          //' notes.md
           gh release create "v$V" out/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "ChaOS $V" --notes-file notes.md
+
+      - name: The image on Pages, for ChaOS Wire's page
+        if: steps.v.outputs.out != '1'
+        env: { GH_TOKEN: "${{ github.token }}" }
+        # A release made with this token starts no workflow of its own accord,
+        # so pages.yml is started here. If Pages isn't set up yet, that run
+        # fails and the release stands: only the page's download needs it.
+        run: gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref main || true

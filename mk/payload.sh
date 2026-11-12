@@ -68,12 +68,12 @@ cp -R "$ROOT/res/overlays" "$P/overlays"  # ChaOS: SkyWalker541's overlays, put 
 # a browser asks for /web/menu.ttf.
 cp "$ROOT/res/web/"* "$P/res/web/"
 cp "$ROOT/res/fonts/menu.ttf" "$P/res/web/menu.ttf"
-# Over the USB cable the page carries the cable's name, Down To The Wire
+# Over the USB cable the page carries the cable's name, ChaOS Wire
 # (src/sys_menu.h), as wire.html, which the launcher serves instead of
 # index.html while a computer is on the cable (hare_set_page). Both devices
 # go both ways, Wi-Fi or the cable. Only the page's own words: the browser
 # code names nothing, and the server is the same.
-cp "$ROOT/res/web/index.html" "$P/res/web/wire.html"   # ChaOS: one name for both
+sed 's/ChaOS Transfer/ChaOS Wire/g' "$ROOT/res/web/index.html" > "$P/res/web/wire.html"
 # The device has curl and OpenSSL but nothing to trust - see res/ssl/README.md.
 # Without this, every HTTPS request fails verification and achievements never
 # arrive, with an error that reads like the network being down.

@@ -982,9 +982,9 @@ $('artgo').addEventListener('click', () => { if (!artBusy) getCovers(); });
 /* ---- toast ------------------------------------------------------------- */
 
 let toastTimer = 0;
-/* ---- updating TortOS (#69) ---------------------------------------------- */
+/* ---- updating ChaOS (TortOS#69) ------------------------------------------ */
 
-/* Down To The Wire only: the device behind the cable has no network, so this
+/* ChaOS Wire only: the device behind the cable has no network, so this
  * page asks GitHub about the latest release, downloads this device's image
  * and sends it over; the device checks it against GitHub's SHA-256 and asks
  * on its own screen (src/hare.h, /api/update). The image comes from GitHub
@@ -1020,7 +1020,7 @@ function readRelease(j, device) {
 		return null;
 	const version = j.tag_name.slice(1);
 	if (!verParts(version)) return null;
-	const file = 'TortOS-v' + version + '-' + device + '.img.xz';
+	const file = 'ChaOS-v' + version + '-' + device + '.img.xz';
 	const a = (j.assets || []).find((x) => x && x.name === file);
 	if (!a || !(a.size > 0) || !/^sha256:[0-9a-f]{64}$/.test(a.digest || '')) return null;
 	return { version, file, size: a.size, sha256: a.digest.slice(7),
@@ -1052,22 +1052,22 @@ function updShow(state, a, b) {
 	const notes = updRel && updRel.notes
 		? '<a class="ghost" href="' + esc(updRel.notes) + '" target="_blank" rel="noopener">What\'s new</a>' : '';
 	const progress = (what, have, total) =>
-		'<h2>Updating to TortOS ' + v + '</h2><div class="line"><span>' + what + '</span><span>' +
+		'<h2>Updating to ChaOS ' + v + '</h2><div class="line"><span>' + what + '</span><span>' +
 		(total ? mb(have) + ' of ' + mb(total) + ' MB' : '') + '</span></div><div class="bar"><span style="width:' +
 		(total ? Math.round(have / total * 100) : 100) + '%"></span></div>';
 	const html = {
-		available: '<h2>TortOS ' + v + ' is available</h2><p>This device has ' + esc(updDev.version) +
+		available: '<h2>ChaOS ' + v + ' is available</h2><p>This device has ' + esc(updDev.version) +
 			'. Your games, saves and settings stay as they are.</p><div class="acts">' + notes +
 			'<button class="go" data-act="go">Update</button></div>',
 		downloading: progress('Downloading', a, b) + '<div class="acts"><button data-act="cancel">Cancel</button></div>',
 		sending: progress('Sending to the device', a, b) + '<div class="acts"><button data-act="cancel">Cancel</button></div>',
 		checking: progress('The device is checking it', 0, 0),
 		asking: '<h2>Confirm on the device</h2><p>The device is asking: Update to ' + v + '?</p>',
-		updating: '<h2>Updating</h2><p>The device is writing TortOS ' + v +
+		updating: '<h2>Updating</h2><p>The device is writing ChaOS ' + v +
 			' and restarts when it\'s done, in about half a minute. Don\'t turn it off.</p>',
-		notnow: '<h2>TortOS ' + v + ' is available</h2><p>Not now was chosen on the device. The update stays on it for next time.</p><div class="acts">' +
+		notnow: '<h2>ChaOS ' + v + ' is available</h2><p>Not now was chosen on the device. The update stays on it for next time.</p><div class="acts">' +
 			notes + '<button class="go" data-act="go">Update</button></div>',
-		nodownload: '<h2>Couldn\'t download TortOS ' + v + '</h2><p>Download it from GitHub, then drop the file here or choose it.</p><div class="acts">' +
+		nodownload: '<h2>Couldn\'t download ChaOS ' + v + '</h2><p>Download it from GitHub, then drop the file here or choose it.</p><div class="acts">' +
 			(updRel && updRel.direct ? '<a class="ghost" href="' + esc(updRel.direct) + '">Download from GitHub</a>' : '') +
 			'<button data-act="pick">Choose file</button></div>',
 		refused: '<h2>The device didn\'t take the update</h2><p>' +
@@ -1123,7 +1123,7 @@ async function drawUpdate() {
 		return;
 	}
 	$('upd').hidden = true;
-	$('verline').textContent = updRel ? 'TortOS ' + updDev.version + ', up to date' : '';
+	$('verline').textContent = updRel ? 'ChaOS ' + updDev.version + ', up to date' : '';
 	$('verline').hidden = !updRel;
 }
 

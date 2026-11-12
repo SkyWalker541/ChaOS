@@ -4549,6 +4549,10 @@ static unsigned menu_accent(void) { return MENU_ACCENT; }
  * menu. A submenu shows a back chevron before its heading; a first menu does
  * not. Set around the draw by whoever draws a first menu (menu_style.root). */
 static bool g_menu_root;
+/* ChaOS: a heading with neither the status line nor the back chevron, for
+ * the updater's pictures (--updater-art): drawn once, ahead of time, and shown
+ * while nothing runs, so a clock would be frozen and B means nothing. */
+static bool g_menu_bare;
 
 /* A chevron: `dir` +1 points right, -1 left; `h` its height; at (cx, cy). Two
  * strokes of a few px, as SDL has no thick line. */
@@ -5036,7 +5040,7 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 		/* ChaOS: the clock and the battery, in the heading's band, so every
 		 * menu shows them with no screen of its own. A submenu's back chevron
 		 * takes the left, so its clock starts a step further in. */
-		{
+		if (!g_menu_bare) {
 			int hw = ui_text_width(fh, head1);
 			int left = panel.x + pad * (g_menu_root ? 1 : 2);
 			int right = panel.x + panel.w - pad;
@@ -5047,7 +5051,7 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 		}
 		/* ChaOS: a submenu says so, and that B goes back, with a chevron
 		 * pointing back at the heading's left, in the margin */
-		if (!g_menu_root)
+		if (!g_menu_root && !g_menu_bare)
 			draw_chevron(a->r, (float)(panel.x + pad / 2 + UI_PANEL_BORDER / 2),
 			             panel.y + head_h / 2.0f + pad / 4.0f,
 			             (float)ui_font_line(UI_F_LABEL) * 0.55f, -1,
@@ -9601,7 +9605,7 @@ static void tortos_menu_draw(app *a, int sel)
 	SDL_RenderFillRect(a->r, NULL);
 	/* The shelf's menu is TortOS's own on the systems screen and a system's on
 	 * a game list, which is where it gains rows that belong to that system. */
-	g_menu_root = true;
+	g_menu_root = !g_appearance_page;   /* ChaOS: Appearance is a submenu */
 	menu_draw(a, heading, rows, n, sel, menu_shelf_width(a),
 	          a->screen == SCREEN_SYSTEMS ? MENU_ACCENT : a->tint);
 	g_menu_root = false;
@@ -15003,6 +15007,7 @@ static void updater_art(app *a, const char *dir)
 	SDL_Rect bar;
 	const char *c;
 
+	g_menu_bare = true;
 	/* A space for a heading: the band stays, and the version goes in it */
 	art_frame(a, dir, "writing.rgba", " ", writing, 4);
 	art_frame(a, dir, "checking.rgba", " ", checking, 4);
@@ -15322,6 +15327,14 @@ int main(int argc, char *argv[])
 		/* --jump N applies N letter-jumps before the shot (negative for up),
 		 * so the d-pad's behavior on a real library can be checked without a
 		 * device or a hand on it. */
+		/* ChaOS: --appearance [row], the Appearance page as --menu draws the
+		 * main menu */
+		else if (!strcmp(argv[i], "--appearance")) {
+			shot_menu = 1;
+			g_appearance_page = true;
+			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9')
+				shot_menu_sel = atoi(argv[++i]);
+		}
 		else if (!strcmp(argv[i], "--sys") && i + 1 < argc) shot_sys = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--jump") && i + 1 < argc) {
 			shot_jump = atoi(argv[++i]);
