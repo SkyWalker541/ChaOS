@@ -156,7 +156,7 @@ screen is mostly for the zone; a Pixel 2 without an adapter has no network to
 take the time from, so set it there once.
 
 Under the clock rows, three more set the **status bar**: **Clock** (on or off,
-top left), **Clock Format** (12-hour or 24-hour) and **Battery** (Off, Icon,
+top left), **12h/24h Clock** (12h or 24h) and **Battery** (Off, Icon,
 Percent, or Icon and percent, top right). The status bar sits over every menu
 and shelf, so you can see the time and the charge without opening anything.
 The low-battery dot is still drawn when the charge runs low; with the battery

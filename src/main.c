@@ -3410,8 +3410,15 @@ static void draw_menu_status(SDL_Renderer *r, int left, int right, int y,
 
 	if (g_status_clock) {
 		char s[16];
+		char *pm;
 
 		clock_hhmm(time(NULL), g_status_clock24, s, sizeof s);
+		/* Beside a long heading ("Date & Time") "3:39 PM" may not fit where
+		 * "15:39" does, and a clock that vanished in 12-hour time read as the
+		 * setting hiding it. Shorter rather than gone: "3:39PM", then "3:39". */
+		pm = strchr(s, ' ');
+		if (pm && left + ui_text_width(f, s) > head_l) memmove(pm, pm + 1, strlen(pm));
+		if (pm && left + ui_text_width(f, s) > head_l) *pm = '\0';
 		if (left + ui_text_width(f, s) <= head_l)
 			ui_text(r, f, s, left, y, -1, UI_TEXT_DIM);
 	}
@@ -3424,8 +3431,13 @@ static void draw_menu_status(SDL_Renderer *r, int left, int right, int y,
 			bool icon  = g_status_batt == STATUS_BATT_ICON || g_status_batt == STATUS_BATT_BOTH;
 			bool words = g_status_batt == STATUS_BATT_PCT || g_status_batt == STATUS_BATT_BOTH;
 			char s[12] = "";
-			int tw = 0, gap = icon && words ? 6 : 0;
-			int iw = icon ? 33 : 0;         /* a 30px body and a 3px nub */
+			/* The icon as tall as the numbers beside it (a digit's height
+			 * is about 0.72 of the font's ascent), and twice as wide, with a
+			 * nub a quarter of its height */
+			int bh = TTF_FontAscent(f) * 72 / 100;
+			int bw = bh * 2, nub = bh / 4 > 3 ? bh / 4 : 3;
+			int tw = 0, gap = icon && words ? bh / 2 : 0;
+			int iw = icon ? bw + nub : 0;
 			int total, ix;
 			SDL_Color fill = pct <= BATT_LOW_PCT ? (SDL_Color){ 224, 72, 72, 255 }
 			               : charging ? (SDL_Color){ 120, 200, 120, 255 }
@@ -3440,14 +3452,18 @@ static void draw_menu_status(SDL_Renderer *r, int left, int right, int y,
 				ix = words ? right - tw - gap : right;
 				if (words) ui_text(r, f, s, right, y, 1, UI_TEXT_DIM);
 				if (icon) {
-					int bw = 30, bh = 14, nub = 3, inner = bw - 4;
+					/* A 2px outline and a 2px gap round the fill, as the
+					 * text's strokes are about that thick */
+					int inner = bw - 8;
 					int w = inner * pct / 100, bx = ix - nub - bw;
 					SDL_Rect body = { bx, mid - bh / 2, bw, bh };
-					SDL_Rect cap  = { bx + bw, mid - 3, nub, 6 };
-					SDL_Rect in   = { bx + 2, mid - bh / 2 + 2, w, bh - 4 };
+					SDL_Rect body2 = { bx + 1, mid - bh / 2 + 1, bw - 2, bh - 2 };
+					SDL_Rect cap  = { bx + bw, mid - bh / 4, nub, bh / 2 };
+					SDL_Rect in   = { bx + 4, mid - bh / 2 + 4, w, bh - 8 };
 
 					SDL_SetRenderDrawColor(r, UI_TEXT_DIM.r, UI_TEXT_DIM.g, UI_TEXT_DIM.b, 255);
 					SDL_RenderDrawRect(r, &body);
+					SDL_RenderDrawRect(r, &body2);
 					SDL_RenderFillRect(r, &cap);
 					SDL_SetRenderDrawColor(r, fill.r, fill.g, fill.b, 255);
 					if (w > 0) SDL_RenderFillRect(r, &in);
@@ -9516,7 +9532,9 @@ static int clock_build(void *ctx, menu_row *rows, int max, const char **heading)
 	 * sit straight under Time Zone, in the order clock_key reads them. */
 	if (n + 3 <= max) {
 		rows[n++] = (menu_row){ "Clock", g_status_clock ? "On" : "Off", true, .toggle = true };
-		rows[n++] = (menu_row){ "Clock Format", g_status_clock24 ? "24-hour" : "12-hour", true, .toggle = true };
+		/* Which of two, so a value and arrows rather than a switch: a switch
+		 * reads On or Off, and neither says which format is on */
+		rows[n++] = (menu_row){ "12h/24h Clock", g_status_clock24 ? "24h" : "12h", true, .cycles = true };
 		rows[n++] = (menu_row){ "Battery", STATUS_BATT_NAMES[g_status_batt], true, .cycles = true };
 	}
 	if (n + 3 <= max) {
@@ -14729,6 +14747,7 @@ static void rescan_all(app *a)
 static const char *shot_path;
 static int shot_screen = -1;
 static int shot_menu, shot_menu_sel;
+static bool shot_clock;                    /* ChaOS: --datetime [row] */
 /* --shader [group [row]]: the shader's page, -1, or a group's (ChaOS). */
 static int shot_shader = -2, shot_shader_sel;
 static const char *shot_shots;      /* --shots DIR [asking]: the viewer */
@@ -15050,6 +15069,16 @@ static void take_shot(app *a)
 	    !shot_syn && !shot_cheevos)
 		welcome_draw(a);
 	if (shot_menu) tortos_menu_draw(a, shot_menu_sel);
+	if (shot_clock) {
+		clock_ui cu;
+		menu_row rows[MENU_MAX_ROWS];
+		const char *head;
+		int n;
+
+		memset(&cu, 0, sizeof cu);
+		n = clock_build(&cu, rows, MENU_MAX_ROWS, &head);
+		menu_draw(a, head, rows, n, shot_menu_sel, menu_std_width(a), MENU_ACCENT);
+	}
 	if (shot_shader > -2) shader_shot(a, shot_shader, shot_shader_sel);
 	if (shot_ss) ss_shot(a);
 	if (shot_shots) {
@@ -15313,6 +15342,12 @@ int main(int argc, char *argv[])
 		else if (!strcmp(argv[i], "--appearance")) {
 			shot_menu = 1;
 			g_appearance_page = true;
+			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9')
+				shot_menu_sel = atoi(argv[++i]);
+		}
+		/* ChaOS: --datetime [row], the Date & Time screen */
+		else if (!strcmp(argv[i], "--datetime")) {
+			shot_clock = true;
 			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9')
 				shot_menu_sel = atoi(argv[++i]);
 		}
