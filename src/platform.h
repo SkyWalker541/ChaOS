@@ -206,6 +206,7 @@ void plat_resident_set_play(const char *map, bool rewind);
 /* ChaOS: the next RUN's Display Mode, by Diatom's name ("integer",
  * "aspect", "stretch"); NULL or "" for Diatom's own */
 void plat_resident_set_display(const char *mode);
+void plat_resident_set_zone(const char *tz);
 /* The paused frame as the shader draws it, the size of the game's rect, or
  * NULL when the game is not shaded. Written by Diatom on the way into its
  * pause, and again after a SETSHADER with preview=. */

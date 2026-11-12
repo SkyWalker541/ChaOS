@@ -12204,6 +12204,13 @@ static void launch(app *a)
 			look_files(a, o, &lcfg, &ldtov);
 			plat_resident_set_look(lcfg, ldtov);
 			plat_resident_set_display(DMODES[a->view[o].dmode].name);
+			{
+				char tz[64];
+
+				/* The zone the Date & Time menu chose, sent with each game */
+				db_get_str(db_lib(), "timezone", tz, sizeof tz, "America/New_York");
+				plat_resident_set_zone(tz);
+			}
 		}
 		/* ChaOS: where its screenshots go (MENU+X, and the in-game menu) */
 		shots_dir(P_CARD, a->sys.systems[o].folder, v->list.items[v->cursor].file,
