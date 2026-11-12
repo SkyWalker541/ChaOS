@@ -64,7 +64,7 @@
 - **Everything on the handheld:** Wi-Fi, box art, RetroAchievements, Bluetooth headphones and sending games over from your phone. You need a computer once, to set up the card.
 - **Three ways to browse** (a row, a column or a cube) and two looks (Plain Jane or Fancy Pants), plus ChaOS Pixel Cards and ChaOS Pixel Names.
 - **Muse,** a music and audiobook player, on SELECT from anywhere.
-- **Turbo buttons, fast forward, mono audio, Play Time, favorites and sorting.**
+- **Turbo buttons, fast forward, mono audio, Play Time, favorites and sorting.** Two shelves sit at the front of the systems row while they have games: **Favorites**, and **Recently Played**, the last twelve games you played across every system. Favorites appear once a game is favorited. Recently Played can be turned off in the menu, under **Recently Played**.
 - **Your Brick stays yours.** ChaOS runs from the SD card and changes nothing on the Brick. Take the card out and it boots its own system again.
 
 ## Install

@@ -234,6 +234,9 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	/* ChaOS: how fast the pixel names form, for this direction alone */
 	full[PM_SPEED]        = (menu_row){ "Transition Speed", u->name_speed, true };
 	full[PM_LISTVIEW]     = (menu_row){ "Game List View", u->list_view, true };
+	/* ChaOS: a switch - the shelf is on the systems row while it has games */
+	full[PM_RECENT]       = (menu_row){ "Recently Played", u->recent, true };
+	full[PM_RECENT].toggle = true;
 	/* ChaOS: the menus' accent, beside the other two rows about the look. */
 	full[PM_COLOR]        = (menu_row){ "Menu Color", u->menu_color, true };
 	/* Not "Sleep". The device has no suspend and is not getting one. This

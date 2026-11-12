@@ -325,6 +325,17 @@ static void tortos_menu_online(void)
 	 * so a build can exist that cannot sign anyone in at all. That state is
 	 * the one worth pinning - a row that opens a keyboard and then refuses
 	 * whatever is typed would look like a rejected password. */
+	/* Recently Played is a switch like the Wi-Fi and audio ones: always there,
+	 * since it is the shelf that is hidden, not the setting. */
+	printf("Recently Played:\n");
+	u.recent = "On";
+	n = sys_menu_build(&u, rows, &b, &heading);
+	ck(has_label(rows, n, "Recently Played") && rows[PM_RECENT].toggle &&
+	   !strcmp(val(&rows[PM_RECENT]), "On"), "a switch that says On");
+	u.recent = "Off";
+	n = sys_menu_build(&u, rows, &b, &heading);
+	ck(!strcmp(val(&rows[PM_RECENT]), "Off"), "and Off when it is turned off");
+	u.recent = NULL;
 	printf("Game List View:\n");
 	u.list_view = NULL;
 	n = sys_menu_build(&u, rows, &b, &heading);

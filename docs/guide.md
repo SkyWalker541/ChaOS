@@ -134,6 +134,7 @@ than any one console:
 | **Auto Off** | how long without a button before the device powers itself down |
 | **UI Theme** | `Plain Jane`, `Fancy Pants`, `ChaOS Pixel Cards` or `ChaOS Pixel Names` - which art the shelves wear |
 | **UI Direction** | `Horizontal`, `Vertical` or `Cubic` - see below |
+| **Recently Played** | `On` or `Off` - whether the Recently Played shelf appears on the systems row. It lists the last twelve games played, across every system, and is hidden until something has been played |
 | **Box Art** | fetch what the whole library is missing |
 | **Cheevos** | the RetroAchievements account, or `sign in` |
 | **Controls** | every button and what it does, a page per place |
