@@ -11,6 +11,7 @@
 #ifndef CLOCK_H
 #define CLOCK_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <time.h>
 
@@ -32,6 +33,9 @@ void clock_field_label(time_t t, clock_field f, char *out, size_t n);
 
 /* The menu row's value: "Oct 3, 6:12 AM". 12-hour, Eric's call 2026-10-03. */
 void clock_label(time_t t, char *out, size_t n);
+
+/* The status bar's clock: "6:12 PM" or "18:12", by `h24`. */
+void clock_hhmm(time_t t, bool h24, char *out, size_t n);
 
 /* The time zones on offer, by city. A short list rather than the four hundred
  * the zone database has, because stepping through those with left and right

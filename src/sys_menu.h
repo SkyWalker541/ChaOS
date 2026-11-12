@@ -38,7 +38,7 @@
 typedef enum {
 	PM_STATS,
 	PM_WIFI, PM_BT, PM_AUDIO, PM_CHANNELS, PM_NIGHT, PM_XFER, PM_CLOCK,
-	PM_SLEEP, PM_THEME, PM_DIR, PM_SPEED, PM_LISTVIEW, PM_RECENT, PM_COLOR, PM_SCRAPE, PM_ACHIEVEMENTS, PM_SS,
+	PM_SLEEP, PM_APPEARANCE, PM_THEME, PM_DIR, PM_SPEED, PM_LISTVIEW, PM_RECENT, PM_COLOR, PM_SCRAPE, PM_ACHIEVEMENTS, PM_SS,
 	PM_UPDATE, PM_CONTROLS, PM_ABOUT, PM_ROWS
 } pm_row;
 
@@ -175,6 +175,10 @@ typedef struct {
 	const char *recent;      /* ChaOS: the Recently Played shelf, "On" or "Off" */
 	const char *night;       /* ChaOS: night volume, "On" or "Off" */
 	bool        night_ok;    /* the device has a night ladder to offer */
+	/* ChaOS: the Appearance page, not the menu. It holds the look rows and
+	 * the menu holds Appearance in their place; the row list and the key
+	 * mapping read this the same way, so they cannot disagree. */
+	bool        appearance;
 	const char *menu_color;  /* ChaOS: the menus' accent's name, from theme.h */
 	const char *update;      /* ChaOS: Updates' value, upd_row_value */
 	bool        rewind;      /* ChaOS: this console keeps states to rewind to */

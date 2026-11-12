@@ -913,6 +913,23 @@ static int g_pn_speed[8];
 static bool g_list_view;
 /* The menu's Recently Played switch, from the device database. On by default. */
 static bool g_recent_shelf = true;
+
+/* ChaOS: the status bar, the clock top left and the battery top right, each set
+ * in Date & Time. Both are small and out of the way by default. */
+/* ChaOS: the Appearance page is open. Read by the row list (sys_menu.c) and the
+ * key mapping alike, so the page's rows and the keys that act on them agree. */
+static bool g_appearance_page;
+static void appearance_screen(app *a);
+
+static bool g_status_clock = true;
+static bool g_status_clock24;             /* false: 12-hour */
+enum { STATUS_BATT_OFF, STATUS_BATT_ICON, STATUS_BATT_PCT, STATUS_BATT_BOTH, STATUS_BATT_COUNT };
+static int  g_status_batt = STATUS_BATT_ICON;
+static const char *const STATUS_BATT_NAMES[STATUS_BATT_COUNT] = {
+	"Off", "Icon", "Percent", "Icon and percent",
+};
+#define STATUS_MARGIN 20
+#define STATUS_Y      6
 #define LIST_VIEW_ON() (g_list_view && !CARD_DIRS[g_dir].both)
 /* ChaOS: a menu drawn to fill the screen, this far from its edges, for the
  * one draw it is set around (the game List); -1 for the usual */
@@ -3305,35 +3322,116 @@ static bool idle_due_ctx(void *ctx) { return idle_due((app *)ctx); }
 
 /* The one piece of chrome: a small accent disc, top right, when the battery is
  * low. Drawn with horizontal spans -- SDL has no circle. */
-static void draw_low_battery_dot(SDL_Renderer *r);
+static void draw_low_battery_dot(SDL_Renderer *r, int cx, int cy);
 static void redraw_at(Uint32 t);   /* below, with the rest of the redraw clock */
 static void draw_upd_notice(app *a);   /* ChaOS: with the Updates screen */
 static bool rewind_load(const char *tag);   /* ChaOS: with Button Mapping */
 static int  menu_shelf_width(app *a);
 static void upd_poll(void);
 
-/* The dot as the battery has it: steady when low, blinking when critical, a
- * second on and a second off, slow enough not to pull at the eye. Returns how
- * long until it changes by itself, in ms, and tells the shelf's loop the same,
- * so a screen that only draws when something moves still blinks it. Diatom
- * blinks its own over a game on the same rhythm. */
-static unsigned draw_battery_dot(SDL_Renderer *r)
+/* The battery as the status bar reads it, asked at most every five seconds,
+ * since the sysfs read is not free and a shelf draws every frame it moves. */
+static bool battery_state(int *pct, bool *charging)
 {
-	Uint32 now, flip;
-	int level = battery_level();
+	static Uint32 next_check;
+	static int got_pct = -1;
+	static bool got_chg;
+	Uint32 now = SDL_GetTicks();
 
-	if (level == 0) return (unsigned)-1;
-	if (level == 1) { draw_low_battery_dot(r); return (unsigned)-1; }
-	now = plat_now_ms();
-	flip = 1000 - now % 1000;
-	redraw_at(now + flip);
-	if ((now / 1000) % 2 == 0) draw_low_battery_dot(r);
-	return flip;
+	if (next_check == 0 || now >= next_check) {
+		int p = -1;
+		bool c = false;
+
+		next_check = now + 5000;
+		got_pct = plat_battery(&p, &c) ? p : -1;
+		got_chg = c;
+	}
+	*pct = got_pct;
+	*charging = got_chg;
+	return got_pct >= 0;
 }
 
-static void draw_low_battery_dot(SDL_Renderer *r)
+/* The status bar: the clock top left, the battery top right (icon, percent or
+ * both), and the low-battery dot. The dot keeps its own place when the battery
+ * is not drawn, and moves in beside it when it is, so the two never overlap.
+ * The dot is steady when low and blinks when critical, a second on and a
+ * second off, slow enough not to pull at the eye. Returns how long until
+ * something here changes by itself, in ms (-1 never), so a screen that only
+ * draws when something moves still updates the minute and blinks the dot.
+ * Diatom blinks its own over a game on the same rhythm. */
+static unsigned draw_status_bar(SDL_Renderer *r)
 {
-	int cx = TORTOS_SCREEN_W - 34, cy = 34, rad = 9;
+	TTF_Font *f = ui_font(UI_F_META);
+	unsigned wait = (unsigned)-1;
+	int dot_x = TORTOS_SCREEN_W - 34, dot_y = 34;
+	int level = battery_level();
+	Uint32 now = plat_now_ms();
+
+	if (g_status_clock) {
+		char s[16];
+		time_t t = time(NULL);
+		unsigned to_minute = (unsigned)(60 - t % 60) * 1000u;
+
+		clock_hhmm(t, g_status_clock24, s, sizeof s);
+		ui_text(r, f, s, STATUS_MARGIN, STATUS_Y, -1, UI_TEXT_DIM);
+		redraw_at(now + to_minute);
+		wait = to_minute;
+	}
+
+	if (g_status_batt != STATUS_BATT_OFF) {
+		int pct = -1;
+		bool charging = false;
+
+		if (battery_state(&pct, &charging)) {
+			bool icon = g_status_batt == STATUS_BATT_ICON || g_status_batt == STATUS_BATT_BOTH;
+			bool words = g_status_batt == STATUS_BATT_PCT || g_status_batt == STATUS_BATT_BOTH;
+			int right = TORTOS_SCREEN_W - STATUS_MARGIN, left = right, mid_y = STATUS_Y + 7;
+			SDL_Color fill = pct <= BATT_LOW_PCT ? (SDL_Color){ 224, 72, 72, 255 }
+			               : charging ? (SDL_Color){ 120, 200, 120, 255 }
+			               : UI_TEXT_SOFT;
+
+			if (words) {
+				char s[12];
+
+				snprintf(s, sizeof s, "%d%%", pct);
+				left = right - ui_text_width(f, s);
+				ui_text(r, f, s, right, STATUS_Y, 1, UI_TEXT_DIM);
+			}
+			if (icon) {
+				/* A body and a nub on its right, the fill to the level */
+				int bw = 30, bh = 14, nub = 3;
+				int bx = (words ? left - 6 : right) - nub - bw;
+				int inner = bw - 4, w = inner * pct / 100;
+				SDL_Rect body = { bx, STATUS_Y, bw, bh };
+				SDL_Rect cap  = { bx + bw, STATUS_Y + 4, nub, 6 };
+				SDL_Rect in   = { bx + 2, STATUS_Y + 2, w, bh - 4 };
+
+				SDL_SetRenderDrawColor(r, UI_TEXT_DIM.r, UI_TEXT_DIM.g, UI_TEXT_DIM.b, 255);
+				SDL_RenderDrawRect(r, &body);
+				SDL_RenderFillRect(r, &cap);
+				SDL_SetRenderDrawColor(r, fill.r, fill.g, fill.b, 255);
+				if (w > 0) SDL_RenderFillRect(r, &in);
+				left = bx;
+			}
+			dot_x = left - 18;
+			dot_y = mid_y;
+		}
+	}
+
+	if (level == 1) draw_low_battery_dot(r, dot_x, dot_y);
+	else if (level == 2) {
+		unsigned flip = 1000 - now % 1000;
+
+		redraw_at(now + flip);
+		if (wait == (unsigned)-1 || flip < wait) wait = flip;
+		if ((now / 1000) % 2 == 0) draw_low_battery_dot(r, dot_x, dot_y);
+	}
+	return wait;
+}
+
+static void draw_low_battery_dot(SDL_Renderer *r, int cx, int cy)
+{
+	int rad = 9;
 	SDL_SetRenderDrawColor(r, 224, 72, 72, 255);
 	for (int dy = -rad; dy <= rad; dy++) {
 		int dx = (int)(sqrt((double)(rad * rad - dy * dy)) + 0.5);
@@ -4223,7 +4321,7 @@ static void draw_shelf(app *a)
 	 * games screen, or Cubic, whose faces are games */
 	if (a->sys.count > 0 && (a->screen != SCREEN_SYSTEMS || CARD_DIRS[g_dir].both))
 		draw_letter_popup(a);
-	draw_battery_dot(a->r);
+	draw_status_bar(a->r);
 }
 
 static void render(app *a)
@@ -5226,6 +5324,20 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 			if (lw + (vw ? gap + vw : 0) + (rows[i].cycles ? text_h * 3 / 2 : 0) <= content_w) {
 				ui_fit_text(fm, rows[i].label, lbl, sizeof lbl, content_w);
 				ui_text(a->r, fm, lbl, content_x, ty, -1, lc);
+				if (rows[i].hint && rows[i].hint[0]) {
+					int hroom = content_w - lw - gap - (vw ? gap + vw : 0)
+					          - (rows[i].cycles ? text_h * 3 / 2 : 0);
+					if (hroom > 0) {
+						/* The smaller face, centred on the label's line, so a
+						 * short description reads as one */
+						TTF_Font *hf = ui_font(UI_F_META);
+						char hb[96];
+						int hy = ty + (text_h - ui_font_height(UI_F_META)) / 2;
+
+						ui_fit_text(hf, rows[i].hint, hb, sizeof hb, hroom);
+						ui_text(a->r, hf, hb, content_x + lw + gap, hy, -1, UI_TEXT_DIM);
+					}
+				}
 				if (rows[i].value && rows[i].toggle)
 					draw_switch(a->r, content_x + content_w,
 					            y + ROW_H(rows[i]) / 2.0f, text_h,
@@ -5480,6 +5592,7 @@ static int menu_build(app *a, screen_id screen, int sys,
 		u.recent    = g_recent_shelf ? "On" : "Off";
 		u.night     = plat_volume_night_get() ? "On" : "Off";
 		u.night_ok  = plat_volume_night_ok();
+		u.appearance = g_appearance_page;
 		u.menu_color = MENU_COLORS[g_menu_color].name;
 		u.update    = upd_row_value();
 		u.auto_off  = a->auto_off;
@@ -5816,6 +5929,9 @@ static menu_exit menu_run_body(app *a, const menu_style *st,
 			          st->follow_tint ? a->tint : st->accent);
 			g_menu_root = false;
 		}
+		/* The status bar over the panel, so the clock in its corner is not
+		 * hidden behind a menu, as it is on the shelf. */
+		draw_status_bar(a->r);
 		plat_draw_osd(a->r);
 		plat_present();
 		SDL_Delay(8);
@@ -8498,6 +8614,13 @@ static int clock_build(void *ctx, menu_row *rows, int max, const char **heading)
 	z = clock_zone_find(id);
 	snprintf(c->zone, sizeof c->zone, "%s", z >= 0 ? CLOCK_ZONES[z].city : id);
 	if (n < max) rows[n++] = (menu_row){ "Time Zone", c->zone, true };
+	/* The status bar: the clock top left, the battery top right. Their rows
+	 * sit straight under Time Zone, in the order clock_key reads them. */
+	if (n + 3 <= max) {
+		rows[n++] = (menu_row){ "Clock", g_status_clock ? "On" : "Off", true, .toggle = true };
+		rows[n++] = (menu_row){ "Clock Format", g_status_clock24 ? "24-hour" : "12-hour", true, .toggle = true };
+		rows[n++] = (menu_row){ "Battery", STATUS_BATT_NAMES[g_status_batt], true, .cycles = true };
+	}
 	if (n + 3 <= max) {
 		rows[n++] = MENU_RULE;
 		rows[n++] = MENU_NOTE("Left/right: change");
@@ -8513,17 +8636,28 @@ static menu_result clock_key(app *a, void *ctx, in_button key, int sel)
 	int d = key == IN_RIGHT ? 1 : key == IN_LEFT ? -1 : 0;
 
 	(void)a; (void)ctx;
-	if (!d) return MENU_STAY;
+	/* The switches also take A, as the rest of the menus do */
+	if (!d && key != IN_ACCEPT) return MENU_STAY;
 	if (sel >= 0 && sel < CLK_FIELDS) {
-		plat_clock_set(clock_step(time(NULL), (clock_field)sel, d));
+		if (d) plat_clock_set(clock_step(time(NULL), (clock_field)sel, d));
 	} else if (sel == CLK_FIELDS) {
 		char id[64];
 		int z;
 
+		if (!d) return MENU_STAY;
 		db_get_str(db_lib(), "timezone", id, sizeof id, "America/New_York");
 		z = clock_zone_step(id, d);
 		db_set_str(db_lib(), "timezone", CLOCK_ZONES[z].id);
 		plat_clock_zone(CLOCK_ZONES[z].id);
+	} else if (sel == CLK_FIELDS + 1) {
+		g_status_clock = !g_status_clock;
+		db_set_int(db_dev(), "status.clock", g_status_clock ? 1 : 0);
+	} else if (sel == CLK_FIELDS + 2) {
+		g_status_clock24 = !g_status_clock24;
+		db_set_int(db_dev(), "status.clock24", g_status_clock24 ? 1 : 0);
+	} else if (sel == CLK_FIELDS + 3) {
+		g_status_batt = (g_status_batt + (d ? d : 1) + STATUS_BATT_COUNT) % STATUS_BATT_COUNT;
+		db_set_int(db_dev(), "status.battery", g_status_batt);
 	}
 	return MENU_STAY;
 }
@@ -8749,6 +8883,7 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 		 * Transition Speed turned Menu Color) */
 		sys_ui dev = { .no_wifi = !plat_has_wifi(), .no_bt = !plat_has_bluetooth(),
 		               .cable_xfer = plat_cable_link(NULL, 0), .ss_have = ss_have_dev(),
+		               .night_ok = plat_volume_night_ok(), .appearance = g_appearance_page,
 		               .name_speed = CARDS_DRAWN(g_cards) ? PN_SPEEDS[g_pn_speed[g_dir]].name
 		                                                  : NULL,
 		               .list_view = CARD_DIRS[g_dir].both ? NULL : "" };
@@ -8890,6 +9025,7 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 	case PM_SS:           ss_screen(a); break;
 	case PM_BT:           bt_screen(a); break;
 	case PM_CLOCK:        clock_screen(a); break;
+	case PM_APPEARANCE:   appearance_screen(a); break;
 	case PM_STATS:        if (stats_screen(a)) return MENU_DONE; break;
 	case PM_CONTROLS:     controls_screen(a); break;
 	case PM_ABOUT:        about_screen(a); break;
@@ -8918,6 +9054,25 @@ static void tortos_menu_for(app *a, int screen)
 	};
 
 	menu_run(a, &st, sysmenu_build, sysmenu_key, &c);
+}
+
+/* MENU > Appearance: the look rows on their own page, B back to the menu. The
+ * same runner and keys as the menu; only the rows it lists are different. */
+static void appearance_screen(app *a)
+{
+	sysmenu_ctx c;
+	menu_style st = {
+		.fixed_w     = menu_std_width(a),
+		.accent      = MENU_ACCENT,
+		.follow_tint = a->screen != SCREEN_SYSTEMS,
+	};
+
+	memset(&c, 0, sizeof c);
+	c.a = a;
+	c.screen = a->screen;
+	g_appearance_page = true;
+	menu_run(a, &st, sysmenu_build, sysmenu_key, &c);
+	g_appearance_page = false;
 }
 
 static void tortos_menu(app *a)
@@ -9941,7 +10096,7 @@ static unsigned np_draw(app *a, const mu_now *mn, const char *next)
 	                 : "A: pause    L1/R1: track    Left/Right: seek    Y: mode"),
 	        TORTOS_SCREEN_W / 2, TORTOS_SCREEN_H - 72, 0, UI_TEXT_DIM);
 	{
-		unsigned dot = draw_battery_dot(r);
+		unsigned dot = draw_status_bar(r);
 		if (dot < wait) wait = dot;
 	}
 	return wait;
@@ -11333,7 +11488,7 @@ static void gm_backdrop(app *a, void *ctx)
 	/* The low-battery disc, as on the shelf: this menu is drawn by this
 	 * process, so it is drawn here; in the game Diatom draws it. This loop
 	 * draws every frame, so the blink needs nothing more. */
-	draw_battery_dot(a->r);
+	draw_status_bar(a->r);
 }
 
 /* Power here stops the GAME. The device is not going anywhere, and the wait
@@ -14590,6 +14745,10 @@ int main(int argc, char *argv[])
 
 		db_get_str(db_dev(), "recent_shelf", rs, sizeof rs, "on");
 		g_recent_shelf = strcmp(rs, "off") != 0;
+		g_status_clock   = db_get_int(db_dev(), "status.clock", 1) != 0;
+		g_status_clock24 = db_get_int(db_dev(), "status.clock24", 0) != 0;
+		g_status_batt    = db_get_int(db_dev(), "status.battery", STATUS_BATT_ICON);
+		if (g_status_batt < 0 || g_status_batt >= STATUS_BATT_COUNT) g_status_batt = STATUS_BATT_ICON;
 	}
 	scan_all(&a);
 	t_mark("library scan");

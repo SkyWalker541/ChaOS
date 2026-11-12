@@ -133,7 +133,8 @@ than any one console:
 | **Over The Hare** | the file server; needs Wi-Fi and says so when there is none. While a computer is on the USB cable it is **Down To The Wire** instead, always at `10.55.0.2` on the Brick and `10.42.0.1` on the Pixel 2 |
 | **Date & Time** | the clock and the time zone, set with left and right - see below |
 | **Auto Off** | how long without a button before the device powers itself down |
-| **UI Theme** | `Plain Jane`, `Fancy Pants`, `ChaOS Pixel Cards` or `ChaOS Pixel Names` - which art the shelves wear |
+| **Appearance** | the look settings on their own page: UI Theme, UI Direction, Transition Speed, Game List View and Menu Color |
+| **UI Theme** | `Plain Jane`, `Fancy Pants`, `ChaOS Pixel Cards` or `ChaOS Pixel Names` - which art the shelves wear. On the Appearance page |
 | **UI Direction** | `Horizontal`, `Vertical` or `Cubic` - see below |
 | **Recently Played** | `On` or `Off` - whether the Recently Played shelf appears on the systems row. It lists the last twelve games played, across every system, and is hidden until something has been played |
 | **Box Art** | fetch what the whole library is missing |
@@ -153,6 +154,13 @@ holds through a power-off. The zones are one or two cities per hour of offset,
 west to east. Wi-Fi sets the clock again whenever it connects, so with it the
 screen is mostly for the zone; a Pixel 2 without an adapter has no network to
 take the time from, so set it there once.
+
+Under the clock rows, three more set the **status bar**: **Clock** (on or off,
+top left), **Clock Format** (12-hour or 24-hour) and **Battery** (Off, Icon,
+Percent, or Icon and percent, top right). The status bar sits over every menu
+and shelf, so you can see the time and the charge without opening anything.
+The low-battery dot is still drawn when the charge runs low; with the battery
+shown it moves in beside it, so the two don't overlap.
 
 Over The Hare and Box Art need a network, and go quiet without one rather than
 disappearing - a row that vanishes teaches nobody why. Cheevos stays reachable

@@ -121,6 +121,20 @@ void clock_label(time_t t, char *out, size_t n)
 	         h, tm.tm_min, tm.tm_hour < 12 ? "AM" : "PM");
 }
 
+void clock_hhmm(time_t t, bool h24, char *out, size_t n)
+{
+	struct tm tm;
+	int h;
+
+	localtime_r(&t, &tm);
+	if (h24) {
+		snprintf(out, n, "%02d:%02d", tm.tm_hour, tm.tm_min);
+		return;
+	}
+	h = tm.tm_hour % 12 ? tm.tm_hour % 12 : 12;
+	snprintf(out, n, "%d:%02d %s", h, tm.tm_min, tm.tm_hour < 12 ? "AM" : "PM");
+}
+
 int clock_zone_find(const char *id)
 {
 	int i;

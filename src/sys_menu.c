@@ -40,6 +40,14 @@ int sys_menu_tortos_rows(const sys_ui *u, pm_row *out)
 		if (!u->name_speed && r == PM_SPEED) continue;
 		if (!u->list_view && r == PM_LISTVIEW) continue;
 		if (!u->night_ok && r == PM_NIGHT) continue;
+		/* The look rows live on the Appearance page; the menu has one row
+		 * for the page, where the first of them sat */
+		{
+			bool look = r == PM_THEME || r == PM_DIR || r == PM_SPEED ||
+			            r == PM_LISTVIEW || r == PM_COLOR;
+
+			if (u->appearance != look) continue;
+		}
 		out[n++] = (pm_row)r;
 	}
 	return n;
@@ -179,7 +187,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 
 	menu_row full[PM_ROWS];
 
-	*heading = "ChaOS";
+	*heading = u->appearance ? "Appearance" : "ChaOS";
 	/* The network's name, not its address. A settings row should say what the
 	 * setting IS; the address is a fact about the machine and lives on the
 	 * About page with the other ones. */
@@ -213,6 +221,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	 * quiet listening at night. Only where the device has the ladder to give. */
 	full[PM_NIGHT]        = (menu_row){ "Night Mode", u->night, true };
 	full[PM_NIGHT].toggle = true;
+	full[PM_NIGHT].hint   = "quieter steps";
 	/* Files onto and off the device over Wi-Fi: a small web server on the LAN
 	 * that a phone or a laptop opens. Named for OTA, which is what everyone
 	 * already calls this, and for the other half of the fable - the tortoise
@@ -240,6 +249,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	full[PM_SPEED]        = (menu_row){ "Transition Speed", u->name_speed, true };
 	full[PM_LISTVIEW]     = (menu_row){ "Game List View", u->list_view, true };
 	/* ChaOS: a switch - the shelf is on the systems row while it has games */
+	full[PM_APPEARANCE]   = (menu_row){ "Appearance", NULL, true };
 	full[PM_RECENT]       = (menu_row){ "Recently Played", u->recent, true };
 	full[PM_RECENT].toggle = true;
 	/* ChaOS: the menus' accent, beside the other two rows about the look. */
@@ -278,6 +288,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	full[PM_ACHIEVEMENTS].opens = full[PM_SS].opens = true;
 	full[PM_CONTROLS].opens = full[PM_ABOUT].opens = true;
 	full[PM_UPDATE].opens = true;
+	full[PM_APPEARANCE].opens = true;
 	/* ChaOS: the rows left and right go round (menu.h, cycles) */
 	full[PM_AUDIO].cycles = full[PM_CHANNELS].cycles = full[PM_SLEEP].cycles = true;
 	full[PM_THEME].cycles = full[PM_DIR].cycles = full[PM_SPEED].cycles = true;

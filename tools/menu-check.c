@@ -173,6 +173,11 @@ static const char *val(const menu_row *r) { return r->value ? r->value : ""; }
  * say so rather than silently doing nothing: Over The Hare, Box Art, and Box
  * Art's counterpart in the system menu. */
 static bool has_label(const menu_row *rows, int n, const char *label);
+/* The top level is four rows shorter than the list of rows: the five look rows
+ * are on the Appearance page, and the menu holds one row for that page. */
+#define TOP_ROWS (PM_ROWS - 5)
+#define PAGE_ROWS 5
+static const menu_row *by_id(const sys_ui *u, const menu_row *rows, int n, pm_row id);
 
 static void tortos_menu_offline(void)
 {
@@ -199,41 +204,54 @@ static void tortos_menu_offline(void)
 	n = sys_menu_build(&u, rows, &b, &heading);
 
 	printf("ChaOS menu, radio off:\n");
-	ck(n == PM_ROWS, "every row is filled");
+	ck(n == TOP_ROWS, "every row is filled");
 	ck(!strcmp(heading, "ChaOS"), "heading");
-	ck(!strcmp(val(&rows[PM_COLOR]), "ChaOS Orange") && rows[PM_COLOR].live,
+	/* The look rows, on their own page under Appearance */
+	u.appearance = true;
+	n = sys_menu_build(&u, rows, &b, &heading);
+	ck(n == PAGE_ROWS && !strcmp(heading, "Appearance"),
+	   "the Appearance page holds the five look rows, under its own heading");
+	ck(!strcmp(val(by_id(&u, rows, n, PM_COLOR)), "ChaOS Orange") && (*by_id(&u, rows, n, PM_COLOR)).live,
 	   "Menu Color names the accent, and is reachable offline");
-	ck(!strcmp(val(&rows[PM_WIFI]), "off"), "Wi-Fi reads off");
-	ck(!strcmp(val(&rows[PM_XFER]), "needs Wi-Fi"), "OTH says why it is dead");
-	ck(!rows[PM_XFER].live, "OTH is not selectable offline");
-	ck(!strcmp(val(&rows[PM_SCRAPE]), "needs Wi-Fi"), "Box Art says why");
-	ck(!rows[PM_SCRAPE].live, "Box Art is not selectable offline");
-	ck(!strcmp(val(&rows[PM_ACHIEVEMENTS]), "sign in"), "Cheevos invites a sign in");
-	ck(rows[PM_ACHIEVEMENTS].live, "Cheevos is reachable signed out");
-	ck(!strcmp(val(&rows[PM_SLEEP]), "2m"), "120s reads as 2m");
-	ck(!strcmp(rows[PM_CLOCK].label, "Date & Time") &&
-	   !strcmp(val(&rows[PM_CLOCK]), "Oct 3, 6:12 AM"), "Date & Time reads the time");
-	ck(rows[PM_CLOCK].live, "and opens with no network: it is how the Pixel gets one");
-	ck(!strcmp(val(&rows[PM_THEME]), "Plain Jane"), "the card set names itself");
-	ck(!strcmp(val(&rows[PM_DIR]), "Horizontal"), "and so does the direction");
-	ck(rows[PM_DIR].live, "UI Direction is reachable offline too");
-	ck(rows[PM_THEME].live, "UI Theme is reachable offline, being a look and not a service");
+	u.appearance = false;
+	n = sys_menu_build(&u, rows, &b, &heading);
+	ck(has_label(rows, n, "Appearance") && !has_label(rows, n, "UI Theme"),
+	   "the menu holds Appearance in their place, not the look rows");
+	ck(!strcmp(val(by_id(&u, rows, n, PM_WIFI)), "off"), "Wi-Fi reads off");
+	ck(!strcmp(val(by_id(&u, rows, n, PM_XFER)), "needs Wi-Fi"), "OTH says why it is dead");
+	ck(!(*by_id(&u, rows, n, PM_XFER)).live, "OTH is not selectable offline");
+	ck(!strcmp(val(by_id(&u, rows, n, PM_SCRAPE)), "needs Wi-Fi"), "Box Art says why");
+	ck(!(*by_id(&u, rows, n, PM_SCRAPE)).live, "Box Art is not selectable offline");
+	ck(!strcmp(val(by_id(&u, rows, n, PM_ACHIEVEMENTS)), "sign in"), "Cheevos invites a sign in");
+	ck((*by_id(&u, rows, n, PM_ACHIEVEMENTS)).live, "Cheevos is reachable signed out");
+	ck(!strcmp(val(by_id(&u, rows, n, PM_SLEEP)), "2m"), "120s reads as 2m");
+	ck(!strcmp((*by_id(&u, rows, n, PM_CLOCK)).label, "Date & Time") &&
+	   !strcmp(val(by_id(&u, rows, n, PM_CLOCK)), "Oct 3, 6:12 AM"), "Date & Time reads the time");
+	ck((*by_id(&u, rows, n, PM_CLOCK)).live, "and opens with no network: it is how the Pixel gets one");
+	u.appearance = true;
+	n = sys_menu_build(&u, rows, &b, &heading);
+	ck(!strcmp(val(by_id(&u, rows, n, PM_THEME)), "Plain Jane"), "the card set names itself");
+	ck(!strcmp(val(by_id(&u, rows, n, PM_DIR)), "Horizontal"), "and so does the direction");
+	ck((*by_id(&u, rows, n, PM_DIR)).live, "UI Direction is reachable offline too");
+	ck((*by_id(&u, rows, n, PM_THEME)).live, "UI Theme is reachable offline, being a look and not a service");
+	u.appearance = false;
+	n = sys_menu_build(&u, rows, &b, &heading);
 	/* Live since 2026-09-06, when the pairing screen landed. The row used to
 	 * be dead and read "not yet", which was true of the screen and false of
 	 * the feature - game audio had been going to a headset for three days. */
-	ck(rows[PM_BT].live, "Bluetooth is reachable now that pairing exists");
+	ck((*by_id(&u, rows, n, PM_BT)).live, "Bluetooth is reachable now that pairing exists");
 	/* Always reachable, even with no radio and no cable: it is the row you go
 	 * to in order to say "not Bluetooth", so it must not vanish with the thing
 	 * it refuses. */
-	ck(rows[PM_AUDIO].live, "Audio Output is reachable offline");
-	ck(!strcmp(val(&rows[PM_AUDIO]), "auto (speaker)"),
+	ck((*by_id(&u, rows, n, PM_AUDIO)).live, "Audio Output is reachable offline");
+	ck(!strcmp(val(by_id(&u, rows, n, PM_AUDIO)), "auto (speaker)"),
 	   "and Auto names where it landed rather than only saying Auto");
 	/* Directly under it, and as reachable: someone who hears with one ear
 	 * needs it with no radio and no cable as much as with both. */
 	ck(PM_CHANNELS == PM_AUDIO + 1, "Audio Channels sits under Audio Output");
-	ck(!strcmp(rows[PM_CHANNELS].label, "Audio Channels") && rows[PM_CHANNELS].live,
+	ck(!strcmp((*by_id(&u, rows, n, PM_CHANNELS)).label, "Audio Channels") && (*by_id(&u, rows, n, PM_CHANNELS)).live,
 	   "Audio Channels is reachable offline");
-	ck(!strcmp(val(&rows[PM_CHANNELS]), "stereo"), "and reads stereo until it is set");
+	ck(!strcmp(val(by_id(&u, rows, n, PM_CHANNELS)), "stereo"), "and reads stereo until it is set");
 }
 
 /* The row names the choice, not what a speaker makes of it: mono left stays
@@ -244,6 +262,7 @@ static void channels_row(void)
 	menu_bufs b;
 	menu_row rows[MENU_MAX_ROWS];
 	const char *heading;
+	int n;
 	static const char *const want[AOUT_CHANNELS_COUNT] = {
 		"stereo", "mono", "mono left", "mono right",
 	};
@@ -254,8 +273,8 @@ static void channels_row(void)
 	u.audio_dest = AOUT_SPK;
 	for (c = 0; c < AOUT_CHANNELS_COUNT; c++) {
 		u.audio_channels = (aout_channels)c;
-		sys_menu_build(&u, rows, &b, &heading);
-		ck(!strcmp(val(&rows[PM_CHANNELS]), want[c]), "each choice names itself");
+		n = sys_menu_build(&u, rows, &b, &heading);
+		ck(!strcmp(val(by_id(&u, rows, n, PM_CHANNELS)), want[c]), "each choice names itself");
 	}
 }
 
@@ -267,31 +286,32 @@ static void audio_row(void)
 	menu_bufs b;
 	menu_row rows[MENU_MAX_ROWS];
 	const char *heading;
+	int n;
 
 	memset(&u, 0, sizeof u);
 	printf("the Audio Output row:\n");
 
 	u.audio_policy = AOUT_AUTO;
 	u.audio_dest = AOUT_WIRED;
-	sys_menu_build(&u, rows, &b, &heading);
-	ck(!strcmp(val(&rows[PM_AUDIO]), "auto (wired)"), "auto, on a cable");
+	n = sys_menu_build(&u, rows, &b, &heading);
+	ck(!strcmp(val(by_id(&u, rows, n, PM_AUDIO)), "auto (wired)"), "auto, on a cable");
 
 	u.audio_dest = AOUT_BT;
-	sys_menu_build(&u, rows, &b, &heading);
-	ck(!strcmp(val(&rows[PM_AUDIO]), "auto (bluetooth)"), "auto, on a headset");
+	n = sys_menu_build(&u, rows, &b, &heading);
+	ck(!strcmp(val(by_id(&u, rows, n, PM_AUDIO)), "auto (bluetooth)"), "auto, on a headset");
 
 	/* Pinned says the place with no "auto", because there is no rule left to
 	 * describe - it is just where the sound is. */
 	u.audio_policy = AOUT_SPEAKER;
 	u.audio_dest = AOUT_SPK;
-	sys_menu_build(&u, rows, &b, &heading);
-	ck(!strcmp(val(&rows[PM_AUDIO]), "speaker"), "pinned reads as the place");
+	n = sys_menu_build(&u, rows, &b, &heading);
+	ck(!strcmp(val(by_id(&u, rows, n, PM_AUDIO)), "speaker"), "pinned reads as the place");
 
 	/* Pinned to Speaker with a cable in is still the cable: the pin refuses
 	 * Bluetooth, never the jack. */
 	u.audio_dest = AOUT_WIRED;
-	sys_menu_build(&u, rows, &b, &heading);
-	ck(!strcmp(val(&rows[PM_AUDIO]), "wired"),
+	n = sys_menu_build(&u, rows, &b, &heading);
+	ck(!strcmp(val(by_id(&u, rows, n, PM_AUDIO)), "wired"),
 	   "and a cable still shows through the Speaker pin");
 }
 
@@ -318,13 +338,13 @@ static void tortos_menu_online(void)
 	u.auto_off = 0;
 	n = sys_menu_build(&u, rows, &b, &heading);
 
-	ck(n == PM_ROWS, "row count does not depend on the network");
+	ck(n == TOP_ROWS, "row count does not depend on the network");
 	printf("ChaOS menu, connected:\n");
-	ck(!strcmp(val(&rows[PM_WIFI]), "kitchen"), "Wi-Fi shows the network name");
-	ck(rows[PM_XFER].live && !rows[PM_XFER].value, "OTH is live and unqualified");
-	ck(rows[PM_SCRAPE].live, "Box Art is live");
-	ck(!strcmp(val(&rows[PM_ACHIEVEMENTS]), "eric"), "Cheevos shows the account");
-	ck(!strcmp(val(&rows[PM_SLEEP]), "never"), "0s reads as never");
+	ck(!strcmp(val(by_id(&u, rows, n, PM_WIFI)), "kitchen"), "Wi-Fi shows the network name");
+	ck((*by_id(&u, rows, n, PM_XFER)).live && !(*by_id(&u, rows, n, PM_XFER)).value, "OTH is live and unqualified");
+	ck((*by_id(&u, rows, n, PM_SCRAPE)).live, "Box Art is live");
+	ck(!strcmp(val(by_id(&u, rows, n, PM_ACHIEVEMENTS)), "eric"), "Cheevos shows the account");
+	ck(!strcmp(val(by_id(&u, rows, n, PM_SLEEP)), "never"), "0s reads as never");
 
 	/* THE SCREENSCRAPER ROW HAS THREE STATES, one more than the Cheevos row
 	 * beside it: the developer key comes from the environment at build time,
@@ -336,11 +356,11 @@ static void tortos_menu_online(void)
 	printf("Recently Played:\n");
 	u.recent = "On";
 	n = sys_menu_build(&u, rows, &b, &heading);
-	ck(has_label(rows, n, "Recently Played") && rows[PM_RECENT].toggle &&
-	   !strcmp(val(&rows[PM_RECENT]), "On"), "a switch that says On");
+	ck(has_label(rows, n, "Recently Played") && (*by_id(&u, rows, n, PM_RECENT)).toggle &&
+	   !strcmp(val(by_id(&u, rows, n, PM_RECENT)), "On"), "a switch that says On");
 	u.recent = "Off";
 	n = sys_menu_build(&u, rows, &b, &heading);
-	ck(!strcmp(val(&rows[PM_RECENT]), "Off"), "and Off when it is turned off");
+	ck(!strcmp(val(by_id(&u, rows, n, PM_RECENT)), "Off"), "and Off when it is turned off");
 	u.recent = NULL;
 	/* Night Mode: a switch on a device with a night ladder, gone without one */
 	u.night = "On";
@@ -352,53 +372,55 @@ static void tortos_menu_online(void)
 	}
 	u.night_ok = false;
 	n = sys_menu_build(&u, rows, &b, &heading);
-	ck(!has_label(rows, n, "Night Mode") && n == PM_ROWS - 1, "no Night Mode row where there is no night ladder");
+	ck(!has_label(rows, n, "Night Mode") && n == TOP_ROWS - 1, "no Night Mode row where there is no night ladder");
 	u.night_ok = true;
 	u.night = NULL;
 	printf("Game List View:\n");
+	u.appearance = true;
 	u.list_view = NULL;
 	n = sys_menu_build(&u, rows, &b, &heading);
-	ck(n == PM_ROWS - 1 && !has_label(rows, n, "Game List View"), "not there in Cubic");
+	ck(n == PAGE_ROWS - 1 && !has_label(rows, n, "Game List View"), "not there in Cubic");
 	u.list_view = "List";
 	n = sys_menu_build(&u, rows, &b, &heading);
-	ck(has_label(rows, n, "Game List View") && !strcmp(val(&rows[PM_LISTVIEW]), "List"),
+	ck(has_label(rows, n, "Game List View") && !strcmp(val(by_id(&u, rows, n, PM_LISTVIEW)), "List"),
 	   "there otherwise, saying which");
 
 	printf("Transition Speed:\n");
 	u.name_speed = NULL;
 	n = sys_menu_build(&u, rows, &b, &heading);
-	ck(n == PM_ROWS - 1 && !has_label(rows, n, "Transition Speed"),
+	ck(n == PAGE_ROWS - 1 && !has_label(rows, n, "Transition Speed"),
 	   "not there with a theme that does not move");
 	u.name_speed = "Fast";
 	n = sys_menu_build(&u, rows, &b, &heading);
-	ck(n == PM_ROWS && has_label(rows, n, "Transition Speed") &&
-	   !strcmp(val(&rows[PM_SPEED]), "Fast"), "there with ChaOS Pixel Names, saying its speed");
+	ck(n == PAGE_ROWS && has_label(rows, n, "Transition Speed") &&
+	   !strcmp(val(by_id(&u, rows, n, PM_SPEED)), "Fast"), "there with ChaOS Pixel Names, saying its speed");
 
 	printf("the ScreenScraper account row:\n");
+	u.appearance = false;
 	u.ss_have = false;
 	n = sys_menu_build(&u, rows, &b, &heading);
-	ck(n == PM_ROWS - 1 && !has_label(rows, n, "ScreenScraper"),
+	ck(n == TOP_ROWS - 1 && !has_label(rows, n, "ScreenScraper"),
 	   "a build with no key has no ScreenScraper row at all");
 
 	u.ss_have = true;
 	n = sys_menu_build(&u, rows, &b, &heading);
-	ck(!strcmp(val(&rows[PM_SS]), "sign in"), "a key with no account invites one");
-	ck(rows[PM_SS].live, "and opens");
+	ck(!strcmp(val(by_id(&u, rows, n, PM_SS)), "sign in"), "a key with no account invites one");
+	ck((*by_id(&u, rows, n, PM_SS)).live, "and opens");
 
 	u.ss_in = true;
 	u.ss_name = "someone";
 	n = sys_menu_build(&u, rows, &b, &heading);
-	ck(!strcmp(val(&rows[PM_SS]), "someone"), "an account shows its name");
-	ck(rows[PM_SS].live, "and stays open, to change it");
-	ck(n == PM_ROWS, "and none of that changes the row count");
+	ck(!strcmp(val(by_id(&u, rows, n, PM_SS)), "someone"), "an account shows its name");
+	ck((*by_id(&u, rows, n, PM_SS)).live, "and stays open, to change it");
+	ck(n == TOP_ROWS, "and none of that changes the row count");
 
 	/* Controls needs nothing of the device - no network, no account, no
 	 * card - so it is live in every state this menu can be in, and it sits
 	 * with About at the end where the rows you only read live. */
 	printf("the Controls row:\n");
-	ck(!strcmp(rows[PM_CONTROLS].label, "Controls"), "it is there");
-	ck(rows[PM_CONTROLS].live, "and live with the radio down and nobody signed in");
-	ck(!rows[PM_CONTROLS].value, "and says nothing in the value column");
+	ck(!strcmp((*by_id(&u, rows, n, PM_CONTROLS)).label, "Controls"), "it is there");
+	ck((*by_id(&u, rows, n, PM_CONTROLS)).live, "and live with the radio down and nobody signed in");
+	ck(!(*by_id(&u, rows, n, PM_CONTROLS)).value, "and says nothing in the value column");
 	ck(PM_CONTROLS == PM_ABOUT - 1, "and sits just above About TortOS");
 }
 
@@ -410,24 +432,25 @@ static void wifi_row_wording(void)
 	menu_bufs b;
 	menu_row rows[MENU_MAX_ROWS];
 	const char *heading;
+	int n;
 
 	memset(&u, 0, sizeof u);
 	printf("the Wi-Fi row's three off states:\n");
 
 	u.wifi = WIFI_CONNECTING;
-	sys_menu_build(&u, rows, &b, &heading);
-	ck(!strcmp(val(&rows[PM_WIFI]), "connecting"), "connecting");
+	n = sys_menu_build(&u, rows, &b, &heading);
+	ck(!strcmp(val(by_id(&u, rows, n, PM_WIFI)), "connecting"), "connecting");
 
 	u.wifi = WIFI_IDLE;
-	sys_menu_build(&u, rows, &b, &heading);
-	ck(!strcmp(val(&rows[PM_WIFI]), "not connected"), "up but unassociated");
+	n = sys_menu_build(&u, rows, &b, &heading);
+	ck(!strcmp(val(by_id(&u, rows, n, PM_WIFI)), "not connected"), "up but unassociated");
 
 	/* Connected with no name yet: better to say nothing useful than to print
 	 * an empty value where a network name belongs. */
 	u.wifi = WIFI_CONNECTED;
 	u.ssid = "";
-	sys_menu_build(&u, rows, &b, &heading);
-	ck(val(&rows[PM_WIFI])[0] != 0, "connected with no SSID still says something");
+	n = sys_menu_build(&u, rows, &b, &heading);
+	ck(val(by_id(&u, rows, n, PM_WIFI))[0] != 0, "connected with no SSID still says something");
 }
 
 /* The system menu. Games and Core carry real values, so a wrong count here is
@@ -627,6 +650,18 @@ static bool holds(const int *v, int n, int want)
 	return false;
 }
 
+/* Is the row with this id among the reachable ones? `got` holds positions in
+ * the build, so each is turned into its id with the list the build came from. */
+static bool holds_id(const sys_ui *u, const int *got, int k, pm_row id)
+{
+	pm_row ids[PM_ROWS];
+	int i, cnt = sys_menu_tortos_rows(u, ids);
+
+	for (i = 0; i < k; i++)
+		if (got[i] >= 0 && got[i] < cnt && ids[got[i]] == id) return true;
+	return false;
+}
+
 /* Is a row with this label among the ones the cursor reaches? By label,
  * because a console without a shader has one row fewer and the rest move. */
 static bool reaches(const menu_row *rows, const int *got, int k, const char *label)
@@ -691,14 +726,29 @@ static void cursor_reaches(void)
 	printf("TortOS menu offline, what the cursor can reach:\n");
 	/* No network needed to pair a headset, so it stays reachable offline -
 	 * unlike the three rows above, which do need one. */
-	ck(holds(got, k, PM_BT), "Bluetooth is reachable with no network");
-	ck(!holds(got, k, PM_XFER), "OTH is skipped with no network");
-	ck(!holds(got, k, PM_SCRAPE), "Box Art is skipped with no network");
-	ck(holds(got, k, PM_WIFI), "Wi-Fi is reachable, which is how you fix that");
-	ck(holds(got, k, PM_ABOUT), "About is reachable");
+	ck(holds_id(&u, got, k, PM_BT), "Bluetooth is reachable with no network");
+	ck(!holds_id(&u, got, k, PM_XFER), "OTH is skipped with no network");
+	ck(!holds_id(&u, got, k, PM_SCRAPE), "Box Art is skipped with no network");
+	ck(holds_id(&u, got, k, PM_WIFI), "Wi-Fi is reachable, which is how you fix that");
+	ck(holds_id(&u, got, k, PM_ABOUT), "About is reachable");
 	/* Play Time reads what is already stored and asks nothing of the network,
 	 * so it stays reachable when everything else is grayed out. */
-	ck(holds(got, k, PM_STATS), "Play Time is reachable offline");
+	ck(holds_id(&u, got, k, PM_STATS), "Play Time is reachable offline");
+}
+
+/* The row for `id` in a build. Rows come out in list order with the hidden
+ * ones left out, so an enum index is only a position while nothing above it is
+ * hidden; this asks the list which row is which. A row not shown reads as a
+ * blank one, which says nothing and so cannot pass a check by accident. */
+static const menu_row *by_id(const sys_ui *u, const menu_row *rows, int n, pm_row id)
+{
+	static const menu_row none;
+	pm_row ids[PM_ROWS];
+	int k, cnt = sys_menu_tortos_rows(u, ids);
+
+	for (k = 0; k < cnt && k < n; k++)
+		if (ids[k] == id) return &rows[k];
+	return &none;
 }
 
 static bool has_label(const menu_row *rows, int n, const char *label)
@@ -740,8 +790,13 @@ static void radio_less(void)
 	u.shader = "On";
 	printf("a device with both radios:\n");
 	k = sys_menu_tortos_rows(&u, pm);
-	for (i = 0, ok = true; i < k; i++) if (pm[i] != (pm_row)i) ok = false;
-	ck(k == PM_ROWS && ok, "every TortOS row, in the enum's order");
+	for (i = 1, ok = true; i < k; i++) if (pm[i] <= pm[i - 1]) ok = false;
+	for (i = 0; i < k; i++)
+		if (pm[i] == PM_THEME || pm[i] == PM_DIR || pm[i] == PM_SPEED ||
+		    pm[i] == PM_LISTVIEW || pm[i] == PM_COLOR) ok = false;
+	/* The top level, in the enum's order, with the five look rows on their page
+	 * and Appearance in their place */
+	ck(k == TOP_ROWS && ok, "every TortOS row, in the enum's order");
 	k = sys_menu_system_rows(&u, sm);
 	for (i = 0, ok = true; i < k; i++) if (sm[i] != (sm_row)i) ok = false;
 	ck(k == SM_ROWS && ok, "every system row, in the enum's order");
@@ -751,7 +806,7 @@ static void radio_less(void)
 	n = sys_menu_build(&u, rows, &b, &heading);
 	k = sys_menu_tortos_rows(&u, pm);
 	printf("ChaOS menu, no radio at all:\n");
-	ck(n == k && n == PM_ROWS - 7, "seven rows fewer (Updates too), and the build agrees with the list");
+	ck(n == k && n == TOP_ROWS - 7, "seven rows fewer (Updates too), and the build agrees with the list");
 	ck(!has_label(rows, n, "Wi-Fi") && !has_label(rows, n, "Bluetooth"),
 	   "no Wi-Fi, no Bluetooth");
 	ck(!has_label(rows, n, "ChaOS Transfer") && !has_label(rows, n, "Box Art"),
@@ -772,7 +827,7 @@ static void radio_less(void)
 	n = sys_menu_build(&u, rows, &b, &heading);
 	k = sys_menu_tortos_rows(&u, pm);
 	printf("ChaOS menu, no radio, files over the cable:\n");
-	ck(n == k && n == PM_ROWS - 6, "six rows fewer: the transfer row stays");
+	ck(n == k && n == TOP_ROWS - 6, "six rows fewer: the transfer row stays");
 	for (i = 0; i < k && pm[i] != PM_XFER; i++) { }
 	ck(i < k && !strcmp(rows[i].label, "ChaOS Transfer"),
 	   "as ChaOS Transfer, where the list says it is");

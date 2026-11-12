@@ -120,6 +120,16 @@ int main(void)
 	clock_label(at(2026, 1, 9, 0, 30), s, sizeof s);
 	CHECK(!strcmp(s, "Jan 9, 12:30 AM"), "and just after midnight \"%s\"", s);
 
+	printf("status bar clock:\n");
+	clock_hhmm(t, false, s, sizeof s);
+	CHECK(!strcmp(s, "6:05 PM"), "12-hour, the status bar's words \"%s\"", s);
+	clock_hhmm(t, true, s, sizeof s);
+	CHECK(!strcmp(s, "18:05"), "24-hour, two digits \"%s\"", s);
+	clock_hhmm(at(2026, 1, 9, 0, 30), false, s, sizeof s);
+	CHECK(!strcmp(s, "12:30 AM"), "just after midnight is 12:30 AM \"%s\"", s);
+	clock_hhmm(at(2026, 1, 9, 0, 30), true, s, sizeof s);
+	CHECK(!strcmp(s, "00:30"), "and 00:30 in 24-hour \"%s\"", s);
+
 	printf("zones:\n");
 	CHECK(clock_zone_find("America/New_York") >= 0, "the shipped zone is on the list");
 	CHECK(clock_zone_find("Mars/Olympus_Mons") < 0, "a zone not on it is not");
