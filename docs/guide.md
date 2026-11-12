@@ -129,6 +129,7 @@ than any one console:
 | **Bluetooth** | the connected headset, or `not connected` - pair, connect and forget |
 | **Audio Output** | `Auto` or `Speaker`, and where Auto landed - see **Audio** below |
 | **Audio Channels** | `stereo`, `mono`, `mono left` or `mono right` - see **Audio** below |
+| **Night Mode** | `On` or `Off`, on the Brick only - eight quieter steps under the volume floor, see **Night Mode** below |
 | **Over The Hare** | the file server; needs Wi-Fi and says so when there is none. While a computer is on the USB cable it is **Down To The Wire** instead, always at `10.55.0.2` on the Brick and `10.42.0.1` on the Pixel 2 |
 | **Date & Time** | the clock and the time zone, set with left and right - see below |
 | **Auto Off** | how long without a button before the device powers itself down |
@@ -267,6 +268,13 @@ side alone is lost. `mono left` and `mono right` put that sound in one ear
 only, with the other silent, on headphones, a Bluetooth headset or a USB-C
 adapter. On the speaker they play as `mono`, since a speaker is not on one
 ear. It covers games and Muse alike, and takes effect as you change it.
+
+**Night Mode** adds eight steps under the quietest level of the volume scale,
+for listening late without the speaker's floor being too loud. The steps are
+the same size as the normal ones, so the scale grows downward. Switching it on
+or off keeps the loudness you have, so nothing jumps. On headphones the floor
+is the register's own limit, so the extra steps there are finer rather than
+quieter. It is on the Brick only.
 
 The wired jack has its own volume range, not the speaker's. The two are about
 9 dB apart, and the level is re-mapped the moment a cable goes in or out, so

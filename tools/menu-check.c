@@ -184,6 +184,8 @@ static void tortos_menu_offline(void)
 
 	memset(&u, 0, sizeof u);
 	u.ss_have = true;   /* the full menu; its hiding is checked on its own */
+	u.night = "Off";
+	u.night_ok = true;
 	u.name_speed = "Normal";
 	u.list_view = "Normal";
 	u.wifi = WIFI_OFF;
@@ -192,6 +194,8 @@ static void tortos_menu_offline(void)
 	u.menu_color = "ChaOS Orange";
 	u.auto_off = 120;
 	u.clock = "Oct 3, 6:12 AM";
+	u.night = "Off";
+	u.night_ok = true;
 	n = sys_menu_build(&u, rows, &b, &heading);
 
 	printf("ChaOS menu, radio off:\n");
@@ -303,6 +307,8 @@ static void tortos_menu_online(void)
 
 	memset(&u, 0, sizeof u);
 	u.ss_have = true;   /* the full menu; its hiding is checked on its own */
+	u.night = "Off";
+	u.night_ok = true;
 	u.name_speed = "Normal";
 	u.list_view = "Normal";
 	u.wifi = WIFI_CONNECTED;
@@ -336,6 +342,19 @@ static void tortos_menu_online(void)
 	n = sys_menu_build(&u, rows, &b, &heading);
 	ck(!strcmp(val(&rows[PM_RECENT]), "Off"), "and Off when it is turned off");
 	u.recent = NULL;
+	/* Night Mode: a switch on a device with a night ladder, gone without one */
+	u.night = "On";
+	n = sys_menu_build(&u, rows, &b, &heading);
+	{
+		int k, at = -1;
+		for (k = 0; k < n; k++) if (!strcmp(rows[k].label, "Night Mode")) at = k;
+		ck(at >= 0 && rows[at].toggle && !strcmp(val(&rows[at]), "On"), "Night Mode is a switch that says On");
+	}
+	u.night_ok = false;
+	n = sys_menu_build(&u, rows, &b, &heading);
+	ck(!has_label(rows, n, "Night Mode") && n == PM_ROWS - 1, "no Night Mode row where there is no night ladder");
+	u.night_ok = true;
+	u.night = NULL;
 	printf("Game List View:\n");
 	u.list_view = NULL;
 	n = sys_menu_build(&u, rows, &b, &heading);
@@ -423,6 +442,8 @@ static void system_menu(void)
 
 	memset(&u, 0, sizeof u);
 	u.ss_have = true;   /* the full menu; its hiding is checked on its own */
+	u.night = "Off";
+	u.night_ok = true;
 	u.name_speed = "Normal";
 	u.list_view = "Normal";
 	u.games = true;
@@ -628,6 +649,8 @@ static void cursor_reaches(void)
 
 	memset(&u, 0, sizeof u);
 	u.ss_have = true;   /* the full menu; its hiding is checked on its own */
+	u.night = "Off";
+	u.night_ok = true;
 	u.name_speed = "Normal";
 	u.list_view = "Normal";
 	u.games = true;
@@ -657,6 +680,8 @@ static void cursor_reaches(void)
 
 	memset(&u, 0, sizeof u);
 	u.ss_have = true;   /* the full menu; its hiding is checked on its own */
+	u.night = "Off";
+	u.night_ok = true;
 	u.name_speed = "Normal";
 	u.list_view = "Normal";
 	u.wifi = WIFI_OFF;
@@ -704,6 +729,8 @@ static void radio_less(void)
 
 	memset(&u, 0, sizeof u);
 	u.ss_have = true;   /* the full menu; its hiding is checked on its own */
+	u.night = "Off";
+	u.night_ok = true;
 	u.name_speed = "Normal";
 	u.list_view = "Normal";
 	u.wifi = WIFI_OFF;
@@ -753,6 +780,8 @@ static void radio_less(void)
 
 	memset(&u, 0, sizeof u);
 	u.ss_have = true;   /* the full menu; its hiding is checked on its own */
+	u.night = "Off";
+	u.night_ok = true;
 	u.name_speed = "Normal";
 	u.list_view = "Normal";
 	u.games = true;

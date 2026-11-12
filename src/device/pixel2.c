@@ -872,6 +872,12 @@ bool plat_muted(void) { return false; }
 void device_levels_forget(void) { jack_was = -1; }
 
 int plat_volume_get(void)     { return cur_vol; }
+/* No night ladder on this device: the menu row is not offered, and the
+ * ladder stays the ordinary one. */
+int plat_volume_max(void) { return PLAT_VOL_MAX; }
+bool plat_volume_night_ok(void) { return false; }
+bool plat_volume_night_get(void) { return false; }
+void plat_volume_night(bool on) { (void)on; }
 int plat_brightness_get(void) { return cur_bright; }
 
 void plat_volume_nudge(int delta)

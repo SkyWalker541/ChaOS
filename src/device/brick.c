@@ -523,7 +523,29 @@ struct pl_ctl_elem_value {
 #define HP_CTL_QUIET 7                    /* its quiet end, for the cut */
 #define SWAP_CTL     "DAC Swap"           /* 1 crosses left and right */
 #define HPSW_CTL     "Headphone Switch"   /* the headphone stage, which the speaker runs off */
-#define VOL_MAX      PLAT_VOL_MAX         /* 21 positions, 0..20 - Diatom's scale */
+/* The ladder in use. Ordinarily PLAT_VOL_MAX (21 positions, 0..20, Diatom's
+ * scale). Night mode adds PLAT_VOL_NIGHT_EXTRA rungs under the floor. The
+ * bottom is the same ladder extended at the same step width, so it is the
+ * ordinary bottom scaled by the extra rungs. Headphones cannot go lower than
+ * the register's end, so for them the extra rungs are finer instead. Diatom
+ * takes the ladder's length from the count it is sent (levels.c), so the two
+ * scales agree with no other message. */
+static void apply_volume(int v);
+static bool night_on;
+static int vol_top(void)
+{
+	return night_on ? PLAT_VOL_MAX + PLAT_VOL_NIGHT_EXTRA : PLAT_VOL_MAX;
+}
+static int vol_bottom(bool hp)
+{
+	int top = hp ? HP_RAW_TOP : SPK_RAW_TOP;
+	int bot = hp ? HP_RAW_BOTTOM : SPK_RAW_BOTTOM;
+	long b;
+
+	if (!night_on) return bot;
+	b = top + ((long)(bot - top) * vol_top() + PLAT_VOL_MAX / 2) / PLAT_VOL_MAX;
+	return b > GAIN_RAW_MAX ? GAIN_RAW_MAX : (int)b;
+}
 
 #define DISP_LCD_SET_BRIGHTNESS 0x102
 #define DISP_LCD_GET_BRIGHTNESS 0x103
@@ -575,6 +597,26 @@ static void levels_save(void)
 {
 	db_set_int(db_dev(), "volume", cur_vol);
 	db_set_int(db_dev(), "brightness", cur_bright);
+}
+
+int plat_volume_max(void) { return vol_top(); }
+bool plat_volume_night_get(void) { return night_on; }
+bool plat_volume_night_ok(void) { return true; }
+
+/* The rung is remapped with the ladder so the loudness holds: night adds the
+ * extra rungs at the quiet end, and leaving it takes them away, a rung at the
+ * floor staying a rung. Silence stays silence. */
+void plat_volume_night(bool on)
+{
+	if (on == night_on) return;
+	if (cur_vol > 0) {
+		if (on) cur_vol += PLAT_VOL_NIGHT_EXTRA;
+		else    cur_vol = cur_vol > PLAT_VOL_NIGHT_EXTRA ? cur_vol - PLAT_VOL_NIGHT_EXTRA : 1;
+	}
+	night_on = on;
+	db_set_int(db_dev(), "volume.night", on ? 1 : 0);
+	if (cur_vol >= 0 && mixer_fd >= 0) apply_volume(clampi(cur_vol, 0, vol_top()));
+	levels_save();
 }
 
 /* Write a control and complain if it does not land. Discarding this return is
@@ -696,9 +738,8 @@ static void apply_volume(int v)
 	int hp = jack_present();
 	bool cut = v == 0 || muted == 1;
 	long raw = cut ? GAIN_RAW_MAX
-	         : aout_level_to_raw(v, VOL_MAX,
-	                             hp ? HP_RAW_TOP : SPK_RAW_TOP,
-	                             hp ? HP_RAW_BOTTOM : SPK_RAW_BOTTOM);
+	         : aout_level_to_raw(v, vol_top(), hp ? HP_RAW_TOP : SPK_RAW_TOP,
+	                             vol_bottom(hp));
 	long quiet = cut ? HP_CTL_QUIET : 0;
 	long on = !cut;
 
@@ -911,7 +952,8 @@ void plat_settings_init(void)
 				if (abs(bright_ladder[i] - raw) < abs(bright_ladder[b] - raw)) b = i;
 		}
 	}
-	cur_vol    = v >= 0 ? clampi(v, 0, VOL_MAX)    : -1;
+	night_on   = db_get_int(db_dev(), "volume.night", 0) != 0;
+	cur_vol    = v >= 0 ? clampi(v, 0, vol_top())  : -1;
 	cur_bright = b >= 0 ? clampi(b, 0, BRIGHT_MAX) : BRIGHT_MAX / 2;
 	if (cur_vol >= 0) apply_volume(cur_vol);
 	apply_brightness(cur_bright);
@@ -937,7 +979,12 @@ void plat_backlight(bool on)
  * (mk/native.mk). There is no codec and no display engine here, so the
  * settings are state and nothing more - enough that the OSD draws and the
  * levels the launcher reports are consistent. */
-#define VOL_MAX    PLAT_VOL_MAX
+static bool night_on;
+int plat_volume_max(void) { return night_on ? PLAT_VOL_MAX + PLAT_VOL_NIGHT_EXTRA : PLAT_VOL_MAX; }
+bool plat_volume_night_get(void) { return night_on; }
+bool plat_volume_night_ok(void) { return true; }
+void plat_volume_night(bool on) { night_on = on; }
+#define VOL_MAX    (night_on ? PLAT_VOL_MAX + PLAT_VOL_NIGHT_EXTRA : PLAT_VOL_MAX)
 #define BRIGHT_MAX PLAT_BRIGHT_MAX
 static int cur_vol = 8, cur_bright = 7;
 static int mixer_fd = 0, disp_fd = 0;    /* "present", so the nudges run */
@@ -988,9 +1035,9 @@ int plat_brightness_get(void) { return cur_bright; }
 void plat_volume_nudge(int delta)
 {
 	if (mixer_fd < 0) return;
-	apply_volume(clampi((cur_vol < 0 ? 0 : cur_vol) + delta, 0, VOL_MAX));
+	apply_volume(clampi((cur_vol < 0 ? 0 : cur_vol) + delta, 0, vol_top()));
 	levels_save();
-	plat_osd_show(2, cur_vol, VOL_MAX);
+	plat_osd_show(2, cur_vol, vol_top());
 }
 
 void plat_brightness_nudge(int delta)
@@ -1004,7 +1051,7 @@ void plat_brightness_nudge(int delta)
 void plat_volume_set_pct(int pct)
 {
 	if (mixer_fd < 0) return;
-	apply_volume(clampi((pct * VOL_MAX + 50) / 100, 0, VOL_MAX));
+	apply_volume(clampi((pct * vol_top() + 50) / 100, 0, vol_top()));
 	levels_save();
 }
 

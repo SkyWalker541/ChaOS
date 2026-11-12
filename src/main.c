@@ -2571,24 +2571,24 @@ static void bt_volume_follow(const char *out, bool fresh)
 				bool echo = !strcmp(who, sent_to) && now - sent_at < 1000;
 				int  have = g_game_ticking && level >= 0 ? level : plat_volume_get();
 
-				want = (hv * PLAT_VOL_MAX + 63) / 127;
+				want = (hv * plat_volume_max() + 63) / 127;
 				if (!echo && want != have) {
 					if (g_game_ticking)
 						plat_resident_line("SETLEVEL\tkind=volume\tindex=%d\tcount=%d",
-						                   want, PLAT_VOL_MAX + 1);
+						                   want, plat_volume_max() + 1);
 					else
 						plat_volume_nudge(want - have);
-					sent = (want * 127 + PLAT_VOL_MAX / 2) / PLAT_VOL_MAX;
+					sent = (want * 127 + plat_volume_max() / 2) / plat_volume_max();
 					snprintf(sent_to, sizeof sent_to, "%s", out);
 					fprintf(stderr, "audio: %s's own buttons: %d/127, level %d of %d\n",
-					        out, hv, want, PLAT_VOL_MAX);
+					        out, hv, want, plat_volume_max());
 				}
 			}
 		}
 		if (f) fclose(f);
 		if (!primed) primed = true;               /* no file yet is a start too */
 	}
-	if (level < 0) { level = plat_volume_get(); count = PLAT_VOL_MAX + 1; }
+	if (level < 0) { level = plat_volume_get(); count = plat_volume_max() + 1; }
 	if (level < 0 || count < 2) return;
 	v = (level * 127 + (count - 1) / 2) / (count - 1);
 	/* And again for a different headset at the same level: with two connected
@@ -5478,6 +5478,8 @@ static int menu_build(app *a, screen_id screen, int sys,
 		u.name_speed = CARDS_DRAWN(g_cards) ? PN_SPEEDS[g_pn_speed[g_dir]].name : NULL;
 		u.list_view = CARD_DIRS[g_dir].both ? NULL : g_list_view ? "List" : "Normal";
 		u.recent    = g_recent_shelf ? "On" : "Off";
+		u.night     = plat_volume_night_get() ? "On" : "Off";
+		u.night_ok  = plat_volume_night_ok();
 		u.menu_color = MENU_COLORS[g_menu_color].name;
 		u.update    = upd_row_value();
 		u.auto_off  = a->auto_off;
@@ -8832,6 +8834,13 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 		return MENU_STAY;
 	}
 
+	/* ChaOS: night volume, on or off. The ladder is remapped at once, so the
+	 * loudness holds and the level shown is the new one. */
+	if (sel == PM_NIGHT && (d || key == IN_ACCEPT)) {
+		plat_volume_night(!plat_volume_night_get());
+		return MENU_STAY;
+	}
+
 	/* ChaOS: this direction's Transition Speed, round the three */
 	if (sel == PM_SPEED && (d || key == IN_ACCEPT)) {
 		char k[64];
@@ -11804,7 +11813,7 @@ static void game_menu(app *a)
 
 			if (vol >= 0)
 				plat_resident_line("SETLEVEL\tkind=volume\tindex=%d\tcount=%d",
-				                   vol, PLAT_VOL_MAX + 1);
+				                   vol, plat_volume_max() + 1);
 		}
 	}
 	/* Nothing presents from here: the next frame on screen is the game's. */

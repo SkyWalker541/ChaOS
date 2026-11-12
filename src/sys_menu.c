@@ -39,6 +39,7 @@ int sys_menu_tortos_rows(const sys_ui *u, pm_row *out)
 		/* ChaOS: only with the ChaOS pixel themes, the ones that move */
 		if (!u->name_speed && r == PM_SPEED) continue;
 		if (!u->list_view && r == PM_LISTVIEW) continue;
+		if (!u->night_ok && r == PM_NIGHT) continue;
 		out[n++] = (pm_row)r;
 	}
 	return n;
@@ -208,6 +209,10 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	 * a side (src/audioout.h), and the row still says what was chosen. */
 	full[PM_CHANNELS]     = (menu_row){ "Audio Channels",
 	                                   aout_channels_name(u->audio_channels), true };
+	/* Night Mode: eight rungs quieter at the bottom of the volume ladder, for
+	 * quiet listening at night. Only where the device has the ladder to give. */
+	full[PM_NIGHT]        = (menu_row){ "Night Mode", u->night, true };
+	full[PM_NIGHT].toggle = true;
 	/* Files onto and off the device over Wi-Fi: a small web server on the LAN
 	 * that a phone or a laptop opens. Named for OTA, which is what everyone
 	 * already calls this, and for the other half of the fable - the tortoise

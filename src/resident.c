@@ -398,7 +398,7 @@ bool plat_resident_send(const char *tag, const char *core, const char *rom,
 		vol = plat_volume_get();
 		bri = plat_brightness_get();
 		if (vol >= 0) dsend("SETLEVEL\tkind=volume\tindex=%d\tcount=%d",
-		                    vol, PLAT_VOL_MAX + 1);
+		                    vol, plat_volume_max() + 1);
 		if (bri >= 0) dsend("SETLEVEL\tkind=brightness\tindex=%d\tcount=%d",
 		                    bri, PLAT_BRIGHT_MAX + 1);
 		/* And the mute, ON EVERY RUN and not only when it changes. A state

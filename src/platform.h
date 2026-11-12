@@ -254,6 +254,9 @@ void plat_request_poweroff(void);
  * table that only the settings code can see. */
 #define PLAT_VOL_MAX     20   /* 21 positions, 0..20 */
 #define PLAT_BRIGHT_MAX  11   /* a 12-rung geometric ladder, 0..11 */
+/* Night mode adds this many quieter rungs under the ladder's floor, each the
+ * width of an ordinary step, so the floor goes down and the steps stay put. */
+#define PLAT_VOL_NIGHT_EXTRA 8
 
 /* Levels come from the settings database: seeded from the shipped defaults on
  * first run, then overwritten by every nudge of the rocker. There is no longer
@@ -262,6 +265,14 @@ void plat_request_poweroff(void);
  * place, and now the precedence has nowhere to disagree with itself. */
 void plat_settings_init(void);
 int  plat_volume_get(void);
+/* The top rung of the ladder in use: PLAT_VOL_MAX, or more in night mode. */
+int  plat_volume_max(void);
+/* Whether this device has a night ladder at all. */
+bool plat_volume_night_ok(void);
+/* Night mode on or off, from the device database's "volume.night". The rung
+ * moves with it, so the loudness holds and the saved rung follows. */
+void plat_volume_night(bool on);
+bool plat_volume_night_get(void);
 int  plat_brightness_get(void);
 void plat_volume_nudge(int delta);
 void plat_brightness_nudge(int delta);
