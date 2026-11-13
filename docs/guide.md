@@ -539,9 +539,11 @@ port. Where that can't be drawn, the screen goes off instead, the next press
 resumes, and power held three seconds powers off. A port that stops on a
 library the Brick hasn't got says which.
 
-PortMaster's own files say what device a port is on and how to run it, and
-the first port started downloads them (about 25 MB) into
-`Roms/Ports/PortMaster/`. A copy already there with no `control.txt` is kept,
+PortMaster's own files say what device a port is on and how to run it.
+**MENU > Get PortMaster** downloads them into `Roms/Ports/PortMaster/`, and
+nothing about ports is on the card before that; the PortMaster card on the
+Ports shelf then browses its catalog, installs ports with their runtimes and
+libraries, and removes them, keeping their saves if asked. A copy already there with no `control.txt` is kept,
 renamed `PortMaster.old-<time>`, not deleted. ChaOS's part is small:
 `/bin/bash` and `/roms` in the system (PortMaster's standard places, so its
 ports run unmodified), and `mod_ChaOS.txt`, put back into PortMaster's folder
