@@ -4,11 +4,15 @@
 hasn't got - the list the port library pack (tools/build-libpack.sh) is
 made from.
 
-    tools/ports-survey.py PORTS_JSON HAVE.txt OUT_DIR [--jobs N] [--max-mb N]
+    tools/ports-survey.py PORTS_JSON HAVE.txt OUT_DIR [--jobs N] [--max-mb N] [--have-dir D]...
 
 PORTS_JSON is PortMaster's catalog; HAVE.txt the library file names the
 Brick has (its root's /lib and /usr/lib, and ChaOS's port libraries), a
-name a line. For every port that may run on ChaOS (src/pmcat.c's rule)
+name a line. Each --have-dir is a folder of those libraries themselves
+(the root's lib folders, ChaOS's port libraries unpacked), read for what
+they need in turn - a port's own copy of a library, on its library path
+first, can need what the Brick's doesn't (Doom Engines' libsndfile wants
+an older FLAC). For every port that may run on ChaOS (src/pmcat.c's rule)
 it reads the zip's central directory with an HTTP range request, then
 fetches only the members that look like programs or libraries, again by
 range, and reads each ELF's DT_NEEDED. A library is had if the Brick has
@@ -225,7 +229,26 @@ def main():
         i = args.index('--jobs'); jobs = int(args[i + 1]); del args[i:i + 2]
     if '--max-mb' in args:
         i = args.index('--max-mb'); max_mb = int(args[i + 1]); del args[i:i + 2]
+    have_dirs = []
+    while '--have-dir' in args:
+        i = args.index('--have-dir'); have_dirs.append(args[i + 1]); del args[i:i + 2]
     cat_path, have_path, out = args
+    have_needs = {}
+    for d in have_dirs:
+        for root, _, files in os.walk(d):
+            for fn in files:
+                fp = os.path.join(root, fn)
+                if os.path.islink(fp) or '.so' not in fn:
+                    continue
+                try:
+                    with open(fp, 'rb') as f:
+                        info = elf_needed(f.read())
+                except Exception:
+                    info = None
+                if info:
+                    have_needs[fn] = info[1]
+                    if info[0]:
+                        have_needs[info[0]] = info[1]
     cat = json.load(open(cat_path))['ports']
     have = {l.strip() for l in open(have_path) if l.strip()}
     cache = os.path.join(out, 'cache')
@@ -266,10 +289,12 @@ def main():
                 if n in seen:
                     continue
                 seen.add(n)
-                if n in libs:
+                if n in libs:                  # the port's own copy, first
                     todo.extend(libs[n])
-                elif n in have or n in carried:
+                elif n in carried:
                     continue
+                elif n in have:
+                    todo.extend(have_needs.get(n, []))
                 else:
                     lacks.add(n)
         report[k] = {'title': r['title'], 'lacks': sorted(lacks),

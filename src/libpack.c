@@ -226,13 +226,11 @@ static bool carried(const walk *w, const char *n)
 	return false;
 }
 
-static bool on_device(const char *const *dirs, const char *n)
+static bool on_device(const char *const *dirs, const char *n, char *path, size_t pn)
 {
-	char p[512];
-
 	for (; dirs && *dirs; dirs++) {
-		snprintf(p, sizeof p, "%s/%s", *dirs, n);
-		if (access(p, F_OK) == 0) return true;
+		snprintf(path, pn, "%s/%s", *dirs, n);
+		if (access(path, F_OK) == 0) return true;
 	}
 	return false;
 }
@@ -270,7 +268,22 @@ int libpack_missing(const char *port_dir, const char *const *have_dirs,
 					snprintf(todo[nt++], LIBPACK_NAME, "%s", lib->needed[k]);
 				continue;
 			}
-			if (carried(&w, n) || on_device(have_dirs, n)) continue;
+			if (carried(&w, n)) continue;
+			{
+				char path[512], more[64][LIBPACK_NAME];
+				int nm = 0;
+
+				/* the device's own: what it needs in turn, since a
+				 * library the port carries, ahead on its path, can be
+				 * what that needs (Doom Engines' libsndfile, under
+				 * ChaOS's FluidSynth, wants an older FLAC) */
+				if (on_device(have_dirs, n, path, sizeof path)) {
+					if (libpack_elf(path, more, 64, &nm, NULL, 0))
+						for (k = 0; k < nm && nt < cap; k++)
+							snprintf(todo[nt++], LIBPACK_NAME, "%s", more[k]);
+					continue;
+				}
+			}
 			for (k = 0; k < nmiss && k < max && strcmp(out[k], n); k++) ;
 			if (k < nmiss && k < max) continue;
 			if (nmiss < max) snprintf(out[nmiss], LIBPACK_NAME, "%s", n);

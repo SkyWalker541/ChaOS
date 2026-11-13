@@ -1,0 +1,19 @@
+# ChaOS's port library pack: where each library's source came from, as
+# tools/build-libpack.sh builds them. Ubuntu's archive keeps each project's own
+# release (Debian's +dfsg copies leave out documentation only).
+# sha256  file  url
+243a0736b978a33dee29f9cca7521733b78a65b5418206fef7bd1c3d4cf10b64  cairo_1.18.0.orig.tar.xz  http://archive.ubuntu.com/ubuntu/pool/main/c/cairo/cairo_1.18.0.orig.tar.xz
+5b356795b889d3e5b379433ece069b8781bf0727f6959ad3bbc9da0c22164f59  expat_2.7.4.orig.tar.gz  http://archive.ubuntu.com/ubuntu/pool/main/e/expat/expat_2.7.4.orig.tar.gz
+213e82bd716c9de6db2f98bcadbc4c24c7e2efe8c75939a1a84e28539c4e1748  flac_1.3.3.orig.tar.xz  http://archive.ubuntu.com/ubuntu/pool/main/f/flac/flac_1.3.3.orig.tar.xz
+63a0658d0e06e0fa886106452b58ef04f21f58202ea02a94c39de0d3335d7c0e  fontconfig_2.15.0.orig.tar.xz  http://archive.ubuntu.com/ubuntu/pool/main/f/fontconfig/fontconfig_2.15.0.orig.tar.xz
+686ec73cbf6783b245dd068a09ce807b729ac0f8a46dd70f7867923c32fdf4de  freetype_2.13.3+dfsg.orig.tar.xz  http://archive.ubuntu.com/ubuntu/pool/main/f/freetype/freetype_2.13.3+dfsg.orig.tar.xz
+3b85d91bf38d1b858d9d01134f4046b3359731968ed4e6e912d29717a35d1a46  gcc-13_13.3.0.orig.tar.gz  http://archive.ubuntu.com/ubuntu/pool/main/g/gcc-13/gcc-13_13.3.0.orig.tar.gz
+bd2966e6d277f79328e894a5a9f3ba3fbf2ed2be81def5f48623e30c23fb1572  gmp_6.3.0+dfsg.orig.tar.xz  http://archive.ubuntu.com/ubuntu/pool/main/g/gmp/gmp_6.3.0+dfsg.orig.tar.xz
+abfc2ce1ba3b7657deb77f510201b49c35ab572963f454fb5a316ed0d36e0efb  libevdev_1.13.1+dfsg.orig.tar.xz  http://archive.ubuntu.com/ubuntu/pool/main/libe/libevdev/libevdev_1.13.1+dfsg.orig.tar.xz
+4cbb7b0746edc1683c9581b373365e955133b7f1243f171b7d1535b4415dfedb  libpng1.6_1.6.57.orig.tar.gz  http://archive.ubuntu.com/ubuntu/pool/main/libp/libpng1.6/libpng1.6_1.6.57.orig.tar.gz
+c59b0f07a7314dfe2ade15c41bc9f637f8a450fc6b340af61b81760629f28f90  libtheora_1.1.1+dfsg.1.orig.tar.gz  http://archive.ubuntu.com/ubuntu/pool/main/libt/libtheora/libtheora_1.1.1+dfsg.1.orig.tar.gz
+ea1480efada2fd948bc75366f7c349e1c96d3297d09a3fe62626e38e234a625e  pixman_0.42.2.orig.tar.gz  http://archive.ubuntu.com/ubuntu/pool/main/p/pixman/pixman_0.42.2.orig.tar.gz
+# libgomp.so.1 is the cross compiler's own (Ubuntu's gcc-13-cross 13.3.0-6ubuntu2~24.04.1,
+# built from gcc-13_13.3.0.orig.tar.gz above); libpulse-simple.so.0 is ChaOS's
+# res/ports/libpack/pulse-simple.c; Ogg comes from dist/brick/portlibs-source.tar.xz.
+# freetype, libpng and expat are built against only: the Brick has its own.

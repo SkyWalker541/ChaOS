@@ -96,6 +96,13 @@ done
 tar -xJf "$ROOT/dist/brick/portlibs.tar.xz" -C "$W/root" --no-same-owner
 [ ! -e "$W/root/roms" ] || { echo "the root has a /roms already: check ports" >&2; exit 1; }
 ln -s /mnt/SDCARD/Roms "$W/root/roms"
+# OpenGL ES 1 by the name ports built elsewhere ask for (libGLESv1_CM);
+# the Brick's PowerVR driver calls it libGLES_CM
+[ -e "$W/root/usr/lib/libGLES_CM.so.1" ] || { echo "no libGLES_CM in the root: check ports" >&2; exit 1; }
+for n in libGLESv1_CM.so.1 libGLESv1_CM.so; do
+	[ ! -e "$W/root/usr/lib/$n" ] || { echo "the root has $n already: check ports" >&2; exit 1; }
+	ln -s libGLES_CM.so.1 "$W/root/usr/lib/$n"
+done
 OSR=$W/root/etc/os-release
 [ -L "$OSR" ] && OSR=$W/root/$(readlink "$OSR" | sed 's|^/||; s|^\.\./||')
 grep -q '^NAME=' "$OSR" || { echo "no os-release to name ChaOS in" >&2; exit 1; }

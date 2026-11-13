@@ -1,0 +1,59 @@
+{
+ "version": 1,
+ "libs": {
+  "libFLAC.so.8": {
+   "file": "libFLAC.so.8",
+   "md5": "c68833a0cb3736dd64ea554a2b74b9ea",
+   "size": 199576,
+   "licence": "BSD-3-Clause"
+  },
+  "libcairo.so.2": {
+   "file": "libcairo.so.2",
+   "md5": "7a55003e7f01405f7d8ca5f67a53a595",
+   "size": 1253712,
+   "licence": "LGPL-2.1-only OR MPL-1.1"
+  },
+  "libevdev.so.2": {
+   "file": "libevdev.so.2",
+   "md5": "9924af5b45fc6afc7c5210a90e964f57",
+   "size": 133632,
+   "licence": "MIT"
+  },
+  "libfontconfig.so.1": {
+   "file": "libfontconfig.so.1",
+   "md5": "9a248a9a753fce9f21e2b2d1d2746c13",
+   "size": 396168,
+   "licence": "MIT"
+  },
+  "libgmp.so.10": {
+   "file": "libgmp.so.10",
+   "md5": "ad88517c425f279bde421ed22c563b11",
+   "size": 529200,
+   "licence": "LGPL-3.0-or-later OR GPL-2.0-or-later"
+  },
+  "libgomp.so.1": {
+   "file": "libgomp.so.1",
+   "md5": "9befd48ea2c41f25a0466ad29af640c5",
+   "size": 462544,
+   "licence": "GPL-3.0-or-later WITH GCC-exception-3.1"
+  },
+  "libpixman-1.so.0": {
+   "file": "libpixman-1.so.0",
+   "md5": "4732fe4ba8bf2d7f5a82e02100bc3278",
+   "size": 658104,
+   "licence": "MIT"
+  },
+  "libpulse-simple.so.0": {
+   "file": "libpulse-simple.so.0",
+   "md5": "b8b9f2cdd35fee103f5661fb0e07bcff",
+   "size": 67272,
+   "licence": "MIT (ChaOS)"
+  },
+  "libtheoradec.so.1": {
+   "file": "libtheoradec.so.1",
+   "md5": "f7fab4bc874bef620604c54ff4d34f22",
+   "size": 133384,
+   "licence": "BSD-3-Clause"
+  }
+ }
+}
