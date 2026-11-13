@@ -35,7 +35,7 @@ int gi_rows(menu_row *out, const game_info *gi, bool net)
 	 * there" is worth a word. */
 	if (gi->scraped)
 		out[n++] = (menu_row){ "Synopsis", gi->has_synopsis ? NULL : "none",
-		                       gi->has_synopsis };
+		                       gi->has_synopsis, .hint = "Read about this game" };
 	if (gi->scraped && gi->year[0])
 		out[n++] = (menu_row){ "Year",  gi->year,  false };
 	if (gi->scraped && gi->genre[0])
@@ -44,7 +44,8 @@ int gi_rows(menu_row *out, const game_info *gi, bool net)
 	 * comes from. Reading "4/54" and having nowhere to go with it is the
 	 * question half-answered: which four, and what are the other fifty. A game
 	 * with no set has nothing to open and says so. */
-	out[n++] = (menu_row){ "RetroAchievements", gi->cheevos, gi->has_cheevos };
+	out[n++] = (menu_row){ "RetroAchievements", gi->cheevos, gi->has_cheevos,
+	                       .hint = "This game's achievements and how many you have" };
 	/* WHAT THIS SCREEN NO LONGER SAYS, and why, because each was removed on a
 	 * reason rather than to make the list shorter:
 	 *
@@ -83,7 +84,8 @@ int gi_rows(menu_row *out, const game_info *gi, bool net)
 	 * hour - and stay off this screen. */
 	/* ChaOS: open with or without Wi-Fi, as a screenshot needs none; the
 	 * choices inside say which do */
-	out[n++] = (menu_row){ gi->has_art ? "Replace Box Art" : "Get Box Art", NULL, true };
+	out[n++] = (menu_row){ gi->has_art ? "Replace Box Art" : "Get Box Art", NULL, true,
+	                       .hint = "A cover from libretro, itch.io or your screenshots" };
 	(void)net;
 	/* ChaOS: how to favorite it, said where people look. Still Y on the
 	 * shelf and not a row here (above); but nothing said so but the Controls
@@ -104,6 +106,25 @@ int gm_rows(const gm_ui *u, menu_row *out, gm_bufs *b)
 	int i;
 
 	for (i = 0; i < GM_ROWS; i++) out[i] = (menu_row){ label[i], NULL, true };
+	/* ChaOS: what each row does, under the menu (menu_draw) */
+	{
+		static const char *hint[GM_ROWS] = {
+			"Back to the game",
+			"Save your place in a slot",
+			"Go back to a saved place",
+			"A picture of the game, kept on the card",
+			"This game's screenshots",
+			"How the picture fills the screen",
+			"A screen effect, like a CRT's or a Game Boy's LCD",
+			"A frame drawn around the picture",
+			"What each button does in this console's games",
+			"This game's achievements and how many you have",
+			"Start the game over, as if switched off and on",
+			"Back to the shelf. Your place is kept"
+		};
+
+		for (i = 0; i < GM_ROWS; i++) out[i].hint = hint[i];
+	}
 	out[GM_DISPLAY].value = u->dmode ? u->dmode : "Integer";
 	/* ChaOS: left and right change these: Display Mode and Overlay go
 	 * round their choices, Shader is a switch */

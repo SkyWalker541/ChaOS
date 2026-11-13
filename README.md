@@ -61,8 +61,9 @@
 - **Game List View** (**MENU > Appearance > Game List View**): **Normal** shows each system's games as the UI Theme draws them; **List** shows them as a scrolling list in the menus' style. Up and down move, left and right jump by letter, and L1 and R1 skip a screenful, as on the shelf. (Not in Cubic, which never opens a list.)
 - **Night Mode** (**MENU > Night Mode**): eight extra volume steps below the quietest, for playing in bed. The volume buttons reach them while it's on.
 - **The clock and battery in every menu,** in the menu's heading, on the main menu and in games. **MENU > Date & Time** sets 12- or 24-hour time, and whether the battery shows as an icon, a percentage or both.
-- **Appearance** (**MENU > Appearance**): the UI Theme, UI Direction, Transition Speed, Game List View and Menu Color on one page.
-- **Recently Played,** a shelf at the front of the systems row with the last twelve games you played across every system. Turn it off under **MENU > Recently Played**.
+- **Appearance** (**MENU > Appearance**): the UI Theme, UI Direction, Transition Speed, Game List View and Menu Color on one page, and switches for which shelves that aren't consoles show on the systems row: **Show Favorites**, **Show Recently Played** and **Show Muse** (SELECT opens Muse either way).
+- **Every menu says what its rows do:** the row you're on is described in a line at the bottom of the menu, in-game menu included.
+- **Recently Played,** a shelf at the front of the systems row with the last twelve games you played across every system. Turn it off under **MENU > Appearance > Show Recently Played**.
 - **ChaOS Wire:** ChaOS Transfer over the USB cable, which can also update ChaOS from your computer.
 - **Box art for homebrew,** from itch.io or one of your own screenshots, chosen from the game's **X** menu, or set from your phone in ChaOS Transfer: a photo, a picture's link, an itch.io page or a Google Images result.
 - **Games come first:** nothing of ChaOS's own runs while you play. An update that was downloading pauses and picks up where it left off afterwards, with its progress shown on the shelf. Muse keeps playing.

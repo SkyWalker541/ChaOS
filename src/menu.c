@@ -40,6 +40,17 @@ int menu_window_first(const menu_row *rows, int n, int sel, int vis, int first)
 	 * window, because a cursor off the screen is worse than a fact off it. */
 	while (top > 0 && !rows[top - 1].live) top--;
 	if (top < first)                first = top;
+	/* ChaOS: and the same below, for the dead rows that end a list - a rule
+	 * and a note saying what the rows above it mean (Appearance's). Nothing
+	 * selectable follows them, so without this they could never be scrolled
+	 * to at all. The cursor still wins: it stays on the screen. */
+	{
+		int bot = sel;
+
+		while (bot + 1 < n && !rows[bot + 1].live) bot++;
+		if (bot == n - 1 && bot > first + vis - 1) first = bot - vis + 1;
+		if (first > sel) first = sel;
+	}
 	if (sel < first)                first = sel;
 	if (sel > first + vis - 1)      first = sel - vis + 1;
 	if (first > n - vis)            first = n - vis;

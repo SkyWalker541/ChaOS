@@ -44,7 +44,8 @@ int sys_menu_tortos_rows(const sys_ui *u, pm_row *out)
 		 * for the page, where the first of them sat */
 		{
 			bool look = r == PM_THEME || r == PM_DIR || r == PM_SPEED ||
-			            r == PM_LISTVIEW || r == PM_COLOR;
+			            r == PM_LISTVIEW || r == PM_COLOR || r == PM_SHELF_FAV ||
+			            r == PM_RECENT || r == PM_SHELF_MUSE;
 
 			if (u->appearance != look) continue;
 		}
@@ -92,7 +93,8 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 		 * them and it has none. See SM_FAV_ROWS. */
 		if (u->fav) {
 			out[0] = (menu_row){ "Games",   b->a,                      false };
-			out[1] = (menu_row){ "Sort By", u->sort ? u->sort : "Name", true, .cycles = true };
+			out[1] = (menu_row){ "Sort By", u->sort ? u->sort : "Name", true, .cycles = true,
+			                     .hint = "The order of the games on this shelf" };
 			return SM_FAV_ROWS;
 		}
 		if (u->muse) {
@@ -109,23 +111,26 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 				case SMM_SHOW:
 					out[k] = (menu_row){ "Show",
 					                     u->muse_books ? "Audiobooks" : "Music", true,
-					                     .cycles = true };
+					                     .cycles = true, .hint = "Music or audiobooks" };
 					break;
 				case SMM_SORT:
 					out[k] = (menu_row){ "Sort By", u->sort ? u->sort
 					                     : u->muse_books ? "Author" : "Artist", true,
-					                     .cycles = true };
+					                     .cycles = true, .hint = "The order of the covers on this shelf" };
 					break;
 				case SMM_LOCK:
 					out[k] = (menu_row){ "Lock Screen",
 					                     u->muse_playing ? NULL : "while playing",
-					                     u->muse_playing };
+					                     u->muse_playing,
+					                     .hint = "Screen off while it plays, the buttons locked" };
 					break;
 				case SMM_ART:
-					out[k] = (menu_row){ "Album Art", NEEDS_WIFI(net), net };
+					out[k] = (menu_row){ "Album Art", NEEDS_WIFI(net), net,
+					                     .hint = "Download covers for your albums" };
 					break;
 				case SMM_RESCAN:
-					out[k] = (menu_row){ "Rescan Folder", NULL, true };
+					out[k] = (menu_row){ "Rescan Folder", NULL, true,
+					                     .hint = "Look for music and books added to the card" };
 					break;
 				}
 			return n;
@@ -169,6 +174,15 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 		 * is the one you came here to refresh, so the name still describes
 		 * what you asked for. */
 		full[SM_RESCAN]  = (menu_row){ "Rescan Folder", NULL,        true  };
+		/* ChaOS: what each row does, under the menu (menu_draw) */
+		full[SM_SORT].hint    = "The order of the games on this shelf";
+		full[SM_DISPLAY].hint = "How the picture fills the screen";
+		full[SM_SHADER].hint  = "A screen effect, like a CRT's or a Game Boy's LCD";
+		full[SM_OVERLAY].hint = "A frame drawn around the picture";
+		full[SM_BUTTONS].hint = "What each button does in this console's games";
+		full[SM_REWIND].hint  = "Hold MENU + L1 to rewind. Costs a little speed";
+		full[SM_BOXART].hint  = "Download box art for this console's games";
+		full[SM_RESCAN].hint  = "Look for games added to the card";
 		/* ChaOS: what left and right do (menu.h): go round the choices, or
 		 * flip a switch */
 		full[SM_SORT].cycles = full[SM_DISPLAY].cycles = full[SM_OVERLAY].cycles = true;
@@ -221,7 +235,6 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	 * quiet listening at night. Only where the device has the ladder to give. */
 	full[PM_NIGHT]        = (menu_row){ "Night Mode", u->night, true };
 	full[PM_NIGHT].toggle = true;
-	full[PM_NIGHT].hint   = "quieter volume";
 	/* Files onto and off the device over Wi-Fi: a small web server on the LAN
 	 * that a phone or a laptop opens. Named for OTA, which is what everyone
 	 * already calls this, and for the other half of the fable - the tortoise
@@ -248,10 +261,14 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	/* ChaOS: how fast the pixel names form, for this direction alone */
 	full[PM_SPEED]        = (menu_row){ "Transition Speed", u->name_speed, true };
 	full[PM_LISTVIEW]     = (menu_row){ "Game List View", u->list_view, true };
-	/* ChaOS: a switch - the shelf is on the systems row while it has games */
 	full[PM_APPEARANCE]   = (menu_row){ "Appearance", NULL, true };
-	full[PM_RECENT]       = (menu_row){ "Recently Played", u->recent, true };
-	full[PM_RECENT].toggle = true;
+	/* ChaOS: switches - whether each shelf that isn't a console shows on
+	 * the systems row (each still only while it has something on it). Off,
+	 * Muse is still on SELECT, and favorites are still kept. */
+	full[PM_SHELF_FAV]    = (menu_row){ "Show Favorites", u->fav_shelf, true };
+	full[PM_RECENT]       = (menu_row){ "Show Recently Played", u->recent, true };
+	full[PM_SHELF_MUSE]   = (menu_row){ "Show Muse", u->muse_shelf, true };
+	full[PM_SHELF_FAV].toggle = full[PM_RECENT].toggle = full[PM_SHELF_MUSE].toggle = true;
 	/* ChaOS: the menus' accent, beside the other two rows about the look. */
 	full[PM_COLOR]        = (menu_row){ "Menu Color", u->menu_color, true };
 	/* Not "Sleep". The device has no suspend and is not getting one. This
@@ -282,6 +299,33 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	full[PM_UPDATE]       = (menu_row){ "Updates", u->update, true };
 	full[PM_CONTROLS]     = (menu_row){ "Controls",    NULL,   true  };
 	full[PM_ABOUT]        = (menu_row){ "About ChaOS", NULL,   true  };
+	/* ChaOS: what each row does, shown under the menu while it is the one
+	 * selected (menu_draw's description line) */
+	full[PM_STATS].hint        = "How long you've played each game";
+	full[PM_WIFI].hint         = "Join a network";
+	full[PM_BT].hint           = "Pair headphones or a speaker";
+	full[PM_AUDIO].hint        = "Speaker, headphones or Bluetooth";
+	full[PM_CHANNELS].hint     = "Stereo, or mono for one ear";
+	full[PM_NIGHT].hint        = "Extra-quiet volume steps for playing at night";
+	full[PM_XFER].hint         = u->cable_xfer ? "Copy games and music over the USB cable"
+	                                           : "Copy games and music from a phone or computer";
+	full[PM_CLOCK].hint        = "Time zone, clock style and battery display";
+	full[PM_SLEEP].hint        = "Power off after this long with no buttons pressed";
+	full[PM_APPEARANCE].hint   = "Theme, layout, menu color and which shelves show";
+	full[PM_THEME].hint        = "The look of the cards on the shelf";
+	full[PM_DIR].hint          = "Which way the shelves move";
+	full[PM_SPEED].hint        = "How fast the pixel names come together";
+	full[PM_LISTVIEW].hint     = "A console's games as cards, or as a list";
+	full[PM_COLOR].hint        = "The color of the menus";
+	full[PM_SHELF_FAV].hint    = "Favorites on the systems row. Y still marks games";
+	full[PM_RECENT].hint       = "Your last 12 games, as a shelf on the systems row";
+	full[PM_SHELF_MUSE].hint   = "Muse on the systems row. SELECT always opens it";
+	full[PM_SCRAPE].hint       = "Download box art for your games";
+	full[PM_ACHIEVEMENTS].hint = "Sign in to earn achievements as you play";
+	full[PM_SS].hint           = "Sign in for more box art and game info";
+	full[PM_UPDATE].hint       = "Check for a newer ChaOS and install it";
+	full[PM_CONTROLS].hint     = "What every button does";
+	full[PM_ABOUT].hint        = "Version, storage and this device";
 	/* ChaOS: the rows A opens a screen from, marked so */
 	full[PM_STATS].opens = full[PM_WIFI].opens = full[PM_BT].opens = true;
 	full[PM_XFER].opens = full[PM_CLOCK].opens = full[PM_SCRAPE].opens = true;

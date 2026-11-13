@@ -172,6 +172,9 @@ typedef struct {
  * the input loop calls it the moment a favorite changes. */
 static void refresh_virtual_shelves(app *a);
 static void build_muse_shelf(app *a);
+static void muse_shelf_attach(app *a);
+static void muse_shelf_detach(app *a);
+static void muse_shelf_set(app *a);
 /* How a Muse screen was left: back one level, Muse closed altogether, or the
  * library rebuilt under it by Rescan Folder, so every album index it held is
  * stale and the shelf has to find itself again. */
@@ -920,6 +923,13 @@ static int g_pn_speed[8];
 static bool g_list_view;
 /* The menu's Recently Played switch, from the device database. On by default. */
 static bool g_recent_shelf = true;
+/* ChaOS: Appearance's other two shelf switches, Favorites and Muse, on by
+ * default. Off, Favorites is still kept (Y still marks a game) and Muse is
+ * still on SELECT: its shelf is put on the row while SELECT has it open, and
+ * taken off again after (muse_open). */
+static bool g_fav_shelf = true;
+static bool g_muse_shelf = true;
+static bool g_muse_attach;          /* SELECT has Muse open with its shelf off */
 
 /* ChaOS: the status bar, the clock top left and the battery top right, each set
  * in Date & Time. Both are small and out of the way by default. */
@@ -3997,7 +4007,7 @@ static int shot_phase = -1;        /* --phase, for the shot harness only */
  * clocks was never the two columns. It was the selected row against the rest,
  * and only one row is ever selected. */
 enum { MQ_SHELF, MQ_MENU, MQ_FIXED, MQ_NOTE0, MQ_NOTE1, MQ_VSCROLL,
-       MQ_HEAD, MQ_NP, MQ_SLOTS };
+       MQ_HEAD, MQ_NP, MQ_DESC, MQ_SLOTS };
 
 static int      mq_last_a[MQ_SLOTS], mq_last_b[MQ_SLOTS];
 static unsigned mq_since[MQ_SLOTS];
@@ -4815,6 +4825,13 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 	int content_off = heading ? head_h + pad / 2 : pad;
 	bool two_col = false;
 	int content_w = 0, i, k, rows_h = 0;
+	/* ChaOS: WHAT THE SELECTED ROW DOES, in a line under the rows. A menu
+	 * whose rows carry a hint (menu_row.hint) keeps a footer for it, the
+	 * same height whichever row is on, so moving the cursor never moves the
+	 * panel. A hint used to sit beside its label, where a long one was cut
+	 * to "o..." and none could say more than a few words. */
+	bool descs = false;
+	int desc_h = 0;
 	SDL_Rect panel;
 	int cx, content_x, content_y;
 	/* The list can outgrow the screen from either end - the type scale turns
@@ -4836,6 +4853,14 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 			                           : ui_text_width(fm, rows[i].value));
 		if (rows[i].cycles) w += text_h * 3 / 2;   /* the left arrow */
 		if (w > content_w) content_w = w;
+		/* ChaOS: wide enough for its description too, so it can be read
+		 * whole; the screen still caps it, and a longer one slides */
+		if (sel >= 0 && rows[i].hint && rows[i].hint[0]) {
+			TTF_Font *df = ui_font(UI_F_META);
+			int hw = df ? ui_text_width(df, rows[i].hint) : 0;
+
+			if (hw > content_w) content_w = hw;
+		}
 	}
 	if (head2) {
 		size_t n1 = (size_t)(head2 - heading);
@@ -4864,8 +4889,11 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 		for (i = 0; i < n; i++) sum += ROW_H(rows[i]);
 		rows_h = sum;
 	}
-	if (content_off + rows_h + pad > TORTOS_SCREEN_H - margin * 2) {
-		int avail = TORTOS_SCREEN_H - margin * 2 - content_off - pad;
+	for (i = 0; i < n && sel >= 0; i++)
+		if (rows[i].label && rows[i].hint && rows[i].hint[0]) descs = true;
+	if (descs) desc_h = rule_h + ui_font_height(UI_F_META) + pad / 3;
+	if (content_off + rows_h + desc_h + pad > TORTOS_SCREEN_H - margin * 2) {
+		int avail = TORTOS_SCREEN_H - margin * 2 - content_off - pad - desc_h;
 
 		if (sel >= 0) {
 			/* THE WINDOW ONLY MOVES WHEN THE CURSOR WOULD LEAVE IT.
@@ -4948,7 +4976,7 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 		/* A scrolling card is as tall as its viewport plus its pinned footer.
 		 * Summing the rows would size the panel to text that is deliberately
 		 * not all on it. */
-		panel.h = content_off + (scroll_h ? scroll_h + scroll_foot : sum) + pad;
+		panel.h = content_off + (scroll_h ? scroll_h + scroll_foot : sum) + pad + desc_h;
 		/* A panel that ends in a footer gets a smaller bottom pad. The full
 		 * pad is there to keep list ITEMS off the border; a note is already
 		 * held off the list by its rule and is meant to sit low.
@@ -4961,7 +4989,7 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 		 * A body row is not a footer. A synopsis short enough to fit without
 		 * scrolling ends in prose, which is the panel's content and wants the
 		 * same pad under it that a list does. */
-		if (!scroll_h && last >= 0 && last < n && rows[last].label &&
+		if (!scroll_h && !descs && last >= 0 && last < n && rows[last].label &&
 		    ROW_IS_NOTE(rows[last]) && !ROW_IS_BODY(rows[last]))
 			panel.h -= pad * 5 / 12;
 	}
@@ -5254,7 +5282,7 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 	if (vis < n) {
 		SDL_Rect rc = { panel.x + UI_PANEL_BORDER, content_y,
 		                panel.w - UI_PANEL_BORDER * 2,
-		                panel.y + panel.h - pad - content_y };
+		                panel.y + panel.h - pad - desc_h - content_y };
 		/* ChaOS: a panel stretched to the screen is taller than its rows;
 		 * the clip stays at the rows, or the row past the window shows */
 		if (g_menu_fill >= 0) {
@@ -5457,20 +5485,6 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 			if (lw + (vw ? gap + vw : 0) + (rows[i].cycles ? text_h * 3 / 2 : 0) <= content_w) {
 				ui_fit_text(fm, rows[i].label, lbl, sizeof lbl, content_w);
 				ui_text(a->r, fm, lbl, content_x, ty, -1, lc);
-				if (rows[i].hint && rows[i].hint[0]) {
-					int hroom = content_w - lw - gap - (vw ? gap + vw : 0)
-					          - (rows[i].cycles ? text_h * 3 / 2 : 0);
-					if (hroom > 0) {
-						/* The smaller face, centred on the label's line, so a
-						 * short description reads as one */
-						TTF_Font *hf = ui_font(UI_F_META);
-						char hb[96];
-						int hy = ty + (text_h - ui_font_height(UI_F_META)) / 2;
-
-						ui_fit_text(hf, rows[i].hint, hb, sizeof hb, hroom);
-						ui_text(a->r, hf, hb, content_x + lw + gap, hy, -1, UI_TEXT_DIM);
-					}
-				}
 				if (rows[i].value && rows[i].toggle)
 					draw_switch(a->r, content_x + content_w,
 					            y + ROW_H(rows[i]) / 2.0f, text_h,
@@ -5592,6 +5606,33 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 					panel.w - UI_PANEL_BORDER * 2, 1 });
 		}
 		SDL_RenderSetClipRect(a->r, NULL);
+	}
+
+	/* ChaOS: the selected row's hint, under a rule at the foot of the panel
+	 * (see descs). Centred when it fits, sliding when it doesn't, as a note
+	 * does; nothing for a row without one, and the rule stays. */
+	if (descs) {
+		TTF_Font *df = ui_font(UI_F_META);
+		int dh = ui_font_height(UI_F_META);
+		int fy = panel.y + panel.h - pad - desc_h;
+		int dy = fy + rule_h + (desc_h - rule_h - dh) / 2;
+		const char *h = sel >= 0 && sel < n ? rows[sel].hint : NULL;
+
+		SDL_RenderSetClipRect(a->r, NULL);
+		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+		SDL_SetRenderDrawColor(a->r, (Uint8)(accent >> 16), (Uint8)(accent >> 8),
+		                       (Uint8)accent, 70);
+		SDL_RenderFillRect(a->r, &(SDL_Rect){ content_x, fy + rule_h - 2, content_w, 2 });
+		if (h && h[0] && df) {
+			if (ui_text_width(df, h) <= content_w) {
+				ui_text(a->r, df, h, cx, dy, 0, UI_TEXT_DIM);
+			} else {
+				unsigned ph = mq_phase(MQ_DESC, sel, n);
+
+				ui_text_marquee(a->r, df, h, content_x, dy, content_w, ph, UI_TEXT_DIM);
+				redraw_at(plat_now_ms() + 33);
+			}
+		}
 	}
 
 	/* Three dim dots where the list carries on, in the same vocabulary the
@@ -5778,6 +5819,8 @@ static int menu_build(app *a, screen_id screen, int sys,
 		u.name_speed = CARDS_DRAWN(g_cards) ? PN_SPEEDS[g_pn_speed[g_dir]].name : NULL;
 		u.list_view = CARD_DIRS[g_dir].both ? NULL : g_list_view ? "List" : "Normal";
 		u.recent    = g_recent_shelf ? "On" : "Off";
+		u.fav_shelf = g_fav_shelf ? "On" : "Off";
+		u.muse_shelf = g_muse_shelf ? "On" : "Off";
 		u.night     = plat_volume_night_get() ? "On" : "Off";
 		u.night_ok  = plat_volume_night_ok();
 		u.appearance = g_appearance_page;
@@ -9831,6 +9874,13 @@ static int menu_measure(const menu_row *rows, int n, const char *heading)
 			                            : ui_text_width(fm, rows[i].value));
 		if (rows[i].cycles) rw += TTF_FontHeight(fm) * 3 / 2;   /* the left arrow */
 		if (rw > w) w = rw;
+		/* ChaOS: its description, as menu_draw sizes for it */
+		if (rows[i].hint && rows[i].hint[0]) {
+			TTF_Font *df = ui_font(UI_F_META);
+			int hw = df ? ui_text_width(df, rows[i].hint) : 0;
+
+			if (hw > w) w = hw;
+		}
 	}
 	if (heading) {
 		int hw = ui_text_width(fh, heading);
@@ -10335,6 +10385,20 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 		g_recent_shelf = !g_recent_shelf;
 		db_set_str(db_dev(), "recent_shelf", g_recent_shelf ? "on" : "off");
 		refresh_virtual_shelves(a);
+		return MENU_STAY;
+	}
+
+	/* ChaOS: Favorites and Muse on the systems row, on or off, at once */
+	if (sel == PM_SHELF_FAV && (d || key == IN_ACCEPT)) {
+		g_fav_shelf = !g_fav_shelf;
+		db_set_str(db_dev(), "fav_shelf", g_fav_shelf ? "on" : "off");
+		refresh_virtual_shelves(a);
+		return MENU_STAY;
+	}
+	if (sel == PM_SHELF_MUSE && (d || key == IN_ACCEPT)) {
+		g_muse_shelf = !g_muse_shelf;
+		db_set_str(db_dev(), "muse_shelf", g_muse_shelf ? "on" : "off");
+		muse_shelf_set(a);
 		return MENU_STAY;
 	}
 
@@ -11904,7 +11968,17 @@ static bool muse_open(app *a, const menu_style *over, void *ctx)
 	g_muse_over = over;
 	g_muse_over_ctx = ctx;
 	g_muse_gone = false;
+	/* ChaOS: Muse's shelf is off the row: on it for as long as SELECT has
+	 * Muse open (a Rescan inside rebuilds it too, see build_muse_shelf) */
+	if (!g_muse_shelf) {
+		g_muse_attach = true;
+		muse_shelf_attach(a);
+	}
 	muse_shelf_screen(a, mn->state == MU_PLAYING || mn->state == MU_PAUSED);
+	if (g_muse_attach) {
+		g_muse_attach = false;
+		muse_shelf_detach(a);
+	}
 	g_muse_over = NULL;
 	g_muse_over_ctx = NULL;
 	/* Nothing Muse did closes the menu it may have been opened over. */
@@ -14671,7 +14745,7 @@ static void build_favorites_shelf(app *a)
 	int *owner;
 	int n = 0, i, k, si, real;
 
-	if (fav_count() <= 0 || a->sys.count <= 0) return;
+	if (!g_fav_shelf || fav_count() <= 0 || a->sys.count <= 0) return;
 
 	items = calloc(FAV_MAX, sizeof *items);
 	owner = calloc(FAV_MAX, sizeof *owner);
@@ -15138,7 +15212,6 @@ static void muse_file_albums(void)
  * and an empty Favorites shelf follow: a card should lead somewhere. */
 static void build_muse_shelf(app *a)
 {
-	system_cfg *s;
 	int i;
 
 	/* Everything indexed by album goes with the albums: a rescan can put a
@@ -15175,7 +15248,23 @@ static void build_muse_shelf(app *a)
 		db_get_str(db_dev(), "muse.show", show, sizeof show, "music");
 		g_muse_books = !strcmp(show, "books");
 	}
-	if (a->sys.count >= CFG_MAX_SYSTEMS) return;
+	fprintf(stderr, "scan: %-16s %d artists, %d albums, %d books, %d tracks\n", "Muse",
+	        g_muse.nartists, ml_count(&g_muse, false), ml_count(&g_muse, true),
+	        g_muse.ntracks);
+	/* ChaOS: the library is read either way, for SELECT; the card goes on
+	 * the row only with Appearance's Show Muse on, or while SELECT has it */
+	if (g_muse_shelf || g_muse_attach) muse_shelf_attach(a);
+}
+
+/* Muse's card on the end of the row, its view its albums */
+static void muse_shelf_attach(app *a)
+{
+	system_cfg *s;
+	int i;
+
+	if (g_muse.ntracks == 0 || a->sys.count >= CFG_MAX_SYSTEMS) return;
+	for (i = 0; i < a->sys.count; i++)
+		if (is_muse(&a->sys.systems[i])) return;
 	i = a->sys.count;
 	s = &a->sys.systems[i];
 	memset(s, 0, sizeof *s);
@@ -15189,9 +15278,48 @@ static void build_muse_shelf(app *a)
 	a->sys_w[i] = a->sys_h[i] = 0;
 	a->sys_cb[i] = 0;
 	a->sys.count++;
-	fprintf(stderr, "scan: %-16s %d artists, %d albums, %d books, %d tracks\n", "Muse",
-	        g_muse.nartists, ml_count(&g_muse, false), ml_count(&g_muse, true),
-	        g_muse.ntracks);
+	/* Its order, as sort_load would read it, for an attach after boot */
+	{
+		char key[CFG_STR + 16], name[CFG_STR];
+
+		snprintf(key, sizeof key, "sort.%s", s->tag);
+		if (db_get_str(db_dev(), key, name, sizeof name, NULL))
+			a->view[i].sort = (int)ml_order_index(name);
+	}
+	look_load_one(a, i);
+	sort_shelf(a, i);
+}
+
+/* ChaOS: and off again. It is always last, so nothing else moves. */
+static void muse_shelf_detach(app *a)
+{
+	int i = a->sys.count - 1, k;
+	sysview *v;
+
+	if (i < 0 || !is_muse(&a->sys.systems[i])) return;
+	v = &a->view[i];
+	for (k = 0; v->tex && k < v->list.count; k++)
+		if (v->tex[k]) SDL_DestroyTexture(v->tex[k]);
+	free(v->tex); free(v->tw); free(v->th); free(v->cb); free(v->album);
+	free(v->list.items);
+	if (a->sys_tex[i]) SDL_DestroyTexture(a->sys_tex[i]);
+	memset(v, 0, sizeof *v);
+	a->sys_tex[i] = NULL;
+	a->sys.count--;
+	if (a->sys_cursor >= a->sys.count) {
+		a->sys_cursor = a->sys.count > 0 ? a->sys.count - 1 : 0;
+		a->screen = SCREEN_SYSTEMS;
+	}
+	cf_reset(&a->cf_sys, a->sys_cursor);
+}
+
+/* ChaOS: Show Muse flipped: the card on or off the row, at once */
+static void muse_shelf_set(app *a)
+{
+	texload_bump();
+	if (g_muse_shelf) muse_shelf_attach(a);
+	else muse_shelf_detach(a);
+	cf_reset(&a->cf_sys, a->sys_cursor);
 }
 
 static void scan_all(app *a)
@@ -15341,6 +15469,7 @@ static void rescan_all(app *a)
 static const char *shot_path;
 static int shot_screen = -1;
 static int shot_menu, shot_menu_sel;
+static int shot_gmenu = -1;           /* ChaOS: --gmenu ROW, the in-game menu */
 static bool shot_clock;                    /* ChaOS: --datetime [row] */
 static const char *shot_pick;              /* ChaOS: --pick IMAGE, the cover picker */
 static const char *shot_pick_note;         /* ChaOS: --pick-note TEXT, its message alone */
@@ -15666,6 +15795,15 @@ static void take_shot(app *a)
 	    !shot_syn && !shot_cheevos)
 		welcome_draw(a);
 	if (shot_menu) tortos_menu_draw(a, shot_menu_sel);
+	if (shot_gmenu >= 0) {
+		static menu_row rows[GM_SHOWN + 4];
+		gm_bufs gb;
+		int gn;
+
+		memset(&gb, 0, sizeof gb);
+		gn = gm_build(a, rows, &gb, 2, NULL);
+		menu_draw(a, NULL, rows, gn, shot_gmenu < gn ? shot_gmenu : 0, 0, MENU_ACCENT);
+	}
 	if (shot_clock) {
 		clock_ui cu;
 		menu_row rows[MENU_MAX_ROWS];
@@ -15948,6 +16086,7 @@ int main(int argc, char *argv[])
 			                                              : SCREEN_SYSTEMS;
 		/* --menu [row] draws the TortOS menu over whichever screen --screen
 		 * asked for, so the panel can be looked at without a device. */
+		else if (!strcmp(argv[i], "--gmenu") && i + 1 < argc) shot_gmenu = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--menu")) {
 			shot_menu = 1;
 			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9')
@@ -16472,6 +16611,10 @@ int main(int argc, char *argv[])
 
 		db_get_str(db_dev(), "recent_shelf", rs, sizeof rs, "on");
 		g_recent_shelf = strcmp(rs, "off") != 0;
+		db_get_str(db_dev(), "fav_shelf", rs, sizeof rs, "on");
+		g_fav_shelf = strcmp(rs, "off") != 0;
+		db_get_str(db_dev(), "muse_shelf", rs, sizeof rs, "on");
+		g_muse_shelf = strcmp(rs, "off") != 0;
 		g_status_clock   = db_get_int(db_dev(), "status.clock", 1) != 0;
 		g_status_clock24 = db_get_int(db_dev(), "status.clock24", 0) != 0;
 		g_status_batt    = db_get_int(db_dev(), "status.battery", STATUS_BATT_ICON);

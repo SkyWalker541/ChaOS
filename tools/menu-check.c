@@ -173,10 +173,13 @@ static const char *val(const menu_row *r) { return r->value ? r->value : ""; }
  * say so rather than silently doing nothing: Over The Hare, Box Art, and Box
  * Art's counterpart in the system menu. */
 static bool has_label(const menu_row *rows, int n, const char *label);
-/* The top level is four rows shorter than the list of rows: the five look rows
- * are on the Appearance page, and the menu holds one row for that page. */
-#define TOP_ROWS (PM_ROWS - 5)
-#define PAGE_ROWS 5
+/* The top level is shorter than the list of rows by the Appearance page's: the
+ * five look rows and the three shelf switches are on that page, and the menu
+ * holds one row for it. */
+#define PAGE_ROWS 8
+#define TOP_ROWS (PM_ROWS - PAGE_ROWS)
+/* (the page's description line is drawn by menu_draw, not a row) */
+#define PAGE_NOTE 0
 static const menu_row *by_id(const sys_ui *u, const menu_row *rows, int n, pm_row id);
 
 static void tortos_menu_offline(void)
@@ -209,8 +212,8 @@ static void tortos_menu_offline(void)
 	/* The look rows, on their own page under Appearance */
 	u.appearance = true;
 	n = sys_menu_build(&u, rows, &b, &heading);
-	ck(n == PAGE_ROWS && !strcmp(heading, "Appearance"),
-	   "the Appearance page holds the five look rows, under its own heading");
+	ck(n == PAGE_ROWS + PAGE_NOTE && !strcmp(heading, "Appearance"),
+	   "the Appearance page holds the look rows and the shelf switches, under its own heading");
 	ck(!strcmp(val(by_id(&u, rows, n, PM_COLOR)), "ChaOS Orange") && (*by_id(&u, rows, n, PM_COLOR)).live,
 	   "Menu Color names the accent, and is reachable offline");
 	u.appearance = false;
@@ -353,15 +356,29 @@ static void tortos_menu_online(void)
 	 * whatever is typed would look like a rejected password. */
 	/* Recently Played is a switch like the Wi-Fi and audio ones: always there,
 	 * since it is the shelf that is hidden, not the setting. */
-	printf("Recently Played:\n");
+	printf("Shelf switches:\n");
+	u.appearance = true;
 	u.recent = "On";
+	u.fav_shelf = "On";
+	u.muse_shelf = "Off";
 	n = sys_menu_build(&u, rows, &b, &heading);
-	ck(has_label(rows, n, "Recently Played") && (*by_id(&u, rows, n, PM_RECENT)).toggle &&
-	   !strcmp(val(by_id(&u, rows, n, PM_RECENT)), "On"), "a switch that says On");
+	ck(has_label(rows, n, "Show Recently Played") && (*by_id(&u, rows, n, PM_RECENT)).toggle &&
+	   !strcmp(val(by_id(&u, rows, n, PM_RECENT)), "On"), "Show Recently Played, a switch that says On");
+	ck(has_label(rows, n, "Show Favorites") && (*by_id(&u, rows, n, PM_SHELF_FAV)).toggle,
+	   "Show Favorites, a switch");
+	ck(has_label(rows, n, "Show Muse") && (*by_id(&u, rows, n, PM_SHELF_MUSE)).toggle &&
+	   !strcmp(val(by_id(&u, rows, n, PM_SHELF_MUSE)), "Off") &&
+	   by_id(&u, rows, n, PM_SHELF_MUSE)->hint &&
+	   strstr(by_id(&u, rows, n, PM_SHELF_MUSE)->hint, "SELECT"),
+	   "Show Muse, whose description says SELECT still opens Muse");
 	u.recent = "Off";
 	n = sys_menu_build(&u, rows, &b, &heading);
 	ck(!strcmp(val(by_id(&u, rows, n, PM_RECENT)), "Off"), "and Off when it is turned off");
-	u.recent = NULL;
+	u.appearance = false;
+	n = sys_menu_build(&u, rows, &b, &heading);
+	ck(!has_label(rows, n, "Show Recently Played") && !has_label(rows, n, "Show Muse"),
+	   "on the Appearance page, not the menu");
+	u.recent = u.fav_shelf = u.muse_shelf = NULL;
 	/* Night Mode: a switch on a device with a night ladder, gone without one */
 	u.night = "On";
 	n = sys_menu_build(&u, rows, &b, &heading);
@@ -379,7 +396,7 @@ static void tortos_menu_online(void)
 	u.appearance = true;
 	u.list_view = NULL;
 	n = sys_menu_build(&u, rows, &b, &heading);
-	ck(n == PAGE_ROWS - 1 && !has_label(rows, n, "Game List View"), "not there in Cubic");
+	ck(n == PAGE_ROWS + PAGE_NOTE - 1 && !has_label(rows, n, "Game List View"), "not there in Cubic");
 	u.list_view = "List";
 	n = sys_menu_build(&u, rows, &b, &heading);
 	ck(has_label(rows, n, "Game List View") && !strcmp(val(by_id(&u, rows, n, PM_LISTVIEW)), "List"),
@@ -388,11 +405,11 @@ static void tortos_menu_online(void)
 	printf("Transition Speed:\n");
 	u.name_speed = NULL;
 	n = sys_menu_build(&u, rows, &b, &heading);
-	ck(n == PAGE_ROWS - 1 && !has_label(rows, n, "Transition Speed"),
+	ck(n == PAGE_ROWS + PAGE_NOTE - 1 && !has_label(rows, n, "Transition Speed"),
 	   "not there with a theme that does not move");
 	u.name_speed = "Fast";
 	n = sys_menu_build(&u, rows, &b, &heading);
-	ck(n == PAGE_ROWS && has_label(rows, n, "Transition Speed") &&
+	ck(n == PAGE_ROWS + PAGE_NOTE && has_label(rows, n, "Transition Speed") &&
 	   !strcmp(val(by_id(&u, rows, n, PM_SPEED)), "Fast"), "there with ChaOS Pixel Names, saying its speed");
 
 	printf("the ScreenScraper account row:\n");
@@ -756,7 +773,7 @@ static bool has_label(const menu_row *rows, int n, const char *label)
 	int i;
 
 	for (i = 0; i < n; i++)
-		if (!strcmp(rows[i].label, label)) return true;
+		if (rows[i].label && !strcmp(rows[i].label, label)) return true;   /* a rule has none */
 	return false;
 }
 
@@ -793,8 +810,9 @@ static void radio_less(void)
 	for (i = 1, ok = true; i < k; i++) if (pm[i] <= pm[i - 1]) ok = false;
 	for (i = 0; i < k; i++)
 		if (pm[i] == PM_THEME || pm[i] == PM_DIR || pm[i] == PM_SPEED ||
-		    pm[i] == PM_LISTVIEW || pm[i] == PM_COLOR) ok = false;
-	/* The top level, in the enum's order, with the five look rows on their page
+		    pm[i] == PM_LISTVIEW || pm[i] == PM_COLOR || pm[i] == PM_SHELF_FAV ||
+		    pm[i] == PM_RECENT || pm[i] == PM_SHELF_MUSE) ok = false;
+	/* The top level, in the enum's order, with the Appearance rows on their page
 	 * and Appearance in their place */
 	ck(k == TOP_ROWS && ok, "every TortOS row, in the enum's order");
 	k = sys_menu_system_rows(&u, sm);
@@ -913,6 +931,13 @@ static void window_returns(void)
 	rows[8].live = true;
 	ck(menu_window_first(rows, 9, 8, 4, 0) == 5, "a cursor is never pushed off");
 	ck(menu_window_first(rows, 9, 8, 9, 0) == 0, "a list that fits never scrolls");
+
+	/* ChaOS: and below. Appearance ends in a rule and a note no cursor can
+	 * reach: on the last row that can be chosen, they come into view. */
+	for (i = 0; i < 9; i++) rows[i].live = i < 7;
+	ck(menu_window_first(rows, 9, 6, 8, 0) == 1, "the note under the last row comes with it");
+	ck(menu_window_first(rows, 9, 5, 8, 1) == 1, "and stays while the cursor is near it");
+	ck(menu_window_first(rows, 9, 6, 2, 0) == 6, "but never pushes the cursor off");
 }
 
 

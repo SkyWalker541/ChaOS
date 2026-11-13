@@ -38,7 +38,10 @@
 typedef enum {
 	PM_STATS,
 	PM_WIFI, PM_BT, PM_AUDIO, PM_CHANNELS, PM_NIGHT, PM_XFER, PM_CLOCK,
-	PM_SLEEP, PM_APPEARANCE, PM_THEME, PM_DIR, PM_SPEED, PM_LISTVIEW, PM_RECENT, PM_COLOR, PM_SCRAPE, PM_ACHIEVEMENTS, PM_SS,
+	PM_SLEEP, PM_APPEARANCE, PM_THEME, PM_DIR, PM_SPEED, PM_LISTVIEW, PM_COLOR,
+	/* ChaOS: which of the shelves that aren't consoles are on the systems row */
+	PM_SHELF_FAV, PM_RECENT, PM_SHELF_MUSE,
+	PM_SCRAPE, PM_ACHIEVEMENTS, PM_SS,
 	PM_UPDATE, PM_CONTROLS, PM_ABOUT, PM_ROWS
 } pm_row;
 
@@ -172,7 +175,11 @@ typedef struct {
 	/* ChaOS: Game List View, Normal or List; NULL for no row (Cubic, which
 	 * never opens a list) */
 	const char *list_view;
-	const char *recent;      /* ChaOS: the Recently Played shelf, "On" or "Off" */
+	/* ChaOS: the shelves that aren't consoles, each "On" or "Off" on the
+	 * systems row (Appearance); Muse still opens on SELECT when it's off */
+	const char *fav_shelf;
+	const char *recent;
+	const char *muse_shelf;
 	const char *night;       /* ChaOS: night volume, "On" or "Off" */
 	bool        night_ok;    /* the device has a night ladder to offer */
 	/* ChaOS: the Appearance page, not the menu. It holds the look rows and
