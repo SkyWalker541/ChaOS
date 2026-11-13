@@ -9778,10 +9778,12 @@ static void update_after_start(app *a)
 	memset(&a->in, 0, sizeof a->in);
 }
 
+static bool g_about_shot;   /* --about: one frame, drawn and not shown */
+
 static void about_screen(app *a)
 {
-	char ver[48], addr[80], batt[32], up[48];
-	menu_row rows[4];
+	char ver[48], addr[80], batt[32], up[48], base[48], store[64];
+	menu_row rows[8];
 	char ssid[WIFI_SSID_MAX], ip[64];
 	int pct = 0;
 	bool charging = false;
@@ -9789,6 +9791,20 @@ static void about_screen(app *a)
 	bool done = false;
 
 	snprintf(ver, sizeof ver, "%s", CHAOS_VERSION);
+	/* ChaOS: what it is built on, and the card's room */
+	snprintf(base, sizeof base, "TortOS %s", TORTOS_VERSION);
+	{
+		struct statvfs vs;
+
+		if (statvfs(P_CARD, &vs) == 0 && vs.f_blocks) {
+			double fr = (double)vs.f_bavail * vs.f_frsize / 1073741824.0;
+			double all = (double)vs.f_blocks * vs.f_frsize / 1073741824.0;
+
+			snprintf(store, sizeof store, "%.1f GB free of %.0f GB", fr, all);
+		} else {
+			snprintf(store, sizeof store, "unknown");
+		}
+	}
 
 	while (!done && !want_quit && a->running) {
 		static unsigned next_check;
@@ -9824,10 +9840,12 @@ static void about_screen(app *a)
 		}
 		snprintf(up, sizeof up, "%uh %02um", secs / 3600, (secs / 60) % 60);
 
-		rows[0] = (menu_row){ "Version",   ver,  false };
-		rows[1] = (menu_row){ "Address",   addr, false };
-		rows[2] = (menu_row){ "Battery",   batt, false };
-		rows[3] = (menu_row){ "Awake for", up,   false };
+		rows[0] = (menu_row){ "Version",   ver,   false };
+		rows[1] = (menu_row){ "Built on",  base,  false };
+		rows[2] = (menu_row){ "Card",      store, false };
+		rows[3] = (menu_row){ "Address",   addr,  false };
+		rows[4] = (menu_row){ "Battery",   batt,  false };
+		rows[5] = (menu_row){ "Awake for", up,    false };
 
 		plat_input_poll(&a->in);
 		if (a->in.quit_requested) { a->running = false; return; }
@@ -9845,7 +9863,8 @@ static void about_screen(app *a)
 		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
 		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
 		SDL_RenderFillRect(a->r, NULL);
-		menu_draw(a, "About ChaOS", rows, 4, -1, menu_std_width(a), MENU_ACCENT);
+		menu_draw(a, "About ChaOS", rows, 6, -1, menu_std_width(a), MENU_ACCENT);
+		if (g_about_shot) return;
 		plat_draw_osd(a->r);
 		plat_present();
 		SDL_Delay(8);
@@ -18684,6 +18703,7 @@ static void take_shot(app *a)
 	if (shot_pm) pm_shot(a);
 	if (shot_port_power >= 0) port_power_draw(a, shot_port_power);
 	if (shot_romm) romm_shot(a);
+	if (g_about_shot) about_screen(a);
 	if (shot_gmenu >= 0) {
 		static menu_row rows[GM_SHOWN + 4];
 		gm_bufs gb;
@@ -18977,6 +18997,7 @@ int main(int argc, char *argv[])
 		 * asked for, so the panel can be looked at without a device. */
 		else if (!strcmp(argv[i], "--gmenu") && i + 1 < argc) shot_gmenu = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--port-power") && i + 1 < argc) shot_port_power = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "--about")) g_about_shot = true;
 		else if (!strcmp(argv[i], "--romm") && i + 1 < argc) {
 			shot_romm = argv[++i];
 			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9') shot_romm_a = atoi(argv[++i]);
