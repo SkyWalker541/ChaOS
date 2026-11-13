@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """Draw the Recently Played shelf's two cards: res/cards/classic/RECENT.png
-and res/cards/fancy/RECENT.png (the mark alone, as that set's cards are: trimmed,
-longest side 96% of a 384 frame, centred, the hands knocked through to
-nothing). In the sets' folders, where the launcher looks for a card; it sat
+(and, with fancy() only, a flat Fancy Pants card; the one in use is rendered
+by tools/genrecentfancy.py). In the sets' folders, where the launcher looks for a card; it sat
 beside them until 2026-11-13, found by nothing, so the shelf drew its
 generated card in every set.
 
@@ -61,7 +60,6 @@ def fancy():
 
 
 def main():
-    fancy()
     # A disc 290px across: the round console marks' size (SNES's buttons are
     # 321 by 313), centred where they are
     im = cardstyle.card(tuple(CYAN), "RECENTLY PLAYED",
