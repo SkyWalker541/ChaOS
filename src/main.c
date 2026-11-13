@@ -13568,9 +13568,24 @@ static void port_launch(app *a, int o, const char *romfile, const char *title)
 	plat_input_quit();
 	plat_video_quit();
 
+	fprintf(stderr, "port %s: starting\n", romfile);
 	rc = plat_run_port(argv, envkv, NULL, &how);
 	fprintf(stderr, "port %s exited %d (%s)\n", romfile, rc,
 	        how == PORT_POWER ? "power" : how == PORT_QUIT ? "select+start" : "itself");
+	/* and in the port's own log, where whoever reads it about a port that
+	 * stopped looks first */
+	{
+		char lp[LIB_PATH + 48];
+		FILE *lf;
+
+		snprintf(lp, sizeof lp, "%s/ports/last.log", P_USERDATA);
+		if ((lf = fopen(lp, "a"))) {
+			fprintf(lf, "ChaOS: the port ended %s, status %d\n",
+			        how == PORT_POWER ? "on power" : how == PORT_QUIT ? "on Select+Start"
+			                                                     : "by itself", rc);
+			fclose(lf);
+		}
+	}
 
 	if (!plat_video_init() || !plat_input_init()) { a->running = false; return; }
 	a->r = plat_renderer();

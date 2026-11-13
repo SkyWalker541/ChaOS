@@ -52,9 +52,15 @@ fi
 # keyboard gptokeyb makes of it
 ( sleep 4; echo "inputs, 4 s in:"; grep '^N:' /proc/bus/input/devices ) &
 
+# Ended from outside (ChaOS's power or Select+Start): said so, and what the
+# kernel had to say (an out-of-memory kill, a crash)
+trap 'echo "run.sh: stopped by ChaOS"; dmesg 2> /dev/null | tail -15; exit 143' TERM HUP INT
+
 cd "$(dirname "$PORT")" || exit 1
 /bin/bash "$PORT"
 st=$?
 echo "port exited $st"
+# a crash or the kernel's out-of-memory killer leaves its mark here
+dmesg 2> /dev/null | grep -iE "killed process|out of memory|segfault|unhandled|oom" | tail -10
 sync
 exit $st
