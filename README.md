@@ -64,6 +64,8 @@
 - **Appearance** (**MENU > Appearance**): the UI Theme, UI Direction, Transition Speed, Game List View and Menu Color on one page.
 - **Recently Played,** a shelf at the front of the systems row with the last twelve games you played across every system. Turn it off under **MENU > Recently Played**.
 - **ChaOS Wire:** ChaOS Transfer over the USB cable, which can also update ChaOS from your computer.
+- **Box art for homebrew,** from itch.io or one of your own screenshots, chosen from the game's **X** menu.
+- **Games come first:** nothing of ChaOS's own runs while you play. An update that was downloading pauses and picks up where it left off afterwards, with its progress shown on the shelf. Muse keeps playing.
 - **Letter scrubbing:** on any game shelf, in every theme, Game List View and Cubic, **L2** and **R2** jump to the first game of the previous or next letter with each press, and a square with the letter you're on fades in over the shelf. Hold the d-pad to scroll and after two seconds the same square shows the letter you're passing through. It fades out a moment after you stop.
 
 **From TortOS**
@@ -287,7 +289,15 @@ Check the folder name against the table above, spelled exactly, and that the fil
 
 **MENU > Box Art** fetches every missing cover over Wi-Fi from [libretro's thumbnail collection](https://thumbnails.libretro.com).
 
-For a game neither has, add your own: a PNG named like the game file, in `Roms/<console>/.media/` (`Black Castle.gb` wants `Black Castle.png`, about 512 pixels on the long side). To try again for a cover you don't like, press X on the game and choose **Replace Box Art**.
+For one game, press **X** on it and choose **Get Box Art** (or **Replace Box Art**). You get three ways to find one:
+
+- **Find Automatically:** libretro's collection, as **MENU > Box Art** does.
+- **Search itch.io:** for homebrew, which is mostly published there and mostly missing from libretro. The first time, the Brick reads that console's list of itch.io games onto the card, which takes a minute or so; after that, a search is instant, and the list is brought up to date once a day. It finds games by title, so a ROM still called something like `gb-studio-export.gb` needs renaming first.
+- **Use a Screenshot:** one of your own screenshots of the game (**MENU + X** while playing), such as its title screen. No Wi-Fi needed.
+
+The choices are shown one at a time, as large as they fit: **left and right** to look, **A** to use one, **B** to go back. Nothing is changed until you choose.
+
+Or add your own: a PNG named like the game file, in `Roms/<console>/.media/` (`Black Castle.gb` wants `Black Castle.png`, about 512 pixels on the long side).
 
 </details>
 

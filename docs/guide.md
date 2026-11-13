@@ -518,6 +518,15 @@ Card art comes from, in order:
 3. a generated slab: the system's color, the title, and the title's first
    letter enormous and barely there behind it.
 
+**Choosing a cover (ChaOS).** X on a game, then **Get Box Art** or **Replace
+Box Art**, offers **Find Automatically** (the fetch above, for that game),
+**Search itch.io** (most new homebrew is published there, and libretro's
+No-Intro-based collection has little of it: the console's itch.io list is read
+onto the card the first time, from its tag feeds, and caught up once a day) and
+**Use a Screenshot** (your own, MENU + X while playing; no network). The
+candidates are shown one at a time - left and right to look, A to use one - and
+the one chosen is written beside the old cover and renamed over it once whole.
+
 **Adding a cover by hand.** Some games have no cover anywhere the fetch looks -
 fan translations, homebrew, a dump no catalog lists. Put one in yourself over
 Over The Hare: open `Roms/<system>/.media/` in its file browser and upload a

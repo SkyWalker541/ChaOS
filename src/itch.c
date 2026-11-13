@@ -385,6 +385,12 @@ itch_game *itch_index_load(const char *path, int *count, time_t *when, bool *who
 
 /* ---- reading the feeds ------------------------------------------------------ */
 
+/* Where the feeds are. Only a test build points it elsewhere (a server on the
+ * desk serving pages in itch.io's format); never anything on the card. */
+#ifndef ITCH_BASE
+#define ITCH_BASE "https://itch.io"
+#endif
+
 #define FEED_TMP   "/tmp/chaos-itch-feed.xml"
 #define PAGES_MAX  120     /* per tag: 4,320 games, twice the largest seen */
 #define NEW_PAGES  10      /* newest-first pages read to catch up */
@@ -504,7 +510,7 @@ int itch_fetch_step(void)
 	if (!F.slugs[F.slug]) return finish(true);
 	if (!F.asking) {
 		if ((int)(now_ms() - F.wait_until) < 0) return 1;
-		snprintf(url, sizeof url, "https://itch.io/games/%s%s.xml?page=%d",
+		snprintf(url, sizeof url, ITCH_BASE "/games/%s%s.xml?page=%d",
 		         F.newest ? "newest/" : "", F.slugs[F.slug], F.page);
 		if (!net_get_async(url, FEED_TMP, 30)) {
 			/* The one request slot is someone else's for now */

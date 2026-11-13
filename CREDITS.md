@@ -144,6 +144,8 @@ use its own art there instead.
 - **RetroAchievements** (https://retroachievements.org): achievements.
 - **libretro thumbnails** (https://thumbnails.libretro.com): box art.
 - **MusicBrainz Cover Art Archive** (https://musicbrainz.org): album art.
+- **itch.io** (https://itch.io): box art for homebrew, from its public tag feeds; each cover is its developer's. ChaOS is not affiliated with itch.io.
+- **NextUI-Itchio-Pak** by Christophe Vanlancker (https://github.com/carroarmato0/NextUI-Itchio-Pak, MIT): how to read itch.io's tag feeds on a handheld, which ChaOS's own itch.io code (src/itch.c) follows.
 
 ---
 
