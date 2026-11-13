@@ -1,0 +1,75 @@
+SDL2: the PowerVR driver says what it did
+
+One line each to stderr - which a port sends to its log - for the screen it
+found, the window, the GLES context, and the first frame shown or not; and
+the framebuffer unblanked as it starts, whatever the last program left it
+as. For a port that runs and shows nothing.
+
+ChaOS, for ports only (src/ports.h). After 0001 to 0005.
+
+diff --git a/src/video/pvrfb/SDL_pvrfbvideo.c b/src/video/pvrfb/SDL_pvrfbvideo.c
+index da636e6..787d11c 100644
+--- a/src/video/pvrfb/SDL_pvrfbvideo.c
++++ b/src/video/pvrfb/SDL_pvrfbvideo.c
+@@ -12,6 +12,7 @@
+ #ifdef SDL_VIDEO_DRIVER_PVRFB
+ 
+ #include <fcntl.h>
++#include <stdio.h>
+ #include <linux/fb.h>
+ #include <sys/ioctl.h>
+ #include <unistd.h>
+@@ -38,7 +39,11 @@ static int PVRFB_VideoInit(_THIS)
+         close(fd);
+         return SDL_SetError("pvrfb: can't read the framebuffer's mode");
+     }
++    /* ChaOS: lit, whatever the last program to have it left it as */
++    ioctl(fd, FBIOBLANK, FB_BLANK_UNBLANK);
+     close(fd);
++    fprintf(stderr, "pvrfb: %ux%u, %u bpp, page at %u of %u\n", info.xres, info.yres,
++            info.bits_per_pixel, info.yoffset, info.yres_virtual);
+ 
+     data = (SDL_DisplayData *)SDL_calloc(1, sizeof(*data));
+     if (!data) {
+@@ -107,6 +112,8 @@ static int PVRFB_CreateWindow(_THIS, SDL_Window *window)
+      * SDL has settled the GL attributes, which a renderer may still change
+      * after the window is made */
+     data->egl_surface = EGL_NO_SURFACE;
++    fprintf(stderr, "pvrfb: window \"%s\" (asked flags 0x%x) as the whole screen\n",
++            window->title ? window->title : "", (unsigned)window->flags);
+     SDL_SetMouseFocus(window);
+     SDL_SetKeyboardFocus(window);
+     return 0;
+@@ -144,14 +151,30 @@ static SDL_GLContext PVRFB_GLES_CreateContext(_THIS, SDL_Window *window)
+     if (data->egl_surface == EGL_NO_SURFACE) {
+         data->egl_surface = SDL_EGL_CreateSurface(_this, (NativeWindowType)0);
+         if (data->egl_surface == EGL_NO_SURFACE) {
++            fprintf(stderr, "pvrfb: no EGL surface: %s\n", SDL_GetError());
+             SDL_SetError("pvrfb: can't create the EGL surface");
+             return NULL;
+         }
+     }
+-    return SDL_EGL_CreateContext(_this, data->egl_surface);
++    {
++        SDL_GLContext ctx = SDL_EGL_CreateContext(_this, data->egl_surface);
++
++        fprintf(stderr, "pvrfb: GLES %d.%d context %s%s\n", _this->gl_config.major_version,
++                _this->gl_config.minor_version, ctx ? "made" : "failed: ", ctx ? "" : SDL_GetError());
++        return ctx;
++    }
+ }
+ 
+-SDL_EGL_SwapWindow_impl(PVRFB)
++/* ChaOS: the first frame shown said so, and the first that couldn't be */
++static int PVRFB_GLES_SwapWindow(_THIS, SDL_Window *window)
++{
++    static int shown, failed;
++    int r = SDL_EGL_SwapBuffers(_this, ((SDL_WindowData *)window->driverdata)->egl_surface);
++
++    if (r == 0 && !shown++) fprintf(stderr, "pvrfb: first frame shown\n");
++    if (r != 0 && !failed++) fprintf(stderr, "pvrfb: a frame couldn't be shown: %s\n", SDL_GetError());
++    return r;
++}
+ SDL_EGL_MakeCurrent_impl(PVRFB)
+ 
+ static void PVRFB_Destroy(SDL_VideoDevice *device)

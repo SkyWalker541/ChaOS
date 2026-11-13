@@ -107,7 +107,8 @@ cm SDL_mixer -DSDL2MIXER_SAMPLES=OFF -DSDL2MIXER_VENDORED=OFF -DSDL2MIXER_DEPS_S
 # driver, patches 0001 and 0002 in the sources) and three more: 0003, so that a
 # port's keyboard is found with no udev, and 0004, so that the Brick's pad,
 # all buttons and no axes, is a joystick, and 0005, so that one button can be
-# two things in a mapping (res/ports/sdl2). In a folder of its
+# two things in a mapping, and 0006, so that its PowerVR driver says what it
+# did, in a port's log (res/ports/sdl2). In a folder of its
 # own, ahead of /usr/lib on a port's LD_LIBRARY_PATH (res/ports/run.sh); the
 # launcher and the emulator keep plastron's.
 cd "$S/SDL2"
