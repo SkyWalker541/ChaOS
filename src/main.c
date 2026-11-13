@@ -53,6 +53,7 @@
 #include "itch.h"
 #include "ports.h"
 #include "pmcat.h"
+#include "libpack.h"
 #include "cover.h"
 #include "pixname.h"
 
@@ -13581,6 +13582,34 @@ static bool ports_setup_screen(app *a, const char *title, unsigned accent)
  * standalone emulator path does, and the idle resident emulator is ended and
  * started again after. */
 static bool pm_launch_runtimes(app *a, const char *script, const char *title, unsigned accent);
+static int pm_libs(app *a, const char *port_dir, const char *title, unsigned accent,
+                   char *left, size_t ln);
+static bool port_game_dir(const char *script, char *out, size_t n);
+
+/* A port's libraries looked at before it starts (pm_libs), until once
+ * nothing was missing: then a mark in .userdata/ports/checked says so and
+ * it isn't looked at again, unless a run stops on a library */
+static void port_checked_path(const char *romfile, char *out, size_t n)
+{
+	snprintf(out, n, "%s/ports/checked/%s", P_USERDATA, romfile);
+}
+
+static void port_libs_before(app *a, const char *script, const char *romfile,
+                             const char *title, unsigned accent)
+{
+	char dir[LIB_PATH * 2], mark[LIB_PATH * 2], left[LIBPACK_NAME];
+
+	port_checked_path(romfile, mark, sizeof mark);
+	if (access(mark, F_OK) == 0 || !port_game_dir(script, dir, sizeof dir)) return;
+	if (pm_libs(a, dir, title, accent, left, sizeof left) == 0) {
+		char d[LIB_PATH];
+		FILE *f;
+
+		snprintf(d, sizeof d, "%s/ports/checked", P_USERDATA);
+		mkdir(d, 0755);
+		if ((f = fopen(mark, "w"))) fclose(f);
+	}
+}
 
 /* ---- ChaOS: power during a port -------------------------------------------
  *
@@ -13772,6 +13801,9 @@ static void port_launch(app *a, int o, const char *romfile, const char *title)
 	/* A runtime it needs and hasn't got - a port put on the card some
 	 * other way, or one PortMaster's own app installed - fetched first */
 	if (!pm_launch_runtimes(a, romfile, title, s->accent) || !a->running) return;
+	/* and any library it needs that the Brick hasn't, from ChaOS's pack */
+	port_libs_before(a, script, romfile, title, s->accent);
+	if (!a->running) return;
 
 	remember_place(a);
 	snprintf(ud, sizeof ud, "CHAOS_USERDATA=%s", P_USERDATA);
@@ -13864,10 +13896,20 @@ static void port_launch(app *a, int o, const char *romfile, const char *title)
 			}
 		}
 		if (missing[0]) {
-			char msg[200];
+			char msg[200], mark[LIB_PATH * 2], dir[LIB_PATH * 2], left[LIBPACK_NAME] = "";
+			int still = -1;
 
 			fprintf(stderr, "port %s: needs %s, which the Brick hasn't got\n", romfile, missing);
-			snprintf(msg, sizeof msg, "This port needs %s,\nwhich ChaOS doesn't have yet", missing);
+			/* looked at again, now and next time: the pack may have it */
+			port_checked_path(romfile, mark, sizeof mark);
+			unlink(mark);
+			if (port_game_dir(script, dir, sizeof dir))
+				still = pm_libs(a, dir, title, s->accent, left, sizeof left);
+			if (still == 0)
+				snprintf(msg, sizeof msg, "Got what it was missing:\nstart it again");
+			else
+				snprintf(msg, sizeof msg, "This port needs %s,\nwhich ChaOS doesn't have yet",
+				         left[0] ? left : missing);
 			pick_say(a, title, msg, s->accent);
 		}
 	}
@@ -14166,6 +14208,100 @@ static bool pm_runtimes(app *a, const pm_port *p, unsigned accent, char *why, si
 	return true;
 }
 
+/* ---- libraries a port needs that the Brick hasn't got --------------------- */
+
+static void pm_lib_dir(char *out, size_t n) { snprintf(out, n, "%s/ports/lib", P_USERDATA); }
+
+/* ChaOS's pack's list (libpack.h), fetched when there is none or it's a day
+ * old, quietly: a port that needs nothing from it never waits on it. Its
+ * text, or NULL. */
+static char *pm_libpack_list(app *a, unsigned accent, size_t *len)
+{
+	char path[LIB_PATH], dir[LIB_PATH], why[96];
+	struct stat st;
+	FILE *f;
+	char *buf = NULL;
+
+	pm_dir(dir, sizeof dir);
+	mkdir(dir, 0755);
+	snprintf(path, sizeof path, "%s/libpack.json", dir);
+	if ((stat(path, &st) != 0 || time(NULL) - st.st_mtime > 86400) && net_online())
+		pm_fetch(a, "Ports", "Getting ChaOS's list of libraries", LIBPACK_LIST, path, 0, NULL,
+		         accent, why, sizeof why);
+	if (stat(path, &st) != 0 || st.st_size <= 0 || st.st_size > (1 << 20)) return NULL;
+	if (!(f = fopen(path, "rb"))) return NULL;
+	buf = malloc((size_t)st.st_size + 1);
+	if (buf && fread(buf, 1, (size_t)st.st_size, f) != (size_t)st.st_size) { free(buf); buf = NULL; }
+	fclose(f);
+	if (buf) { buf[st.st_size] = '\0'; *len = (size_t)st.st_size; }
+	return buf;
+}
+
+/* What `port_dir`'s programs need and nothing has, fetched from ChaOS's
+ * pack into .userdata/ports/lib (run.sh puts it on their library path),
+ * with what each fetched library needs in turn. Returns how many are still
+ * missing after, naming the first in `left`. */
+static int pm_libs(app *a, const char *port_dir, const char *title, unsigned accent,
+                   char *left, size_t ln)
+{
+	char lib[LIB_PATH], want[24][LIBPACK_NAME], file[LIBPACK_NAME], md5[40];
+	const char *have[5];
+	char *list = NULL;
+	size_t len = 0;
+	int n, i, still = 0;
+
+	left[0] = '\0';
+	pm_lib_dir(lib, sizeof lib);
+	have[0] = "/lib"; have[1] = "/usr/lib"; have[2] = "/usr/lib/chaos-ports"; have[3] = lib;
+	have[4] = NULL;
+	n = libpack_missing(port_dir, have, want, 24);
+	if (n == 0) return 0;
+	fprintf(stderr, "ports: %s needs %d librar%s the Brick hasn't got, %s first\n", port_dir, n,
+	        n == 1 ? "y" : "ies", want[0]);
+	mkdir(lib, 0755);
+	list = pm_libpack_list(a, accent, &len);
+	for (i = 0; i < n; i++) {
+		char url[300], path[LIB_PATH * 2], what[128], why[160];
+		long size;
+
+		if (!list || !libpack_find(list, len, want[i], file, sizeof file, md5, sizeof md5, &size)) {
+			if (!still++) snprintf(left, ln, "%s", want[i]);
+			fprintf(stderr, "ports: %s isn't in ChaOS's pack\n", want[i]);
+			continue;
+		}
+		snprintf(url, sizeof url, "%s%s", LIBPACK_BASE, file);
+		snprintf(path, sizeof path, "%s/%s", lib, want[i]);
+		snprintf(what, sizeof what, "Getting %s, which it needs", want[i]);
+		if (!pm_fetch(a, title, what, url, path, size, md5, accent, why, sizeof why)) {
+			if (!still++) snprintf(left, ln, "%s", want[i]);
+			if (!strcmp(why, "Stopped")) break;
+			continue;
+		}
+		fprintf(stderr, "ports: %s fetched\n", want[i]);
+		/* and what that one needs, onto the end of the list */
+		{
+			char more[32][LIBPACK_NAME], so[LIBPACK_NAME];
+			int nm = 0, k, j;
+
+			libpack_elf(path, more, 32, &nm, so, sizeof so);
+			for (k = 0; k < nm && n < 24; k++) {
+				char p2[LIB_PATH * 2];
+				bool had = false;
+				const char *const *d;
+
+				for (j = 0; j < n && !had; j++) had = !strcmp(want[j], more[k]);
+				for (d = have; *d && !had; d++) {
+					snprintf(p2, sizeof p2, "%s/%s", *d, more[k]);
+					had = access(p2, F_OK) == 0;
+				}
+				if (!had) snprintf(want[n++], LIBPACK_NAME, "%s", more[k]);
+			}
+		}
+	}
+	free(list);
+	return still;
+}
+
 /* Its screenshot as its box art on the Ports shelf */
 static void pm_box_art(app *a, const pm_port *p, unsigned accent)
 {
@@ -14316,6 +14452,15 @@ static bool pm_install(app *a, int idx, unsigned accent)
 	if (!pm_runtimes(a, p, accent, why, sizeof why)) {
 		if (strcmp(why, "Stopped")) pick_say(a, p->title, why, accent);
 		fprintf(stderr, "portmaster: %s installed without its runtime: %s\n", p->zip, why);
+	}
+	{
+		char dir[LIB_PATH * 2], left[LIBPACK_NAME], msg[200];
+
+		snprintf(dir, sizeof dir, "%s/%s", ports, p->dir);
+		if (p->dir[0] && pm_libs(a, dir, p->title, accent, left, sizeof left) > 0) {
+			snprintf(msg, sizeof msg, "It needs %s,\nwhich ChaOS doesn't have yet:\nit may not start", left);
+			pick_say(a, p->title, msg, accent);
+		}
 	}
 	pm_box_art(a, p, accent);
 	sync();

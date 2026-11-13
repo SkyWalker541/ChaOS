@@ -44,7 +44,13 @@ if [ ! -d "$cache" ] || [ -z "$have" ] || [ "$have" != "$stamp" ]; then
 	tmp=$cache.new
 	rm -rf "$tmp" "$cache"
 	mkdir -p "$tmp"
-	unsquashfs -no-progress -f -d "$tmp" "$src" > /dev/null 2>&1
+	# -ignore-errors: the card is exFAT, so a link, an owner or a name it
+	# can't hold is skipped rather than ending the unpacking there (it did:
+	# Pyxel's bin/python is a link, and its library never came out)
+	unsquashfs -no-progress -ignore-errors -f -d "$tmp" "$src" > /dev/null 2>&1
+	want=$(unsquashfs -lls "$src" 2>/dev/null | grep -c '^-')
+	got=$(find "$tmp" -type f | wc -l)
+	log "$name: $got of $want files"
 	# Links, as copies: each `path -> target`, twice over for a link to a link
 	links=$(unsquashfs -lls -d "" "$src" 2>/dev/null | sed -n 's/^l[^ ]* .* \/\(.*\) -> \(.*\)$/\1|\2/p')
 	for pass in 1 2; do

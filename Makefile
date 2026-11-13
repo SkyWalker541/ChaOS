@@ -9,7 +9,7 @@
         check check-cheevos check-hare check-httpd check-idle check-rahash \
         check-raset check-xfer check-menus check-artscrape check-artrun check-audioout \
         check-db check-stats check-sort check-bt check-ss check-update check-asan \
-        check-release check-updater check-chaos-names check-itch check-cover check-ports check-pmcat
+        check-release check-updater check-chaos-names check-itch check-cover check-ports check-pmcat check-libpack
 
 all: check
 
@@ -22,7 +22,7 @@ CHECKS = check-cheevos check-hare check-httpd check-idle check-rahash \
          check-db check-stats check-sort check-bt check-ss \
          check-muselib check-musequeue check-museart check-controls check-logpack \
          check-clock check-update check-remap check-shots check-pixfont \
-         check-release check-updater check-chaos-names check-itch check-cover check-ports check-pmcat
+         check-release check-updater check-chaos-names check-itch check-cover check-ports check-pmcat check-libpack
 
 check:
 	@fail=0; for c in $(CHECKS); do \
@@ -319,6 +319,15 @@ build-native/pmcat-check: tools/pmcat-check.c src/pmcat.c src/pmcat.h src/rajson
 	@mkdir -p build-native
 	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g -Isrc -o $@ tools/pmcat-check.c \
 	      src/pmcat.c src/rajson.c
+
+# ChaOS: what a port's programs need that the device hasn't (src/libpack.h)
+check-libpack: build-native/libpack-check
+	@LIBPACK_PORT=$(LIBPACK_PORT) LIBPACK_HAVE=$(LIBPACK_HAVE) ./build-native/libpack-check
+
+build-native/libpack-check: tools/libpack-check.c src/libpack.c src/libpack.h src/rajson.c FORCE
+	@mkdir -p build-native
+	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g -Isrc -o $@ tools/libpack-check.c \
+	      src/libpack.c src/rajson.c
 
 # ChaOS: a game's cover from ChaOS Transfer's page (src/cover.c), on a card
 # in /tmp; CHAOS_NET_CHECKS=1 make check-cover follows real links too.

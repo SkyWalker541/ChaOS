@@ -40,7 +40,9 @@ export SDL_GAMECONTROLLERCONFIG="$CHAOS_PAD"
 # port's buttons arrive, as keys on gptokeyb's virtual keyboard
 # (res/ports/sdl2, tools/build-portlibs.sh). Ahead of the system's; a port
 # that brings an SDL of its own puts that ahead of both.
-export LD_LIBRARY_PATH="/usr/lib/chaos-ports${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+# and after it, the libraries fetched from ChaOS's pack for ports that need
+# what the Brick hasn't got (src/libpack.h), kept in .userdata
+export LD_LIBRARY_PATH="/usr/lib/chaos-ports:$CHAOS_USERDATA/ports/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 # how many there are before the port starts anything (mod_ChaOS.txt)
 CHAOS_EV_BASE=$(ls /dev/input/event* 2> /dev/null | wc -l)
 export CHAOS_EV_BASE
