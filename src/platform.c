@@ -323,6 +323,8 @@ int plat_run(char *const argv[], const char *const envkv[], const char *workdir)
  * group, ended as a group. The pad is only read here, never grabbed; the port
  * reads the same buttons itself. */
 #define PORT_QUIT_HOLD_MS 2000
+/* ChaOS: power held this long during a port powers off (a press pauses) */
+#define PORT_POWER_HOLD_MS 3000
 
 static void port_group_end(pid_t pid, int *status)
 {
@@ -371,28 +373,59 @@ int plat_run_port(char *const argv[], const char *const envkv[], const char *wor
 #ifdef __linux__
 	{
 		in_state in;
-		Uint32 both_since = 0;
+		Uint32 both_since = 0, power_since = 0;
+		bool paused = false, power_down = false;
 
 		memset(&in, 0, sizeof in);
 		device_power_pressed();
+		device_power_event(NULL);
 		for (;;) {
 			pid_t r = waitpid(pid, &status, WNOHANG);
+			bool press;
 
 			if (r == pid) break;
 			if (r < 0) return -1;
 			usleep(50 * 1000);
 			device_child_poll(&in);
+			/* ChaOS: power never ends a port on a press - a port keeps its
+			 * own saves, and a slip of the thumb would lose everything
+			 * since the last one. A press PAUSES it: the whole port frozen
+			 * where it is (SIGSTOP to its group) and the screen off. The
+			 * next press brings it back as it was. Holding power for
+			 * PORT_POWER_HOLD_MS, paused or not, powers off. Select+Start
+			 * held is the way out to ChaOS. */
+			press = device_power_event(&power_down);
+			if (power_down) {
+				if (!power_since) power_since = SDL_GetTicks() | 1;
+			} else {
+				power_since = 0;
+			}
+			if (power_since && SDL_GetTicks() - power_since >= PORT_POWER_HOLD_MS) {
+				*how = PORT_POWER;
+				if (paused) { kill(-pid, SIGCONT); plat_backlight(true); }
+				port_group_end(pid, &status);
+				break;
+			}
+			if (press) {
+				paused = !paused;
+				if (paused) {
+					kill(-pid, SIGSTOP);
+					plat_backlight(false);
+				} else {
+					plat_backlight(true);
+					kill(-pid, SIGCONT);
+				}
+				both_since = 0;
+				memset(&in, 0, sizeof in);
+				continue;
+			}
+			if (paused) continue;   /* nothing else while it sleeps */
 			if (in_repeat(&in, IN_VOLUP)) plat_volume_nudge(+1);
 			if (in_repeat(&in, IN_VOLDN)) plat_volume_nudge(-1);
 			if (in.down[IN_SELECT] && in.down[IN_START]) {
 				if (!both_since) both_since = SDL_GetTicks() | 1;
 			} else {
 				both_since = 0;
-			}
-			if (device_power_pressed()) {
-				*how = PORT_POWER;
-				port_group_end(pid, &status);
-				break;
 			}
 			if (both_since && SDL_GetTicks() - both_since >= PORT_QUIT_HOLD_MS) {
 				*how = PORT_QUIT;

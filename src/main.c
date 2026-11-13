@@ -13623,7 +13623,7 @@ static void port_launch(app *a, int o, const char *romfile, const char *title)
 	fprintf(stderr, "port %s: starting\n", romfile);
 	rc = plat_run_port(argv, envkv, NULL, &how);
 	fprintf(stderr, "port %s exited %d (%s)\n", romfile, rc,
-	        how == PORT_POWER ? "power" : how == PORT_QUIT ? "select+start" : "itself");
+	        how == PORT_POWER ? "power held" : how == PORT_QUIT ? "select+start" : "itself");
 	/* and in the port's own log, where whoever reads it about a port that
 	 * stopped looks first */
 	{
@@ -13633,7 +13633,7 @@ static void port_launch(app *a, int o, const char *romfile, const char *title)
 		snprintf(lp, sizeof lp, "%s/ports/last.log", P_USERDATA);
 		if ((lf = fopen(lp, "a"))) {
 			fprintf(lf, "ChaOS: the port ended %s, status %d\n",
-			        how == PORT_POWER ? "on power" : how == PORT_QUIT ? "on Select+Start"
+			        how == PORT_POWER ? "on power held" : how == PORT_QUIT ? "on Select+Start"
 			                                                     : "by itself", rc);
 			fclose(lf);
 		}
@@ -13671,6 +13671,8 @@ static void port_launch(app *a, int o, const char *romfile, const char *title)
 	plat_input_flush();
 	memset(&a->in, 0, sizeof a->in);
 	if (access(TORTOS_POWEROFF_FLAG, F_OK) == 0) { a->running = false; return; }
+	/* Power held through the port: off, as asked */
+	if (how == PORT_POWER) { power_off(a); return; }
 	render(a);
 }
 

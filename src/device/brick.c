@@ -368,6 +368,26 @@ bool device_power_pressed(void)
 	return pressed;
 }
 
+/* ChaOS: the same queue, as presses and releases: true if a press was in
+ * it, and *down whether the key is held now (for a hold, as a port's power
+ * off is). Kept across calls, since a hold spans many. */
+bool device_power_event(bool *down)
+{
+	static bool held;
+	bool pressed = false;
+#ifdef __linux__
+	struct input_event ev;
+
+	while (fd_power >= 0 && read(fd_power, &ev, sizeof ev) == (ssize_t)sizeof ev) {
+		if (ev.type != EV_KEY || ev.code != KEY_POWER) continue;
+		if (ev.value == 1) { pressed = true; held = true; }
+		else if (ev.value == 0) held = false;
+	}
+#endif
+	if (down) *down = held;
+	return pressed;
+}
+
 /* ---- volume and brightness, straight at the hardware ----------------------
  *
  * TortOS's own code, against the same two device interfaces the emulator uses.

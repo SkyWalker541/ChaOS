@@ -17,6 +17,7 @@
 /* Drain the power key's queue and say whether a press was in it. Called while
  * a child or a game owns the screen, so it must not block. */
 bool device_power_pressed(void);
+bool device_power_event(bool *down);   /* ChaOS: presses, and whether held */
 
 /* ChaOS: the buttons, while a port owns the screen (plat_run_port): the pad
  * and the volume keys read into `st` without taking them from the port, which

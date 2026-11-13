@@ -242,7 +242,7 @@ Ports are PC games rebuilt for handhelds, packaged by [PortMaster](https://portm
 2. Unzip it into `Roms/Ports/` on the card. You get a script, `Some Game.sh`, and a folder of the game's files beside it. Some ports also need the game's own data files copied into that folder; the port's page on portmaster.games says which.
 3. It's on the **Ports** shelf. The first port you start asks to download PortMaster itself (about 25 MB, over Wi-Fi). That happens once; it lives in `Roms/Ports/PortMaster/` after that.
 
-While a port runs, the volume buttons work, and **power** or holding **Select + Start** for two seconds quits it. Whatever a port prints goes to `.userdata/brick/ports/last.log` on the card, the first place to look when one won't start.
+While a port runs, the volume buttons work, and holding **Select + Start** for two seconds quits it. **Power pauses it**: the port freezes where it is and the screen goes off, and the next press brings it back exactly as it was, so a stray press never loses progress. Holding **power** for three seconds, paused or not, powers off. Whatever a port prints goes to `.userdata/brick/ports/last.log` on the card, with each port's last run also kept in `.userdata/brick/ports/logs/`.
 
 Ports run on the Brick's own graphics driver. Most that use the system's SDL work; one that brings its own graphics libraries built for another device may not. Browsing and installing ports from the Brick itself is coming in a later release.
 
