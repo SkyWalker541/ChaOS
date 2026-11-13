@@ -95,6 +95,8 @@ grep -q '^OS_NAME=' "$OSR" || echo 'OS_NAME=ChaOS' >> "$OSR"
 mkdir -p "$C/TortOS/ports"
 install -m 755 "$ROOT/res/ports/run.sh" "$C/TortOS/ports/run.sh"
 install -m 644 "$ROOT/res/ports/mod_ChaOS.txt" "$C/TortOS/ports/mod_ChaOS.txt"
+mkdir -p "$C/TortOS/ports/bin"
+install -m 755 "$ROOT/res/ports/bin/pkill" "$ROOT/res/ports/bin/pgrep" "$C/TortOS/ports/bin/"
 # The shelf: ChaOS's systems.cfg, with the Ports row, and the cards for the
 # shelves that aren't consoles - Favorites, Muse, Recently Played, Ports - in
 # both of TortOS's sets, as ChaOS draws them (tools/cardstyle.py,

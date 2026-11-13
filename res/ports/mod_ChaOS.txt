@@ -37,11 +37,12 @@ get_controls() {
   DEVICE="19000000427269636b2047616d657000"
   param_device="brick"
 
+  # The Brick's own lines only, as PortMaster's get_controls keeps only the
+  # device's: ports put this file's text in SDL_GAMECONTROLLERCONFIG, which
+  # every program they start inherits, and PortMaster's whole list (460 KB)
+  # is over the kernel's limit for one variable - nothing could start.
   export SDL_GAMECONTROLLERCONFIG_FILE="/tmp/gamecontrollerdb.txt"
-  {
-    printf '%s\n' "$CHAOS_PAD"
-    [ -f "$controlfolder/gamecontrollerdb.txt" ] && cat "$controlfolder/gamecontrollerdb.txt"
-  } > /tmp/gamecontrollerdb.txt
+  printf '%s\n' "$CHAOS_PAD" > /tmp/gamecontrollerdb.txt
 
   SDLDBUSERFILE="${HOME}/.config/SDL-GameControllerDB/gamecontrollerdb.txt"
   sdl_controllerconfig="$(< "${SDL_GAMECONTROLLERCONFIG_FILE}")"

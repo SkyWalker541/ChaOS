@@ -13,6 +13,8 @@ PORT="$1"
 HERE=$(cd "$(dirname "$0")" && pwd)
 PM=/roms/ports/PortMaster
 
+# pkill and pgrep, which PortMaster's funcs.txt uses and BusyBox lacks
+export PATH="$HERE/bin:$PATH"
 export HOME="$CHAOS_USERDATA/ports/home"
 export XDG_DATA_HOME="$HOME/.local/share"
 export XDG_CONFIG_HOME="$HOME/.config"

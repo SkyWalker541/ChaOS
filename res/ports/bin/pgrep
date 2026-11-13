@@ -1,0 +1,54 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# ChaOS: pkill and pgrep, for ports (src/ports.h). The Brick's BusyBox has
+# neither, and PortMaster's funcs.txt ends a port with
+# `pkill -9 -f gptokeyb`. Enough of procps's to do that:
+#
+#   pkill [-SIGNAL|-s SIGNAL] [-f] [-x] PATTERN      (pgrep: prints the pids)
+#
+# PATTERN is an extended regular expression, matched against the process's
+# name, or with -f its whole command line; -x matches all of it. Never this
+# script nor anything that started it: their command lines hold PATTERN too.
+me=$(basename "$0")
+sig=TERM full=0 exact=0
+while [ $# -gt 1 ]; do
+	case "$1" in
+	-f) full=1 ;;
+	-x) exact=1 ;;
+	-s) shift; sig=$1 ;;
+	-[0-9]*|-[A-Z]*) sig=${1#-} ;;
+	--) shift; break ;;
+	-*) ;;
+	*) break ;;
+	esac
+	shift
+done
+pat=$1
+[ -n "$pat" ] || { echo "usage: $me [-SIGNAL] [-f] [-x] PATTERN" >&2; exit 2; }
+[ $exact = 1 ] && pat="^($pat)\$"
+# this script and its ancestors, by way of each one's parent in /proc/*/stat
+skip=" $$ " p=$$
+while [ "$p" -gt 1 ] 2>/dev/null; do
+	read -r stat < "/proc/$p/stat" 2>/dev/null || break
+	stat=${stat##*) }
+	set -- $stat
+	p=$2
+	skip="$skip$p "
+done
+found=1
+for d in /proc/[0-9]*; do
+	pid=${d#/proc/}
+	case "$skip" in *" $pid "*) continue ;; esac
+	if [ $full = 1 ]; then
+		what=$(tr '\0' ' ' < "$d/cmdline" 2>/dev/null)
+		what=${what% }
+	else
+		read -r what < "$d/comm" 2>/dev/null || continue
+	fi
+	[ -n "$what" ] || continue
+	echo "$what" | grep -Eq -- "$pat" || continue
+	found=0
+	if [ "$me" = pgrep ]; then echo "$pid"; else kill -"$sig" "$pid" 2>/dev/null; fi
+done
+exit $found
