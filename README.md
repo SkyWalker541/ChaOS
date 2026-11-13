@@ -246,6 +246,15 @@ While a port runs, the volume buttons work and **Select + Start** quits it. **Po
 
 Ports run on the Brick's own graphics driver. Most that use the system's SDL work; one that brings its own graphics libraries built for another device may not. Browsing and installing ports from the Brick itself is coming in a later release.
 
+## RomM
+
+[RomM](https://romm.app) is a game library you run on your own computer or NAS. **RomM** in the ChaOS menu connects the Brick to it over Wi-Fi:
+
+- **Sign In**: set your server's address under **Server** (like `nas.local:8080`), then **Sign In**. On RomM 5 the Brick shows a short code to approve in RomM's web page; on RomM 4, make a pairing code in RomM (your profile, Client API Tokens) and type it in. No password is stored, only RomM's device token, in `.userdata`.
+- **Games**: your library by system (the ones ChaOS plays). A downloads a game onto its shelf, with RomM's cover as its box art. A game in several files (a CD game) comes as a folder.
+- **Sync Saves**: RomM's device sync, for the games downloaded from RomM. A save replaced by the server's is kept first in `Saves/.romm-backup`, and when both changed, yours is sent up beside the server's, so neither is lost. It only runs when you choose it, never during a game.
+- **BIOS**: the BIOS files RomM keeps for ChaOS's systems, into `Bios/`.
+
 ## Supported systems
 
 | Console | Put games in | File types | Core |

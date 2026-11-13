@@ -181,3 +181,4 @@ SOFTWARE.
 ### PT SkyWalker541 (MIT)
 
 The full text is in ChaOS-diatom, `shaders/pt/LICENSE`.
+- **RomM** support speaks [RomM](https://github.com/rommapp/romm)'s own API (AGPL-3.0 server, not included), as its handheld client [Grout](https://github.com/rommapp/grout) (MIT) uses it; no code from either is in ChaOS.

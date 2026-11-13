@@ -9,7 +9,7 @@
         check check-cheevos check-hare check-httpd check-idle check-rahash \
         check-raset check-xfer check-menus check-artscrape check-artrun check-audioout \
         check-db check-stats check-sort check-bt check-ss check-update check-asan \
-        check-release check-updater check-chaos-names check-itch check-cover check-ports check-pmcat check-libpack
+        check-release check-updater check-chaos-names check-itch check-cover check-ports check-pmcat check-libpack check-romm
 
 all: check
 
@@ -22,7 +22,7 @@ CHECKS = check-cheevos check-hare check-httpd check-idle check-rahash \
          check-db check-stats check-sort check-bt check-ss \
          check-muselib check-musequeue check-museart check-controls check-logpack \
          check-clock check-update check-remap check-shots check-pixfont \
-         check-release check-updater check-chaos-names check-itch check-cover check-ports check-pmcat check-libpack
+         check-release check-updater check-chaos-names check-itch check-cover check-ports check-pmcat check-libpack check-romm
 
 check:
 	@fail=0; for c in $(CHECKS); do \
@@ -328,6 +328,16 @@ build-native/libpack-check: tools/libpack-check.c src/libpack.c src/libpack.h sr
 	@mkdir -p build-native
 	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g -Isrc -o $@ tools/libpack-check.c \
 	      src/libpack.c src/rajson.c
+
+# ChaOS: RomM (src/romm.h) against a stand-in server (tools/romm-mock.py)
+check-romm: build-native/romm-check
+	@./build-native/romm-check
+
+build-native/romm-check: tools/romm-check.c src/romm.c src/romm.h src/net.c src/urlenc.c src/rajson.c \
+                         tools/romm-mock.py FORCE
+	@mkdir -p build-native
+	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g -DCHAOS_VERSION='"check"' -Isrc -o $@ \
+	      tools/romm-check.c src/romm.c src/net.c src/urlenc.c src/rajson.c
 
 # ChaOS: a game's cover from ChaOS Transfer's page (src/cover.c), on a card
 # in /tmp; CHAOS_NET_CHECKS=1 make check-cover follows real links too.

@@ -28,7 +28,7 @@ int sys_menu_tortos_rows(const sys_ui *u, pm_row *out)
 		 * stays, since a cable and the speaker are still two places. */
 		if (u->no_wifi && (r == PM_WIFI || r == PM_SCRAPE ||
 		                   r == PM_ACHIEVEMENTS || r == PM_SS || r == PM_UPDATE ||
-		                   r == PM_PORTS))
+		                   r == PM_PORTS || r == PM_ROMM))
 			continue;
 		/* Unless the files go over a cable, which needs no radio. */
 		if (u->no_wifi && !u->cable_xfer && r == PM_XFER) continue;
@@ -301,6 +301,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	 * Live without Wi-Fi too: a download already on the card installs
 	 * without it, and the screen says what it needs. */
 	full[PM_PORTS]        = (menu_row){ "Get PortMaster", NEEDS_WIFI(net), net };
+	full[PM_ROMM]         = (menu_row){ "RomM", u->romm ? u->romm : "sign in", true };
 	full[PM_UPDATE]       = (menu_row){ "Updates", u->update, true };
 	full[PM_CONTROLS]     = (menu_row){ "Controls",    NULL,   true  };
 	full[PM_ABOUT]        = (menu_row){ "About ChaOS", NULL,   true  };
@@ -329,6 +330,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	full[PM_ACHIEVEMENTS].hint = "Sign in to earn achievements as you play";
 	full[PM_SS].hint           = "Sign in for more box art and game info";
 	full[PM_PORTS].hint        = "Add the Ports shelf: PC games rebuilt for handhelds";
+	full[PM_ROMM].hint         = "Your own RomM server: download games, sync saves, get BIOS";
 	full[PM_UPDATE].hint       = "Check for a newer ChaOS and install it";
 	full[PM_CONTROLS].hint     = "What every button does";
 	full[PM_ABOUT].hint        = "Version, storage and this device";
@@ -337,7 +339,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	full[PM_XFER].opens = full[PM_CLOCK].opens = full[PM_SCRAPE].opens = true;
 	full[PM_ACHIEVEMENTS].opens = full[PM_SS].opens = true;
 	full[PM_CONTROLS].opens = full[PM_ABOUT].opens = true;
-	full[PM_UPDATE].opens = full[PM_PORTS].opens = true;
+	full[PM_UPDATE].opens = full[PM_PORTS].opens = full[PM_ROMM].opens = true;
 	full[PM_APPEARANCE].opens = true;
 	/* ChaOS: the rows left and right go round (menu.h, cycles) */
 	full[PM_AUDIO].cycles = full[PM_CHANNELS].cycles = full[PM_SLEEP].cycles = true;

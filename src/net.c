@@ -267,6 +267,153 @@ static long request_buf(const char *url, bool get, const net_field *f, int n,
 	return got;
 }
 
+/* ---- ChaOS: any request (net_req) ---------------------------------------- */
+
+static long now_ms(void);
+
+static bool write_req_config(const char *path, const net_req *r, const char *body_path,
+                             const char *json_path)
+{
+	FILE *f;
+	int fd;
+
+	fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+	if (fd < 0) return false;
+	f = fdopen(fd, "w");
+	if (!f) { close(fd); return false; }
+	/* No `fail`: an API's 4xx carries what went wrong in its body (RomM's
+	 * pairing says "authorization_pending" that way), and the status comes
+	 * back on stdout as for every other request here */
+	fprintf(f, "silent\nlocation\n");
+	fprintf(f, "write-out = "); cfg_quote(f, "%{http_code}"); fputc('\n', f);
+	if (body_path) { fprintf(f, "output = "); cfg_quote(f, body_path); fputc('\n', f); }
+	fprintf(f, "max-time = %d\n", r->timeout_s > 0 ? r->timeout_s : 30);
+	if (g_ca[0]) { fprintf(f, "cacert = "); cfg_quote(f, g_ca); fputc('\n', f); }
+	fprintf(f, "user-agent = "); cfg_quote(f, NET_UA); fputc('\n', f);
+	if (r->method) { fprintf(f, "request = "); cfg_quote(f, r->method); fputc('\n', f); }
+	if (r->bearer && r->bearer[0]) {
+		char h[600];
+
+		snprintf(h, sizeof h, "Authorization: Bearer %s", r->bearer);
+		fprintf(f, "header = "); cfg_quote(f, h); fputc('\n', f);
+	}
+	fprintf(f, "header = "); cfg_quote(f, "Accept: application/json"); fputc('\n', f);
+	if (json_path) {
+		char d[300];
+
+		fprintf(f, "header = "); cfg_quote(f, "Content-Type: application/json"); fputc('\n', f);
+		snprintf(d, sizeof d, "@%s", json_path);
+		fprintf(f, "data-binary = "); cfg_quote(f, d); fputc('\n', f);
+	}
+	if (r->form_name && r->form_file) {
+		char d[700];
+
+		snprintf(d, sizeof d, "%s=@%s", r->form_name, r->form_file);
+		fprintf(f, "form = "); cfg_quote(f, d); fputc('\n', f);
+	}
+	fprintf(f, "url = "); cfg_quote(f, r->url); fputc('\n', f);
+	fclose(f);
+	return true;
+}
+
+/* The JSON body to a file of its own, 0600: curl reads it from there */
+static bool write_json(const char *path, const char *json)
+{
+	int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+	size_t n = strlen(json);
+	bool ok;
+
+	if (fd < 0) return false;
+	ok = write(fd, json, n) == (ssize_t)n;
+	close(fd);
+	return ok;
+}
+
+long net_request(const net_req *r, char *out, size_t outn, int *http)
+{
+	char cfg[128], body[160], st[160], js[160], code[16];
+	int fd, sfd, status = 0;
+	ssize_t got;
+	long len = -1;
+
+	if (http) *http = 0;
+	if (!r || !r->url || !out || outn == 0) return -1;
+	out[0] = '\0';
+	tmp_config(cfg, sizeof cfg);
+	snprintf(body, sizeof body, "%s.body", cfg);
+	snprintf(st, sizeof st, "%s.http", cfg);
+	snprintf(js, sizeof js, "%s.json", cfg);
+	if (r->json && !write_json(js, r->json)) return -1;
+	if (!write_req_config(cfg, r, body, r->json ? js : NULL)) { unlink(js); return -1; }
+	fd = open(body, O_RDWR | O_CREAT | O_TRUNC, 0600);
+	sfd = open(st, O_RDWR | O_CREAT | O_TRUNC, 0600);
+	if (fd < 0 || sfd < 0) {
+		if (fd >= 0) close(fd);
+		if (sfd >= 0) close(sfd);
+		unlink(cfg); unlink(js); unlink(body); unlink(st);
+		return -1;
+	}
+	run_curl(cfg, sfd);
+	unlink(cfg);
+	unlink(js);
+	lseek(sfd, 0, SEEK_SET);
+	got = read(sfd, code, sizeof code - 1);
+	if (got > 0) { code[got] = '\0'; status = atoi(code); }
+	if (http) *http = status;
+	if (status > 0) {
+		lseek(fd, 0, SEEK_SET);
+		got = read(fd, out, outn - 1);
+		if (got >= 0) { out[got] = '\0'; len = (long)got; }
+	}
+	close(sfd);
+	close(fd);
+	unlink(st);
+	unlink(body);
+	return len;
+}
+
+pid_t net_request_spawn(const net_req *r, const char *path)
+{
+	const char *bin = curl_bin();
+	char cfg[160];
+	pid_t pid;
+	net_req g;
+
+	if (!bin || !r || !r->url) return -1;
+	g = *r;
+	g.json = NULL;      /* a download: a GET, or what the request says */
+	snprintf(cfg, sizeof cfg, "/tmp/chaos-get-%ld-%u.curl", (long)getpid(), (unsigned)now_ms());
+	if (!write_req_config(cfg, &g, path, NULL)) return -1;
+	{
+		/* `fail` here: a download that comes back 4xx is no file at all */
+		FILE *f = fopen(cfg, "a");
+
+		if (f) { fputs("fail\n", f); fclose(f); }
+	}
+	pid = fork();
+	if (pid < 0) { unlink(cfg); return -1; }
+	if (pid == 0) {
+		char *argv[4];
+		int devnull = open("/dev/null", O_RDWR);
+
+		if (devnull >= 0) { dup2(devnull, 0); dup2(devnull, 1); close(devnull); }
+		argv[0] = (char *)bin;
+		argv[1] = (char *)"-K";
+		argv[2] = cfg;
+		argv[3] = NULL;
+		execv(bin, argv);
+		_exit(127);
+	}
+	{
+		char link[64];
+		FILE *f;
+
+		snprintf(link, sizeof link, "/tmp/chaos-get-%ld.name", (long)pid);
+		if ((f = fopen(link, "w"))) { fputs(cfg, f); fclose(f); }
+	}
+	return pid;
+}
+
 long net_get_buf(const char *url, const net_field *f, int n, char *out,
                  size_t outn, int timeout_s)
 {

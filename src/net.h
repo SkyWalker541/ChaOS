@@ -96,6 +96,27 @@ void  net_spawn_done(pid_t pid);
  * (curl's continue-at): a download stopped for a game, carried on after. */
 pid_t net_get_spawn_resume(const char *url, const char *path, int timeout_s);
 
+/* ChaOS: any request, as a self-hosted server's API wants it (RomM): a
+ * method, an Authorization: Bearer token, a JSON body or one file sent as a
+ * form, the reply to a buffer or to a file. All of it through the same 0600
+ * config file as the rest, never argv - the token is an account's key. */
+typedef struct {
+	const char *method;        /* NULL is GET */
+	const char *url;
+	const char *bearer;        /* NULL: no Authorization header */
+	const char *json;          /* a body, sent as application/json */
+	const char *form_name;     /* a multipart field ... */
+	const char *form_file;     /* ... and the file it carries */
+	int timeout_s;
+} net_req;
+/* Blocking: the reply into `out` (NUL-terminated, up to outn - 1 bytes),
+ * its length or -1; the HTTP status in *http (0 when nothing answered), a
+ * 4xx or 5xx's body still read, since APIs explain themselves in it. */
+long  net_request(const net_req *r, char *out, size_t outn, int *http);
+/* Started and left, the reply to `path`; reaped as net_get_spawn's are:
+ * waitpid for curl's exit (0 for a 2xx), then net_spawn_done. */
+pid_t net_request_spawn(const net_req *r, const char *path);
+
 /* What the server answered with, once net_async_poll has returned non-zero:
  * an HTTP status, or 0 when the request never reached a server at all.
  *

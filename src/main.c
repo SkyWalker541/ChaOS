@@ -54,6 +54,7 @@
 #include "ports.h"
 #include "pmcat.h"
 #include "libpack.h"
+#include "romm.h"
 #include "cover.h"
 #include "pixname.h"
 
@@ -184,6 +185,8 @@ typedef struct {
 #define PM_ENTRY_NAME "PortMaster"
 static bool pm_is_entry(const char *file) { return file && !strcmp(file, PM_ENTRY_FILE); }
 static void pm_get(app *a);   /* the ChaOS menu's Get PortMaster */
+static romm_conn *romm_get(void);   /* the ChaOS menu's RomM */
+static void romm_screen(app *a);
 
 static void refresh_virtual_shelves(app *a);
 static void build_muse_shelf(app *a);
@@ -5837,6 +5840,8 @@ static int menu_build(app *a, screen_id screen, int sys,
 		u.ra_name   = u.ra_in ? ra_user() : NULL;
 		u.ss_have   = ss_have_dev();
 		u.pm_have   = ports_pm_ready(P_ROMS);
+		u.romm      = romm_get()->token[0] ? (romm_get()->user[0] ? romm_get()->user : "signed in")
+		                                   : "sign in";
 		u.ss_in     = ss_signed_in();
 		u.ss_name   = u.ss_in ? ss_user() : NULL;
 		u.cards     = CARD_SETS[g_cards].name;
@@ -10514,6 +10519,7 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 	case PM_STATS:        if (stats_screen(a)) return MENU_DONE; break;
 	case PM_CONTROLS:     controls_screen(a); break;
 	case PM_PORTS:        pm_get(a); break;
+	case PM_ROMM:         romm_screen(a); break;
 	case PM_UPDATE:       update_screen(a); break;
 	case PM_ABOUT:        about_screen(a); break;
 	default: break;
@@ -15426,6 +15432,893 @@ static void pm_screen(app *a, unsigned accent)
 	if (g_pmc_loaded) { pmcat_free(&g_pmc); g_pmc_loaded = false; }
 }
 
+/* ---- ChaOS: RomM (src/romm.h) ---------------------------------------------
+ *
+ * The ChaOS menu's RomM: signing in by RomM's pairing, its library by system
+ * with each game's cover, a game downloaded onto its shelf, saves synced, and
+ * BIOS fetched. Everything here waits behind a panel, B giving up; nothing
+ * runs during a game. */
+
+static romm_conn g_romm;
+static bool      g_romm_loaded;
+
+static void romm_dir(char *out, size_t n) { snprintf(out, n, "%s/romm", P_USERDATA); }
+
+static romm_conn *romm_get(void)
+{
+	if (!g_romm_loaded) {
+		char d[LIB_PATH];
+
+		romm_dir(d, sizeof d);
+		romm_load(&g_romm, d);
+		g_romm_loaded = true;
+	}
+	return &g_romm;
+}
+
+static void romm_keep(void)
+{
+	char d[LIB_PATH];
+
+	romm_dir(d, sizeof d);
+	mkdir(d, 0700);
+	romm_save(&g_romm, d);
+}
+
+/* systems.cfg's folder for a tag: where a RomM platform's games go */
+static bool romm_folder_for(const char *tag, char *out, size_t n)
+{
+	static systems_cfg cfg;
+	static bool loaded;
+	char path[CFG_STR * 2];
+	int i;
+
+	if (!loaded) {
+		snprintf(path, sizeof path, "%s/systems.cfg", P_ROOT);
+		loaded = cfg_load_systems(path, &cfg);
+	}
+	for (i = 0; loaded && i < cfg.count; i++)
+		if (tag && !strcmp(cfg.systems[i].tag, tag)) {
+			snprintf(out, n, "%s", cfg.systems[i].folder);
+			return true;
+		}
+	return false;
+}
+
+/* A blocking call behind "Talking to RomM" */
+static void romm_busy(app *a, const char *what)
+{
+	pick_frame(a, "RomM", NULL, 0, 0, NULL, 0, 0, what, MENU_ACCENT);
+}
+
+/* The name this Brick goes by in RomM's list of devices */
+static void romm_device_name(char *out, size_t n)
+{
+	char host[64] = "";
+
+	if (gethostname(host, sizeof host) != 0 || !host[0]) snprintf(host, sizeof host, "Brick");
+	snprintf(out, n, "ChaOS (%s)", host);
+}
+
+/* ---- signing in ------------------------------------------------------------ */
+
+static void romm_signed_in(app *a)
+{
+	char why[160], name[96];
+
+	romm_busy(a, "Signed in\nGetting your account");
+	romm_whoami(&g_romm, why, sizeof why);
+	romm_device_name(name, sizeof name);
+	if (!romm_register(&g_romm, name, why, sizeof why))
+		fprintf(stderr, "romm: no device for save sync: %s\n", why);
+	romm_keep();
+	fprintf(stderr, "romm: signed in to %s as %s\n", g_romm.url, g_romm.user);
+}
+
+/* RomM 5: a code on the screen, approved in RomM's web page */
+static bool romm_pair_screen(app *a)
+{
+	romm_pair p;
+	char why[160], name[96], msg[600];
+	unsigned t0, next;
+	int r, interval;
+
+	if (!net_online()) { pick_say(a, "RomM", "Connect to Wi-Fi first", MENU_ACCENT); return false; }
+	romm_busy(a, "Talking to RomM");
+	romm_device_name(name, sizeof name);
+	r = romm_pair_begin(&g_romm, name, &p, why, sizeof why);
+	if (r < 0) { pick_say(a, "RomM", why, MENU_ACCENT); return false; }
+	if (r == 0) {
+		/* RomM 4: a pairing code made in its web page, typed here */
+		char code[64] = "";
+		kb_result kr;
+
+		pick_say(a, "RomM", "In RomM's web page: your profile,\nClient API Tokens, Pair Device.\nThen type its code here",
+		         MENU_ACCENT);
+		kr = kb_prompt(a->r, &a->in, "RomM Pairing Code", code, (int)sizeof code, MENU_ACCENT,
+		               wifi_backdrop, idle_due_ctx, a);
+		if (kr == KB_POWER) { power_off(a); return false; }
+		if (kr != KB_ACCEPT || !code[0]) return false;
+		romm_busy(a, "Checking the code");
+		if (!romm_exchange(&g_romm, code, why, sizeof why)) { pick_say(a, "RomM", why, MENU_ACCENT); return false; }
+		romm_signed_in(a);
+		return true;
+	}
+	interval = p.interval;
+	t0 = plat_now_ms();
+	next = t0 + (unsigned)interval * 1000u;
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+	while (a->running) {
+		plat_input_poll(&a->in);
+		if (a->in.quit_requested) { a->running = false; return false; }
+		if (a->in.pressed[IN_POWER]) { power_off(a); return false; }
+		if (menu_leaving(a)) return false;
+		if (plat_now_ms() - t0 > (unsigned)p.expires * 1000u) {
+			pick_say(a, "RomM", "The code ran out: try again", MENU_ACCENT);
+			return false;
+		}
+		if ((int)(plat_now_ms() - next) >= 0) {
+			r = romm_pair_poll(&g_romm, &p, why, sizeof why);
+			if (r == ROMM_PAIR_OK) { romm_signed_in(a); return true; }
+			if (r == ROMM_PAIR_DENIED || r == ROMM_PAIR_EXPIRED) {
+				pick_say(a, "RomM", why, MENU_ACCENT);
+				return false;
+			}
+			if (r == ROMM_PAIR_SLOW) interval += 5;
+			next = plat_now_ms() + (unsigned)interval * 1000u;
+		}
+		snprintf(msg, sizeof msg, "Your code: %s\n\nOn a phone or computer, open\n%s\nand approve it",
+		         p.user_code, p.verify);
+		pick_frame(a, "Connect to RomM", NULL, 0, 0, NULL, 0, 0, msg, MENU_ACCENT);
+		SDL_Delay(30);
+	}
+	return false;
+}
+
+/* ---- downloads -------------------------------------------------------------- */
+
+/* A RomM download with the panel up: pm_fetch's way, with the token */
+static bool romm_fetch(app *a, const char *title, const char *what, const char *url,
+                       const char *path, long size, char *why, size_t wn)
+{
+	char part[LIB_PATH * 2 + 8];
+	net_req r;
+	pid_t pid;
+	int rc;
+
+	snprintf(part, sizeof part, "%s.part", path);
+	unlink(part);
+	memset(&r, 0, sizeof r);
+	r.url = url;
+	r.bearer = g_romm.token;
+	r.timeout_s = 3600;
+	pid = net_request_spawn(&r, part);
+	if (pid <= 0) { snprintf(why, wn, "Couldn't start the download"); return false; }
+	rc = pm_wait(a, pid, title, what, part, size, MENU_ACCENT, true);
+	if (rc != 0) {
+		unlink(part);
+		snprintf(why, wn, rc < 0 ? "Stopped" : "Couldn't download it");
+		return false;
+	}
+	if (rename(part, path) != 0) { unlink(part); snprintf(why, wn, "Couldn't save it to the card"); return false; }
+	return true;
+}
+
+/* The first file in `dir` with one of `exts` (a disc's .m3u or .cue) */
+static bool romm_first_of(const char *dir, const char *const *exts, char *out, size_t n)
+{
+	DIR *d = opendir(dir);
+	struct dirent *e;
+	bool found = false;
+	int i;
+
+	if (!d) return false;
+	for (i = 0; exts[i] && !found; i++) {
+		rewinddir(d);
+		while ((e = readdir(d))) {
+			const char *dot = strrchr(e->d_name, '.');
+
+			if (dot && !strcasecmp(dot + 1, exts[i])) {
+				snprintf(out, n, "%s", e->d_name);
+				found = true;
+				break;
+			}
+		}
+	}
+	closedir(d);
+	return found;
+}
+
+/* A game onto its shelf: the file, or a multi-file game's zip unpacked to a
+ * folder of its own; its cover as its box art; and noted as RomM's */
+static bool romm_download_game(app *a, const romm_rom *g, const char *folder, const char *cover)
+{
+	char url[1200], dir[LIB_PATH], dest[LIB_PATH * 2], why[160], file[LIB_PATH * 2], rdir[LIB_PATH];
+	char stem[LIB_NAME];
+
+	if (!net_online()) { pick_say(a, g->name, "Connect to Wi-Fi first", MENU_ACCENT); return false; }
+	sync_abandon();
+	snprintf(dir, sizeof dir, "%s/%s", P_ROMS, folder);
+	mkdir(dir, 0755);
+	romm_rom_url(&g_romm, g, url, sizeof url);
+	if (!g->multi) {
+		snprintf(dest, sizeof dest, "%s/%s", dir, g->file_name);
+		if (!romm_fetch(a, g->name, "Downloading", url, dest, g->size, why, sizeof why)) {
+			if (strcmp(why, "Stopped")) pick_say(a, g->name, why, MENU_ACCENT);
+			return false;
+		}
+		snprintf(file, sizeof file, "%s", g->file_name);
+		snprintf(stem, sizeof stem, "%s", g->file_name);
+		if (strrchr(stem, '.')) *strrchr(stem, '.') = '\0';
+	} else {
+		static const char *const firsts[] = { "m3u", "cue", "ccd", "chd", "toc", NULL };
+		char zip[LIB_PATH * 2], to[LIB_PATH * 2], disc[LIB_NAME];
+
+		snprintf(zip, sizeof zip, "%s/.romm-%d.zip", dir, g->id);
+		if (!romm_fetch(a, g->name, "Downloading", url, zip, g->size, why, sizeof why)) {
+			if (strcmp(why, "Stopped")) pick_say(a, g->name, why, MENU_ACCENT);
+			return false;
+		}
+		snprintf(to, sizeof to, "%s/%s", dir, g->fs_name);
+		mkdir(to, 0755);
+		{
+			const char *argv[] = { pm_unzip_bin(), "-oq", zip, "-d", to, NULL };
+			int rc = pm_run(a, g->name, "Unpacking", MENU_ACCENT, argv, NULL);
+
+			unlink(zip);
+			if (rc != 0) { pick_say(a, g->name, "Couldn't unpack it", MENU_ACCENT); return false; }
+		}
+		if (!romm_first_of(to, firsts, disc, sizeof disc)) disc[0] = '\0';
+		snprintf(file, sizeof file, "%s%s%s", g->fs_name, disc[0] ? "/" : "", disc);
+		snprintf(stem, sizeof stem, "%s", g->fs_name);
+	}
+	/* its cover, as the shelf's box art */
+	if (cover && cover[0] && access(cover, R_OK) == 0) {
+		char media[LIB_PATH + 16];
+
+		snprintf(media, sizeof media, "%s/.media", dir);
+		mkdir(media, 0755);
+		cover_save(a, cover, folder, stem);
+	}
+	romm_dir(rdir, sizeof rdir);
+	romm_map_add(rdir, g->id, folder, file);
+	sync();
+	fprintf(stderr, "romm: %s downloaded into %s\n", g->name, folder);
+	rescan_all(a);
+	return true;
+}
+
+/* ---- a system's games ------------------------------------------------------- */
+
+typedef struct {
+	romm_rom *g;
+	int n;
+	const char *folder;
+	char (*have)[1];              /* on the card already */
+} romm_list;
+
+/* The cover under the cursor, fetched with the token, kept in .userdata */
+typedef struct {
+	int want, shown;
+	pid_t pid;
+	int fetching;
+	unsigned since;
+	SDL_Texture *tex;
+	int tw, th;
+	bool failed;
+} romm_pic;
+
+static void romm_cover_path(int id, char *out, size_t n)
+{
+	snprintf(out, n, "%s/romm/covers/%d.img", P_USERDATA, id);
+}
+
+static void romm_pic_step(app *a, romm_pic *pp, const romm_rom *list)
+{
+	char path[LIB_PATH], url[1200];
+
+	if (pp->pid > 0) {
+		int st;
+		pid_t r = waitpid(pp->pid, &st, WNOHANG);
+
+		if (r == pp->pid || r < 0) {
+			char part[LIB_PATH + 8];
+
+			net_spawn_done(pp->pid);
+			romm_cover_path(list[pp->fetching].id, path, sizeof path);
+			snprintf(part, sizeof part, "%s.part", path);
+			if (r == pp->pid && WIFEXITED(st) && WEXITSTATUS(st) == 0) rename(part, path);
+			else { unlink(part); if (pp->fetching == pp->want) pp->failed = true; }
+			pp->pid = 0;
+		}
+	}
+	if (pp->want < 0 || pp->shown == pp->want) return;
+	romm_cover_path(list[pp->want].id, path, sizeof path);
+	if (access(path, R_OK) == 0) {
+		SDL_Surface *s = IMG_Load(path);
+
+		if (pp->tex) SDL_DestroyTexture(pp->tex);
+		pp->tex = NULL;
+		if (s) {
+			pp->tex = SDL_CreateTextureFromSurface(a->r, s);
+			pp->tw = s->w; pp->th = s->h;
+			SDL_FreeSurface(s);
+			if (pp->tex) SDL_SetTextureScaleMode(pp->tex, SDL_ScaleModeLinear);
+		} else {
+			pp->failed = true;
+		}
+		pp->shown = pp->want;
+		return;
+	}
+	if (pp->pid <= 0 && !pp->failed && plat_now_ms() - pp->since > 180 && net_online()) {
+		char dir[LIB_PATH], part[LIB_PATH + 8];
+		net_req r;
+		bool own;
+
+		romm_cover_url(&g_romm, &list[pp->want], url, sizeof url);
+		if (!url[0]) { pp->failed = true; return; }
+		snprintf(dir, sizeof dir, "%s/romm/covers", P_USERDATA);
+		mkdir(dir, 0755);
+		snprintf(part, sizeof part, "%s.part", path);
+		own = !strncmp(url, g_romm.url, strlen(g_romm.url));
+		memset(&r, 0, sizeof r);
+		r.url = url;
+		r.bearer = own ? g_romm.token : NULL;   /* never to anyone else's server */
+		r.timeout_s = 20;
+		pp->pid = net_request_spawn(&r, part);
+		pp->fetching = pp->want;
+		if (pp->pid <= 0) { pp->pid = 0; pp->failed = true; }
+	}
+}
+
+static void romm_pic_free(romm_pic *pp)
+{
+	if (pp->pid > 0) { kill(pp->pid, SIGTERM); waitpid(pp->pid, NULL, 0); net_spawn_done(pp->pid); }
+	if (pp->tex) SDL_DestroyTexture(pp->tex);
+	memset(pp, 0, sizeof *pp);
+	pp->want = pp->shown = -1;
+}
+
+static void romm_list_draw(app *a, const char *heading, const romm_list *l, int sel, int first,
+                           int vis, romm_pic *pp)
+{
+	SDL_Rect panel = PM_PANEL;
+	TTF_Font *fm = ui_font(UI_F_MENU), *fs = ui_font(UI_F_META);
+	int rh = menu_row_h(), lm = ui_font_line(UI_F_MENU), ls = ui_font_line(UI_F_META);
+	int lx = panel.x + 20, lw = 452, y0 = panel.y + 100, i;
+	SDL_Rect box = { lx + lw + 24, y0, panel.x + panel.w - 36 - (lx + lw + 24), 0 };
+	char meta[48], fit[256], line[200];
+
+	snprintf(meta, sizeof meta, "%d game%s", l->n, l->n == 1 ? "" : "s");
+	pm_frame_begin(a, MENU_ACCENT, heading, meta);
+	if (l->n == 0) {
+		ui_text(a->r, fm, "No games here", panel.x + panel.w / 2, panel.y + panel.h / 2 - lm / 2, 0,
+		        UI_TEXT_DIM);
+		pm_footer(a, "B: back");
+		pm_frame_end(a);
+		return;
+	}
+	for (i = first; i < l->n && i < first + vis; i++) {
+		int y = y0 + (i - first) * rh, cy = y + rh / 2, tw = 0;
+
+		if (i == sel)
+			ui_round_rect(a->r, &(SDL_Rect){ lx, y, lw, rh }, rh / 4, (SDL_Color){ 255, 255, 255, 34 });
+		if (l->have[i][0])
+			tw = pm_tag(a, "On Brick", lx + lw - 12, cy, (SDL_Color){ 0, 30, 12, 255 }, PM_GREEN) + 8;
+		ui_fit_text(fm, l->g[i].name, fit, sizeof fit, lw - 28 - tw);
+		ui_text(a->r, fm, fit, lx + 16, cy - lm / 2 - TTF_FontDescent(fm) / 2, -1, UI_TEXT);
+	}
+	if (l->n > vis) {
+		int track = vis * rh, th = track * vis / l->n, ty = y0 + (track - th) * first / (l->n - vis);
+
+		SDL_SetRenderDrawColor(a->r, 0x3D, 0xD6, 0xFF, 160);
+		SDL_RenderFillRect(a->r, &(SDL_Rect){ lx - 10, ty, 3, th > 12 ? th : 12 });
+	}
+	{
+		const romm_rom *g = &l->g[sel];
+		int y;
+
+		/* as tall as leaves room for the name, its size and the keys */
+		box.h = panel.y + panel.h - 24 - ls - 20 - (lm + ls + 30) - y0;
+		if (box.h > box.w) box.h = box.w;
+		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+		ui_round_rect(a->r, &box, 10, (SDL_Color){ 0, 0, 0, 90 });
+		if (pp->tex && pp->shown == pp->want && pp->tw > 0 && pp->th > 0) {
+			float k = (float)box.w / pp->tw < (float)box.h / pp->th ? (float)box.w / pp->tw
+			                                                       : (float)box.h / pp->th;
+			SDL_Rect d = { 0, 0, (int)(pp->tw * k), (int)(pp->th * k) };
+
+			d.x = box.x + (box.w - d.w) / 2;
+			d.y = box.y + (box.h - d.h) / 2;
+			SDL_RenderCopy(a->r, pp->tex, NULL, &d);
+		} else {
+			ui_text(a->r, fs, pp->failed ? "No cover" : "Loading...", box.x + box.w / 2,
+			        box.y + box.h / 2 - ls / 2, 0, UI_TEXT_DIM);
+		}
+		y = box.y + box.h + 18;
+		ui_fit_text(fm, g->name, fit, sizeof fit, box.w);
+		ui_text(a->r, fm, fit, box.x, y, -1, UI_TEXT);
+		y += lm + 4;
+		snprintf(line, sizeof line, "%.1f MB%s%s", g->size / 1048576.0, g->multi ? "  \xC2\xB7  several files" : "",
+		         l->have[sel][0] ? "  \xC2\xB7  on this Brick" : "");
+		ui_text(a->r, fs, line, box.x, y, -1, UI_TEXT_DIM);
+		(void)y;
+	}
+	pm_footer(a, "A: download   \xE2\x80\xB9 \xE2\x80\xBA: page   L2 R2: letter   B: back");
+	draw_letter_popup(a);
+	pm_frame_end(a);
+}
+
+static bool romm_is_here(const char *dir, const romm_rom *g, const char *folder)
+{
+	char p[LIB_PATH * 2];
+
+	snprintf(p, sizeof p, "%s/%s/%s", P_ROMS, folder, g->multi ? g->fs_name : g->file_name);
+	(void)dir;
+	return access(p, F_OK) == 0;
+}
+
+static int romm_letter_jump(const romm_list *l, int cur, int dir)
+{
+	char c0;
+	int i;
+
+	if (l->n <= 1) return cur;
+	c0 = shelf_initial(l->g[cur].name);
+	if (dir > 0) {
+		for (i = cur + 1; i < l->n; i++) if (shelf_initial(l->g[i].name) != c0) return i;
+		return 0;
+	}
+	i = cur;
+	while (i > 0 && shelf_initial(l->g[i - 1].name) == c0) i--;
+	if (i != cur) return i;
+	i = cur == 0 ? l->n - 1 : cur - 1;
+	c0 = shelf_initial(l->g[i].name);
+	while (i > 0 && shelf_initial(l->g[i - 1].name) == c0) i--;
+	return i;
+}
+
+static void romm_games_screen(app *a, const romm_platform *p, const char *folder)
+{
+	SDL_Rect panel = PM_PANEL;
+	romm_list l;
+	romm_pic pp;
+	char why[160], now[96], rdir[LIB_PATH];
+	int total = 0, got, cap = 0, sel = 0, first = 0, i;
+	int vis = (panel.h - 100 - 24 - ui_font_line(UI_F_META) - 16) / menu_row_h();
+	Uint32 held = 0;
+
+	memset(&l, 0, sizeof l);
+	l.folder = folder;
+	romm_dir(rdir, sizeof rdir);
+	/* the whole list, a page at a time */
+	for (;;) {
+		romm_rom *more;
+
+		if (l.n + 100 > cap) {
+			cap = cap ? cap * 2 : 256;
+			more = realloc(l.g, (size_t)cap * sizeof *l.g);
+			if (!more) break;
+			l.g = more;
+		}
+		snprintf(now, sizeof now, "Getting %s's games\n%d of %d", p->name, l.n, total ? total : p->roms);
+		romm_busy(a, now);
+		got = romm_roms(&g_romm, p->id, l.n, 100, l.g + l.n, 100, &total, why, sizeof why);
+		if (got < 0) { pick_say(a, "RomM", why, MENU_ACCENT); free(l.g); return; }
+		l.n += got;
+		if (got == 0 || l.n >= total) break;
+		plat_input_poll(&a->in);
+		if (menu_leaving(a)) break;
+	}
+	l.have = calloc((size_t)(l.n ? l.n : 1), 1);
+	for (i = 0; i < l.n && l.have; i++) l.have[i][0] = romm_is_here(rdir, &l.g[i], folder);
+	if (!l.have) { free(l.g); return; }
+	memset(&pp, 0, sizeof pp);
+	pp.want = pp.shown = -1;
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+	while (a->running) {
+		if (l.n > 0 && pp.want != sel) { pp.want = sel; pp.since = plat_now_ms(); pp.failed = false; }
+		romm_pic_step(a, &pp, l.g);
+		plat_input_poll(&a->in);
+		if (a->in.quit_requested) { a->running = false; break; }
+		if (a->in.pressed[IN_POWER] || idle_due(a)) { power_off(a); break; }
+		if (menu_leaving(a)) break;
+		if (in_repeat(&a->in, IN_VOLUP)) plat_volume_nudge(+1);
+		if (in_repeat(&a->in, IN_VOLDN)) plat_volume_nudge(-1);
+		if (l.n > 0) {
+			if (in_repeat(&a->in, IN_DOWN)) sel = sel + 1 < l.n ? sel + 1 : 0;
+			if (in_repeat(&a->in, IN_UP)) sel = sel > 0 ? sel - 1 : l.n - 1;
+			if (in_repeat(&a->in, IN_RIGHT) || in_repeat(&a->in, IN_R1)) sel = sel + vis < l.n ? sel + vis : l.n - 1;
+			if (in_repeat(&a->in, IN_LEFT) || in_repeat(&a->in, IN_L1)) sel = sel - vis > 0 ? sel - vis : 0;
+			if (in_repeat(&a->in, IN_R2)) { sel = romm_letter_jump(&l, sel, +1); letter_show(shelf_initial(l.g[sel].name)); }
+			if (in_repeat(&a->in, IN_L2)) { sel = romm_letter_jump(&l, sel, -1); letter_show(shelf_initial(l.g[sel].name)); }
+			if (a->in.down[IN_UP] || a->in.down[IN_DOWN]) {
+				if (!held) held = plat_now_ms();
+				if (plat_now_ms() - held >= 2000) letter_show(shelf_initial(l.g[sel].name));
+			} else {
+				held = 0;
+			}
+			if (a->in.pressed[IN_ACCEPT]) {
+				char cover[LIB_PATH];
+				bool go = true;
+
+				if (l.have[sel][0])
+					go = confirm_panel(a, "Download", "It's on this Brick already.\nDownload it again?",
+					                   "Download");
+				if (go) {
+					romm_cover_path(l.g[sel].id, cover, sizeof cover);
+					if (romm_download_game(a, &l.g[sel], folder, cover)) l.have[sel][0] = 1;
+				}
+				plat_input_flush();
+				memset(&a->in, 0, sizeof a->in);
+				continue;
+			}
+		}
+		if (sel < first) first = sel;
+		if (sel >= first + vis) first = sel - vis + 1;
+		romm_list_draw(a, p->name, &l, sel, first, vis, &pp);
+		SDL_Delay(8);
+	}
+	romm_pic_free(&pp);
+	free(l.have);
+	free(l.g);
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+}
+
+/* ---- systems -------------------------------------------------------------- */
+
+typedef struct {
+	romm_platform p[64];
+	char folder[64][CFG_STR];
+	char counts[64][16];
+	int n;
+} romm_sys_ctx;
+
+static int romm_sys_build(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	romm_sys_ctx *c = ctx;
+	int i, n = 0;
+
+	*heading = "RomM Games";
+	for (i = 0; i < c->n && n < max - 2; i++)
+		rows[n++] = (menu_row){ c->p[i].name, c->counts[i], c->p[i].roms > 0, true };
+	if (c->n == 0) rows[n++] = MENU_NOTE("None of RomM's systems are ChaOS's");
+	return n;
+}
+
+static menu_result romm_sys_key(app *a, void *ctx, in_button key, int sel)
+{
+	romm_sys_ctx *c = ctx;
+
+	if (key != IN_ACCEPT || sel < 0 || sel >= c->n) return MENU_STAY;
+	romm_games_screen(a, &c->p[sel], c->folder[sel]);
+	return g_menu_closing ? MENU_DONE : MENU_STAY;
+}
+
+static void romm_systems_screen(app *a)
+{
+	romm_sys_ctx *c = calloc(1, sizeof *c);
+	romm_platform all[64];
+	menu_style st = { 0 };
+	char why[160];
+	int n, i;
+
+	if (!c) return;
+	romm_busy(a, "Getting your systems");
+	n = romm_platforms(&g_romm, all, 64, why, sizeof why);
+	if (n < 0) { pick_say(a, "RomM", why, MENU_ACCENT); free(c); return; }
+	for (i = 0; i < n; i++) {
+		if (!all[i].tag || !romm_folder_for(all[i].tag, c->folder[c->n], CFG_STR)) continue;
+		c->p[c->n] = all[i];
+		snprintf(c->counts[c->n], 16, "%d", all[i].roms);
+		c->n++;
+	}
+	st.accent = MENU_ACCENT;
+	st.fixed_w = menu_std_width(a);
+	menu_run(a, &st, romm_sys_build, romm_sys_key, c);
+	free(c);
+}
+
+/* ---- saves -------------------------------------------------------------------- */
+
+typedef struct {
+	romm_local_save *s;
+	int n, cap;
+	struct { int rom_id; char stem[LIB_NAME]; } *games;
+	int ng, capg;
+} romm_scan;
+
+static bool romm_scan_one(int rom_id, const char *folder, const char *file, void *ctx)
+{
+	romm_scan *sc = ctx;
+	const char *base = strrchr(file, '/');
+	char stem[LIB_NAME], path[LIB_PATH * 2];
+	struct stat st;
+
+	(void)folder;
+	snprintf(stem, sizeof stem, "%s", base ? base + 1 : file);
+	if (strrchr(stem, '.')) *strrchr(stem, '.') = '\0';
+	if (sc->ng == sc->capg) {
+		void *m = realloc(sc->games, (size_t)(sc->capg = sc->capg ? sc->capg * 2 : 64) * sizeof *sc->games);
+
+		if (!m) return false;
+		sc->games = m;
+	}
+	sc->games[sc->ng].rom_id = rom_id;
+	snprintf(sc->games[sc->ng].stem, LIB_NAME, "%s", stem);
+	sc->ng++;
+	snprintf(path, sizeof path, "%s/Saves/%s.srm", P_CARD, stem);
+	if (stat(path, &st) != 0 || st.st_size <= 0) return true;
+	if (sc->n == sc->cap) {
+		void *m = realloc(sc->s, (size_t)(sc->cap = sc->cap ? sc->cap * 2 : 64) * sizeof *sc->s);
+
+		if (!m) return false;
+		sc->s = m;
+	}
+	memset(&sc->s[sc->n], 0, sizeof sc->s[0]);
+	sc->s[sc->n].rom_id = rom_id;
+	snprintf(sc->s[sc->n].file_name, ROMM_STR, "%s.srm", stem);
+	if (!ra_md5_file(path, sc->s[sc->n].md5)) return true;
+	sc->s[sc->n].mtime = st.st_mtime;
+	sc->s[sc->n].size = (long)st.st_size;
+	sc->n++;
+	return true;
+}
+
+static const char *romm_stem_of(const romm_scan *sc, int rom_id)
+{
+	int i;
+
+	for (i = 0; i < sc->ng; i++) if (sc->games[i].rom_id == rom_id) return sc->games[i].stem;
+	return NULL;
+}
+
+/* Sync: what the server's plan says, for the games that came from RomM. A
+ * save replaced is kept first, in Saves/.romm-backup; a conflict is sent up
+ * as a new save beside the server's, so both are kept. */
+static void romm_sync_screen(app *a)
+{
+	romm_scan sc;
+	romm_sync_op ops[256];
+	char rdir[LIB_PATH], why[160], msg[200];
+	int n, session = 0, i, up = 0, down = 0, failed = 0;
+
+	if (!net_online()) { pick_say(a, "Sync Saves", "Connect to Wi-Fi first", MENU_ACCENT); return; }
+	memset(&sc, 0, sizeof sc);
+	romm_dir(rdir, sizeof rdir);
+	romm_busy(a, "Looking at your saves");
+	romm_map_each(rdir, romm_scan_one, &sc);
+	if (sc.ng == 0) {
+		pick_say(a, "Sync Saves", "Download games from RomM first:\ntheir saves are what syncs", MENU_ACCENT);
+		free(sc.s); free(sc.games);
+		return;
+	}
+	if (!g_romm.device_id[0]) {
+		char name[96];
+
+		romm_device_name(name, sizeof name);
+		if (!romm_register(&g_romm, name, why, sizeof why)) {
+			pick_say(a, "Sync Saves", why, MENU_ACCENT);
+			free(sc.s); free(sc.games);
+			return;
+		}
+		romm_keep();
+	}
+	romm_busy(a, "Asking RomM what to sync");
+	n = romm_negotiate(&g_romm, sc.s, sc.n, &session, ops, 256, why, sizeof why);
+	if (n < 0) { pick_say(a, "Sync Saves", why, MENU_ACCENT); free(sc.s); free(sc.games); return; }
+	for (i = 0; i < n; i++) {
+		const char *stem = romm_stem_of(&sc, ops[i].rom_id);
+		char path[LIB_PATH * 2];
+
+		if (!stem) continue;                      /* a game not on this Brick */
+		snprintf(path, sizeof path, "%s/Saves/%s.srm", P_CARD, stem);
+		if (!strcmp(ops[i].action, "upload") || !strcmp(ops[i].action, "conflict")) {
+			snprintf(msg, sizeof msg, "Sending %s's save", stem);
+			romm_busy(a, msg);
+			if (access(path, R_OK) == 0 && romm_save_upload(&g_romm, ops[i].rom_id, path, why, sizeof why)) up++;
+			else failed++;
+		} else if (!strcmp(ops[i].action, "download") && ops[i].save_id) {
+			char tmp[LIB_PATH * 2 + 16];
+
+			snprintf(msg, sizeof msg, "Getting %s's save", stem);
+			romm_busy(a, msg);
+			snprintf(tmp, sizeof tmp, "%s.romm", path);
+			if (!romm_save_download(&g_romm, ops[i].save_id, tmp, why, sizeof why)) { failed++; continue; }
+			if (access(path, F_OK) == 0) {
+				/* the one here, kept */
+				char bdir[LIB_PATH], bk[LIB_PATH * 2 + 40];
+
+				snprintf(bdir, sizeof bdir, "%s/Saves/.romm-backup", P_CARD);
+				mkdir(bdir, 0755);
+				snprintf(bk, sizeof bk, "%s/%s.%ld.srm", bdir, stem, (long)time(NULL));
+				rename(path, bk);
+			}
+			if (rename(tmp, path) == 0) down++; else failed++;
+		}
+	}
+	romm_sync_complete(&g_romm, session, up + down, failed);
+	sync();
+	fprintf(stderr, "romm: sync sent %d, got %d, %d failed\n", up, down, failed);
+	if (up + down + failed == 0) snprintf(msg, sizeof msg, "Everything is in sync");
+	else snprintf(msg, sizeof msg, "Sent %d save%s, got %d%s", up, up == 1 ? "" : "s", down,
+	              failed ? "\nSome couldn't be synced" : "");
+	pick_say(a, "Sync Saves", msg, MENU_ACCENT);
+	{
+		char p[LIB_PATH];
+		FILE *f;
+
+		snprintf(p, sizeof p, "%s/last-sync", rdir);
+		if ((f = fopen(p, "w"))) { fprintf(f, "%ld\n", (long)time(NULL)); fclose(f); }
+	}
+	free(sc.s);
+	free(sc.games);
+}
+
+/* ---- BIOS --------------------------------------------------------------------- */
+
+static void romm_bios_screen(app *a)
+{
+	romm_platform all[64];
+	romm_firmware fw[32];
+	char why[160], msg[200], bios[LIB_PATH];
+	int n, i, k, nf, got = 0, had = 0, failed = 0;
+
+	if (!net_online()) { pick_say(a, "BIOS", "Connect to Wi-Fi first", MENU_ACCENT); return; }
+	romm_busy(a, "Asking RomM for BIOS files");
+	n = romm_platforms(&g_romm, all, 64, why, sizeof why);
+	if (n < 0) { pick_say(a, "BIOS", why, MENU_ACCENT); return; }
+	snprintf(bios, sizeof bios, "%s/Bios", P_CARD);
+	mkdir(bios, 0755);
+	for (i = 0; i < n; i++) {
+		char folder[CFG_STR];
+
+		if (!all[i].tag || !all[i].firmware || !romm_folder_for(all[i].tag, folder, sizeof folder)) continue;
+		nf = romm_firmware_list(&g_romm, all[i].id, fw, 32, why, sizeof why);
+		for (k = 0; k < nf; k++) {
+			char path[LIB_PATH * 2], url[1200];
+			struct stat st;
+
+			snprintf(path, sizeof path, "%s/%s", bios, fw[k].file_name);
+			if (stat(path, &st) == 0 && (fw[k].size <= 0 || st.st_size == fw[k].size)) { had++; continue; }
+			romm_firmware_url(&g_romm, &fw[k], url, sizeof url);
+			if (romm_fetch(a, "BIOS", fw[k].file_name, url, path, fw[k].size, why, sizeof why)) got++;
+			else if (!strcmp(why, "Stopped")) { i = n; break; }
+			else failed++;
+		}
+	}
+	fprintf(stderr, "romm: BIOS got %d, had %d, %d failed\n", got, had, failed);
+	if (got + had + failed == 0) snprintf(msg, sizeof msg, "RomM has no BIOS files\nfor ChaOS's systems");
+	else snprintf(msg, sizeof msg, "Got %d BIOS file%s%s%s", got, got == 1 ? "" : "s",
+	              had ? ", the rest were here" : "", failed ? "\nSome couldn't be fetched" : "");
+	pick_say(a, "BIOS", msg, MENU_ACCENT);
+}
+
+/* ---- RomM's page ------------------------------------------------------------ */
+
+enum { RM_GAMES, RM_SYNC, RM_BIOS, RM_SERVER, RM_SIGNOUT };
+
+typedef struct {
+	char when[48], note[160];
+} romm_home_ctx;
+
+static void romm_home_refresh(romm_home_ctx *c)
+{
+	char p[LIB_PATH], d[LIB_PATH];
+	FILE *f;
+	long t = 0;
+
+	romm_dir(d, sizeof d);
+	snprintf(p, sizeof p, "%s/last-sync", d);
+	if ((f = fopen(p, "r"))) { if (fscanf(f, "%ld", &t) != 1) t = 0; fclose(f); }
+	if (!t) snprintf(c->when, sizeof c->when, "never");
+	else {
+		long age = (long)time(NULL) - t;
+
+		if (age < 3600) snprintf(c->when, sizeof c->when, "just now");
+		else if (age < 86400) snprintf(c->when, sizeof c->when, "%ld hr ago", age / 3600);
+		else snprintf(c->when, sizeof c->when, "%ld day%s ago", age / 86400, age < 172800 ? "" : "s");
+	}
+	if (g_romm.token[0])
+		snprintf(c->note, sizeof c->note, "Signed in%s%s", g_romm.user[0] ? " as " : "", g_romm.user);
+	else
+		snprintf(c->note, sizeof c->note, "Not signed in");
+}
+
+static int romm_home_build(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	romm_home_ctx *c = ctx;
+	bool in = g_romm.token[0] != 0, net = net_online();
+	int n = 0;
+	const char *server = g_romm.url[0] ? g_romm.url + (strstr(g_romm.url, "://") ? strstr(g_romm.url, "://") - g_romm.url + 3 : 0)
+	                                   : "set it";
+
+	(void)max;
+	*heading = "RomM";
+	if (in) {
+		rows[n] = (menu_row){ "Games", NULL, net, true };
+		rows[n++].hint = "Download games from your library";
+		rows[n] = (menu_row){ "Sync Saves", c->when, net, true };
+		rows[n++].hint = "Saves of the games from RomM, both ways";
+		rows[n] = (menu_row){ "BIOS", NULL, net, true };
+		rows[n++].hint = "Get the BIOS files RomM has";
+	}
+	rows[n] = (menu_row){ "Server", server, true, true };
+	rows[n++].hint = "Your RomM's address, like nas.local:8080";
+	if (in) {
+		rows[n] = (menu_row){ "Sign Out", g_romm.user[0] ? g_romm.user : NULL, true, true };
+		rows[n++].hint = "Your games and saves stay";
+	} else {
+		rows[n] = (menu_row){ "Sign In", NULL, net && g_romm.url[0], true };
+		rows[n++].hint = "Pair this Brick with your RomM";
+	}
+	(void)c;
+	return n;
+}
+
+static menu_result romm_home_key(app *a, void *ctx, in_button key, int sel)
+{
+	romm_home_ctx *c = ctx;
+	bool in = g_romm.token[0] != 0;
+	int row = sel;
+
+	if (key != IN_ACCEPT) return MENU_STAY;
+	if (!in) row = sel == 0 ? RM_SERVER : RM_SIGNOUT;   /* Server, Sign In */
+	switch (row) {
+	case RM_GAMES: romm_systems_screen(a); break;
+	case RM_SYNC:  romm_sync_screen(a); break;
+	case RM_BIOS:  romm_bios_screen(a); break;
+	case RM_SERVER: {
+		char typed[ROMM_STR];
+		kb_result kr;
+		const char *u = g_romm.url;
+
+		snprintf(typed, sizeof typed, "%s", strstr(u, "://") ? strstr(u, "://") + 3 : u);
+		kr = kb_prompt(a->r, &a->in, "RomM Server", typed, (int)sizeof typed, MENU_ACCENT,
+		               wifi_backdrop, idle_due_ctx, a);
+		if (kr == KB_POWER) { power_off(a); return MENU_DONE; }
+		if (kr == KB_ACCEPT) {
+			if (!romm_set_url(&g_romm, typed)) pick_say(a, "RomM", "That isn't a server's address", MENU_ACCENT);
+			else romm_keep();
+		}
+		break;
+	}
+	case RM_SIGNOUT:
+		if (in) {
+			if (confirm_panel(a, "Sign Out", "Forget this sign-in?\nYour games and saves stay.", "Sign Out")) {
+				char d[LIB_PATH];
+
+				romm_dir(d, sizeof d);
+				romm_forget(&g_romm, d);
+			}
+		} else if (g_romm.url[0]) {
+			romm_pair_screen(a);
+		}
+		break;
+	default: break;
+	}
+	romm_home_refresh(c);
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+	return g_menu_closing ? MENU_DONE : MENU_STAY;
+}
+
+static void romm_screen(app *a)
+{
+	romm_home_ctx c;
+	menu_style st = { 0 };
+
+	romm_get();
+	memset(&c, 0, sizeof c);
+	romm_home_refresh(&c);
+	st.accent = MENU_ACCENT;
+	st.fixed_w = menu_std_width(a);
+	menu_run(a, &st, romm_home_build, romm_home_key, &c);
+}
+
 static void launch_game(app *a)
 {
 	sysview *v = &a->view[a->sys_cursor];
@@ -17353,6 +18246,9 @@ static int shot_gmenu = -1;           /* ChaOS: --gmenu ROW, the in-game menu */
 /* ChaOS: --pm home ROW | list SECTION ROW | detail ZIP: PortMaster's browser,
  * from the catalog in .userdata/ports */
 static int shot_port_power = -1;   /* ChaOS: --port-power ROW, power during a port */
+/* ChaOS: --romm home ROW | games PLATFORM ROW, against .userdata/romm's server */
+static const char *shot_romm;
+static int shot_romm_a, shot_romm_b;
 static const char *shot_pm;
 static const char *shot_pm_arg;
 static int shot_pm_n;
@@ -17667,6 +18563,46 @@ static void updater_art(app *a, const char *dir)
 	fprintf(stderr, "updater art: wrote %s\n", dir);
 }
 
+/* One frame of RomM's screens for --romm */
+static void romm_shot(app *a)
+{
+	g_pm_shot = true;
+	romm_get();
+	if (!strcmp(shot_romm, "home")) {
+		romm_home_ctx c;
+		menu_row rows[16];
+		const char *heading;
+		int n;
+
+		memset(&c, 0, sizeof c);
+		romm_home_refresh(&c);
+		n = romm_home_build(&c, rows, 16, &heading);
+		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
+		SDL_RenderFillRect(a->r, NULL);
+		menu_draw(a, heading, rows, n, shot_romm_a, menu_std_width(a), MENU_ACCENT);
+	} else if (!strcmp(shot_romm, "games")) {
+		romm_list l;
+		romm_pic pp;
+		romm_rom g[64];
+		char why[160], have[64][1];
+		int total, i, vis = (PM_PANEL.h - 100 - 24 - ui_font_line(UI_F_META) - 16) / menu_row_h();
+
+		memset(&l, 0, sizeof l);
+		memset(have, 0, sizeof have);
+		l.n = romm_roms(&g_romm, shot_romm_a, 0, 64, g, 64, &total, why, sizeof why);
+		if (l.n < 0) { fprintf(stderr, "--romm games: %s\n", why); return; }
+		l.g = g;
+		l.have = have;
+		if (l.n > 1) have[1][0] = 1;
+		memset(&pp, 0, sizeof pp);
+		pp.want = pp.shown = -1;
+		if (l.n) { pp.want = shot_romm_b < l.n ? shot_romm_b : 0; pp.failed = true; }
+		for (i = 0; i < 1; i++) ;
+		romm_list_draw(a, "Game Boy", &l, pp.want < 0 ? 0 : pp.want, 0, vis, &pp);
+	}
+}
+
 /* One frame of PortMaster's browser for --pm */
 static void pm_shot(app *a)
 {
@@ -17747,6 +18683,7 @@ static void take_shot(app *a)
 	if (shot_menu) tortos_menu_draw(a, shot_menu_sel);
 	if (shot_pm) pm_shot(a);
 	if (shot_port_power >= 0) port_power_draw(a, shot_port_power);
+	if (shot_romm) romm_shot(a);
 	if (shot_gmenu >= 0) {
 		static menu_row rows[GM_SHOWN + 4];
 		gm_bufs gb;
@@ -18040,6 +18977,11 @@ int main(int argc, char *argv[])
 		 * asked for, so the panel can be looked at without a device. */
 		else if (!strcmp(argv[i], "--gmenu") && i + 1 < argc) shot_gmenu = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--port-power") && i + 1 < argc) shot_port_power = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "--romm") && i + 1 < argc) {
+			shot_romm = argv[++i];
+			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9') shot_romm_a = atoi(argv[++i]);
+			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9') shot_romm_b = atoi(argv[++i]);
+		}
 		else if (!strcmp(argv[i], "--pm") && i + 1 < argc) {
 			shot_pm = argv[++i];
 			if (i + 1 < argc && argv[i + 1][0] != '-') shot_pm_arg = argv[++i];

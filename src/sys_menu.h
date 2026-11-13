@@ -44,6 +44,8 @@ typedef enum {
 	PM_SCRAPE, PM_ACHIEVEMENTS, PM_SS,
 	/* ChaOS: PortMaster's ports, browsed and installed (src/pmcat.h) */
 	PM_PORTS,
+	/* ChaOS: RomM, a self-hosted game library (src/romm.h) */
+	PM_ROMM,
 	PM_UPDATE, PM_CONTROLS, PM_ABOUT, PM_ROWS
 } pm_row;
 
@@ -168,6 +170,7 @@ typedef struct {
 	 * than two - see src/ss.h. */
 	bool        ss_have;     /* this build carries a developer key */
 	bool        pm_have;     /* ChaOS: PortMaster is installed (Get PortMaster goes) */
+	const char *romm;        /* ChaOS: RomM's row's value: who, or "sign in" */
 	bool        ss_in;
 	const char *ss_name;     /* only read when ss_in */
 	const char *cards;       /* the showing card set's name, from CARD_SETS */

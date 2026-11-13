@@ -837,7 +837,7 @@ static void radio_less(void)
 	n = sys_menu_build(&u, rows, &b, &heading);
 	k = sys_menu_tortos_rows(&u, pm);
 	printf("ChaOS menu, no radio at all:\n");
-	ck(n == k && n == TOP_ROWS - 8, "eight rows fewer (Updates and Get PortMaster too), and the build agrees with the list");
+	ck(n == k && n == TOP_ROWS - 9, "nine rows fewer (Updates, Get PortMaster and RomM too), and the build agrees with the list");
 	ck(!has_label(rows, n, "Wi-Fi") && !has_label(rows, n, "Bluetooth"),
 	   "no Wi-Fi, no Bluetooth");
 	ck(!has_label(rows, n, XFER_NAME_WIFI) && !has_label(rows, n, XFER_NAME_CABLE) &&
@@ -859,7 +859,7 @@ static void radio_less(void)
 	n = sys_menu_build(&u, rows, &b, &heading);
 	k = sys_menu_tortos_rows(&u, pm);
 	printf("ChaOS menu, no radio, files over the cable:\n");
-	ck(n == k && n == TOP_ROWS - 7, "seven rows fewer: the transfer row stays");
+	ck(n == k && n == TOP_ROWS - 8, "eight rows fewer: the transfer row stays");
 	for (i = 0; i < k && pm[i] != PM_XFER; i++) { }
 	ck(i < k && !strcmp(rows[i].label, XFER_NAME_CABLE),
 	   "as ChaOS Wire, where the list says it is");
