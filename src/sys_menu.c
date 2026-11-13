@@ -259,7 +259,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	 * is what sleep would have been for. */
 	sys_menu_auto_off_label(u->auto_off, b->c, sizeof b->c);
 	full[PM_SCRAPE]       = (menu_row){ "Box Art",   NEEDS_WIFI(net), net };
-	full[PM_ACHIEVEMENTS] = (menu_row){ "Cheevos",
+	full[PM_ACHIEVEMENTS] = (menu_row){ "RetroAchievements",
 	                                   u->ra_in ? u->ra_name : "sign in",
 	                                   true };
 	/* Beside Cheevos because it is the same kind of row: an account, named by

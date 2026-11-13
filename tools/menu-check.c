@@ -812,7 +812,7 @@ static void radio_less(void)
 	ck(!has_label(rows, n, XFER_NAME_WIFI) && !has_label(rows, n, XFER_NAME_CABLE) &&
 	   !has_label(rows, n, "Box Art"),
 	   "no ChaOS Transfer or ChaOS Wire, no Box Art");
-	ck(!has_label(rows, n, "Cheevos") && !has_label(rows, n, "ScreenScraper"),
+	ck(!has_label(rows, n, "RetroAchievements") && !has_label(rows, n, "ScreenScraper"),
 	   "and no sign-ins");
 	ck(!has_label(rows, n, "Updates"), "and no Updates, which come over Wi-Fi");
 	ck(has_label(rows, n, "Audio Output") && has_label(rows, n, "Play Time") &&
@@ -970,7 +970,7 @@ static void info_rows(void)
 	n = gi_rows(rows, &gi, true);
 	printf("game info, nothing scraped, art present and a network:\n");
 	ck(n == 2, "Cheevos and the art action, and nothing else to say");
-	ck(!strcmp(rows[0].label, "Cheevos"), "Cheevos leads when nothing describes the game");
+	ck(!strcmp(rows[0].label, "RetroAchievements"), "Cheevos leads when nothing describes the game");
 	ck(!strcmp(val(&rows[0]), "12 of 78"), "and carries the count");
 	ck(rows[0].live, "and opens the set, the way the in-game row does");
 	ck(!strcmp(rows[1].label, "Replace Box Art"), "art present offers a replace");
@@ -1014,7 +1014,7 @@ static void info_rows(void)
 	   "then when it came out");
 	ck(!strcmp(rows[2].label, "Genre") && !strcmp(val(&rows[2]), "Platform,Shoot'em Up"),
 	   "then what kind, as the scrape joined it");
-	ck(!strcmp(rows[3].label, "Cheevos"),
+	ck(!strcmp(rows[3].label, "RetroAchievements"),
 	   "then what there is to shoot for, which is worth seeing before starting");
 	ck(!strcmp(rows[4].label, "Replace Box Art"), "and the action last");
 	k = reachable(rows, n, got, GI_MAX);
@@ -1038,7 +1038,7 @@ static void info_rows(void)
 	n = gi_rows(rows, &gi, true);
 	printf("game info, scraped with neither year nor genre:\n");
 	ck(n == GI_MAX - 2, "both are simply absent");
-	ck(!strcmp(rows[1].label, "Cheevos"), "leaving the prose and the two actions");
+	ck(!strcmp(rows[1].label, "RetroAchievements"), "leaving the prose and the two actions");
 }
 
 

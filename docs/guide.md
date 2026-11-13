@@ -78,7 +78,7 @@ card is the thing to wipe before it goes to anyone else.
 | **MENU** (on the systems row) | the TortOS menu - settings that are about the firmware |
 | **MENU** (inside a system) | that system's menu, below |
 | **MENU** (in `Cubic`) | always the TortOS menu; B is the system's |
-| **MENU** (in game) | the in-game menu: Continue, Save, Load, Display, Cheevos, Reset, Quit. It opens when you let go, so MENU can be held for fast forward |
+| **MENU** (in game) | the in-game menu: Continue, Save, Load, Display, RetroAchievements, Reset, Quit. It opens when you let go, so MENU can be held for fast forward |
 | **MENU+R1** (in game) | fast forward: 2x, 3x, 4x, then back to normal |
 | **MENU** (inside any menu) | closes the whole menu, however deep in it you are. B goes back one screen |
 | **SELECT** | Muse, the music and audiobook player, from anywhere but a running game - the in-game menu included. Again to close it |
@@ -138,12 +138,12 @@ than any one console:
 | **UI Direction** | `Horizontal`, `Vertical` or `Cubic` - see below |
 | **Recently Played** | `On` or `Off` - whether the Recently Played shelf appears on the systems row. It lists the last twelve games played, across every system, and is hidden until something has been played |
 | **Box Art** | fetch what the whole library is missing |
-| **Cheevos** | the RetroAchievements account, or `sign in` |
+| **RetroAchievements** | the account, or `sign in` |
 | **Controls** | every button and what it does, a page per place |
 | **About TortOS** | version, address, battery, uptime |
 
 On the Pixel 2, which has no radio of its own, the rows that need Wi-Fi are
-there only while a USB Wi-Fi adapter is plugged in: Wi-Fi, Box Art, Cheevos
+there only while a USB Wi-Fi adapter is plugged in: Wi-Fi, Box Art, RetroAchievements
 and Over The Hare here (Down To The Wire stays, with a computer
 on the cable), Box Art in a console's menu, and Album Art in Muse's. Bluetooth
 is never there.
@@ -163,7 +163,7 @@ The low-battery dot is still drawn when the charge runs low; with the battery
 shown it moves in beside it, so the two don't overlap.
 
 Over The Hare and Box Art need a network, and go quiet without one rather than
-disappearing - a row that vanishes teaches nobody why. Cheevos stays reachable
+disappearing - a row that vanishes teaches nobody why. RetroAchievements stays reachable
 either way, because signing in is the thing you go there to do, and Bluetooth
 and Play Time need no network at all.
 

@@ -294,7 +294,7 @@ For a game neither has, add your own: a PNG named like the game file, in `Roms/<
 <details>
 <summary><b>How do achievements work?</b></summary>
 
-Sign in to RetroAchievements under **MENU > Cheevos**. The first time you start a game the Brick needs Wi-Fi to download its achievements; after that it works offline, and anything you unlock offline is sent later.
+Sign in to RetroAchievements under **MENU > RetroAchievements**. The first time you start a game the Brick needs Wi-Fi to download its achievements; after that it works offline, and anything you unlock offline is sent later.
 
 </details>
 
