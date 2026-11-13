@@ -22,7 +22,28 @@
 #include <unistd.h>
 #ifdef __linux__
 #include <sys/mount.h>
+#include <sys/resource.h>
+#include <sys/syscall.h>
 #endif
+
+/* ChaOS: an update's download and its unpacking at the lowest priority, for
+ * the processor (nice 19) and for the card (the idle I/O class), so a game
+ * started while one runs is never the one that waits. A download can go on
+ * through a game - it is curl, apart from this process - and unpacking is
+ * xz over 40 MB; neither should cost a frame. Best-effort: a kernel that
+ * refuses either leaves the process as it was. */
+static void background_priority(pid_t pid)
+{
+#ifdef __linux__
+	setpriority(PRIO_PROCESS, (id_t)pid, 19);
+#ifdef SYS_ioprio_set
+	/* IOPRIO_WHO_PROCESS, IOPRIO_CLASS_IDLE << IOPRIO_CLASS_SHIFT */
+	syscall(SYS_ioprio_set, 1, (int)pid, 3 << 13);
+#endif
+#else
+	(void)pid;
+#endif
+}
 
 #define OTA_URL "https://github.com/SkyWalker541/ChaOS/releases/latest/download/ChaOS-ota.txt"
 #define DL_URL  "https://github.com/SkyWalker541/ChaOS/releases/download/v%s/%s"
@@ -388,6 +409,7 @@ bool upd_download(bool small)
 	         g_latest.small ? g_latest.app : g_latest.root);
 	g_pid = net_get_spawn(url, g_dl_part, 1800);
 	if (g_pid <= 0) { fail("Couldn't start the download"); return false; }
+	background_priority(g_pid);
 	g_state = UPD_DOWNLOADING;
 	fprintf(stderr, "update: downloading %s\n", url);
 	return true;
@@ -403,6 +425,7 @@ static void unpack(void)
 	if (rename(g_dl_part, g_dl) != 0) { fail("The download went missing"); return; }
 	pid = fork();
 	if (pid < 0) { fail("Couldn't check the download"); return; }
+	if (pid == 0) background_priority(0);      /* the child, and what it runs */
 	if (pid == 0 && g_latest.small) {
 		/* The small one: unpacked beside the card's ChaOS, and only the
 		 * launcher there taken as proof it is whole */

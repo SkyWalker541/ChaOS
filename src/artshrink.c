@@ -177,6 +177,10 @@ static struct job *g_head, *g_tail;
 
 static int worker(void *unused)
 {
+	/* ChaOS: below everything else, as a game can start while a cover just
+	 * fetched is still being resized. Linux sets a thread's niceness by its
+	 * own id; elsewhere this is a no-op. */
+	SDL_SetThreadPriority(SDL_THREAD_PRIORITY_LOW);
 	(void)unused;
 	SDL_LockMutex(g_lock);
 	for (;;) {
