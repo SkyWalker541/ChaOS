@@ -7665,9 +7665,25 @@ static void pick_draw(app *a, const char *title, pick_item *it, int n, int sel,
 	} else {
 		const char *say = n <= 0 ? note
 		                : it[sel].state < 0 ? "Couldn't load this one" : "Loading...";
+		/* A line or two ("\n" between), each fitted to the panel: a long
+		 * console name ran out of it */
+		char l1[160] = "", l2[160] = "";
+		const char *br = say ? strchr(say, '\n') : NULL;
+		int lh = ui_font_line(UI_F_MENU), y;
 
-		ui_text(a->r, fm, say ? say : "", area.x + area.w / 2,
-		        area.y + area.h / 2 - ui_font_height(UI_F_MENU) / 2, 0, UI_TEXT_DIM);
+		if (br) {
+			snprintf(l1, sizeof l1, "%.*s", (int)(br - say), say);
+			snprintf(l2, sizeof l2, "%s", br + 1);
+		} else {
+			snprintf(l1, sizeof l1, "%s", say ? say : "");
+		}
+		y = area.y + area.h / 2 - (l2[0] ? lh : lh / 2);
+		ui_fit_text(fm, l1, fit, sizeof fit, area.w);
+		ui_text(a->r, fm, fit, area.x + area.w / 2, y, 0, UI_TEXT_DIM);
+		if (l2[0]) {
+			ui_fit_text(fm, l2, fit, sizeof fit, area.w);
+			ui_text(a->r, fm, fit, area.x + area.w / 2, y + lh, 0, UI_TEXT_DIM);
+		}
 	}
 	if (n > 0) {
 		ui_fit_text(fm, it[sel].label, fit, sizeof fit, panel.w - 96);
@@ -7830,7 +7846,7 @@ static bool itch_cover_screen(app *a, const char *folder, const char *stem,
 					break;
 				}
 				itch_fetch_progress(&g, &pg);
-				snprintf(now, sizeof now, "Reading itch.io's %s games... %d", folder, g);
+				snprintf(now, sizeof now, "Reading itch.io's list\n%s \xC2\xB7 %d games", folder, g);
 				pick_frame(a, title, NULL, 0, 0, NULL, 0, 0, now, accent);
 				SDL_Delay(8);
 			}
@@ -15159,6 +15175,7 @@ static int shot_screen = -1;
 static int shot_menu, shot_menu_sel;
 static bool shot_clock;                    /* ChaOS: --datetime [row] */
 static const char *shot_pick;              /* ChaOS: --pick IMAGE, the cover picker */
+static const char *shot_pick_note;         /* ChaOS: --pick-note TEXT, its message alone */
 /* --shader [group [row]]: the shader's page, -1, or a group's (ChaOS). */
 static int shot_shader = -2, shot_shader_sel;
 static const char *shot_shots;      /* --shots DIR [asking]: the viewer */
@@ -15491,6 +15508,13 @@ static void take_shot(app *a)
 		n = clock_build(&cu, rows, MENU_MAX_ROWS, &head);
 		menu_draw(a, head, rows, n, shot_menu_sel, menu_std_width(a), MENU_ACCENT);
 	}
+	if (shot_pick_note) {
+		char note[192];
+
+		snprintf(note, sizeof note, "%s", shot_pick_note);
+		for (char *q = note; *q; q++) if (*q == '|') *q = '\n';
+		pick_draw(a, "Super Tilt Bro", NULL, 0, 0, NULL, 0, 0, note, MENU_ACCENT);
+	}
 	if (shot_upd_pill >= 0) {
 		upd_demo((upd_state)shot_upd_pill, "1.2.0", NULL);
 		draw_upd_notice(a);
@@ -15776,6 +15800,7 @@ int main(int argc, char *argv[])
 				shot_menu_sel = atoi(argv[++i]);
 		}
 		else if (!strcmp(argv[i], "--pick") && i + 1 < argc) shot_pick = argv[++i];
+		else if (!strcmp(argv[i], "--pick-note") && i + 1 < argc) shot_pick_note = argv[++i];
 		/* ChaOS: --datetime [row], the Date & Time screen */
 		else if (!strcmp(argv[i], "--datetime")) {
 			shot_clock = true;
