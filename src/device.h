@@ -18,6 +18,11 @@
  * a child or a game owns the screen, so it must not block. */
 bool device_power_pressed(void);
 
+/* ChaOS: the buttons, while a port owns the screen (plat_run_port): the pad
+ * and the volume keys read into `st` without taking them from the port, which
+ * reads the same devices itself. Power is device_power_pressed's. */
+void device_child_poll(in_state *st);
+
 /* A game just handed input back. Forget whatever was remembered about the
  * hardware while something else was driving: the headphone jack, a mute
  * switch. */

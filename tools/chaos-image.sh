@@ -37,6 +37,10 @@ UPDATER=${TORTOS_UPDATE:-$ROOT/build/tortos-update}
 NOTICE=${DIATOM_NOTICE:-$(dirname "$DIATOM")/../../THIRD-PARTY.md}
 [ -f "$ELF" ] && [ -f "$DIATOM" ] || { echo "build tortos.elf and diatom first" >&2; exit 1; }
 [ -f "$UPDATER" ] || { echo "build tortos-update first (mk/cross.mk)" >&2; exit 1; }
+# ChaOS: bash, for ports (src/ports.h): static, aarch64 (tools/build-bash.sh)
+BASH_BIN=${CHAOS_BASH:-$ROOT/dist/brick/bash}
+file "$BASH_BIN" | grep -q 'ARM aarch64.*statically linked' ||
+	{ echo "$BASH_BIN isn't a static aarch64 bash (tools/build-bash.sh)" >&2; exit 1; }
 # ChaOS's, for the Brick: static (it runs once the root is gone), aarch64,
 # with the request it reads and ChaOS's image names. The launcher has the
 # names too, so they alone don't tell the two apart.
@@ -74,6 +78,38 @@ install -m 755 "$ELF" "$C/TortOS/tortos.elf"
 grep -q '::restart:/usr/sbin/tortos-update' "$W/root/etc/inittab" || { echo "inittab has changed: check the updater" >&2; exit 1; }
 install -m 755 "$UPDATER" "$W/root/usr/sbin/tortos-update"
 install -m 755 "$DIATOM" "$C/TortOS/diatom"
+# ChaOS: ports (src/ports.h). PortMaster's standard places, so its ports and
+# its own app work unchanged: bash at /bin/bash (the root has only BusyBox's
+# sh), /roms for the card's Roms (the card is case-blind, so /roms/ports is
+# Roms/Ports), and OS_NAME, which PortMaster reads as the system's name and
+# so finds mod_ChaOS.txt by. On the card, ChaOS/ports: what runs a port and
+# ChaOS's settings for PortMaster.
+[ ! -e "$W/root/bin/bash" ] || { echo "the root has a bash already: check ports" >&2; exit 1; }
+install -m 755 "$BASH_BIN" "$W/root/bin/bash"
+[ ! -e "$W/root/roms" ] || { echo "the root has a /roms already: check ports" >&2; exit 1; }
+ln -s /mnt/SDCARD/Roms "$W/root/roms"
+OSR=$W/root/etc/os-release
+[ -L "$OSR" ] && OSR=$W/root/$(readlink "$OSR" | sed 's|^/||; s|^\.\./||')
+grep -q '^NAME=' "$OSR" || { echo "no os-release to name ChaOS in" >&2; exit 1; }
+grep -q '^OS_NAME=' "$OSR" || echo 'OS_NAME=ChaOS' >> "$OSR"
+mkdir -p "$C/TortOS/ports"
+install -m 755 "$ROOT/res/ports/run.sh" "$C/TortOS/ports/run.sh"
+install -m 644 "$ROOT/res/ports/mod_ChaOS.txt" "$C/TortOS/ports/mod_ChaOS.txt"
+# The shelf: ChaOS's systems.cfg, with the Ports row, and the cards for the
+# shelves ChaOS adds - Ports and Recently Played - in both of TortOS's sets
+# (ChaOS's own two sets are drawn, not files)
+[ -d "$C/TortOS/cards/classic" ] && [ -d "$C/TortOS/cards/fancy" ] || { echo "no cards in the image: check ports" >&2; exit 1; }
+install -m 644 "$ROOT/config/systems.cfg" "$C/TortOS/systems.cfg"
+for set in classic fancy; do
+	for card in PORTS RECENT; do
+		install -m 644 "$ROOT/res/cards/$set/$card.png" "$C/TortOS/cards/$set/$card.png"
+	done
+done
+mkdir -p "$C/Roms/Ports"
+# bash's license beside the others; its source is in the sources archive
+# (tools/chaos-sources.sh)
+tar -xJOf "$ROOT/dist/brick/bash-source.tar.xz" bash-5.1.16/COPYING > "$C/Licenses/bash.txt"
+chmod 644 "$C/Licenses/bash.txt"
 rm -rf "$C/TortOS/overlays"
 cp -R "$ROOT/res/overlays" "$C/TortOS/overlays"
 find "$C/TortOS/overlays" -type d -exec chmod 755 {} +

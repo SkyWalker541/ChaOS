@@ -129,6 +129,8 @@ sold, put behind a paywall, or shipped with a device that is sold.
   identify each platform.
 - **Mozilla's root certificate list**, as published by the curl project: used
   to check HTTPS servers. MPL-2.0.
+- **GNU bash** 5.1.16 (https://www.gnu.org/software/bash/, GPL-3.0-or-later): `/bin/bash` in the image, unchanged, for ports. Its licence is `Licenses/bash.txt` on the card and its source is in each release's sources archive (`dist/brick/bash-source.tar.xz`, built by `tools/build-bash.sh`).
+- **The Ports and Recently Played cards** are drawn by `tools/genportscard.py` and `tools/genrecentcard.py`, no third-party images.
 - **ChaOS logo** ("Handheld burst"): original pixel art made for ChaOS, drawn
   pixel by pixel in `tools/genlogo.py` with no third-party images or fonts;
   see `res/logo/SOURCE.md`.
@@ -146,6 +148,8 @@ use its own art there instead.
 - **MusicBrainz Cover Art Archive** (https://musicbrainz.org): album art.
 - **itch.io** (https://itch.io): box art for homebrew, from its public tag feeds; each cover is its developer's. ChaOS is not affiliated with itch.io.
 - **NextUI-Itchio-Pak** by Christophe Vanlancker (https://github.com/carroarmato0/NextUI-Itchio-Pak, MIT): how to read itch.io's tag feeds on a handheld, which ChaOS's own itch.io code (src/itch.c) follows.
+- **PortMaster** (https://portmaster.games, https://github.com/PortsMaster/PortMaster-GUI, MIT): ports, and the files they run with. Not in the image: the Brick downloads PortMaster's own release the first time a port is started. ChaOS's settings for it (`res/ports/mod_ChaOS.txt`, MIT) follow its other systems' `mod_*.txt`.
+- **minui-portmaster** by ben16w (https://github.com/ben16w/minui-portmaster, MIT), which NextUI's PortMaster pak now points to: the reference for running PortMaster on a TrimUI Brick.
 
 ---
 

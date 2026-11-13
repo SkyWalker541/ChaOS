@@ -518,6 +518,29 @@ Card art comes from, in order:
 3. a generated slab: the system's color, the title, and the title's first
    letter enormous and barely there behind it.
 
+(ChaOS) The game's name over the shelf is shown only for a card with a
+picture on it. A generated slab already says the name, so it isn't said twice.
+
+### Ports (ChaOS)
+
+The Ports shelf lists the scripts in `Roms/Ports/` - each port is one, with
+its game's files in a folder beside it - and starting one hands it the whole
+device: the launcher lets go of the screen, Muse pauses, and the idle emulator
+is stopped, all of it put back when the port ends. A port is ended by power,
+or by Select + Start held for two seconds, as the whole of what it started
+(`plat_run_port`); the volume buttons work throughout.
+
+PortMaster's own files say what device a port is on and how to run it, and
+the first port started downloads them (about 25 MB) into
+`Roms/Ports/PortMaster/`. A copy already there with no `control.txt` is kept,
+renamed `PortMaster.old-<time>`, not deleted. ChaOS's part is small:
+`/bin/bash` and `/roms` in the system (PortMaster's standard places, so its
+ports run unmodified), and `mod_ChaOS.txt`, put back into PortMaster's folder
+before every port, which gives the Brick's screen (1024x768) and its pad, laid
+out by position as an Xbox pad is. What a port prints is in
+`.userdata/brick/ports/last.log`.
+
+
 **Choosing a cover (ChaOS).** X on a game, then **Get Box Art** or **Replace
 Box Art**, offers **Find Automatically** (the fetch above, for that game),
 **Search itch.io** (most new homebrew is published there, and libretro's

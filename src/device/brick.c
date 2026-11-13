@@ -289,6 +289,13 @@ static void poll_fd(int fd, in_state *st)
 #endif
 }
 
+void device_child_poll(in_state *st)
+{
+	memset(st->pressed, 0, sizeof st->pressed);
+	poll_fd(fd_pad, st);
+	poll_fd(fd_keys, st);
+}
+
 /* keyboard fallback so the native dev build is drivable */
 static in_button map_key(SDL_Keycode k)
 {

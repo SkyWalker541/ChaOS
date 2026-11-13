@@ -51,6 +51,7 @@
 #include "remap.h"
 #include "shots.h"
 #include "itch.h"
+#include "ports.h"
 #include "cover.h"
 #include "pixname.h"
 
@@ -3932,7 +3933,8 @@ static void draw_systems(app *a)
 		 * starts empty and grows one at a time, but any system with a single
 		 * ROM has always said it. */
 		if (gc > 0)
-			snprintf(line, sizeof line, "%d game%s", gc, gc == 1 ? "" : "s");
+			snprintf(line, sizeof line, "%d %s%s", gc,
+			         !strcmp(label->core, PORTS_CORE) ? "port" : "game", gc == 1 ? "" : "s");
 		else
 			/* The folder is bounded by CFG_STR and this line is not, so
 			 * the name is capped rather than the buffer grown: a folder
@@ -4056,6 +4058,30 @@ static unsigned title_phase(app *a)
  * and its place in the list. Split out so a cube face draws the same thing the
  * row does - the marquee's seat, the heart's fixed position and the reasoning
  * behind both are delicate enough that a second copy would drift. */
+/* ChaOS: whether a game's card is drawn from its title - no box art, no
+ * autosave picture - and so already says its name. Asked of the focused card
+ * every frame, so remembered against the texture: a new one (a cover just
+ * chosen, a game just played) asks again. */
+static bool card_is_title(app *a, sysview *v, int idx)
+{
+	static const void *seen;
+	static int seen_sys = -1, seen_idx = -1;
+	static bool was;
+	int o;
+	char prev[LIB_PATH * 3];
+
+	if (idx < 0 || idx >= v->list.count) return false;
+	if (seen == v->tex[idx] && seen_sys == a->sys_cursor && seen_idx == idx) return was;
+	o = shelf_owner(a, a->sys_cursor, idx);
+	preview_path(a, o, &v->list.items[idx], prev, sizeof prev);
+	was = !has_box_art(a->sys.systems[o].folder, v->list.items[idx].name) &&
+	      access(prev, R_OK) != 0;
+	seen = v->tex[idx];
+	seen_sys = a->sys_cursor;
+	seen_idx = idx;
+	return was;
+}
+
 static void draw_game_text(app *a, sysview *v, const system_cfg *s, int idx)
 {
 	const system_cfg *gs = &a->sys.systems[
@@ -4116,7 +4142,11 @@ static void draw_game_text(app *a, sysview *v, const system_cfg *s, int idx)
 
 			draw_heart(a->r, (float)(margin + hrad), (float)dy, (float)hrad, c);
 		}
-		if (slides) {
+		/* ChaOS: the name once. A card drawn from the title already says
+		 * it, so the line above is for a card with a picture on it. */
+		if (!is_muse(s) && card_is_title(a, v, idx)) {
+			/* nothing: the card is the title */
+		} else if (slides) {
 			ui_text_marquee(a->r, ft2, g->title, boxx, 40, boxw,
 			                phase, UI_TEXT);
 			/* Not "a title is sliding, so keep drawing". It ping-pongs for
@@ -13370,6 +13400,120 @@ static void launch(app *a)
 	upd_hold(false);
 }
 
+/* ChaOS: PortMaster, fetched the first time a port is started (ports.h).
+ * True once it is on the card. */
+static bool ports_setup_screen(app *a, const char *title, unsigned accent)
+{
+	char now[96];
+	bool ok = false;
+
+	if (!net_online()) {
+		pick_say(a, title, "Ports need PortMaster:\nconnect to Wi-Fi to get it", accent);
+		return false;
+	}
+	if (!confirm_panel(a, "PortMaster",
+	                   "Ports run with PortMaster.\nDownload it now? (about 25 MB)",
+	                   "Download"))
+		return false;
+	sync_abandon();
+	if (!ports_setup_begin(P_ROMS)) {
+		pick_say(a, title, ports_setup_problem(), accent);
+		return false;
+	}
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+	for (;;) {
+		ports_setup_state st = ports_setup_step();
+
+		if (st == PS_DONE) { ok = true; break; }
+		if (st == PS_FAILED) { pick_say(a, title, ports_setup_problem(), accent); break; }
+		plat_input_poll(&a->in);
+		if (a->in.quit_requested) { ports_setup_cancel(); a->running = false; return false; }
+		if (a->in.pressed[IN_POWER]) { ports_setup_cancel(); power_off(a); return false; }
+		if (a->in.pressed[IN_BACK]) { ports_setup_cancel(); break; }
+		if (in_repeat(&a->in, IN_VOLUP)) plat_volume_nudge(+1);
+		if (in_repeat(&a->in, IN_VOLDN)) plat_volume_nudge(-1);
+		if (st == PS_DOWNLOAD)
+			snprintf(now, sizeof now, "Downloading PortMaster\n%.1f MB",
+			         ports_setup_bytes() / 1048576.0);
+		else
+			snprintf(now, sizeof now, "Unpacking PortMaster\nThis takes a minute");
+		pick_frame(a, title, NULL, 0, 0, NULL, 0, 0, now, accent);
+		SDL_Delay(30);
+	}
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+	return ok;
+}
+
+/* ChaOS: a port off the Ports shelf. Not a game Diatom runs: a script, run
+ * with bash through ChaOS/ports/run.sh, with the screen, the sound and the
+ * memory handed over whole - the launcher lets go of its display as the
+ * standalone emulator path does, and the idle resident emulator is ended and
+ * started again after. */
+static void port_launch(app *a, int o, const char *romfile, const char *title)
+{
+	const system_cfg *s = &a->sys.systems[o];
+	char script[LIB_PATH * 2], runner[CFG_STR * 2], why[96], ud[LIB_PATH + 32];
+	char *argv[4];
+	const char *envkv[2];
+	bool music;
+	int how = PORT_ENDED, rc;
+
+	snprintf(script, sizeof script, "%s/%s/%s", P_ROMS, s->folder, romfile);
+	snprintf(runner, sizeof runner, "%s/ports/run.sh", P_ROOT);
+	if (access(runner, R_OK) != 0 || access("/bin/bash", X_OK) != 0) {
+		pick_say(a, title, "Ports need ChaOS's full update", s->accent);
+		return;
+	}
+	if (!ports_script_ok(script, why, sizeof why)) {
+		pick_say(a, title, why, s->accent);
+		return;
+	}
+	if (!ports_pm_ready(P_ROMS) && !ports_setup_screen(a, title, s->accent)) return;
+	if (!a->running) return;
+
+	remember_place(a);
+	snprintf(ud, sizeof ud, "CHAOS_USERDATA=%s", P_USERDATA);
+	envkv[0] = ud;
+	envkv[1] = NULL;
+	argv[0] = (char *)"/bin/sh";
+	argv[1] = runner;
+	argv[2] = script;
+	argv[3] = NULL;
+
+	/* Muse holds the sound card while it plays; the port needs it */
+	music = musec_playing();
+	if (music) musec_toggle();
+	plat_resident_end();
+
+	anim_launch(a, 190);
+	free_all_textures(a);
+	texload_fonts(false);
+	ui_quit();
+	plat_input_quit();
+	plat_video_quit();
+
+	rc = plat_run_port(argv, envkv, NULL, &how);
+	fprintf(stderr, "port %s exited %d (%s)\n", romfile, rc,
+	        how == PORT_POWER ? "power" : how == PORT_QUIT ? "select+start" : "itself");
+
+	if (!plat_video_init() || !plat_input_init()) { a->running = false; return; }
+	a->r = plat_renderer();
+	ui_init(a->r, P_FONT);
+	texload_fonts(true);
+	a->menu_w = 0;
+	prime_sys_window(a);
+	prime_window(a, a->sys_cursor);
+	respawn_resident(a);
+	if (music) musec_toggle();
+
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+	if (access(TORTOS_POWEROFF_FLAG, F_OK) == 0) { a->running = false; return; }
+	render(a);
+}
+
 static void launch_game(app *a)
 {
 	sysview *v = &a->view[a->sys_cursor];
@@ -13395,6 +13539,11 @@ static void launch_game(app *a)
 	int n = 0;
 
 	if (v->list.count == 0) return;
+	/* ChaOS: a port, not a game for Diatom */
+	if (!strcmp(s->core, PORTS_CORE)) {
+		port_launch(a, o, v->list.items[v->cursor].file, v->list.items[v->cursor].title);
+		return;
+	}
 
 	snprintf(core, sizeof core, "%s/cores/%s_libretro.so", P_ROOT, s->core);
 	snprintf(elf, sizeof elf, "%s/diatom", P_ROOT);

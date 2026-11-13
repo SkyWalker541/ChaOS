@@ -1,0 +1,58 @@
+#!/bin/bash
+#
+# SPDX-License-Identifier: MIT
+#
+## Modular - ChaOS (github.com/SkyWalker541/ChaOS), the TrimUI Brick
+#
+# Sourced by ports after control.txt, as PortMaster's other mod_<CFW>.txt are:
+#   [ -f "${controlfolder}/mod_${CFW_NAME}.txt" ] && source "${controlfolder}/mod_${CFW_NAME}.txt"
+# CFW_NAME is ChaOS from OS_NAME in /etc/os-release. ChaOS puts this file back
+# in PortMaster's folder before every port (ChaOS/ports/run.sh), so an update
+# of PortMaster that leaves it out loses nothing.
+
+# Nothing to clear: the launcher has let go of the screen, and there is no
+# text console on it
+CUR_TTY=/dev/null
+
+# The Brick's screen, said outright: what PortMaster reads from the frame
+# buffer can be its double-height virtual size
+export DISPLAY_WIDTH=1024
+export DISPLAY_HEIGHT=768
+export ASPECT_X=4
+export ASPECT_Y=3
+export DISPLAY_ORIENTATION=0
+export ANALOG_STICKS=0
+
+# Godot 2, and 3 and later
+GODOT2_OPTS="-r ${DISPLAY_WIDTH}x${DISPLAY_HEIGHT} -f"
+GODOT_OPTS="--resolution ${DISPLAY_WIDTH}x${DISPLAY_HEIGHT} -f"
+
+# The pad, for SDL and gptokeyb: "Brick Gamepad" (plastron's brick-pad), keys
+# only. Laid out by position as an Xbox pad is, as PortMaster expects: the
+# bottom face button (B on the Brick) is SDL's a, the right one (A) its b.
+# CHAOS_PAD is set by run.sh, the same lines SDL_GAMECONTROLLERCONFIG has.
+get_controls() {
+  ANALOGSTICKS="0"
+  LOWRES="N"
+  DEVICE="19000000427269636b2047616d657000"
+  param_device="brick"
+
+  export SDL_GAMECONTROLLERCONFIG_FILE="/tmp/gamecontrollerdb.txt"
+  {
+    printf '%s\n' "$CHAOS_PAD"
+    [ -f "$controlfolder/gamecontrollerdb.txt" ] && cat "$controlfolder/gamecontrollerdb.txt"
+  } > /tmp/gamecontrollerdb.txt
+
+  SDLDBUSERFILE="${HOME}/.config/SDL-GameControllerDB/gamecontrollerdb.txt"
+  sdl_controllerconfig="$(< "${SDL_GAMECONTROLLERCONFIG_FILE}")"
+}
+
+pm_platform_helper() {
+  pm_message_close
+
+  if [ -e "$PM_PIPE" ]; then
+    PortMasterDialogExit
+  fi
+
+  printf ""
+}

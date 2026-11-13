@@ -868,6 +868,48 @@ static int diatom_wait(void)
 	}
 }
 
+/* ChaOS: the resident emulator, ended while no game is in it - a port is
+ * about to have the display, the sound and the memory to itself. Nothing is
+ * running in it, so SIGTERM loses nothing; respawn_resident (main.c) puts it
+ * back afterwards. */
+void plat_resident_end(void)
+{
+	DIR *d = opendir("/proc");
+	struct dirent *e;
+
+	dclose();
+	if (!d) return;
+	/* By its command line rather than /tmp/diatom.pid: launch.sh writes that
+	 * for the one it starts, and respawn_resident's never had one */
+	while ((e = readdir(d))) {
+		char path[64], cmd[512];
+		long v = strtol(e->d_name, NULL, 10);
+		int fd, n, i;
+
+		if (v <= 1 || v == (long)getpid()) continue;
+		snprintf(path, sizeof path, "/proc/%ld/cmdline", v);
+		if ((fd = open(path, O_RDONLY)) < 0) continue;
+		n = (int)read(fd, cmd, sizeof cmd - 1);
+		close(fd);
+		if (n <= 0) continue;
+		cmd[n] = '\0';
+		/* argv[0] ends in /diatom, and --socket follows: the resident */
+		{
+			size_t l0 = strlen(cmd);
+			bool resident = false;
+
+			if (l0 < 7 || strcmp(cmd + l0 - 7, "/diatom")) continue;
+			for (i = (int)l0 + 1; i < n; i += (int)strlen(cmd + i) + 1)
+				if (!strcmp(cmd + i, "--socket")) resident = true;
+			if (!resident) continue;
+		}
+		kill((pid_t)v, SIGTERM);
+		for (i = 0; i < 30 && kill((pid_t)v, 0) == 0; i++) usleep(100 * 1000);
+		if (kill((pid_t)v, 0) == 0) kill((pid_t)v, SIGKILL);
+	}
+	closedir(d);
+}
+
 int plat_resident_wait(void)
 {
 	int r;

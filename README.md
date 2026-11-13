@@ -66,6 +66,7 @@
 - **ChaOS Wire:** ChaOS Transfer over the USB cable, which can also update ChaOS from your computer.
 - **Box art for homebrew,** from itch.io or one of your own screenshots, chosen from the game's **X** menu, or set from your phone in ChaOS Transfer: a photo, a picture's link, an itch.io page or a Google Images result.
 - **Games come first:** nothing of ChaOS's own runs while you play. An update that was downloading pauses and picks up where it left off afterwards, with its progress shown on the shelf. Muse keeps playing.
+- **Ports:** PC games rebuilt for handhelds, from [PortMaster](https://portmaster.games), on a **Ports** shelf of their own. See *Ports* below.
 - **Letter scrubbing:** on any game shelf, in every theme, Game List View and Cubic, **L2** and **R2** jump to the first game of the previous or next letter with each press, and a square with the letter you're on fades in over the shelf. Hold the d-pad to scroll and after two seconds the same square shows the letter you're passing through. It fades out a moment after you stop.
 
 **From TortOS**
@@ -232,6 +233,18 @@ If the Brick restarts but **About ChaOS** still shows the old version, the insta
 
 ChaOS Wire's page also updates ChaOS: when a newer release is out, its first page offers it with what's new. **Update** downloads it on the computer and sends it to the Brick, which checks it and asks on its own screen; **Update now** there writes it, and **Not now** keeps it on the card for next time.
 
+## Ports
+
+Ports are PC games rebuilt for handhelds, packaged by [PortMaster](https://portmaster.games): Cave Story, OpenTyrian, Spelunky Classic and hundreds more, most of them free.
+
+1. Download a port for **TrimUI Brick** (aarch64) from [portmaster.games](https://portmaster.games).
+2. Unzip it into `Roms/Ports/` on the card. You get a script, `Some Game.sh`, and a folder of the game's files beside it. Some ports also need the game's own data files copied into that folder; the port's page on portmaster.games says which.
+3. It's on the **Ports** shelf. The first port you start asks to download PortMaster itself (about 25 MB, over Wi-Fi). That happens once; it lives in `Roms/Ports/PortMaster/` after that.
+
+While a port runs, the volume buttons work, and **power** or holding **Select + Start** for two seconds quits it. Whatever a port prints goes to `.userdata/brick/ports/last.log` on the card, the first place to look when one won't start.
+
+Ports run on the Brick's own graphics driver. Most that use the system's SDL work; one that brings its own graphics libraries built for another device may not. Browsing and installing ports from the Brick itself is coming in a later release.
+
 ## Supported systems
 
 | Console | Put games in | File types | Core |
@@ -247,6 +260,8 @@ ChaOS Wire's page also updates ChaOS: when a newer release is out, its first pag
 | Game Gear | `Roms/Game Gear` | `.gg` `.zip` | Genesis Plus GX |
 | Neo Geo Pocket | `Roms/Neo Geo Pocket` | `.ngp` `.ngc` `.ngpc` `.npc` `.zip` | Beetle NeoPop |
 | Neo Geo Pocket Color | `Roms/Neo Geo Pocket Color` | `.ngp` `.ngc` `.ngpc` `.npc` `.zip` | Beetle NeoPop |
+
+| Ports | `Roms/Ports` | `.sh` (with its folder) | [PortMaster](#ports) |
 
 **BIOS files** go loose in `Bios/`. Only TurboGrafx-CD games need one, `syscard3.pce`. Game Boy Advance runs without its BIOS; add `gba_bios.bin` for the original boot animation.
 

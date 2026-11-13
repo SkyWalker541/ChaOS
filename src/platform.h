@@ -88,6 +88,13 @@ void plat_terminate(void);
  * process's own environment, or NULL for that environment alone. */
 int  plat_run(char *const argv[], const char *const envkv[], const char *workdir);
 bool plat_run_power_pressed(void);
+/* ChaOS: a port (src/ports.h), run like plat_run but in a process group of its
+ * own, since a port is a script that starts programs of its own. While it runs
+ * the volume keys work, and power or Select+Start held for two seconds end it:
+ * the whole group, SIGTERM and then SIGKILL. How it ended goes in *how. */
+enum { PORT_ENDED, PORT_POWER, PORT_QUIT };
+int  plat_run_port(char *const argv[], const char *const envkv[], const char *workdir,
+                   int *how);
 /* Say that something equivalent to a power press has happened, for the paths
  * the evdev watchdog cannot see: a screen the launcher is drawing over a
  * paused game, where plat_resident_wait is not running and so nothing is
@@ -116,6 +123,8 @@ bool plat_spawn_detached(char *const argv[], const char *const envkv[],
 #define RES_PAUSED 2   /* Diatom only: menu open, the launcher owns the display */
 const char *plat_resident_socket(void);
 bool plat_resident_ready(void);
+/* ChaOS: end an idle resident emulator, for a port (src/ports.h) */
+void plat_resident_end(void);
 /* plat_resident_ready, waiting up to max_ms for a Diatom that is running but
  * not answering yet (still starting); false at once when none is running. */
 bool plat_resident_await(unsigned max_ms, unsigned *waited_ms);

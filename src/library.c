@@ -235,6 +235,10 @@ bool lib_scan(const char *roms_root, const char *folder, const char *exts,
 	 * double up. */
 	files_n = n;
 	rewinddir(d);
+	/* ChaOS: not on the Ports shelf, whose folders are each a port's game
+	 * files beside its script - never a game of their own, and no more
+	 * "skipped" than a ROM's save is */
+	if (ext_allowed("sh", exts)) goto scanned;
 	while ((e = readdir(d))) {
 		char full[LIB_PATH * 3], inside[LIB_NAME];
 		bool shadowed = false;
@@ -274,6 +278,7 @@ bool lib_scan(const char *roms_root, const char *folder, const char *exts,
 		lib_title(list[n].name, list[n].title, sizeof list[n].title);
 		n++;
 	}
+scanned:
 	closedir(d);
 
 	if (n == 0) { free(list); return false; }

@@ -317,6 +317,98 @@ int plat_run(char *const argv[], const char *const envkv[], const char *workdir)
 	return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
 }
 
+/* ChaOS: a port. Unlike a game, nothing on the other end is listening for a
+ * quit - a port is a script that starts its own programs (the game, gptokeyb,
+ * a runtime it mounts) - so the launcher keeps a hand on it: its own process
+ * group, ended as a group. The pad is only read here, never grabbed; the port
+ * reads the same buttons itself. */
+#define PORT_QUIT_HOLD_MS 2000
+
+static void port_group_end(pid_t pid, int *status)
+{
+	int waited;
+
+	kill(-pid, SIGTERM);
+	for (waited = 0; waited < 3000; waited += 100) {
+		pid_t r = waitpid(pid, status, WNOHANG);
+
+		if (r == pid || r < 0) break;
+		usleep(100 * 1000);
+	}
+	kill(-pid, SIGKILL);
+	waitpid(pid, status, 0);
+}
+
+int plat_run_port(char *const argv[], const char *const envkv[], const char *workdir,
+                  int *how)
+{
+	pid_t pid;
+	char **env = child_environ(envkv);
+	size_t alen = strlen(argv[0]);
+	int status = 0;
+
+	*how = PORT_ENDED;
+	if (!env) return -1;
+	run_power_pressed = false;
+	pid = fork();
+	if (pid < 0) { free(env); return -1; }
+	if (pid == 0) {
+		ssize_t w;
+
+		setpgid(0, 0);
+		if (workdir) {
+			if (chdir(workdir) != 0) { /* still try to run */ }
+		}
+		execve(argv[0], argv, env);
+		w = write(2, "execve ", 7);
+		w = write(2, argv[0], alen);
+		w = write(2, ": failed\n", 9);
+		(void)w;
+		_exit(127);
+	}
+	free(env);
+	setpgid(pid, pid);   /* the same, from this side: whichever runs first */
+#ifdef __linux__
+	{
+		in_state in;
+		Uint32 both_since = 0;
+
+		memset(&in, 0, sizeof in);
+		device_power_pressed();
+		for (;;) {
+			pid_t r = waitpid(pid, &status, WNOHANG);
+
+			if (r == pid) break;
+			if (r < 0) return -1;
+			usleep(50 * 1000);
+			device_child_poll(&in);
+			if (in_repeat(&in, IN_VOLUP)) plat_volume_nudge(+1);
+			if (in_repeat(&in, IN_VOLDN)) plat_volume_nudge(-1);
+			if (in.down[IN_SELECT] && in.down[IN_START]) {
+				if (!both_since) both_since = SDL_GetTicks() | 1;
+			} else {
+				both_since = 0;
+			}
+			if (device_power_pressed()) {
+				*how = PORT_POWER;
+				port_group_end(pid, &status);
+				break;
+			}
+			if (both_since && SDL_GetTicks() - both_since >= PORT_QUIT_HOLD_MS) {
+				*how = PORT_QUIT;
+				port_group_end(pid, &status);
+				break;
+			}
+		}
+		/* Whatever the script left running behind it */
+		kill(-pid, SIGKILL);
+	}
+#else
+	if (waitpid(pid, &status, 0) < 0) return -1;
+#endif
+	return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+}
+
 /* Start a child that outlives this process. Double-forked, so the middle
  * child is reaped here and the grandchild is inherited by init rather than
  * becoming a zombie nobody waits for. */

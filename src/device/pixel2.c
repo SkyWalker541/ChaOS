@@ -458,6 +458,13 @@ static void poll_fd(int fd, in_state *st)
 		key_event(st, &ev);
 }
 
+void device_child_poll(in_state *st)
+{
+	memset(st->pressed, 0, sizeof st->pressed);
+	poll_fd(fd_pad, st);
+	poll_fd(fd_keys, st);
+}
+
 void plat_input_poll(in_state *st)
 {
 	SDL_Event e;

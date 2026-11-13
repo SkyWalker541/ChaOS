@@ -8,7 +8,7 @@
 # release (plastron, the Linux kernel, Buildroot's packages, TortOS), as
 # TortOS publishes it, plus ChaOS's (this repository at HEAD) and
 # ChaOS-diatom's (dist/brick/ChaOS-diatom-source.tar.gz, the commit the
-# shipped diatom was built from).
+# shipped diatom was built from), and bash's (dist/brick/bash-source.tar.xz).
 set -e
 TORTOS_SRC=$1 OUT=$2
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -23,6 +23,7 @@ mkdir -p "$S"
 ln -s "$(cd "$(dirname "$TORTOS_SRC")" && pwd)/$(basename "$TORTOS_SRC")" "$S/TortOS-v$BASE-brick-sources.tar"
 git -C "$ROOT" archive --format=tar.gz --prefix=ChaOS/ HEAD > "$S/ChaOS-source.tar.gz"
 cp "$ROOT/dist/brick/ChaOS-diatom-source.tar.gz" "$S/"
+cp "$ROOT/dist/brick/bash-source.tar.xz" "$S/"
 cat > "$S/README.txt" <<EOF
 ChaOS $V for the TrimUI Brick: the source of everything in its card image.
 
@@ -43,6 +44,11 @@ ChaOS $V for the TrimUI Brick: the source of everything in its card image.
       ChaOS-diatom, the emulator (diatom), with rewind and its shaders: PT
       SkyWalker541 (MIT), crt-lottes-fast and lcd3x (public domain).
       MPL-2.0. https://github.com/SkyWalker541/ChaOS-diatom
+
+  bash-source.tar.xz
+      GNU bash 5.1.16, unchanged, which ChaOS adds to the root as /bin/bash
+      for ports (tools/build-bash.sh builds it). GPL-3.0-or-later.
+      https://www.gnu.org/software/bash/
 
 The licenses are in the image's Licenses/ folder and in each archive.
 EOF

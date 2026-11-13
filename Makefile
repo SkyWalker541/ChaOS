@@ -9,7 +9,7 @@
         check check-cheevos check-hare check-httpd check-idle check-rahash \
         check-raset check-xfer check-menus check-artscrape check-artrun check-audioout \
         check-db check-stats check-sort check-bt check-ss check-update check-asan \
-        check-release check-updater check-chaos-names check-itch check-cover
+        check-release check-updater check-chaos-names check-itch check-cover check-ports
 
 all: check
 
@@ -22,7 +22,7 @@ CHECKS = check-cheevos check-hare check-httpd check-idle check-rahash \
          check-db check-stats check-sort check-bt check-ss \
          check-muselib check-musequeue check-museart check-controls check-logpack \
          check-clock check-update check-remap check-shots check-pixfont \
-         check-release check-updater check-chaos-names check-itch check-cover
+         check-release check-updater check-chaos-names check-itch check-cover check-ports
 
 check:
 	@fail=0; for c in $(CHECKS); do \
@@ -296,6 +296,18 @@ build-native/itch-check: tools/itch-check.c src/itch.c src/itch.h src/artscrape.
 	@mkdir -p build-native
 	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g -DTORTOS_VERSION='"check"' \
 	      -DCHAOS_VERSION='"check"' -Isrc -o $@ tools/itch-check.c src/itch.c src/artscrape.c \
+	      src/net.c src/urlenc.c
+
+# ChaOS: ports (src/ports.h): the Ports shelf's scan, the scripts refused,
+# and PortMaster fetched from a file:// zip and put in place; no network.
+check-ports: build-native/ports-check
+	@./build-native/ports-check
+
+build-native/ports-check: tools/ports-check.c src/ports.c src/ports.h src/library.c src/net.c \
+                          src/urlenc.c FORCE
+	@mkdir -p build-native
+	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g -DTORTOS_VERSION='"check"' \
+	      -DCHAOS_VERSION='"check"' -Isrc -o $@ tools/ports-check.c src/ports.c src/library.c \
 	      src/net.c src/urlenc.c
 
 # ChaOS: a game's cover from ChaOS Transfer's page (src/cover.c), on a card

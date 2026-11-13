@@ -95,6 +95,7 @@ cp "$VENDOR_DIR/cores/"*.so "$P/cores/"
 missing=
 for core in $(awk -F'|' '$1=="sys"{gsub(/^[ \t]+|[ \t]+$/,"",$4); print $4}' \
               "$ROOT/config/systems.cfg" | sort -u); do
+	[ "$core" = port ] && continue   # ChaOS: the Ports shelf (src/ports.h)
 	[ -f "$P/cores/${core}_libretro.so" ] || missing="$missing $core"
 done
 if [ -n "$missing" ]; then
