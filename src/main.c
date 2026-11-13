@@ -7762,24 +7762,50 @@ static void pick_draw(app *a, const char *title, pick_item *it, int n, int sel,
 	} else {
 		const char *say = n <= 0 ? note
 		                : it[sel].state < 0 ? "Couldn't load this one" : "Loading...";
-		/* A line or two ("\n" between), each fitted to the panel: a long
-		 * console name ran out of it */
-		char l1[160] = "", l2[160] = "";
-		const char *br = say ? strchr(say, '\n') : NULL;
-		int lh = ui_font_line(UI_F_MENU), y;
+		/* ChaOS: every line of it, wrapped to the panel rather than cut:
+		 * "\n" starts a line, and a line too long breaks between words
+		 * (an install's "Getting Godot (FRT) 3.5, which it runs on" was
+		 * losing its end). Up to six lines, centred as a block. */
+		char lines[6][160];
+		int first_para[6], para_no = 0;
+		int nl = 0, lh = ui_font_line(UI_F_MENU), y, k;
+		const char *p = say ? say : "";
 
-		if (br) {
-			snprintf(l1, sizeof l1, "%.*s", (int)(br - say), say);
-			snprintf(l2, sizeof l2, "%s", br + 1);
-		} else {
-			snprintf(l1, sizeof l1, "%s", say ? say : "");
+		while (*p && nl < 6) {
+			size_t para = strcspn(p, "\n");
+			const char *e = p + para;
+
+			while (p < e && nl < 6) {
+				char try[160];
+				size_t take = 0, best = 0;
+
+				/* the most whole words that fit */
+				while (take < (size_t)(e - p) && take < sizeof try - 1) {
+					size_t w = take;
+
+					while (w < (size_t)(e - p) && p[w] == ' ') w++;
+					while (w < (size_t)(e - p) && p[w] != ' ') w++;
+					if (w >= sizeof try) break;
+					memcpy(try, p, w);
+					try[w] = '\0';
+					if (ui_text_width(fm, try) > area.w && best) break;
+					best = take = w;
+					if (ui_text_width(fm, try) > area.w) break;
+				}
+				if (!best) best = (size_t)(e - p) < sizeof try - 1 ? (size_t)(e - p) : sizeof try - 1;
+				first_para[nl] = para_no == 0;
+				snprintf(lines[nl++], sizeof lines[0], "%.*s", (int)best, p);
+				p += best;
+				while (p < e && *p == ' ') p++;
+			}
+			p = *e ? e + 1 : e;
+			para_no++;
 		}
-		y = area.y + area.h / 2 - (l2[0] ? lh : lh / 2);
-		ui_fit_text(fm, l1, fit, sizeof fit, area.w);
-		ui_text(a->r, fm, fit, area.x + area.w / 2, y, 0, UI_TEXT_DIM);
-		if (l2[0]) {
-			ui_fit_text(fm, l2, fit, sizeof fit, area.w);
-			ui_text(a->r, fm, fit, area.x + area.w / 2, y + lh, 0, UI_TEXT_DIM);
+		y = area.y + area.h / 2 - nl * lh / 2;
+		for (k = 0; k < nl; k++) {
+			ui_fit_text(fm, lines[k], fit, sizeof fit, area.w);
+			ui_text(a->r, fm, fit, area.x + area.w / 2, y + k * lh, 0,
+			        first_para[k] ? UI_TEXT_SOFT : UI_TEXT_DIM);
 		}
 	}
 	if (n > 0) {
