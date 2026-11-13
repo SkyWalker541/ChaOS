@@ -54,8 +54,10 @@ ChaOS $V for the TrimUI Brick: the source of everything in its card image.
   portlibs-source.tar.xz
       The libraries ChaOS adds to the root's /usr/lib for ports, each
       project's own source (SOURCES.txt says from where, at which commit):
-      OpenAL Soft and mpg123 (LGPL-2.1-or-later), Ogg, Vorbis, FLAC, Opus
-      and opusfile (BSD-3-Clause), SDL2_mixer (zlib).
+      OpenAL Soft, mpg123 and libsndfile (LGPL-2.1), Ogg, Vorbis, FLAC,
+      Opus, opusfile and Speex (BSD-3-Clause), bzip2, Zstandard (BSD),
+      libmodplug (public domain), SDL2_mixer, SDL2_gfx and SDL2 with its
+      patches (zlib).
       tools/build-portlibs.sh builds them.
 
 The licenses are in the image's Licenses/ folder and in each archive.
