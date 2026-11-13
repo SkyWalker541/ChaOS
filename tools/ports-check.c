@@ -138,6 +138,43 @@ int main(void)
 		CHECK(old, "the broken folder kept, with what was in it");
 		CHECK(!leftover, "no download or staging left behind");
 	}
+	/* An update of a working PortMaster: its runtimes and settings come
+	 * along, and no old copy is left */
+	snprintf(p, sizeof p, "%s/Ports/PortMaster/libs", roms);
+	mkdir(p, 0755);
+	snprintf(p, sizeof p, "%s/Ports/PortMaster/libs/godot.squashfs", roms);
+	put(p, "rt");
+	snprintf(p, sizeof p, "%s/Ports/PortMaster/config", roms);
+	mkdir(p, 0755);
+	snprintf(p, sizeof p, "%s/Ports/PortMaster/config/config.json", roms);
+	put(p, "{\"theme\": 1}");
+	CHECK(run_setup(roms) == PS_DONE, "PortMaster updated: %s", ports_setup_problem());
+	snprintf(p, sizeof p, "%s/Ports/PortMaster/libs/godot.squashfs", roms);
+	CHECK(access(p, R_OK) == 0, "the runtimes kept through an update");
+	snprintf(p, sizeof p, "%s/Ports/PortMaster/config/config.json", roms);
+	CHECK(access(p, R_OK) == 0, "the settings kept through an update");
+	{
+		DIR *d;
+		struct dirent *e;
+		int olds = 0;
+
+		snprintf(p, sizeof p, "%s/Ports", roms);
+		d = opendir(p);
+		while (d && (e = readdir(d)))
+			if (!strncmp(e->d_name, "PortMaster.old-", 15)) olds++;
+		if (d) closedir(d);
+		CHECK(olds == 1, "only the broken one kept, not the updated one: %d", olds);
+	}
+	/* Uninstalled keeping its settings, then installed again: they're back */
+	snprintf(cmd, sizeof cmd, "cd '%s/Ports' && mkdir -p .PortMaster.kept && "
+	         "mv PortMaster/config .PortMaster.kept/ && rm -rf PortMaster", roms);
+	CHECK(system(cmd) == 0, "uninstalled");
+	CHECK(!ports_pm_ready(roms), "gone");
+	CHECK(run_setup(roms) == PS_DONE, "installed again: %s", ports_setup_problem());
+	snprintf(p, sizeof p, "%s/Ports/PortMaster/config/config.json", roms);
+	CHECK(access(p, R_OK) == 0, "the kept settings back");
+	snprintf(p, sizeof p, "%s/Ports/.PortMaster.kept", roms);
+	CHECK(access(p, F_OK) != 0, "and the kept folder tidied away");
 	CHECK(lib_scan(roms, "Ports", "sh", &l) && l.count == 2,
 	      "PortMaster's folder isn't a port: %d", l.count);
 	lib_free(&l);

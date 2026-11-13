@@ -1,0 +1,65 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# ChaOS: `mount` for ports. PortMaster's runtimes (Godot, .NET, Mono, Java...)
+# are squashfs images a port's script mounts on a folder:
+#
+#     $ESUDO mount "$controlfolder/libs/godot_4.3.squashfs" "$godot_dir"
+#
+# The Brick's kernel can't: it has no loop devices and no zlib squashfs. So a
+# squashfs is unpacked instead - once, next to it, into libs/.chaos/<name>,
+# and kept until the image changes - and that folder is bind-mounted where the
+# port asked. Anything else is the real mount. PortMaster does the same on
+# muOS (muos/mount), unpacking every time.
+#
+# The card is exFAT, which has no symlinks: a link in the image becomes a copy
+# of what it points to.
+
+real=${CHAOS_REAL_MOUNT:-/bin/mount}
+src= dst= prepare=
+# `mount --chaos-prepare IMAGE`: only unpack (ChaOS does, when it installs a
+# port, so the first start isn't a long wait on a black screen)
+[ "$1" = --chaos-prepare ] && { prepare=1; shift; src=$1; }
+for a in "$@"; do
+	case $a in
+	-*) ;;
+	*.squashfs|*.SQUASHFS) [ -z "$src" ] && src=$a ;;
+	*) [ -n "$src" ] && [ -z "$dst" ] && dst=$a ;;
+	esac
+done
+if [ -z "$prepare" ]; then
+	[ -n "$src" ] && [ -n "$dst" ] && [ -f "$src" ] || exec "$real" "$@"
+fi
+[ -f "$src" ] || exit 1
+
+log() { echo "chaos mount: $*" >&2; }
+
+name=$(basename "$src" .squashfs)
+cache=$(dirname "$src")/.chaos/$name
+stamp=$(stat -c '%s %Y' "$src")
+if [ "$(cat "$cache/.chaos-stamp" 2>/dev/null)" != "$stamp" ]; then
+	log "unpacking $name (once)"
+	tmp=$cache.new
+	rm -rf "$tmp" "$cache"
+	mkdir -p "$tmp"
+	unsquashfs -no-progress -f -d "$tmp" "$src" > /dev/null 2>&1
+	# Links, as copies: each `path -> target`, twice over for a link to a link
+	links=$(unsquashfs -lls -d "" "$src" 2>/dev/null | sed -n 's/^l[^ ]* .* \/\(.*\) -> \(.*\)$/\1|\2/p')
+	for pass in 1 2; do
+		echo "$links" | while IFS='|' read -r p t; do
+			[ -n "$p" ] || continue
+			[ -e "$tmp/$p" ] && [ ! -L "$tmp/$p" ] && continue
+			case $t in /*) from=$tmp$t ;; *) from=$tmp/$(dirname "$p")/$t ;; esac
+			[ -e "$from" ] && rm -f "$tmp/$p" && cp -rf "$from" "$tmp/$p"
+		done
+	done
+	if [ -z "$(ls -A "$tmp")" ]; then
+		log "couldn't unpack $src"
+		rm -rf "$tmp"
+		exit 1
+	fi
+	echo "$stamp" > "$tmp/.chaos-stamp"
+	mv "$tmp" "$cache" || exit 1
+fi
+[ -n "$prepare" ] && exit 0
+mkdir -p "$dst"
+exec "$real" -o bind "$cache" "$dst"

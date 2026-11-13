@@ -42,6 +42,8 @@ typedef enum {
 	/* ChaOS: which of the shelves that aren't consoles are on the systems row */
 	PM_SHELF_FAV, PM_RECENT, PM_SHELF_MUSE,
 	PM_SCRAPE, PM_ACHIEVEMENTS, PM_SS,
+	/* ChaOS: PortMaster's ports, browsed and installed (src/pmcat.h) */
+	PM_PORTS,
 	PM_UPDATE, PM_CONTROLS, PM_ABOUT, PM_ROWS
 } pm_row;
 
@@ -97,7 +99,7 @@ typedef enum { SMM_COUNT, SMM_SHOW, SMM_SORT, SMM_LOCK, SMM_ART, SMM_RESCAN } sm
  * two cannot disagree about what row 2 is. */
 int sys_menu_muse_rows(bool books, bool both, bool no_wifi, sm_muse_row *out);
 
-#define MENU_MAX_ROWS 24
+#define MENU_MAX_ROWS 28
 
 /* The array every caller declares must hold every row a build can produce, and
  * on 2026-09-16 it stopped: PM_ROWS went to 13 against a cap of 12 when the
@@ -165,6 +167,7 @@ typedef struct {
 	 * without it cannot sign anybody in, so the row has three states rather
 	 * than two - see src/ss.h. */
 	bool        ss_have;     /* this build carries a developer key */
+	bool        pm_have;     /* ChaOS: PortMaster is installed (Get PortMaster goes) */
 	bool        ss_in;
 	const char *ss_name;     /* only read when ss_in */
 	const char *cards;       /* the showing card set's name, from CARD_SETS */

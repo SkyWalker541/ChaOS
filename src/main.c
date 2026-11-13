@@ -52,6 +52,7 @@
 #include "shots.h"
 #include "itch.h"
 #include "ports.h"
+#include "pmcat.h"
 #include "cover.h"
 #include "pixname.h"
 
@@ -72,6 +73,7 @@
 #include <SDL_image.h>
 #include <ctype.h>
 #include <dirent.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <math.h>
 #include <signal.h>
@@ -170,6 +172,13 @@ typedef struct {
 
 /* Defined down with the shelf building it belongs to, declared here because
  * the input loop calls it the moment a favorite changes. */
+/* The Ports shelf's first card, which is PortMaster rather than a port: a
+ * name no script has, so nothing on the card can be mistaken for it */
+#define PM_ENTRY_FILE ".chaos-portmaster"
+#define PM_ENTRY_NAME "PortMaster"
+static bool pm_is_entry(const char *file) { return file && !strcmp(file, PM_ENTRY_FILE); }
+static void pm_get(app *a);   /* the ChaOS menu's Get PortMaster */
+
 static void refresh_virtual_shelves(app *a);
 static void build_muse_shelf(app *a);
 static void muse_shelf_attach(app *a);
@@ -824,6 +833,11 @@ static void sort_shelf(app *a, int sys)
 		for (i = 0; i < a->sys.count && i < CFG_MAX_SYSTEMS; i++)
 			tags[i] = a->sys.systems[i].tag;
 		sort_apply_owned(v->list.items, v->owner, v->list.count, v->sort, tags);
+		return;
+	}
+	/* ChaOS: PortMaster's card stays first on the Ports shelf */
+	if (v->list.count > 1 && pm_is_entry(v->list.items[0].file)) {
+		sort_apply(v->list.items + 1, v->list.count - 1, v->sort, a->sys.systems[sys].tag);
 		return;
 	}
 	sort_apply(v->list.items, v->list.count, v->sort, a->sys.systems[sys].tag);
@@ -3937,12 +3951,14 @@ static void draw_systems(app *a)
 		if (books)  snprintf(bk, sizeof bk, "%d book%s", books, books == 1 ? "" : "s");
 		snprintf(line, sizeof line, "%s%s%s", al, al[0] && bk[0] ? ", " : "", bk);
 	} else {
-		int gc = a->view[(int)(label - a->sys.systems)].list.count;
+		const game_list *gl = &a->view[(int)(label - a->sys.systems)].list;
+		/* ChaOS: PortMaster's own card isn't a port */
+		int gc = gl->count - (gl->count > 0 && pm_is_entry(gl->items[0].file));
 
 		/* A shelf of one read "1 games". Favorites hits it first because it
 		 * starts empty and grows one at a time, but any system with a single
 		 * ROM has always said it. */
-		if (gc > 0)
+		if (gc > 0 || !strcmp(label->core, PORTS_CORE))
 			snprintf(line, sizeof line, "%d %s%s", gc,
 			         !strcmp(label->core, PORTS_CORE) ? "port" : "game", gc == 1 ? "" : "s");
 		else
@@ -5812,6 +5828,7 @@ static int menu_build(app *a, screen_id screen, int sys,
 		u.ra_in     = ra_signed_in();
 		u.ra_name   = u.ra_in ? ra_user() : NULL;
 		u.ss_have   = ss_have_dev();
+		u.pm_have   = ports_pm_ready(P_ROMS);
 		u.ss_in     = ss_signed_in();
 		u.ss_name   = u.ss_in ? ss_user() : NULL;
 		u.cards     = CARD_SETS[g_cards].name;
@@ -10302,6 +10319,7 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 		 * Transition Speed turned Menu Color) */
 		sys_ui dev = { .no_wifi = !plat_has_wifi(), .no_bt = !plat_has_bluetooth(),
 		               .cable_xfer = plat_cable_link(NULL, 0), .ss_have = ss_have_dev(),
+		               .pm_have = ports_pm_ready(P_ROMS),
 		               .night_ok = plat_volume_night_ok(), .appearance = g_appearance_page,
 		               .name_speed = CARDS_DRAWN(g_cards) ? PN_SPEEDS[g_pn_speed[g_dir]].name
 		                                                  : NULL,
@@ -10461,6 +10479,7 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 	case PM_APPEARANCE:   appearance_screen(a); break;
 	case PM_STATS:        if (stats_screen(a)) return MENU_DONE; break;
 	case PM_CONTROLS:     controls_screen(a); break;
+	case PM_PORTS:        pm_get(a); break;
 	case PM_UPDATE:       update_screen(a); break;
 	case PM_ABOUT:        about_screen(a); break;
 	default: break;
@@ -13603,6 +13622,1313 @@ static void port_launch(app *a, int o, const char *romfile, const char *title)
 	render(a);
 }
 
+/* ---- ChaOS: PortMaster's catalog, browsed and installed ------------------
+ *
+ * PortMaster's own app is a Python program drawn in its own style; this is
+ * the same catalog (src/pmcat.h) in ChaOS's menus. The Ports shelf's first
+ * card opens it, and so does PortMaster in the ChaOS menu.
+ *
+ *   PortMaster          the sections, Genres, Installed, Updates, and
+ *                       getting or updating PortMaster itself
+ *   a list              titles on the left, the one under the cursor on the
+ *                       right with its screenshot, fetched as you go
+ *   a port              its picture, what it needs, its description, and
+ *                       Install, Update or Remove
+ *
+ * Installing is what PortMaster does: the zip, checked against the
+ * catalog's MD5 and unpacked over Roms/Ports (so a port's own files that
+ * aren't in the zip - game files you copied in, saves - stay through an
+ * update), then any runtime it needs into PortMaster/libs, unpacked once
+ * there (res/ports/bin/mount), and its screenshot as its box art. */
+
+
+static pm_catalog g_pmc;
+static bool       g_pmc_loaded;
+static bool       g_pm_rtr_only;   /* "Ready to Run Only" */
+
+static void rescan_all(app *a);    /* with scan_all, below */
+
+
+static void pm_dir(char *out, size_t n) { snprintf(out, n, "%s/ports", P_USERDATA); }
+static void pm_cat_path(char *out, size_t n) { snprintf(out, n, "%s/ports/ports.json", P_USERDATA); }
+static void pm_ports_dir(char *out, size_t n) { snprintf(out, n, "%s/Ports", P_ROMS); }
+
+/* What an install unpacked (pmcat_manifest_remove): .userdata, so it
+ * outlives anything done to the card's Ports folder */
+static void pm_manifest_path(const char *zip, char *out, size_t n)
+{
+	snprintf(out, n, "%s/ports/installed/%.*s.txt", P_USERDATA,
+	         (int)(strlen(zip) > 4 ? strlen(zip) - 4 : strlen(zip)), zip);
+}
+
+static void pm_img_path(const pm_port *p, char *out, size_t n)
+{
+	char url[400], file[96];
+
+	out[0] = '\0';
+	if (pmcat_shot(p, url, sizeof url, file, sizeof file))
+		snprintf(out, n, "%s/ports/img/%s", P_USERDATA, file);
+}
+
+static bool pm_reload(void)
+{
+	char cat[LIB_PATH], ports[LIB_PATH], tested[LIB_PATH];
+
+	if (g_pmc_loaded) pmcat_free(&g_pmc);
+	pm_cat_path(cat, sizeof cat);
+	pm_ports_dir(ports, sizeof ports);
+	snprintf(tested, sizeof tested, "%s/ports/tested.txt", P_ROOT);
+	g_pmc_loaded = pmcat_load(&g_pmc, cat, ports, tested);
+	if (g_pmc_loaded) fprintf(stderr, "portmaster: catalog of %d ports\n", g_pmc.n);
+	return g_pmc_loaded;
+}
+
+/* How old the catalog on the card is, in seconds; -1 when there is none */
+static long pm_cat_age(void)
+{
+	char cat[LIB_PATH];
+	struct stat st;
+
+	pm_cat_path(cat, sizeof cat);
+	if (stat(cat, &st) != 0 || st.st_size == 0) return -1;
+	return (long)(time(NULL) - st.st_mtime);
+}
+
+/* A child, waited on with the screen up: `what` over a progress line from
+ * `file` growing toward `total` bytes (either may be absent). B gives up,
+ * which kills it. Its exit status, or -1 for given up or killed. */
+static int pm_wait(app *a, pid_t pid, const char *title, const char *what,
+                   const char *file, long total, unsigned accent, bool spawned)
+{
+	char now[160];
+	int st = 0, rc = -1;
+
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+	for (;;) {
+		pid_t r = waitpid(pid, &st, WNOHANG);
+
+		if (r == pid) { rc = WIFEXITED(st) ? WEXITSTATUS(st) : -1; break; }
+		if (r < 0 && errno != EINTR) break;
+		plat_input_poll(&a->in);
+		if (a->in.quit_requested || a->in.pressed[IN_POWER] || a->in.pressed[IN_BACK]) {
+			kill(pid, SIGTERM);
+			kill(-pid, SIGTERM);
+			waitpid(pid, NULL, 0);
+			if (a->in.quit_requested) a->running = false;
+			else if (a->in.pressed[IN_POWER]) power_off(a);
+			rc = -1;
+			break;
+		}
+		if (in_repeat(&a->in, IN_VOLUP)) plat_volume_nudge(+1);
+		if (in_repeat(&a->in, IN_VOLDN)) plat_volume_nudge(-1);
+		if (file) {
+			struct stat fs;
+			double got = stat(file, &fs) == 0 ? fs.st_size / 1048576.0 : 0.0;
+
+			if (total > 0)
+				snprintf(now, sizeof now, "%s\n%.1f of %.1f MB", what, got, total / 1048576.0);
+			else
+				snprintf(now, sizeof now, "%s\n%.1f MB", what, got);
+		} else {
+			snprintf(now, sizeof now, "%s", what);
+		}
+		pick_frame(a, title, NULL, 0, 0, NULL, 0, 0, now, accent);
+		SDL_Delay(30);
+	}
+	if (spawned) net_spawn_done(pid);
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+	return rc;
+}
+
+/* A download to `path`, through a temporary, with the panel up. `md5`, when
+ * there is one, is checked after (in a child: a runtime runs to hundreds of
+ * MB, and the panel keeps drawing while it is read). */
+static bool pm_fetch(app *a, const char *title, const char *what, const char *url,
+                     const char *path, long size, const char *md5, unsigned accent,
+                     char *why, size_t wn)
+{
+	char part[LIB_PATH + 8];
+	pid_t pid;
+	int rc;
+
+	snprintf(part, sizeof part, "%s.part", path);
+	unlink(part);
+	pid = net_get_spawn(url, part, 3600);
+	if (pid <= 0) { snprintf(why, wn, "Couldn't start the download"); return false; }
+	rc = pm_wait(a, pid, title, what, part, size, accent, true);
+	if (rc != 0) {
+		unlink(part);
+		snprintf(why, wn, rc < 0 ? "Stopped" : "Couldn't download it:\ncheck Wi-Fi and try again");
+		return false;
+	}
+	if (md5 && md5[0]) {
+		pid = fork();
+		if (pid == 0) {
+			char got[40];
+
+			_exit(ra_md5_file(part, got) && !strcasecmp(got, md5) ? 0 : 1);
+		}
+		if (pid < 0 || pm_wait(a, pid, title, "Checking the download", NULL, 0, accent, false) != 0) {
+			unlink(part);
+			snprintf(why, wn, "The download was damaged:\ntry again");
+			fprintf(stderr, "portmaster: %s failed its MD5\n", url);
+			return false;
+		}
+	}
+	if (rename(part, path) != 0) {
+		unlink(part);
+		snprintf(why, wn, "Couldn't save it to the card");
+		return false;
+	}
+	return true;
+}
+
+/* A program run to its end with the panel up: unzip, rm, the unpacker */
+static int pm_run(app *a, const char *title, const char *what, unsigned accent,
+                  const char *const argv[], const char *path_prefix)
+{
+	pid_t pid = fork();
+
+	if (pid < 0) return -1;
+	if (pid == 0) {
+		int devnull = open("/dev/null", O_RDWR);
+
+		setpgid(0, 0);
+		if (devnull >= 0) { dup2(devnull, 0); dup2(devnull, 1); close(devnull); }
+		if (path_prefix) {
+			char path[LIB_PATH * 2];
+			const char *old = getenv("PATH");
+
+			snprintf(path, sizeof path, "%s:%s", path_prefix, old ? old : "/usr/bin:/bin");
+			setenv("PATH", path, 1);
+		}
+		execv(argv[0], (char *const *)argv);
+		_exit(127);
+	}
+	setpgid(pid, pid);
+	return pm_wait(a, pid, title, what, NULL, 0, accent, false);
+}
+
+static const char *pm_unzip_bin(void)
+{
+	return access("/usr/bin/unzip", X_OK) == 0 ? "/usr/bin/unzip" : "/bin/unzip";
+}
+
+/* The catalog, fetched now. True if there is one to show after, new or not. */
+static bool pm_catalog_fetch(app *a, unsigned accent)
+{
+	char dir[LIB_PATH], cat[LIB_PATH], why[96];
+
+	pm_dir(dir, sizeof dir);
+	mkdir(dir, 0755);
+	pm_cat_path(cat, sizeof cat);
+	if (!net_online()) {
+		if (pm_cat_age() < 0) pick_say(a, "PortMaster", "Connect to Wi-Fi to see\nPortMaster's ports", accent);
+		return pm_cat_age() >= 0;
+	}
+	sync_abandon();
+	if (!pm_fetch(a, "PortMaster", "Getting the list of ports", PMCAT_URL, cat, 0, NULL,
+	              accent, why, sizeof why)) {
+		if (strcmp(why, "Stopped")) pick_say(a, "PortMaster", why, accent);
+		return pm_cat_age() >= 0;
+	}
+	return true;
+}
+
+/* ---- a port's runtimes and art -------------------------------------------- */
+
+/* What a runtime is called to a person: "godot_4.3.squashfs" is "Godot 4.3" */
+static void pm_runtime_name(const char *file, char *out, size_t n)
+{
+	static const struct { const char *pre, *name; } k[] = {
+		{ "frt_", "Godot (FRT) " }, { "godot", "Godot " }, { "dotnet", ".NET " },
+		{ "mono", "Mono " }, { "zulu", "Java " }, { "weston", "Weston " },
+		{ "gmtoolkit", "GameMaker toolkit" }, { "renpy", "Ren'Py " },
+		{ "pyxel", "Pyxel " }, { "python", "Python " }, { "solarus", "Solarus " },
+		{ "mesa", "Mesa " }, { "rlvm", "RLVM" }, { "qt6", "Qt " }, { "ags", "AGS " },
+	};
+	size_t i;
+
+	for (i = 0; i < sizeof k / sizeof k[0]; i++) {
+		size_t l = strlen(k[i].pre);
+
+		if (!strncasecmp(file, k[i].pre, l)) {
+			const char *v = file + l;
+			char ver[24] = "";
+			size_t j = 0;
+
+			while (*v && (*v < '0' || *v > '9')) v++;
+			while (v[j] && j + 1 < sizeof ver && ((v[j] >= '0' && v[j] <= '9') || v[j] == '.')) {
+				ver[j] = v[j];
+				j++;
+			}
+			while (j > 0 && ver[j - 1] == '.') ver[--j] = '\0';
+			snprintf(out, n, "%s%s", k[i].name, k[i].name[strlen(k[i].name) - 1] == ' ' ? ver : "");
+			return;
+		}
+	}
+	snprintf(out, n, "%.*s", (int)strcspn(file, "."), file);
+}
+
+/* Every runtime the port needs, fetched into PortMaster/libs if it isn't
+ * there, and unpacked. False, with why, if one couldn't be. */
+static bool pm_runtimes(app *a, const pm_port *p, unsigned accent, char *why, size_t wn)
+{
+	char rt[8][64], libs[LIB_PATH], path[LIB_PATH * 2], url[400], md5[40], nice[64], what[128];
+	char shim[LIB_PATH], bin[LIB_PATH];
+	int n = pmcat_runtimes(p, rt, 8), i;
+	long size;
+
+	if (n == 0) return true;
+	snprintf(libs, sizeof libs, "%s/Ports/PortMaster/libs", P_ROMS);
+	mkdir(libs, 0755);
+	snprintf(bin, sizeof bin, "%s/ports/bin", P_ROOT);
+	snprintf(shim, sizeof shim, "%s/mount", bin);
+	for (i = 0; i < n; i++) {
+		struct stat st;
+
+		pm_runtime_name(rt[i], nice, sizeof nice);
+		snprintf(path, sizeof path, "%s/%s", libs, rt[i]);
+		if (stat(path, &st) != 0 || st.st_size == 0) {
+			if (!pmcat_runtime(&g_pmc, rt[i], url, sizeof url, md5, sizeof md5, &size)) {
+				snprintf(why, wn, "It needs %s,\nwhich PortMaster doesn't list", nice);
+				return false;
+			}
+			snprintf(what, sizeof what, "Getting %s, which it runs on", nice);
+			if (!pm_fetch(a, p->title, what, url, path, size, md5, accent, why, wn)) return false;
+			fprintf(stderr, "portmaster: runtime %s fetched\n", rt[i]);
+		}
+		/* Unpacked now rather than on the first start, which would be a
+		 * long wait on a black screen */
+		if (access(shim, R_OK) == 0) {
+			const char *argv[] = { "/bin/sh", shim, "--chaos-prepare", path, NULL };
+
+			snprintf(what, sizeof what, "Unpacking %s\nThis takes a minute", nice);
+			if (pm_run(a, p->title, what, accent, argv, bin) != 0) {
+				snprintf(why, wn, "Couldn't unpack %s", nice);
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+/* Its screenshot as its box art on the Ports shelf */
+static void pm_box_art(app *a, const pm_port *p, unsigned accent)
+{
+	char img[LIB_PATH], url[400], file[96], why[96], stem[LIB_NAME];
+	size_t l;
+
+	pm_img_path(p, img, sizeof img);
+	if (!img[0] || !p->script[0]) return;
+	if (access(img, R_OK) != 0 && net_online()) {
+		char dir[LIB_PATH];
+
+		snprintf(dir, sizeof dir, "%s/ports/img", P_USERDATA);
+		mkdir(dir, 0755);
+		pmcat_shot(p, url, sizeof url, file, sizeof file);
+		if (!pm_fetch(a, p->title, "Getting its picture", url, img, 0, NULL, accent, why, sizeof why))
+			return;
+	}
+	snprintf(stem, sizeof stem, "%s", p->script);
+	l = strlen(stem);
+	if (l > 3 && !strcasecmp(stem + l - 3, ".sh")) stem[l - 3] = '\0';
+	{
+		char media[LIB_PATH];
+
+		snprintf(media, sizeof media, "%s/Ports/.media", P_ROMS);
+		mkdir(media, 0755);
+	}
+	cover_save(a, img, "Ports", stem);
+}
+
+/* ---- install, update, remove ---------------------------------------------- */
+
+static bool pm_install(app *a, int idx, unsigned accent)
+{
+	const pm_port *p = &g_pmc.p[idx];
+	char url[400], md5[40], zip[LIB_PATH], ports[LIB_PATH], why[160], what[96];
+	bool update = (p->flags & PMF_INSTALLED) != 0;
+
+	if (!net_online()) { pick_say(a, p->title, "Connect to Wi-Fi to install ports", accent); return false; }
+	if (!pmcat_source(p, url, sizeof url, md5, sizeof md5)) {
+		pick_say(a, p->title, "PortMaster has no download for this one", accent);
+		return false;
+	}
+	/* PortMaster first: every port's script runs through it */
+	if (!ports_pm_ready(P_ROMS) && !ports_setup_screen(a, p->title, accent)) return false;
+	if (!a->running) return false;
+	sync_abandon();
+
+	pm_ports_dir(ports, sizeof ports);
+	mkdir(ports, 0755);
+	snprintf(zip, sizeof zip, "%s/.chaos-%s", ports, p->zip);
+	snprintf(what, sizeof what, update ? "Downloading the update" : "Downloading");
+	fprintf(stderr, "portmaster: %s %s (v%d)\n", update ? "updating" : "installing", p->zip, p->version);
+	if (!pm_fetch(a, p->title, what, url, zip, p->size, md5, accent, why, sizeof why)) {
+		if (strcmp(why, "Stopped")) pick_say(a, p->title, why, accent);
+		return false;
+	}
+	{
+		/* Over what is there: a port's own files that aren't in the zip -
+		 * the game's data you copied in, its saves - stay */
+		const char *argv[] = { pm_unzip_bin(), "-oq", zip, "-d", ports, NULL };
+		char man[LIB_PATH], old[LIB_PATH + 8], dir[LIB_PATH];
+		int rc;
+
+		/* What it unpacks, kept, so a removal can leave the saves.
+		 * An update's list is added to the last one's: a file the old
+		 * version had and the new one doesn't is still the port's. */
+		snprintf(dir, sizeof dir, "%s/ports/installed", P_USERDATA);
+		mkdir(dir, 0755);
+		pm_manifest_path(p->zip, man, sizeof man);
+		snprintf(old, sizeof old, "%s.old", man);
+		rename(man, old);
+		if (pmcat_zip_names(zip, man)) {
+			FILE *fo = fopen(old, "r"), *fn = fo ? fopen(man, "a") : NULL;
+			char ln[1100];
+
+			while (fn && fgets(ln, sizeof ln, fo)) fputs(ln, fn);
+			if (fn) fclose(fn);
+			if (fo) fclose(fo);
+			unlink(old);
+		} else {
+			rename(old, man);
+		}
+		rc = pm_run(a, p->title, "Unpacking", accent, argv, NULL);
+
+		unlink(zip);
+		if (rc != 0) {
+			pick_say(a, p->title, "Couldn't unpack it:\nis the card full?", accent);
+			return false;
+		}
+	}
+	if (!pm_runtimes(a, p, accent, why, sizeof why)) {
+		if (strcmp(why, "Stopped")) pick_say(a, p->title, why, accent);
+		fprintf(stderr, "portmaster: %s installed without its runtime: %s\n", p->zip, why);
+	}
+	pm_box_art(a, p, accent);
+	sync();
+	fprintf(stderr, "portmaster: %s %s\n", p->zip, update ? "updated" : "installed");
+	{
+		char ports_dir[LIB_PATH];
+
+		pm_ports_dir(ports_dir, sizeof ports_dir);
+		pmcat_installed(&g_pmc, ports_dir);
+	}
+	rescan_all(a);
+	return true;
+}
+
+/* A choice of two, and Cancel: 1 the first, 2 the second, 0 neither */
+typedef struct {
+	const char *heading, *say, *one, *one_hint, *two, *two_hint;
+	int chose;
+} pm_choice_ctx;
+
+static int pm_choice_build(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	pm_choice_ctx *c = ctx;
+	int n = 0;
+
+	(void)max;
+	*heading = c->heading;
+	rows[n] = (menu_row){ c->one, NULL, true };
+	rows[n++].hint = c->one_hint;
+	rows[n] = (menu_row){ c->two, NULL, true };
+	rows[n++].hint = c->two_hint;
+	rows[n++] = (menu_row){ "Cancel", NULL, true };
+	rows[n++] = MENU_RULE;
+	rows[n++] = MENU_NOTE(c->say);
+	return n;
+}
+
+static menu_result pm_choice_key(app *a, void *ctx, in_button key, int sel)
+{
+	pm_choice_ctx *c = ctx;
+
+	(void)a;
+	if (key != IN_ACCEPT) return MENU_STAY;
+	c->chose = sel == 0 ? 1 : sel == 1 ? 2 : 0;
+	return MENU_DONE;
+}
+
+static int pm_choice(app *a, pm_choice_ctx *c, unsigned accent)
+{
+	menu_style st = { 0 };
+
+	c->chose = 0;
+	st.accent = accent;
+	st.fixed_w = menu_std_width(a);
+	menu_run(a, &st, pm_choice_build, pm_choice_key, c);
+	return c->chose;
+}
+
+/* The script's name less .sh: what its box art is called */
+static void pm_stem(const char *script, char *out, size_t n)
+{
+	size_t l;
+
+	snprintf(out, n, "%s", script);
+	l = strlen(out);
+	if (l > 3 && !strcasecmp(out + l - 3, ".sh")) out[l - 3] = '\0';
+}
+
+/* A port's own files, by its manifest, leaving what it made as it ran.
+ * In a child, with the panel up: a big port is thousands of files. */
+static void pm_remove_keep(app *a, const char *zip, const char *title, unsigned accent)
+{
+	char man[LIB_PATH], ports[LIB_PATH];
+	pid_t pid;
+
+	pm_manifest_path(zip, man, sizeof man);
+	pm_ports_dir(ports, sizeof ports);
+	if (access(man, R_OK) != 0) return;
+	pid = fork();
+	if (pid == 0) _exit(pmcat_manifest_remove(ports, man) >= 0 ? 0 : 1);
+	if (pid > 0) pm_wait(a, pid, title, "Removing", NULL, 0, accent, false);
+	unlink(man);
+}
+
+static bool pm_remove(app *a, int idx, unsigned accent)
+{
+	const pm_port *p = &g_pmc.p[idx];
+	char msg[200], man[LIB_PATH], art[LIB_PATH * 2], stem[LIB_NAME], sh[LIB_PATH * 2];
+	pm_choice_ctx c = { 0 };
+	int how;
+
+	pm_manifest_path(p->zip, man, sizeof man);
+	snprintf(msg, sizeof msg, "Remove %s", p->title);
+	c.heading = msg;
+	c.say = "Saves and settings stay on the card if you keep them";
+	c.one = "Keep Saves and Settings";
+	c.one_hint = "Install it again later and carry on where you left off";
+	c.two = "Remove Everything";
+	c.two_hint = "Its whole folder, with any game files and saves in it";
+	how = pm_choice(a, &c, accent);
+	if (how == 0) return false;
+	if (how == 2 && !confirm_panel(a, "Remove Everything",
+	                               "Its saves and any game files\nyou copied in go too.", "Remove"))
+		return false;
+	pm_stem(p->script, stem, sizeof stem);
+	box_art_path("Ports", stem, art, sizeof art);
+	snprintf(sh, sizeof sh, "%s/Ports/%s", P_ROMS, p->script);
+	if (how == 1 && access(man, R_OK) == 0) {
+		pm_remove_keep(a, p->zip, p->title, accent);
+	} else if (how == 1) {
+		/* Installed some other way: nothing says which files are its own,
+		 * so its folder stays whole and only the script goes */
+		if (p->script[0]) unlink(sh);
+	} else {
+		char dir[LIB_PATH * 2];
+
+		snprintf(dir, sizeof dir, "%s/Ports/%s", P_ROMS, p->dir);
+		if (p->dir[0] && strcmp(p->dir, ".") && strcmp(p->dir, "..") &&
+		    strcasecmp(p->dir, "PortMaster")) {
+			const char *argv[] = { "/bin/rm", "-rf", dir, NULL };
+
+			pm_run(a, p->title, "Removing", accent, argv, NULL);
+		}
+		if (p->script[0]) unlink(sh);
+		unlink(man);
+	}
+	unlink(art);
+	sync();
+	fprintf(stderr, "portmaster: %s removed (%s)\n", p->zip, how == 1 ? "saves kept" : "everything");
+	{
+		char ports_dir[LIB_PATH];
+
+		pm_ports_dir(ports_dir, sizeof ports_dir);
+		pmcat_installed(&g_pmc, ports_dir);
+	}
+	rescan_all(a);
+	return true;
+}
+
+/* PortMaster off the card. Keeping: every port installed from here loses
+ * its own files and keeps what it made; PortMaster's settings wait in
+ * .PortMaster.kept for the next install (ports.c); ports put on the card
+ * some other way stay as they are. Everything: Roms/Ports, and the ports'
+ * home in .userdata. True if it went. */
+static bool pm_uninstall(app *a, unsigned accent)
+{
+	pm_choice_ctx c = { 0 };
+	char dir[LIB_PATH * 2], kept[LIB_PATH], cfg[LIB_PATH + 16], to[LIB_PATH + 16];
+	int how;
+
+	c.heading = "Uninstall PortMaster";
+	c.say = "Your ports go with it. Keep their saves to carry on later";
+	c.one = "Keep Saves and Settings";
+	c.one_hint = "Reinstall PortMaster and your ports later and carry on";
+	c.two = "Remove Everything";
+	c.two_hint = "Every port, its saves, and PortMaster's settings";
+	how = pm_choice(a, &c, accent);
+	if (how == 0) return false;
+	if (how == 2 && !confirm_panel(a, "Remove Everything",
+	                               "Every port and every save\nin Ports goes. This can't be undone.",
+	                               "Remove"))
+		return false;
+	sync_abandon();
+	if (how == 1) {
+		DIR *d;
+		struct dirent *e;
+
+		snprintf(dir, sizeof dir, "%s/ports/installed", P_USERDATA);
+		if ((d = opendir(dir))) {
+			while ((e = readdir(d))) {
+				char zip[300], man[LIB_PATH + 300], ln[1100], art[LIB_PATH * 2], stem[LIB_NAME];
+				size_t l = strlen(e->d_name);
+				FILE *f;
+
+				if (l <= 4 || strcmp(e->d_name + l - 4, ".txt")) continue;
+				snprintf(zip, sizeof zip, "%.*s.zip", (int)(l - 4), e->d_name);
+				/* its box art, by the script its manifest names */
+				snprintf(man, sizeof man, "%s/%s", dir, e->d_name);
+				if ((f = fopen(man, "r"))) {
+					while (fgets(ln, sizeof ln, f)) {
+						size_t k = strcspn(ln, "\r\n");
+
+						ln[k] = '\0';
+						if (k > 3 && !strchr(ln, '/') && !strcasecmp(ln + k - 3, ".sh")) {
+							pm_stem(ln, stem, sizeof stem);
+							box_art_path("Ports", stem, art, sizeof art);
+							unlink(art);
+						}
+					}
+					fclose(f);
+				}
+				pm_remove_keep(a, zip, "Uninstall PortMaster", accent);
+			}
+			closedir(d);
+		}
+		/* its settings, for next time */
+		ports_pm_kept_dir(P_ROMS, kept, sizeof kept);
+		mkdir(kept, 0755);
+		snprintf(cfg, sizeof cfg, "%s/Ports/PortMaster/config", P_ROMS);
+		snprintf(to, sizeof to, "%s/config", kept);
+		if (access(cfg, F_OK) == 0) {
+			const char *rm[] = { "/bin/rm", "-rf", to, NULL };
+
+			pm_run(a, "Uninstall PortMaster", "Removing", accent, rm, NULL);
+			rename(cfg, to);
+		}
+		snprintf(dir, sizeof dir, "%s/Ports/PortMaster", P_ROMS);
+		{
+			const char *rm[] = { "/bin/rm", "-rf", dir, NULL };
+
+			pm_run(a, "Uninstall PortMaster", "Removing PortMaster", accent, rm, NULL);
+		}
+	} else {
+		char home[LIB_PATH], inst[LIB_PATH];
+
+		snprintf(dir, sizeof dir, "%s/Ports", P_ROMS);
+		snprintf(home, sizeof home, "%s/ports/home", P_USERDATA);
+		snprintf(inst, sizeof inst, "%s/ports/installed", P_USERDATA);
+		{
+			const char *rm[] = { "/bin/rm", "-rf", dir, home, inst, NULL };
+
+			pm_run(a, "Uninstall PortMaster", "Removing everything", accent, rm, NULL);
+		}
+	}
+	sync();
+	fprintf(stderr, "portmaster: uninstalled (%s)\n", how == 1 ? "saves kept" : "everything");
+	rescan_all(a);
+	return !ports_pm_ready(P_ROMS);
+}
+
+/* ---- the screenshot under the cursor -------------------------------------- */
+
+typedef struct {
+	int          want;      /* the port whose picture is wanted */
+	int          shown;     /* the one `tex` is */
+	int          fetching;  /* the one being downloaded, -1 none */
+	unsigned     since;     /* when `want` last changed */
+	SDL_Texture *tex;
+	int          tw, th;
+	bool         failed;    /* no picture to be had for `want` */
+} pm_pic;
+
+static void pm_pic_init(pm_pic *pp) { memset(pp, 0, sizeof *pp); pp->want = pp->shown = pp->fetching = -1; }
+
+static void pm_pic_free(pm_pic *pp)
+{
+	if (pp->fetching >= 0) net_async_abort();
+	if (pp->tex) SDL_DestroyTexture(pp->tex);
+	pm_pic_init(pp);
+}
+
+static void pm_pic_want(pm_pic *pp, int idx)
+{
+	if (pp->want == idx) return;
+	pp->want = idx;
+	pp->since = plat_now_ms();
+	pp->failed = false;
+}
+
+/* Each frame: the download in flight, the next to start (after the cursor
+ * has rested a moment, so scrolling through a list doesn't fetch all of
+ * it), and the texture once its file is here */
+static void pm_pic_step(app *a, pm_pic *pp)
+{
+	char img[LIB_PATH], url[400], file[96];
+
+	if (pp->fetching >= 0) {
+		int got = net_async_poll();
+
+		if (got != 0) {
+			if (got < 0 && pp->fetching == pp->want) pp->failed = true;
+			pp->fetching = -1;
+		}
+	}
+	if (pp->want < 0 || pp->shown == pp->want) return;
+	pm_img_path(&g_pmc.p[pp->want], img, sizeof img);
+	if (!img[0]) { pp->failed = true; return; }
+	if (access(img, R_OK) == 0) {
+		SDL_Surface *s = IMG_Load(img);
+
+		if (pp->tex) SDL_DestroyTexture(pp->tex);
+		pp->tex = NULL;
+		if (s) {
+			pp->tex = SDL_CreateTextureFromSurface(a->r, s);
+			pp->tw = s->w;
+			pp->th = s->h;
+			SDL_FreeSurface(s);
+			if (pp->tex) SDL_SetTextureScaleMode(pp->tex, SDL_ScaleModeLinear);
+		} else {
+			unlink(img);   /* not a picture: asked for again next time */
+			pp->failed = true;
+		}
+		pp->shown = pp->want;
+		return;
+	}
+	if (pp->fetching < 0 && !pp->failed && plat_now_ms() - pp->since > 180 && net_online()) {
+		char dir[LIB_PATH];
+
+		snprintf(dir, sizeof dir, "%s/ports/img", P_USERDATA);
+		mkdir(dir, 0755);
+		pmcat_shot(&g_pmc.p[pp->want], url, sizeof url, file, sizeof file);
+		if (net_get_async(url, img, 20)) pp->fetching = pp->want;
+	}
+}
+
+/* The picture into `box`, whole, centered; a quiet line when there is none */
+static void pm_pic_draw(app *a, pm_pic *pp, SDL_Rect box)
+{
+	SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+	ui_round_rect(a->r, &box, 10, (SDL_Color){ 0, 0, 0, 90 });
+	if (pp->tex && pp->shown == pp->want && pp->tw > 0 && pp->th > 0) {
+		float k = (float)box.w / pp->tw < (float)box.h / pp->th ? (float)box.w / pp->tw
+		                                                       : (float)box.h / pp->th;
+		SDL_Rect d;
+
+		d.w = (int)(pp->tw * k);
+		d.h = (int)(pp->th * k);
+		d.x = box.x + (box.w - d.w) / 2;
+		d.y = box.y + (box.h - d.h) / 2;
+		SDL_RenderCopy(a->r, pp->tex, NULL, &d);
+	} else {
+		const char *say = pp->failed || !net_online() ? "No picture" : "Loading...";
+
+		ui_text(a->r, ui_font(UI_F_META), say, box.x + box.w / 2,
+		        box.y + box.h / 2 - ui_font_line(UI_F_META) / 2, 0, UI_TEXT_DIM);
+	}
+}
+
+/* ---- drawing ------------------------------------------------------------- */
+
+#define PM_PANEL ((SDL_Rect){ 28, 28, TORTOS_SCREEN_W - 56, TORTOS_SCREEN_H - 56 })
+
+static void pm_frame_begin(app *a, unsigned accent, const char *heading, const char *meta)
+{
+	SDL_Rect panel = PM_PANEL;
+	TTF_Font *fh = ui_font(UI_F_LABEL), *fs = ui_font(UI_F_META);
+	char fit[200];
+	int band = 84;
+
+	tick_tint(a);
+	draw_shelf(a);
+	SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+	SDL_SetRenderDrawColor(a->r, 0, 0, 0, 150);
+	SDL_RenderFillRect(a->r, NULL);
+	ui_glow(a->r, &panel, accent, 60, 1.5f);
+	ui_panel(a->r, &panel, MENU_RADIUS, accent);
+	ui_fit_text(fh, heading, fit, sizeof fit, panel.w - 360);
+	ui_text(a->r, fh, fit, panel.x + panel.w / 2,
+	        panel.y + (band - ui_font_line(UI_F_LABEL)) / 2, 0, UI_TEXT);
+	if (meta && meta[0])
+		ui_text(a->r, fs, meta, panel.x + panel.w - 36,
+		        panel.y + (band - ui_font_line(UI_F_META)) / 2, 1, UI_TEXT_DIM);
+	SDL_SetRenderDrawColor(a->r, (Uint8)(accent >> 16), (Uint8)(accent >> 8), (Uint8)accent, 70);
+	SDL_RenderFillRect(a->r, &(SDL_Rect){ panel.x + 32, panel.y + band, panel.w - 64, 2 });
+}
+
+static void pm_footer(app *a, const char *keys)
+{
+	SDL_Rect panel = PM_PANEL;
+
+	ui_text(a->r, ui_font(UI_F_META), keys, panel.x + panel.w / 2,
+	        panel.y + panel.h - 24 - ui_font_line(UI_F_META), 0, UI_TEXT_DIM);
+}
+
+static bool g_pm_shot;   /* --pm: drawn for a screenshot, not shown */
+
+static void pm_frame_end(app *a)
+{
+	if (g_pm_shot) return;
+	plat_draw_osd(a->r);
+	plat_present();
+}
+
+/* A small tag: what a port is, beside its name */
+static int pm_tag(app *a, const char *s, int right, int cy, SDL_Color fg, SDL_Color bg)
+{
+	TTF_Font *f = ui_font(UI_F_META);
+	int w = ui_text_width(f, s) + 18, h = ui_font_line(UI_F_META) + 4;
+	SDL_Rect r = { right - w, cy - h / 2, w, h };
+
+	ui_round_rect(a->r, &r, h / 2, bg);
+	ui_text(a->r, f, s, r.x + w / 2, r.y + 2, 0, fg);
+	return w;
+}
+
+#define PM_GREEN  ((SDL_Color){ 120, 220, 150, 255 })
+#define PM_AMBER  ((SDL_Color){ 255, 196, 92, 255 })
+#define PM_RED    ((SDL_Color){ 255, 120, 110, 255 })
+
+/* "action, fps" as "Action, FPS" */
+static void pm_genre_label(const char *g, char *out, size_t n)
+{
+	size_t o = 0;
+
+	while (*g && o + 1 < n) {
+		size_t l = strcspn(g, ",");
+		char one[32];
+
+		snprintf(one, sizeof one, "%.*s", (int)(l < 31 ? l : 31), g);
+		if (!strcmp(one, "fps") || !strcmp(one, "rpg")) {
+			size_t i;
+
+			for (i = 0; one[i]; i++) one[i] = (char)toupper((unsigned char)one[i]);
+		} else if (one[0]) {
+			one[0] = (char)toupper((unsigned char)one[0]);
+		}
+		o += (size_t)snprintf(out + o, n - o, "%s%s", o ? ", " : "", one);
+		if (o >= n) { out[n - 1] = '\0'; return; }
+		g += l;
+		while (*g == ',' || *g == ' ') g++;
+	}
+	if (o == 0 && n) out[0] = '\0';
+}
+
+/* What a port needs, for a person, in one line */
+static const char *pm_needs(const pm_port *p)
+{
+	if (p->flags & PMF_NO) return p->why;
+	return p->flags & PMF_RTR ? "Ready to run" : "Needs your own game files";
+}
+
+/* ---- a port --------------------------------------------------------------- */
+
+static void pm_detail_draw(app *a, int idx, pm_pic *pp, const char (*desc)[CHV_WRAP_COLS],
+                           int ndesc, int top, unsigned accent, const char *keys)
+{
+	const pm_port *p = &g_pmc.p[idx];
+	SDL_Rect panel = PM_PANEL;
+	SDL_Rect shot = { panel.x + 36, panel.y + 108, 448, 336 };
+	TTF_Font *fm = ui_font(UI_F_MENU), *fs = ui_font(UI_F_META);
+	int x = shot.x + shot.w + 32, w = panel.x + panel.w - 36 - x, y = shot.y;
+	int lm = ui_font_line(UI_F_MENU), ls = ui_font_line(UI_F_META);
+	char line[256], fit[256];
+	int i, vis, dy;
+
+	pm_frame_begin(a, accent, p->title, NULL);
+	pm_pic_draw(a, pp, shot);
+
+#define INFO(label, val, col) do { \
+		ui_text(a->r, fs, label, x, y, -1, UI_TEXT_DIM); \
+		y += ls; \
+		ui_fit_text(fs, val, fit, sizeof fit, w); \
+		ui_text(a->r, fs, fit, x, y, -1, col); \
+		y += ls + 12; \
+	} while (0)
+
+	{
+		char g[96];
+
+		pm_genre_label(p->genres, g, sizeof g);
+		INFO("Ported by", p->porter[0] ? p->porter : "unknown", UI_TEXT);
+		INFO("Genre", g[0] ? g : "-", UI_TEXT);
+	}
+	INFO("Needs", pm_needs(p), p->flags & PMF_NO ? PM_RED : p->flags & PMF_RTR ? PM_GREEN : PM_AMBER);
+	{
+		char rt[4][64], nice[64];
+		int nr = pmcat_runtimes(p, rt, 4);
+
+		if (nr > 0) {
+			pm_runtime_name(rt[0], nice, sizeof nice);
+			snprintf(line, sizeof line, "%s%s", nice, nr > 1 ? " and more" : "");
+			INFO("Runs on", line, UI_TEXT_SOFT);
+		}
+	}
+	if (p->flags & PMF_INSTALLED)
+		snprintf(line, sizeof line, p->flags & PMF_UPDATE ? "Installed, update ready"
+		                                                  : "Installed");
+	else
+		snprintf(line, sizeof line, "%.1f MB download", p->size / 1048576.0);
+	INFO(p->flags & PMF_INSTALLED ? "On this Brick" : "Size", line,
+	     p->flags & PMF_UPDATE ? PM_AMBER : UI_TEXT_SOFT);
+	if (p->flags & (PMF_POWER | PMF_EXP))
+		INFO("Note", p->flags & PMF_EXP ? "Experimental: it may not work well"
+		                                : "Made for stronger devices: it may run slowly", PM_AMBER);
+#undef INFO
+
+	/* The description under it all, as much as fits; Y reads the whole */
+	dy = shot.y + shot.h + 28;
+	vis = (panel.y + panel.h - 24 - ls - 20 - dy) / lm;
+	for (i = 0; i < vis && top + i < ndesc; i++)
+		ui_text(a->r, fm, desc[top + i], shot.x, dy + i * lm, -1, UI_TEXT_SOFT);
+	pm_footer(a, keys);
+	pm_frame_end(a);
+}
+
+static void pm_detail_screen(app *a, int idx, unsigned accent)
+{
+	char (*desc)[CHV_WRAP_COLS] = calloc(80, CHV_WRAP_COLS);
+	char *text = malloc(8192), *inst = malloc(4096), keys[160];
+	pm_pic pp;
+	int ndesc = 0;
+	SDL_Rect panel = PM_PANEL;
+
+	if (!desc || !text || !inst) { free(desc); free(text); free(inst); return; }
+	pm_pic_init(&pp);
+	pm_pic_want(&pp, idx);
+	pp.since = 0;
+	pmcat_text(&g_pmc.p[idx], "desc", text, 8192);
+	pmcat_text(&g_pmc.p[idx], "inst", inst, 4096);
+	ndesc = wrap_text(ui_font(UI_F_MENU), text[0] ? text : "No description.", panel.w - 72, desc, 80);
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+	while (a->running) {
+		const pm_port *p = &g_pmc.p[idx];
+
+		pm_pic_step(a, &pp);
+		plat_input_poll(&a->in);
+		if (a->in.quit_requested) { a->running = false; break; }
+		if (a->in.pressed[IN_POWER] || idle_due(a)) { power_off(a); break; }
+		if (menu_leaving(a)) break;
+		if (in_repeat(&a->in, IN_VOLUP)) plat_volume_nudge(+1);
+		if (in_repeat(&a->in, IN_VOLDN)) plat_volume_nudge(-1);
+		if (in_repeat(&a->in, IN_BRIGHTUP)) plat_brightness_nudge(+1);
+		if (in_repeat(&a->in, IN_BRIGHTDN)) plat_brightness_nudge(-1);
+		if (a->in.pressed[IN_Y]) {
+			/* All of it, and how to set it up */
+			char *all = malloc(12800);
+
+			if (all) {
+				snprintf(all, 12800, "%s%s%s", text, inst[0] ? "\n\nTo play: " : "", inst);
+				synopsis_screen(a, p->title, all, accent);
+				free(all);
+			}
+			continue;
+		}
+		if (a->in.pressed[IN_ACCEPT] && (!(p->flags & PMF_INSTALLED) || p->flags & PMF_UPDATE)) {
+			bool was = (p->flags & PMF_INSTALLED) != 0;
+
+			if (p->flags & PMF_NO) {
+				char msg[200];
+
+				snprintf(msg, sizeof msg, "%s.\nInstall it anyway?", p->why);
+				if (!confirm_panel(a, "Won't run here", msg, "Install")) continue;
+			}
+			if (pm_install(a, idx, accent) && !was && !(p->flags & PMF_RTR)) {
+				/* Not ready to run: what to copy, and where */
+				char *say = malloc(4608);
+
+				if (say) {
+					snprintf(say, 4608, "%s needs files from your own copy of the game, in "
+					         "Ports/%s on the card.\n\n%s", p->title, p->dir,
+					         inst[0] ? inst : "PortMaster's page for it says which.");
+					synopsis_screen(a, "Before you play", say, accent);
+					free(say);
+				}
+			}
+			continue;
+		}
+		if (a->in.pressed[IN_X] && p->flags & PMF_INSTALLED) {
+			pm_remove(a, idx, accent);
+			continue;
+		}
+		snprintf(keys, sizeof keys, "%s%sY: read all   B: back",
+		         p->flags & PMF_UPDATE ? "A: update   "
+		         : p->flags & PMF_INSTALLED ? "" : "A: install   ",
+		         p->flags & PMF_INSTALLED ? "X: remove   " : "");
+		pm_detail_draw(a, idx, &pp, (const char (*)[CHV_WRAP_COLS])desc, ndesc, 0, accent, keys);
+		SDL_Delay(8);
+	}
+	pm_pic_free(&pp);
+	free(desc); free(text); free(inst);
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+}
+
+/* ---- a list of ports ------------------------------------------------------ */
+
+static void pm_list_draw(app *a, const char *heading, const int *idx, int n, int sel, int first,
+                         int vis, pm_pic *pp, unsigned accent)
+{
+	SDL_Rect panel = PM_PANEL;
+	TTF_Font *fm = ui_font(UI_F_MENU), *fs = ui_font(UI_F_META);
+	int rh = menu_row_h(), lm = ui_font_line(UI_F_MENU), ls = ui_font_line(UI_F_META);
+	int lx = panel.x + 20, lw = 452, y0 = panel.y + 100;
+	SDL_Rect shot = { lx + lw + 24, y0, panel.x + panel.w - 36 - (lx + lw + 24), 0 };
+	char meta[48], fit[256], line[200];
+	int i;
+
+	snprintf(meta, sizeof meta, "%d port%s", n, n == 1 ? "" : "s");
+	pm_frame_begin(a, accent, heading, meta);
+	if (n == 0) {
+		ui_text(a->r, fm, g_pm_rtr_only ? "Nothing ready to run here" : "Nothing here yet",
+		        panel.x + panel.w / 2, panel.y + panel.h / 2 - lm / 2, 0, UI_TEXT_DIM);
+		pm_footer(a, "B: back");
+		pm_frame_end(a);
+		return;
+	}
+	for (i = first; i < n && i < first + vis; i++) {
+		const pm_port *p = &g_pmc.p[idx[i]];
+		int y = y0 + (i - first) * rh, cy = y + rh / 2, right = lx + lw - 12, tw = 0;
+		SDL_Color col = p->flags & PMF_NO ? UI_TEXT_DIM : UI_TEXT;
+
+		if (i == sel)
+			ui_round_rect(a->r, &(SDL_Rect){ lx, y, lw, rh }, rh / 4, (SDL_Color){ 255, 255, 255, 34 });
+		if (p->flags & PMF_UPDATE)
+			tw = pm_tag(a, "Update", right, cy, (SDL_Color){ 30, 22, 0, 255 }, PM_AMBER) + 8;
+		else if (p->flags & PMF_INSTALLED)
+			tw = pm_tag(a, "Installed", right, cy, (SDL_Color){ 0, 30, 12, 255 }, PM_GREEN) + 8;
+		else if (!(p->flags & PMF_RTR))
+			tw = pm_tag(a, "Files", right, cy, UI_TEXT, (SDL_Color){ 255, 255, 255, 40 }) + 8;
+		ui_fit_text(fm, p->title, fit, sizeof fit, lw - 28 - tw);
+		ui_text(a->r, fm, fit, lx + 16, cy - lm / 2 - TTF_FontDescent(fm) / 2, -1, col);
+	}
+	/* where in the list: a thin rail at the left of the rows */
+	if (n > vis) {
+		int track = vis * rh, th = track * vis / n, ty = y0 + (track - th) * first / (n - vis);
+
+		SDL_SetRenderDrawColor(a->r, (Uint8)(accent >> 16), (Uint8)(accent >> 8), (Uint8)accent, 160);
+		SDL_RenderFillRect(a->r, &(SDL_Rect){ lx - 10, ty, 3, th > 12 ? th : 12 });
+	}
+	/* the one under the cursor */
+	{
+		const pm_port *p = &g_pmc.p[idx[sel]];
+		int y;
+		SDL_Color nc = p->flags & PMF_NO ? PM_RED : p->flags & PMF_RTR ? PM_GREEN : PM_AMBER;
+
+		shot.h = shot.w * 3 / 4;
+		pm_pic_draw(a, pp, shot);
+		y = shot.y + shot.h + 18;
+		ui_fit_text(fm, p->title, fit, sizeof fit, shot.w);
+		ui_text(a->r, fm, fit, shot.x, y, -1, UI_TEXT);
+		y += lm + 4;
+		ui_fit_text(fs, pm_needs(p), fit, sizeof fit, shot.w);
+		ui_text(a->r, fs, fit, shot.x, y, -1, nc);
+		y += ls + 4;
+		{
+			char g[96];
+
+			pm_genre_label(p->genres, g, sizeof g);
+			snprintf(line, sizeof line, "%s%s%.1f MB", g, g[0] ? "  \xC2\xB7  " : "",
+			         p->size / 1048576.0);
+		}
+		ui_fit_text(fs, line, fit, sizeof fit, shot.w);
+		ui_text(a->r, fs, fit, shot.x, y, -1, UI_TEXT_DIM);
+		y += ls + 4;
+		if (p->porter[0]) {
+			snprintf(line, sizeof line, "Ported by %s", p->porter);
+			ui_fit_text(fs, line, fit, sizeof fit, shot.w);
+			ui_text(a->r, fs, fit, shot.x, y, -1, UI_TEXT_DIM);
+		}
+	}
+	pm_footer(a, "A: open   \xE2\x80\xB9 \xE2\x80\xBA: page   B: back");
+	pm_frame_end(a);
+}
+
+static int pm_list_build(pm_section s, const char *genre, int **out)
+{
+	int n = pmcat_list(&g_pmc, s, genre, NULL, 0), k, m = 0;
+	int *idx = malloc((size_t)(n ? n : 1) * sizeof *idx);
+
+	*out = idx;
+	if (!idx) return 0;
+	n = pmcat_list(&g_pmc, s, genre, idx, n);
+	for (k = 0; k < n; k++)
+		if (!g_pm_rtr_only || g_pmc.p[idx[k]].flags & PMF_RTR) idx[m++] = idx[k];
+	return m;
+}
+
+static void pm_list_screen(app *a, const char *heading, pm_section s, const char *genre,
+                           unsigned accent)
+{
+	SDL_Rect panel = PM_PANEL;
+	int *idx = NULL, n = pm_list_build(s, genre, &idx), sel = 0, first = 0;
+	int vis = (panel.h - 100 - 24 - ui_font_line(UI_F_META) - 16) / menu_row_h();
+	pm_pic pp;
+
+	pm_pic_init(&pp);
+	sync_abandon();
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+	while (a->running) {
+		int was = sel;
+
+		if (n > 0) pm_pic_want(&pp, idx[sel]);
+		pm_pic_step(a, &pp);
+		plat_input_poll(&a->in);
+		if (a->in.quit_requested) { a->running = false; break; }
+		if (a->in.pressed[IN_POWER] || idle_due(a)) { power_off(a); break; }
+		if (menu_leaving(a)) break;
+		if (in_repeat(&a->in, IN_VOLUP)) plat_volume_nudge(+1);
+		if (in_repeat(&a->in, IN_VOLDN)) plat_volume_nudge(-1);
+		if (in_repeat(&a->in, IN_BRIGHTUP)) plat_brightness_nudge(+1);
+		if (in_repeat(&a->in, IN_BRIGHTDN)) plat_brightness_nudge(-1);
+		if (n > 0) {
+			if (in_repeat(&a->in, IN_DOWN)) sel = sel + 1 < n ? sel + 1 : 0;
+			if (in_repeat(&a->in, IN_UP)) sel = sel > 0 ? sel - 1 : n - 1;
+			if (in_repeat(&a->in, IN_RIGHT) || in_repeat(&a->in, IN_R1))
+				sel = sel + vis < n ? sel + vis : n - 1;
+			if (in_repeat(&a->in, IN_LEFT) || in_repeat(&a->in, IN_L1))
+				sel = sel - vis > 0 ? sel - vis : 0;
+			if (a->in.pressed[IN_ACCEPT]) {
+				int at = idx[sel];
+
+				pm_pic_free(&pp);
+				pm_detail_screen(a, at, accent);
+				if (g_menu_closing || !a->running) break;
+				/* An install or a removal can move it out of this list */
+				free(idx);
+				n = pm_list_build(s, genre, &idx);
+				for (sel = 0; sel < n && idx[sel] != at; sel++) ;
+				if (sel >= n) sel = n > 0 ? (was < n ? was : n - 1) : 0;
+				continue;
+			}
+		}
+		if (sel < first) first = sel;
+		if (sel >= first + vis) first = sel - vis + 1;
+		pm_list_draw(a, heading, idx, n, sel, first, vis, &pp, accent);
+		SDL_Delay(8);
+	}
+	pm_pic_free(&pp);
+	free(idx);
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+}
+
+/* ---- Genres --------------------------------------------------------------- */
+
+typedef struct {
+	char names[32][24];
+	char labels[32][32];
+	char counts[32][12];
+	int  n;
+	unsigned accent;
+} pm_genre_ctx;
+
+static int pm_genre_count(const char *g)
+{
+	int *idx = NULL, n = pm_list_build(PMS_MAY, g, &idx), t;
+
+	free(idx);
+	idx = NULL;
+	t = pm_list_build(PMS_TESTED, g, &idx);
+	free(idx);
+	return n + t;
+}
+
+static int pm_genre_build(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	pm_genre_ctx *c = ctx;
+	int i, n = 0;
+
+	*heading = "Genres";
+	for (i = 0; i < c->n && n < max; i++)
+		rows[n++] = (menu_row){ c->labels[i], c->counts[i], true, true };
+	return n;
+}
+
+static menu_result pm_genre_key(app *a, void *ctx, in_button key, int sel)
+{
+	pm_genre_ctx *c = ctx;
+	char head[64];
+
+	if (key != IN_ACCEPT || sel < 0 || sel >= c->n) return MENU_STAY;
+	/* What may run, of the genre: the ones that can't are no use browsing
+	 * by kind; Show All has them */
+	snprintf(head, sizeof head, "%s", c->labels[sel]);
+	pm_list_screen(a, head, PMS_MAY, c->names[sel], c->accent);
+	return g_menu_closing ? MENU_DONE : MENU_STAY;
+}
+
+/* ---- PortMaster's first page ---------------------------------------------- */
+
+enum { PMH_TESTED, PMH_MAY, PMH_ALL, PMH_GENRES, PMH_INSTALLED, PMH_UPDATES, PMH_RTR,
+       PMH_REFRESH, PMH_PM, PMH_UNINSTALL, PMH_ROWS };
+
+typedef struct {
+	char counts[PMH_ROWS][16];
+	char when[48], note[96];
+	unsigned accent;
+} pm_home_ctx;
+
+static void pm_home_counts(pm_home_ctx *c)
+{
+	static const pm_section sec[] = { PMS_TESTED, PMS_MAY, PMS_ALL, 0, PMS_INSTALLED, PMS_UPDATES };
+	int i;
+	long age = pm_cat_age();
+
+	for (i = 0; i <= PMH_UPDATES; i++) {
+		int *idx = NULL;
+
+		c->counts[i][0] = '\0';
+		if (i == PMH_GENRES || !g_pmc_loaded) continue;
+		snprintf(c->counts[i], sizeof c->counts[i], "%d", pm_list_build(sec[i], NULL, &idx));
+		free(idx);
+	}
+	if (age < 0) snprintf(c->when, sizeof c->when, "never");
+	else if (age < 3600) snprintf(c->when, sizeof c->when, "just now");
+	else if (age < 86400) snprintf(c->when, sizeof c->when, "%ld hour%s ago", age / 3600, age < 7200 ? "" : "s");
+	else snprintf(c->when, sizeof c->when, "%ld day%s ago", age / 86400, age < 172800 ? "" : "s");
+	snprintf(c->note, sizeof c->note, g_pmc_loaded ? "%d ports in PortMaster's catalog" : "No catalog yet",
+	         g_pmc.n);
+}
+
+static int pm_home_build(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	pm_home_ctx *c = ctx;
+	bool have = g_pmc_loaded, pm = ports_pm_ready(P_ROMS);
+	int n = 0;
+
+	(void)max;
+	*heading = "PortMaster";
+	rows[n] = (menu_row){ "Runs on ChaOS", c->counts[PMH_TESTED], have, true };
+	rows[n++].hint = "Tried on a Brick under ChaOS, and known to work";
+	rows[n] = (menu_row){ "May Run on ChaOS", c->counts[PMH_MAY], have, true };
+	rows[n++].hint = "Nothing it needs rules out the Brick";
+	rows[n] = (menu_row){ "Show All", c->counts[PMH_ALL], have, true };
+	rows[n++].hint = "Every port, with the ones that can't run here marked";
+	rows[n] = (menu_row){ "Genres", NULL, have, true };
+	rows[n++].hint = "What may run, by kind of game";
+	rows[n] = (menu_row){ "Installed", c->counts[PMH_INSTALLED], have, true };
+	rows[n++].hint = "The ports on this Brick from the catalog";
+	rows[n] = (menu_row){ "Updates", c->counts[PMH_UPDATES], have && strcmp(c->counts[PMH_UPDATES], "0"), true };
+	rows[n++].hint = "Installed ports with a newer version";
+	rows[n] = (menu_row){ "Ready to Run Only", g_pm_rtr_only ? "On" : "Off", true };
+	rows[n].toggle = true;
+	rows[n++].hint = "Hide the ports that need files from a game you own";
+	rows[n] = (menu_row){ "Refresh List", c->when, true };
+	rows[n++].hint = "Get PortMaster's latest catalog";
+	rows[n] = (menu_row){ pm ? "Update PortMaster" : "Get PortMaster", NULL, true };
+	rows[n++].hint = pm ? "Its newest release; your ports, saves and settings stay"
+	                    : "Ports run with PortMaster: download it (about 25 MB)";
+	rows[n] = (menu_row){ "Uninstall PortMaster", NULL, pm, true };
+	rows[n++].hint = "Remove it and its ports, keeping their saves if you like";
+	rows[n++] = MENU_RULE;
+	rows[n++] = MENU_NOTE(c->note);
+	return n;
+}
+
+static menu_result pm_home_key(app *a, void *ctx, in_button key, int sel)
+{
+	pm_home_ctx *c = ctx;
+	static const char *const heads[] = { "Runs on ChaOS", "May Run on ChaOS", "All Ports",
+	                                     NULL, "Installed", "Updates" };
+	static const pm_section sec[] = { PMS_TESTED, PMS_MAY, PMS_ALL, 0, PMS_INSTALLED, PMS_UPDATES };
+
+	if (sel == PMH_RTR && (key == IN_ACCEPT || key == IN_LEFT || key == IN_RIGHT)) {
+		g_pm_rtr_only = !g_pm_rtr_only;
+		db_set_int(db_dev(), "pm_rtr_only", g_pm_rtr_only);
+		pm_home_counts(c);
+		return MENU_STAY;
+	}
+	if (key != IN_ACCEPT) return MENU_STAY;
+	switch (sel) {
+	case PMH_TESTED: case PMH_MAY: case PMH_ALL: case PMH_INSTALLED: case PMH_UPDATES:
+		if (!g_pmc_loaded) return MENU_STAY;
+		pm_list_screen(a, heads[sel], sec[sel], NULL, c->accent);
+		break;
+	case PMH_GENRES: {
+		pm_genre_ctx g;
+		menu_style st = { 0 };
+		int i, k = 0;
+
+		memset(&g, 0, sizeof g);
+		g.accent = c->accent;
+		g.n = pmcat_genres(&g_pmc, g.names, 32);
+		if (g.n > 32) g.n = 32;
+		for (i = 0; i < g.n; i++) {
+			int cnt = pm_genre_count(g.names[i]);
+
+			if (!cnt) continue;
+			memmove(g.names[k], g.names[i], 24);
+			pm_genre_label(g.names[k], g.labels[k], sizeof g.labels[k]);
+			snprintf(g.counts[k], sizeof g.counts[k], "%d", cnt);
+			k++;
+		}
+		g.n = k;
+		st.accent = c->accent;
+		st.fixed_w = menu_std_width(a);
+		menu_run(a, &st, pm_genre_build, pm_genre_key, &g);
+		break;
+	}
+	case PMH_REFRESH:
+		if (pm_catalog_fetch(a, c->accent)) pm_reload();
+		break;
+	case PMH_PM:
+		if (!net_online()) { pick_say(a, "PortMaster", "Connect to Wi-Fi first", c->accent); break; }
+		ports_setup_screen(a, "PortMaster", c->accent);
+		break;
+	case PMH_UNINSTALL:
+		if (pm_uninstall(a, c->accent)) return MENU_DONE;
+		break;
+	default: break;
+	}
+	pm_home_counts(c);
+	return g_menu_closing ? MENU_DONE : MENU_STAY;
+}
+
+static void pm_screen(app *a, unsigned accent);
+
+/* Get PortMaster, in the ChaOS menu until it is installed: then the Ports
+ * shelf appears, PortMaster its first card, and the browser opens */
+static void pm_get(app *a)
+{
+	if (!ports_setup_screen(a, "PortMaster", MENU_ACCENT) || !a->running) return;
+	rescan_all(a);
+	pm_screen(a, MENU_ACCENT);
+}
+
+/* PortMaster, from the Ports shelf's first card or the ChaOS menu */
+static void pm_screen(app *a, unsigned accent)
+{
+	pm_home_ctx c;
+	menu_style st = { 0 };
+	long age = pm_cat_age();
+
+	memset(&c, 0, sizeof c);
+	c.accent = accent;
+	g_pm_rtr_only = db_get_int(db_dev(), "pm_rtr_only", 0) != 0;
+	/* A day old or none at all: fetched first (with no Wi-Fi, the one on
+	 * the card, or a word about Wi-Fi when there is none) */
+	if (age < 0 || age > 86400) pm_catalog_fetch(a, accent);
+	if (!a->running) return;
+	pm_reload();
+	pm_home_counts(&c);
+	st.accent = accent;
+	st.fixed_w = menu_std_width(a);
+	menu_run(a, &st, pm_home_build, pm_home_key, &c);
+	/* 2.5 MB is a lot to keep for a screen nobody is on */
+	if (g_pmc_loaded) { pmcat_free(&g_pmc); g_pmc_loaded = false; }
+}
+
 static void launch_game(app *a)
 {
 	sysview *v = &a->view[a->sys_cursor];
@@ -13630,6 +14956,8 @@ static void launch_game(app *a)
 	if (v->list.count == 0) return;
 	/* ChaOS: a port, not a game for Diatom */
 	if (!strcmp(s->core, PORTS_CORE)) {
+		/* ChaOS: its first card is PortMaster's catalog, not a port */
+		if (pm_is_entry(v->list.items[v->cursor].file)) { pm_screen(a, s->accent); return; }
 		port_launch(a, o, v->list.items[v->cursor].file, v->list.items[v->cursor].title);
 		return;
 	}
@@ -15337,11 +16665,32 @@ static void muse_shelf_set(app *a)
 	cf_reset(&a->cf_sys, a->sys_cursor);
 }
 
+/* ChaOS: the Ports shelf. Only with PortMaster installed - it is only
+ * there if someone wants it (Get PortMaster) - and then PortMaster's own
+ * card first, which opens the browser (pm_screen) */
+static void pm_shelf_entry(game_list *l)
+{
+	game_entry *items;
+
+	if (!ports_pm_ready(P_ROMS)) { lib_free(l); return; }
+	items = realloc(l->items, (size_t)(l->count + 1) * sizeof *items);
+	if (!items) return;
+	memmove(items + 1, items, (size_t)l->count * sizeof *items);
+	memset(&items[0], 0, sizeof items[0]);
+	snprintf(items[0].name, sizeof items[0].name, "%s", PM_ENTRY_NAME);
+	snprintf(items[0].title, sizeof items[0].title, "%s", PM_ENTRY_NAME);
+	snprintf(items[0].file, sizeof items[0].file, "%s", PM_ENTRY_FILE);
+	l->items = items;
+	l->count++;
+	l->scanned = true;
+}
+
 static void scan_all(app *a)
 {
 	for (int i = 0; i < a->sys.count; i++) {
 		sysview *v = &a->view[i];
 		lib_scan(P_ROMS, a->sys.systems[i].folder, a->sys.systems[i].exts, &v->list);
+		if (!strcmp(a->sys.systems[i].core, PORTS_CORE)) pm_shelf_entry(&v->list);
 		if (v->list.count > 0) {
 			v->tex = calloc((size_t)v->list.count, sizeof *v->tex);
 			v->tw = calloc((size_t)v->list.count, sizeof *v->tw);
@@ -15485,6 +16834,11 @@ static const char *shot_path;
 static int shot_screen = -1;
 static int shot_menu, shot_menu_sel;
 static int shot_gmenu = -1;           /* ChaOS: --gmenu ROW, the in-game menu */
+/* ChaOS: --pm home ROW | list SECTION ROW | detail ZIP: PortMaster's browser,
+ * from the catalog in .userdata/ports */
+static const char *shot_pm;
+static const char *shot_pm_arg;
+static int shot_pm_n;
 static bool shot_clock;                    /* ChaOS: --datetime [row] */
 static const char *shot_pick;              /* ChaOS: --pick IMAGE, the cover picker */
 static const char *shot_pick_note;         /* ChaOS: --pick-note TEXT, its message alone */
@@ -15796,6 +17150,69 @@ static void updater_art(app *a, const char *dir)
 	fprintf(stderr, "updater art: wrote %s\n", dir);
 }
 
+/* One frame of PortMaster's browser for --pm */
+static void pm_shot(app *a)
+{
+	unsigned accent = 0xA0AEC0;
+	int k;
+
+	for (k = 0; k < a->sys.count; k++)
+		if (!strcmp(a->sys.systems[k].core, PORTS_CORE)) accent = a->sys.systems[k].accent;
+	g_pm_shot = true;
+	if (!pm_reload()) { fprintf(stderr, "--pm: no catalog in .userdata/ports\n"); return; }
+	g_pm_rtr_only = false;
+	if (!strcmp(shot_pm, "home")) {
+		pm_home_ctx c;
+		menu_row rows[16];
+		const char *heading;
+		int n;
+
+		memset(&c, 0, sizeof c);
+		pm_home_counts(&c);
+		n = pm_home_build(&c, rows, 16, &heading);
+		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
+		SDL_RenderFillRect(a->r, NULL);
+		menu_draw(a, heading, rows, n, shot_pm_arg ? atoi(shot_pm_arg) : 0, menu_std_width(a), accent);
+	} else if (!strcmp(shot_pm, "list")) {
+		static const pm_section sec[] = { PMS_TESTED, PMS_MAY, PMS_ALL, PMS_INSTALLED, PMS_UPDATES };
+		static const char *const heads[] = { "Runs on ChaOS", "May Run on ChaOS", "All Ports",
+		                                     "Installed", "Updates" };
+		int which = shot_pm_arg ? atoi(shot_pm_arg) : 1, *idx = NULL, n, sel = shot_pm_n, first;
+		int vis = (PM_PANEL.h - 100 - 24 - ui_font_line(UI_F_META) - 16) / menu_row_h();
+		pm_pic pp;
+
+		if (which < 0 || which > 4) which = 1;
+		n = pm_list_build(sec[which], NULL, &idx);
+		if (sel >= n) sel = n ? n - 1 : 0;
+		first = sel >= vis ? sel - vis + 1 : 0;
+		pm_pic_init(&pp);
+		if (n) { pm_pic_want(&pp, idx[sel]); pm_pic_step(a, &pp); }
+		pm_list_draw(a, heads[which], idx, n, sel, first, vis, &pp, accent);
+		pm_pic_free(&pp);
+		free(idx);
+	} else if (!strcmp(shot_pm, "detail") && shot_pm_arg) {
+		int at = pmcat_find(&g_pmc, shot_pm_arg), nd;
+		static char desc[80][CHV_WRAP_COLS];
+		char text[8192];
+		pm_pic pp;
+		const pm_port *p;
+
+		if (at < 0) { fprintf(stderr, "--pm detail: no %s\n", shot_pm_arg); return; }
+		p = &g_pmc.p[at];
+		pmcat_text(p, "desc", text, sizeof text);
+		nd = wrap_text(ui_font(UI_F_MENU), text, PM_PANEL.w - 72, desc, 80);
+		pm_pic_init(&pp);
+		pm_pic_want(&pp, at);
+		pm_pic_step(a, &pp);
+		pm_detail_draw(a, at, &pp, (const char (*)[CHV_WRAP_COLS])desc, nd, 0, accent,
+		               p->flags & PMF_UPDATE ? "A: update   X: remove   Y: read all   B: back"
+		               : p->flags & PMF_INSTALLED ? "X: remove   Y: read all   B: back"
+		               : "A: install   Y: read all   B: back");
+		pm_pic_free(&pp);
+	}
+}
+
 static void take_shot(app *a)
 {
 	SDL_Surface *out = SDL_CreateRGBSurfaceWithFormat(0, TORTOS_SCREEN_W,
@@ -15810,6 +17227,7 @@ static void take_shot(app *a)
 	    !shot_syn && !shot_cheevos)
 		welcome_draw(a);
 	if (shot_menu) tortos_menu_draw(a, shot_menu_sel);
+	if (shot_pm) pm_shot(a);
 	if (shot_gmenu >= 0) {
 		static menu_row rows[GM_SHOWN + 4];
 		gm_bufs gb;
@@ -16102,6 +17520,12 @@ int main(int argc, char *argv[])
 		/* --menu [row] draws the TortOS menu over whichever screen --screen
 		 * asked for, so the panel can be looked at without a device. */
 		else if (!strcmp(argv[i], "--gmenu") && i + 1 < argc) shot_gmenu = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "--pm") && i + 1 < argc) {
+			shot_pm = argv[++i];
+			if (i + 1 < argc && argv[i + 1][0] != '-') shot_pm_arg = argv[++i];
+			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9')
+				shot_pm_n = atoi(argv[++i]);
+		}
 		else if (!strcmp(argv[i], "--menu")) {
 			shot_menu = 1;
 			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9')

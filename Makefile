@@ -9,7 +9,7 @@
         check check-cheevos check-hare check-httpd check-idle check-rahash \
         check-raset check-xfer check-menus check-artscrape check-artrun check-audioout \
         check-db check-stats check-sort check-bt check-ss check-update check-asan \
-        check-release check-updater check-chaos-names check-itch check-cover check-ports
+        check-release check-updater check-chaos-names check-itch check-cover check-ports check-pmcat
 
 all: check
 
@@ -22,7 +22,7 @@ CHECKS = check-cheevos check-hare check-httpd check-idle check-rahash \
          check-db check-stats check-sort check-bt check-ss \
          check-muselib check-musequeue check-museart check-controls check-logpack \
          check-clock check-update check-remap check-shots check-pixfont \
-         check-release check-updater check-chaos-names check-itch check-cover check-ports
+         check-release check-updater check-chaos-names check-itch check-cover check-ports check-pmcat
 
 check:
 	@fail=0; for c in $(CHECKS); do \
@@ -309,6 +309,16 @@ build-native/ports-check: tools/ports-check.c src/ports.c src/ports.h src/librar
 	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g -DTORTOS_VERSION='"check"' \
 	      -DCHAOS_VERSION='"check"' -Isrc -o $@ tools/ports-check.c src/ports.c src/library.c \
 	      src/net.c src/urlenc.c
+
+# ChaOS: PortMaster's catalog (src/pmcat.h): a small one of its own, and
+# PMCAT_JSON=/path/to/ports.json for the real one
+check-pmcat: build-native/pmcat-check
+	@./build-native/pmcat-check $(PMCAT_JSON)
+
+build-native/pmcat-check: tools/pmcat-check.c src/pmcat.c src/pmcat.h src/rajson.c FORCE
+	@mkdir -p build-native
+	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g -Isrc -o $@ tools/pmcat-check.c \
+	      src/pmcat.c src/rajson.c
 
 # ChaOS: a game's cover from ChaOS Transfer's page (src/cover.c), on a card
 # in /tmp; CHAOS_NET_CHECKS=1 make check-cover follows real links too.

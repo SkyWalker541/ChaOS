@@ -819,12 +819,25 @@ static void radio_less(void)
 	for (i = 0, ok = true; i < k; i++) if (sm[i] != (sm_row)i) ok = false;
 	ck(k == SM_ROWS && ok, "every system row, in the enum's order");
 
+	/* ChaOS: Get PortMaster until it is installed, then not */
+	{
+		pm_row ids2[PM_ROWS];
+		int had = sys_menu_tortos_rows(&u, ids2), j, found = 0;
+
+		for (j = 0; j < had; j++) if (ids2[j] == PM_PORTS) found = 1;
+		ck(found, "Get PortMaster is there before it is installed");
+		u.pm_have = true;
+		k = sys_menu_tortos_rows(&u, ids2);
+		for (j = 0, found = 0; j < k; j++) if (ids2[j] == PM_PORTS) found = 1;
+		ck(!found && k == had - 1, "and gone once it is");
+		u.pm_have = false;
+	}
 	u.no_wifi = true;
 	u.no_bt = true;
 	n = sys_menu_build(&u, rows, &b, &heading);
 	k = sys_menu_tortos_rows(&u, pm);
 	printf("ChaOS menu, no radio at all:\n");
-	ck(n == k && n == TOP_ROWS - 7, "seven rows fewer (Updates too), and the build agrees with the list");
+	ck(n == k && n == TOP_ROWS - 8, "eight rows fewer (Updates and Get PortMaster too), and the build agrees with the list");
 	ck(!has_label(rows, n, "Wi-Fi") && !has_label(rows, n, "Bluetooth"),
 	   "no Wi-Fi, no Bluetooth");
 	ck(!has_label(rows, n, XFER_NAME_WIFI) && !has_label(rows, n, XFER_NAME_CABLE) &&
@@ -846,7 +859,7 @@ static void radio_less(void)
 	n = sys_menu_build(&u, rows, &b, &heading);
 	k = sys_menu_tortos_rows(&u, pm);
 	printf("ChaOS menu, no radio, files over the cable:\n");
-	ck(n == k && n == TOP_ROWS - 6, "six rows fewer: the transfer row stays");
+	ck(n == k && n == TOP_ROWS - 7, "seven rows fewer: the transfer row stays");
 	for (i = 0; i < k && pm[i] != PM_XFER; i++) { }
 	ck(i < k && !strcmp(rows[i].label, XFER_NAME_CABLE),
 	   "as ChaOS Wire, where the list says it is");

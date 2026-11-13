@@ -254,6 +254,23 @@ void ra_md5_hex(const void *data, size_t len, char *out)
 	md5_hex(&m, out);
 }
 
+bool ra_md5_file(const char *path, char *out)
+{
+	static unsigned char buf[65536];
+	FILE *f = fopen(path, "rb");
+	md5_ctx m;
+	size_t got;
+
+	out[0] = '\0';
+	if (!f) return false;
+	md5_init(&m);
+	while ((got = fread(buf, 1, sizeof buf, f)) > 0) md5_update(&m, buf, got);
+	if (ferror(f)) { fclose(f); return false; }
+	fclose(f);
+	md5_hex(&m, out);
+	return true;
+}
+
 bool ra_hash_rom(const char *path, const char *tag, char *out)
 {
 	unsigned char *data = NULL;

@@ -33,6 +33,10 @@ bool js_member(jsv v, const char *name, jsv *out);
  */
 bool js_next(jsv arr, jsv *it, jsv *elem);
 
+/* ChaOS: iterate an object's members the same way; `key` is the key's raw
+ * text, between its quotes, not unescaped. */
+bool js_next_member(jsv obj, jsv *it, jsv *key, jsv *val);
+
 /* A string, unescaped, NUL terminated and truncated to fit. False if the value
  * is not a string. \uXXXX becomes UTF-8; a lone surrogate becomes U+FFFD
  * rather than a malformed sequence the font will render as a box. */

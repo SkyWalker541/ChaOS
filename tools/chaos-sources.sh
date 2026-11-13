@@ -25,6 +25,7 @@ git -C "$ROOT" archive --format=tar.gz --prefix=ChaOS/ HEAD > "$S/ChaOS-source.t
 cp "$ROOT/dist/brick/ChaOS-diatom-source.tar.gz" "$S/"
 cp "$ROOT/dist/brick/bash-source.tar.xz" "$S/"
 cp "$ROOT/dist/brick/portlibs-source.tar.xz" "$S/"
+cp "$ROOT/dist/brick/unsquashfs-source.tar.xz" "$S/"
 cat > "$S/README.txt" <<EOF
 ChaOS $V for the TrimUI Brick: the source of everything in its card image.
 
@@ -58,6 +59,12 @@ ChaOS $V for the TrimUI Brick: the source of everything in its card image.
       Opus, opusfile and Speex (BSD-3-Clause), bzip2, Zstandard (BSD),
       libmodplug (public domain), SDL2_mixer, SDL2_gfx and SDL2 with its
       patches (zlib).
+
+  unsquashfs-source.tar.xz
+      squashfs-tools 4.6.1's unsquashfs (GPL-2.0-or-later), with zlib, XZ
+      Utils' liblzma (0BSD), Zstandard and LZ4 (BSD-2-Clause), static, in
+      ChaOS/ports/bin: ports' runtimes are unpacked with it, as the Brick's
+      kernel can't mount them (tools/build-unsquashfs.sh builds it).
       tools/build-portlibs.sh builds them.
 
 The licenses are in the image's Licenses/ folder and in each archive.

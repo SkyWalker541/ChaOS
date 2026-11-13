@@ -125,6 +125,34 @@ bool js_next(jsv arr, jsv *it, jsv *elem)
 	return true;
 }
 
+/* ChaOS: an object's members in order, for a catalog keyed by name (PortMaster's
+ * ports.json). `it` as for js_next; `key` is the raw key, quotes left off. */
+bool js_next_member(jsv obj, jsv *it, jsv *key, jsv *val)
+{
+	const char *p = skip_ws(obj.b, obj.e);
+
+	if (p >= obj.e || *p != '{') return false;
+	if (!it->b) {
+		p++;
+	} else {
+		p = skip_ws(it->e, obj.e);
+		if (p >= obj.e || *p != ',') return false;
+		p++;
+	}
+	p = skip_ws(p, obj.e);
+	if (p >= obj.e || *p != '"') return false;
+	key->b = p + 1;
+	p = skip_string(p, obj.e);
+	key->e = p > key->b ? p - 1 : p;
+	p = skip_ws(p, obj.e);
+	if (p >= obj.e || *p != ':') return false;
+	p = skip_ws(p + 1, obj.e);
+	val->b = p;
+	val->e = skip_value(p, obj.e);
+	*it = *val;
+	return true;
+}
+
 static void put_utf8(char **o, char *end, unsigned cp)
 {
 	char *p = *o;

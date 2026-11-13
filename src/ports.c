@@ -19,6 +19,11 @@ void ports_pm_dir(const char *roms, char *out, size_t n)
 	snprintf(out, n, "%s/Ports/PortMaster", roms);
 }
 
+void ports_pm_kept_dir(const char *roms, char *out, size_t n)
+{
+	snprintf(out, n, "%s/Ports/.PortMaster.kept", roms);
+}
+
 bool ports_pm_ready(const char *roms)
 {
 	char p[512];
@@ -51,7 +56,7 @@ bool ports_script_ok(const char *path, char *why, size_t n)
 
 static ports_setup_state g_state = PS_IDLE;
 static pid_t g_pid = -1;
-static char g_zip[512], g_stage[512], g_pm[512];
+static char g_zip[512], g_stage[512], g_pm[512], g_roms[400];
 static char g_why[96];
 static const char *g_url = PORTS_PM_URL;
 
@@ -77,6 +82,7 @@ bool ports_setup_begin(const char *roms)
 	char dir[400];
 
 	g_why[0] = '\0';
+	snprintf(g_roms, sizeof g_roms, "%s", roms);
 	snprintf(dir, sizeof dir, "%s/Ports", roms);
 	mkdir(dir, 0755);
 	snprintf(g_zip, sizeof g_zip, "%s/.PortMaster.zip", dir);
@@ -136,18 +142,74 @@ static bool unpack_begin(void)
 /* The unpacked PortMaster into place. A folder already there without a
  * control.txt is a broken or half-copied one: kept, renamed, not deleted -
  * it may have someone's settings in it. */
+/* What PortMaster keeps of its own beside its code: the runtimes it has
+ * fetched (libs/: some are hundreds of MB, and ChaOS's unpacked copies are
+ * in libs/.chaos) and its settings (config/). An update carries them over. */
+static const char *const g_keep[] = { "libs", "config", NULL };
+
+static void carry_over(const char *old)
+{
+	int i;
+
+	for (i = 0; g_keep[i]; i++) {
+		char from[700], to[700];
+		struct stat st;
+
+		snprintf(from, sizeof from, "%s/%s", old, g_keep[i]);
+		snprintf(to, sizeof to, "%s/%s", g_pm, g_keep[i]);
+		if (stat(from, &st) != 0 || !S_ISDIR(st.st_mode)) continue;
+		/* The new release's own (an empty libs/, a default config):
+		 * the old one, with what was fetched and set, wins */
+		remove_tree(to);
+		rename(from, to);
+	}
+}
+
 static bool unpack_finish(void)
 {
-	char from[600], old[600];
+	char from[600], old[600] = "";
 	struct stat st;
+	bool update = false;
 
 	snprintf(from, sizeof from, "%s/PortMaster", g_stage);
 	if (stat(from, &st) != 0 || !S_ISDIR(st.st_mode)) return false;
 	if (stat(g_pm, &st) == 0) {
-		snprintf(old, sizeof old, "%s.old-%ld", g_pm, (long)time(NULL));
+		char ctl[620];
+
+		snprintf(ctl, sizeof ctl, "%s/control.txt", g_pm);
+		update = access(ctl, R_OK) == 0;
+		/* A name nothing has: two in one second would collide */
+		{
+			int k = 0;
+			struct stat o;
+
+			do snprintf(old, sizeof old, k ? "%s.old-%ld-%d" : "%s.old-%ld", g_pm,
+			            (long)time(NULL), k);
+			while (stat(old, &o) == 0 && ++k < 100);
+		}
 		if (rename(g_pm, old) != 0) return false;
 	}
-	if (rename(from, g_pm) != 0) return false;
+	if (rename(from, g_pm) != 0) {
+		if (old[0]) rename(old, g_pm);
+		return false;
+	}
+	/* A working PortMaster updated: what it had fetched and set comes
+	 * along, and the old one goes. A broken one stays, renamed. */
+	if (update) {
+		carry_over(old);
+		remove_tree(old);
+	} else {
+		/* Installed again after an uninstall that kept its settings
+		 * (ports_pm_kept_dir): they come back */
+		char kept[600];
+		struct stat ks;
+
+		ports_pm_kept_dir(g_roms, kept, sizeof kept);
+		if (stat(kept, &ks) == 0 && S_ISDIR(ks.st_mode)) {
+			carry_over(kept);
+			remove_tree(kept);
+		}
+	}
 	remove_tree(g_stage);
 	unlink(g_zip);
 	return true;

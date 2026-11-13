@@ -103,8 +103,12 @@ grep -q '^OS_NAME=' "$OSR" || echo 'OS_NAME=ChaOS' >> "$OSR"
 mkdir -p "$C/TortOS/ports"
 install -m 755 "$ROOT/res/ports/run.sh" "$C/TortOS/ports/run.sh"
 install -m 644 "$ROOT/res/ports/mod_ChaOS.txt" "$C/TortOS/ports/mod_ChaOS.txt"
+install -m 644 "$ROOT/res/ports/tested.txt" "$C/TortOS/ports/tested.txt"
 mkdir -p "$C/TortOS/ports/bin"
-install -m 755 "$ROOT/res/ports/bin/pkill" "$ROOT/res/ports/bin/pgrep" "$C/TortOS/ports/bin/"
+install -m 755 "$ROOT/res/ports/bin/pkill" "$ROOT/res/ports/bin/pgrep" "$ROOT/res/ports/bin/mount" "$C/TortOS/ports/bin/"
+# unsquashfs, for runtimes the kernel can't mount (res/ports/bin/mount,
+# tools/build-unsquashfs.sh)
+install -m 755 "$ROOT/dist/brick/unsquashfs" "$C/TortOS/ports/bin/unsquashfs"
 # The shelf: ChaOS's systems.cfg, with the Ports row, and the cards for the
 # shelves that aren't consoles - Favorites, Muse, Recently Played, Ports - in
 # both of TortOS's sets, as ChaOS draws them (tools/cardstyle.py,
@@ -121,6 +125,8 @@ mkdir -p "$C/Roms/Ports"
 # (tools/chaos-sources.sh)
 tar -xJOf "$ROOT/dist/brick/bash-source.tar.xz" bash-5.1.16/COPYING > "$C/Licenses/bash.txt"
 chmod 644 "$C/Licenses/bash.txt"
+tar -xJOf "$ROOT/dist/brick/unsquashfs-source.tar.xz" unsquashfs-source/squashfs-tools/COPYING > "$C/Licenses/squashfs-tools.txt"
+chmod 644 "$C/Licenses/squashfs-tools.txt"
 # and the port libraries' licenses, each project's own text
 mkdir -p "$C/Licenses/ports"
 for p in "ogg COPYING" "vorbis COPYING" "flac COPYING.Xiph" "flac COPYING.GPL" "opus COPYING" \

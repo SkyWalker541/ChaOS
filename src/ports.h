@@ -30,6 +30,10 @@
 
 /* Where things are, under `roms` (P_ROMS on the device) */
 void ports_pm_dir(const char *roms, char *out, size_t n);   /* Roms/Ports/PortMaster */
+/* Where PortMaster's settings wait (its config/) after an uninstall that
+ * kept them, to be put back when it is installed again: Roms/Ports/
+ * .PortMaster.kept, a dot folder, so the shelf doesn't list it */
+void ports_pm_kept_dir(const char *roms, char *out, size_t n);
 /* Whether PortMaster is there to run a port with: its control.txt */
 bool ports_pm_ready(const char *roms);
 

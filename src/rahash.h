@@ -32,4 +32,8 @@ bool ra_hash_rom(const char *path, const char *tag, char *out);
  * a second thing to get subtly wrong. */
 void ra_md5_hex(const void *data, size_t len, char *out);
 
+/* ChaOS: the MD5 of a whole file, read in pieces (a port's zip, a runtime -
+ * up to a few hundred MB, checked against PortMaster's catalog). */
+bool ra_md5_file(const char *path, char *out);
+
 #endif
