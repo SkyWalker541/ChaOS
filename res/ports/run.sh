@@ -26,7 +26,10 @@ date
 
 # The Brick's pad for SDL, by position (see mod_ChaOS.txt): with SDL's
 # checksum of the name and without, as SDL matches either
-M="a:b1,b:b0,x:b3,y:b2,back:b8,start:b9,guide:b10,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,leftstick:b11,rightstick:b12,dpup:b13,dpdown:b14,dpleft:b15,dpright:b16,platform:Linux,"
+# The d-pad is the left stick as well: the Brick has no stick, and a port
+# that steers with one (PortMaster's analog_1) can then be played. SDL takes
+# a button on half an axis, and one button on two outputs.
+M="a:b1,b:b0,x:b3,y:b2,back:b8,start:b9,guide:b10,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,leftstick:b11,rightstick:b12,dpup:b13,dpdown:b14,dpleft:b15,dpright:b16,-leftx:b15,+leftx:b16,-lefty:b13,+lefty:b14,platform:Linux,"
 CHAOS_PAD="19001eec427269636b2047616d657000,Brick Gamepad,$M
 19000000427269636b2047616d657000,Brick Gamepad,$M"
 export CHAOS_PAD

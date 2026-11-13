@@ -1,0 +1,22 @@
+SDL2: one button, every output a mapping binds it to
+
+HandleJoystickButton stops at the first binding of a button, so a mapping
+can't make one button two things. ChaOS's mapping for the TrimUI Brick, which
+has no stick, makes the d-pad both the d-pad and the left stick
+(res/ports/run.sh), so that a port steering with a stick can be played.
+
+ChaOS, for ports only (src/ports.h). After plastron's 0001 and 0002.
+
+diff --git a/src/joystick/SDL_gamecontroller.c b/src/joystick/SDL_gamecontroller.c
+index 36e521e..8fa2fac 100644
+--- a/src/joystick/SDL_gamecontroller.c
++++ b/src/joystick/SDL_gamecontroller.c
+@@ -267,7 +267,7 @@ static void HandleJoystickButton(SDL_GameController *gamecontroller, int button,
+             } else {
+                 SDL_PrivateGameControllerButton(gamecontroller, binding->output.button, state);
+             }
+-            break;
++            /* ChaOS: on to the next binding of the same button, if any */
+         }
+     }
+ }

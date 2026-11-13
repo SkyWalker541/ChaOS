@@ -92,9 +92,10 @@ cm SDL_mixer -DSDL2MIXER_SAMPLES=OFF -DSDL2MIXER_VENDORED=OFF -DSDL2MIXER_DEPS_S
 	-DSDL2MIXER_MIDI=ON -DSDL2MIXER_MIDI_TIMIDITY=ON -DSDL2MIXER_MIDI_FLUIDSYNTH=OFF \
 	-DSDL2MIXER_WAVPACK=OFF -DSDL2MIXER_GME=OFF
 # SDL2 for ports: the Brick's own (plastron's: 2.32.10 with its PowerVR
-# driver, patches 0001 and 0002 in the sources) and two more: 0003, so that a
+# driver, patches 0001 and 0002 in the sources) and three more: 0003, so that a
 # port's keyboard is found with no udev, and 0004, so that the Brick's pad,
-# all buttons and no axes, is a joystick (res/ports/sdl2). In a folder of its
+# all buttons and no axes, is a joystick, and 0005, so that one button can be
+# two things in a mapping (res/ports/sdl2). In a folder of its
 # own, ahead of /usr/lib on a port's LD_LIBRARY_PATH (res/ports/run.sh); the
 # launcher and the emulator keep plastron's.
 cd "$S/SDL2"
