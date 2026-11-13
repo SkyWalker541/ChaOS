@@ -87,12 +87,13 @@ install -m 755 "$DIATOM" "$C/TortOS/diatom"
 [ ! -e "$W/root/bin/bash" ] || { echo "the root has a bash already: check ports" >&2; exit 1; }
 install -m 755 "$BASH_BIN" "$W/root/bin/bash"
 # The libraries ports expect any system to have, which the Brick's doesn't:
-# OpenAL, Ogg, Vorbis, FLAC, Opus, mpg123, SDL2_mixer (tools/build-portlibs.sh)
+# OpenAL, Ogg, Vorbis, FLAC, Opus, mpg123, SDL2_mixer, and SDL2 for ports in
+# /usr/lib/chaos-ports (tools/build-portlibs.sh)
 for f in $(tar -tJf "$ROOT/dist/brick/portlibs.tar.xz" | grep '^usr/lib/lib'); do
 	[ ! -e "$W/root/$f" ] || { echo "the root has $f already: check the port libraries" >&2; exit 1; }
 done
-tar -xJf "$ROOT/dist/brick/portlibs.tar.xz" -C "$W/root" --no-same-owner
 [ ! -e "$W/root/usr/lib/chaos-ports" ] || { echo "the root has /usr/lib/chaos-ports already" >&2; exit 1; }
+tar -xJf "$ROOT/dist/brick/portlibs.tar.xz" -C "$W/root" --no-same-owner
 [ ! -e "$W/root/roms" ] || { echo "the root has a /roms already: check ports" >&2; exit 1; }
 ln -s /mnt/SDCARD/Roms "$W/root/roms"
 OSR=$W/root/etc/os-release
