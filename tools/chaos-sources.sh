@@ -24,6 +24,7 @@ ln -s "$(cd "$(dirname "$TORTOS_SRC")" && pwd)/$(basename "$TORTOS_SRC")" "$S/To
 git -C "$ROOT" archive --format=tar.gz --prefix=ChaOS/ HEAD > "$S/ChaOS-source.tar.gz"
 cp "$ROOT/dist/brick/ChaOS-diatom-source.tar.gz" "$S/"
 cp "$ROOT/dist/brick/bash-source.tar.xz" "$S/"
+cp "$ROOT/dist/brick/portlibs-source.tar.xz" "$S/"
 cat > "$S/README.txt" <<EOF
 ChaOS $V for the TrimUI Brick: the source of everything in its card image.
 
@@ -49,6 +50,13 @@ ChaOS $V for the TrimUI Brick: the source of everything in its card image.
       GNU bash 5.1.16, unchanged, which ChaOS adds to the root as /bin/bash
       for ports (tools/build-bash.sh builds it). GPL-3.0-or-later.
       https://www.gnu.org/software/bash/
+
+  portlibs-source.tar.xz
+      The libraries ChaOS adds to the root's /usr/lib for ports, each
+      project's own source (SOURCES.txt says from where, at which commit):
+      OpenAL Soft and mpg123 (LGPL-2.1-or-later), Ogg, Vorbis, FLAC, Opus
+      and opusfile (BSD-3-Clause), SDL2_mixer (zlib).
+      tools/build-portlibs.sh builds them.
 
 The licenses are in the image's Licenses/ folder and in each archive.
 EOF

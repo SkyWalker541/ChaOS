@@ -86,6 +86,12 @@ install -m 755 "$DIATOM" "$C/TortOS/diatom"
 # ChaOS's settings for PortMaster.
 [ ! -e "$W/root/bin/bash" ] || { echo "the root has a bash already: check ports" >&2; exit 1; }
 install -m 755 "$BASH_BIN" "$W/root/bin/bash"
+# The libraries ports expect any system to have, which the Brick's doesn't:
+# OpenAL, Ogg, Vorbis, FLAC, Opus, mpg123, SDL2_mixer (tools/build-portlibs.sh)
+for f in $(tar -tJf "$ROOT/dist/brick/portlibs.tar.xz" | grep '^usr/lib/lib'); do
+	[ ! -e "$W/root/$f" ] || { echo "the root has $f already: check the port libraries" >&2; exit 1; }
+done
+tar -xJf "$ROOT/dist/brick/portlibs.tar.xz" -C "$W/root" --no-same-owner
 [ ! -e "$W/root/roms" ] || { echo "the root has a /roms already: check ports" >&2; exit 1; }
 ln -s /mnt/SDCARD/Roms "$W/root/roms"
 OSR=$W/root/etc/os-release
@@ -113,6 +119,14 @@ mkdir -p "$C/Roms/Ports"
 # (tools/chaos-sources.sh)
 tar -xJOf "$ROOT/dist/brick/bash-source.tar.xz" bash-5.1.16/COPYING > "$C/Licenses/bash.txt"
 chmod 644 "$C/Licenses/bash.txt"
+# and the port libraries' licenses, each project's own text
+mkdir -p "$C/Licenses/ports"
+for p in "ogg COPYING" "vorbis COPYING" "flac COPYING.Xiph" "flac COPYING.GPL" "opus COPYING" \
+         "opusfile COPYING" "mpg123 COPYING" "openal-soft COPYING" "SDL_mixer LICENSE.txt"; do
+	set -- $p
+	tar -xJOf "$ROOT/dist/brick/portlibs-source.tar.xz" "portlibs-source/$1/$2" > "$C/Licenses/ports/$1-${2%.txt}.txt"
+done
+chmod 644 "$C/Licenses/ports/"*
 rm -rf "$C/TortOS/overlays"
 cp -R "$ROOT/res/overlays" "$C/TortOS/overlays"
 find "$C/TortOS/overlays" -type d -exec chmod 755 {} +

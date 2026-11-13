@@ -129,6 +129,7 @@ sold, put behind a paywall, or shipped with a device that is sold.
   identify each platform.
 - **Mozilla's root certificate list**, as published by the curl project: used
   to check HTTPS servers. MPL-2.0.
+- **Libraries for ports**, added to the image's `/usr/lib` because ports expect any system to have them: **OpenAL Soft** 1.24.3 (LGPL-2.1-or-later), **mpg123** (LGPL-2.1), **Ogg**, **Vorbis**, **FLAC**, **Opus** and **opusfile** (BSD-3-Clause, Xiph.Org), and **SDL2_mixer** 2.8.1 (zlib). Unchanged but for Vorbis's library names; built by `tools/build-portlibs.sh` from `dist/brick/portlibs-source.tar.xz`, which is in each release's sources archive. Their licences are in `Licenses/ports/` on the card.
 - **GNU bash** 5.1.16 (https://www.gnu.org/software/bash/, GPL-3.0-or-later): `/bin/bash` in the image, unchanged, for ports. Its licence is `Licenses/bash.txt` on the card and its source is in each release's sources archive (`dist/brick/bash-source.tar.xz`, built by `tools/build-bash.sh`).
 - **The Favorites, Muse, Recently Played and Ports cards** are ChaOS's own, with no third-party images: in Plain Jane on the drawn set's own card (`tools/cardstyle.py`), in Fancy Pants rendered in 3D as objects (`tools/raymarch.py`; `tools/genmusefancy.py`, `tools/genportsfancy.py`, `tools/genrecentfancy.py`). Muse's Fancy Pants card replaces TortOS's iPod photograph, whose source was never recorded.
 - **ChaOS logo** ("Handheld burst"): original pixel art made for ChaOS, drawn
