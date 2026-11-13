@@ -90,11 +90,20 @@ int  plat_run(char *const argv[], const char *const envkv[], const char *workdir
 bool plat_run_power_pressed(void);
 /* ChaOS: a port (src/ports.h), run like plat_run but in a process group of its
  * own, since a port is a script that starts programs of its own. While it runs
- * the volume keys work, and power or Select+Start held for two seconds end it:
- * the whole group, SIGTERM and then SIGKILL. How it ended goes in *how. */
+ * the volume keys work, and Select+Start ends it: the whole group, SIGTERM and
+ * then SIGKILL. Power freezes it (SIGSTOP to the group) and asks `on_power`
+ * what now: 1 power off (the port ended, *how PORT_POWER), 0 go on (SIGCONT),
+ * -1 couldn't ask - then the screen goes off and the next press brings the
+ * port back, and power held three seconds powers off. How it ended goes in
+ * *how. */
 enum { PORT_ENDED, PORT_POWER, PORT_QUIT };
+/* For on_power, which runs while the port is frozen and the launcher has no
+ * window: the buttons, read without SDL, and the power key's presses */
+void plat_child_input(in_state *st);
+void plat_child_grab(bool on);   /* the buttons kept from the port while it asks */
+bool plat_power_event(bool *down);
 int  plat_run_port(char *const argv[], const char *const envkv[], const char *workdir,
-                   int *how);
+                   int *how, int (*on_power)(void *ctx), void *ctx);
 /* Say that something equivalent to a power press has happened, for the paths
  * the evdev watchdog cannot see: a screen the launcher is drawing over a
  * paused game, where plat_resident_wait is not running and so nothing is

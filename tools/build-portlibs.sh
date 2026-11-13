@@ -3,6 +3,7 @@
 # (src/ports.h): OpenAL Soft, Ogg, Vorbis, FLAC, Opus, opusfile, mpg123 and
 # SDL2_mixer, cross-built for aarch64 against the Brick's own root
 # (SYSROOT, with ALSA and SDL2 in it), as dist/brick/portlibs.tar.xz is.
+# FluidSynth (LGPL-2.1) and SDL2_net (zlib) for Doom's engines, too.
 # tools/chaos-image.sh puts them in the root's /usr/lib.
 #
 #   tools/build-portlibs.sh SYSROOT OUT.tar.xz
@@ -37,7 +38,7 @@ cm() {
 	b=$W/b-$(echo "$src" | tr / _)
 	cmake -S "$S/$src" -B "$b" -G Ninja -DCMAKE_TOOLCHAIN_FILE="$TC" \
 		-DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_SHARED_LIBS=ON "$@" > /dev/null
-	ninja -C "$b" > /dev/null
+	ninja -C "$b" > "$b.log" 2>&1 || { tail -30 "$b.log" >&2; exit 1; }
 	DESTDIR=$ST ninja -C "$b" install > /dev/null
 	echo "built $src"
 }
@@ -85,6 +86,17 @@ aarch64-linux-gnu-gcc --sysroot="$SYSROOT" -O2 -fPIC -shared -I"$SYSROOT/usr/inc
 	"$S"/SDL2_gfx/SDL2_rotozoom.c -L"$SYSROOT/usr/lib" -lSDL2 -lm
 ln -sf libSDL2_gfx-1.0.so.0.0.2 "$ST/usr/lib/libSDL2_gfx-1.0.so.0"
 echo "built SDL2_gfx"
+# FluidSynth, for the MIDI music of Doom's engines (Crispy Doom asks for
+# libfluidsynth.so.3): its C++11 OS layer rather than GLib, which the Brick
+# hasn't, no OpenMP (libgomp), and output left to the port (SDL_mixer)
+cm fluidsynth -Dosal=cpp11 -Denable-alsa=OFF -Denable-aufile=OFF -Denable-dbus=OFF -Denable-ipv6=OFF \
+	-Denable-jack=OFF -Denable-ladspa=OFF -Denable-libinstpatch=OFF -Denable-libsndfile=ON \
+	-Denable-midishare=OFF -Denable-network=OFF -Denable-oss=OFF -Denable-sdl3=OFF \
+	-Denable-pulseaudio=OFF -Denable-pipewire=OFF -Denable-readline=OFF -Denable-openmp=OFF \
+	-Denable-systemd=OFF -Denable-native-dls=ON -DCMAKE_INSTALL_LIBDIR=lib \
+	-DGCEM_INCLUDE_DIR="$S/fluidsynth/gcem/include" -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath-link,$ST/usr/lib"
+# SDL2_net, which Crispy Doom links for its multiplayer
+cm SDL_net -DSDL2NET_SAMPLES=OFF -DSDL2NET_INSTALL=ON
 cm SDL_mixer -DSDL2MIXER_SAMPLES=OFF -DSDL2MIXER_VENDORED=OFF -DSDL2MIXER_DEPS_SHARED=OFF \
 	-DSDL2MIXER_OPUS=ON -DSDL2MIXER_VORBIS=VORBISFILE -DSDL2MIXER_FLAC=ON \
 	-DSDL2MIXER_FLAC_LIBFLAC=OFF -DSDL2MIXER_FLAC_DRFLAC=ON -DSDL2MIXER_MP3=ON \

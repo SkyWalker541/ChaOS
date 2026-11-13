@@ -131,10 +131,13 @@ mkdir -p "$C/Licenses/ports"
 for p in "ogg COPYING" "vorbis COPYING" "flac COPYING.Xiph" "flac COPYING.GPL" "opus COPYING" \
          "opusfile COPYING" "mpg123 COPYING" "openal-soft COPYING" "SDL_mixer LICENSE.txt" \
          "SDL2 LICENSE.txt" "bzip2 LICENSE" "zstd LICENSE" "libmodplug COPYING" \
-         "libsndfile COPYING" "speex COPYING" "SDL2_gfx LICENSE"; do
+         "libsndfile COPYING" "speex COPYING" "SDL2_gfx LICENSE" "fluidsynth LICENSE" \
+         "SDL_net LICENSE.txt"; do
 	set -- $p
 	tar -xJOf "$ROOT/dist/brick/portlibs-source.tar.xz" "portlibs-source/$1/$2" > "$C/Licenses/ports/$1-${2%.txt}.txt"
 done
+# GCEM, inside FluidSynth
+tar -xJOf "$ROOT/dist/brick/portlibs-source.tar.xz" "portlibs-source/fluidsynth/gcem/LICENSE" > "$C/Licenses/ports/fluidsynth-gcem-LICENSE.txt"
 chmod 644 "$C/Licenses/ports/"*
 rm -rf "$C/TortOS/overlays"
 cp -R "$ROOT/res/overlays" "$C/TortOS/overlays"

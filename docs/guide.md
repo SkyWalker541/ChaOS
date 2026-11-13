@@ -529,11 +529,14 @@ The Ports shelf lists the scripts in `Roms/Ports/` - each port is one, with
 its game's files in a folder beside it - and starting one hands it the whole
 device: the launcher lets go of the screen, Muse pauses, and the idle emulator
 is stopped, all of it put back when the port ends. A port is ended by Select
-+ Start held for two seconds, as the whole of what it started
-(`plat_run_port`); the volume buttons work throughout. Power doesn't end a
-port: a press pauses it (SIGSTOP to its process group, and the backlight off)
-and the next press resumes it as it was; power held for three seconds powers
-off.
++ Start, as the whole of what it started (`plat_run_port`); the volume buttons
+work throughout. Power doesn't end a port: a press freezes it (SIGSTOP to its
+process group) and the launcher asks Resume or Power Off in its own panel,
+drawn by SDL's software renderer into the framebuffer page on show
+(`port_power_prompt`), with the pad grabbed so the answer never reaches the
+port. Where that can't be drawn, the screen goes off instead, the next press
+resumes, and power held three seconds powers off. A port that stops on a
+library the Brick hasn't got says which.
 
 PortMaster's own files say what device a port is on and how to run it, and
 the first port started downloads them (about 25 MB) into

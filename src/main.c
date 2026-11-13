@@ -74,6 +74,11 @@
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
+#ifdef __linux__
+#include <linux/fb.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
+#endif
 #include <fcntl.h>
 #include <math.h>
 #include <signal.h>
@@ -12678,6 +12683,9 @@ static void shots_draw(app *a, SDL_Texture *tex, int tw, int th, const char *nam
 {
 	char when[48];
 	static SDL_Texture *layer;     /* the caption, drawn here to fade as one */
+	static SDL_Renderer *made_for; /* the renderer it belongs to (draw_letter_popup) */
+
+	if (made_for != a->r) { layer = NULL; made_for = a->r; }
 
 	SDL_SetRenderDrawColor(a->r, 0, 0, 0, 255);
 	SDL_RenderClear(a->r);
@@ -13574,6 +13582,172 @@ static bool ports_setup_screen(app *a, const char *title, unsigned accent)
  * started again after. */
 static bool pm_launch_runtimes(app *a, const char *script, const char *title, unsigned accent);
 
+/* ---- ChaOS: power during a port -------------------------------------------
+ *
+ * The port is frozen (plat_run_port) and this asks what now, in the menus'
+ * own panel: Resume or Power Off. The port has the screen - the launcher let
+ * its renderer go - so the panel is drawn by SDL's software renderer into a
+ * picture of the frozen frame and written straight to the framebuffer page
+ * on show, then the frame put back as it was before the port goes on. */
+static const menu_row *port_power_rows(int *n)
+{
+	static menu_row rows[2];
+
+	rows[0] = (menu_row){ "Resume", NULL, true };
+	rows[0].hint = "Back to the game, just as it was";
+	rows[1] = (menu_row){ "Power Off", NULL, true };
+	rows[1].hint = "Anything the port hasn't saved is lost";
+	*n = 2;
+	return rows;
+}
+
+/* One frame of it, over whatever a->r holds: the device's and --port-power's */
+static void port_power_draw(app *a, int sel)
+{
+	int n;
+	const menu_row *rows = port_power_rows(&n);
+
+	SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+	SDL_SetRenderDrawColor(a->r, 0, 0, 0, 150);
+	SDL_RenderFillRect(a->r, NULL);
+	menu_draw(a, "Power", rows, n, sel, 0, MENU_ACCENT);
+}
+
+static int port_power_prompt(void *ctx)
+{
+#ifdef __linux__
+	app *a = ctx;
+	struct fb_var_screeninfo var;
+	struct fb_fix_screeninfo fix;
+	SDL_Surface *bg = NULL, *fr = NULL;
+	SDL_Renderer *sw = NULL, *was = a->r;
+	uint8_t *mem = MAP_FAILED, *page, *save = NULL;
+	size_t len = 0;
+	int fd, sel = 0, said = -1, y, drawn = -1;
+	in_state in;
+
+	fd = open("/dev/fb0", O_RDWR);
+	if (fd < 0) return -1;
+	if (ioctl(fd, FBIOGET_VSCREENINFO, &var) != 0 || ioctl(fd, FBIOGET_FSCREENINFO, &fix) != 0 ||
+	    var.bits_per_pixel != 32 || var.xres != TORTOS_SCREEN_W || var.yres != TORTOS_SCREEN_H)
+		goto out;
+	len = (size_t)fix.line_length * var.yres_virtual;
+	mem = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	if (mem == MAP_FAILED) goto out;
+	/* the page on show now, as the port last flipped it */
+	page = mem + (size_t)var.yoffset * fix.line_length + (size_t)var.xoffset * 4;
+	if ((size_t)(page - mem) + (size_t)fix.line_length * var.yres > len) goto out;
+	save = malloc((size_t)fix.line_length * var.yres);
+	bg = SDL_CreateRGBSurfaceWithFormat(0, TORTOS_SCREEN_W, TORTOS_SCREEN_H, 32, SDL_PIXELFORMAT_ARGB8888);
+	fr = SDL_CreateRGBSurfaceWithFormat(0, TORTOS_SCREEN_W, TORTOS_SCREEN_H, 32, SDL_PIXELFORMAT_ARGB8888);
+	if (!save || !bg || !fr) goto out;
+	memcpy(save, page, (size_t)fix.line_length * var.yres);
+	for (y = 0; y < TORTOS_SCREEN_H; y++)
+		memcpy((uint8_t *)bg->pixels + (size_t)y * bg->pitch, page + (size_t)y * fix.line_length,
+		       (size_t)TORTOS_SCREEN_W * 4);
+	sw = SDL_CreateSoftwareRenderer(fr);
+	if (!sw) goto out;
+	a->r = sw;
+	if (!ui_init(sw, P_FONT)) { ui_quit(); goto out; }
+	a->menu_w = 0;
+	fprintf(stderr, "port: power - frozen, asking\n");
+
+	memset(&in, 0, sizeof in);
+	plat_backlight(true);
+	plat_child_grab(true);
+	for (;;) {
+		bool down;
+
+		if (drawn != sel) {
+			SDL_BlitSurface(bg, NULL, fr, NULL);
+			port_power_draw(a, sel);
+			SDL_RenderFlush(sw);
+			for (y = 0; y < TORTOS_SCREEN_H; y++) {
+				uint32_t *d = (uint32_t *)(page + (size_t)y * fix.line_length);
+				const uint32_t *p = (const uint32_t *)((uint8_t *)fr->pixels + (size_t)y * fr->pitch);
+				int x;
+
+				/* opaque: the display engine reads the top byte as alpha */
+				for (x = 0; x < TORTOS_SCREEN_W; x++) d[x] = p[x] | 0xff000000u;
+			}
+			drawn = sel;
+		}
+		usleep(16 * 1000);
+		plat_child_input(&in);
+		if (plat_power_event(&down)) { said = 0; break; }   /* again: back to it */
+		if (in_repeat(&in, IN_UP) || in_repeat(&in, IN_DOWN)) sel ^= 1;
+		if (in_repeat(&in, IN_VOLUP)) plat_volume_nudge(+1);
+		if (in_repeat(&in, IN_VOLDN)) plat_volume_nudge(-1);
+		if (in.pressed[IN_BACK]) { said = 0; break; }
+		if (in.pressed[IN_ACCEPT]) { said = sel; break; }
+	}
+	/* the button that answered, let go before the port has the pad back */
+	while (in.down[IN_ACCEPT] || in.down[IN_BACK]) { usleep(16 * 1000); plat_child_input(&in); }
+	plat_child_grab(false);
+	fprintf(stderr, "port: power - %s\n", said == 1 ? "power off" : "resume");
+	/* the frame back as it was, for a port that only draws when it changes */
+	if (said == 0) memcpy(page, save, (size_t)fix.line_length * var.yres);
+	ui_quit();
+out:
+	a->r = was;
+	if (sw) SDL_DestroyRenderer(sw);
+	if (bg) SDL_FreeSurface(bg);
+	if (fr) SDL_FreeSurface(fr);
+	free(save);
+	if (mem != MAP_FAILED) munmap(mem, len);
+	close(fd);
+	return said;
+#else
+	(void)ctx;
+	return -1;
+#endif
+}
+
+/* The library a port's log says it couldn't load: the loader's own words,
+ * "error while loading shared libraries: libX.so.N: cannot open..." */
+static void port_missing_lib(const char *log, char *out, size_t n)
+{
+	FILE *f = fopen(log, "r");
+	char line[1024];
+	static const char key[] = "error while loading shared libraries: ";
+
+	out[0] = '\0';
+	if (!f) return;
+	while (fgets(line, sizeof line, f)) {
+		char *p = strstr(line, key);
+
+		if (p) {
+			p += sizeof key - 1;
+			snprintf(out, n, "%.*s", (int)strcspn(p, ": \r\n"), p);
+		}
+	}
+	fclose(f);
+}
+
+/* A port's own folder, from its script: the GAMEDIR= line most of them
+ * carry ("/$directory/ports/doomengines"), as the folder on the card */
+static bool port_game_dir(const char *script, char *out, size_t n)
+{
+	FILE *f = fopen(script, "r");
+	char line[512];
+	bool ok = false;
+
+	if (!f) return false;
+	while (!ok && fgets(line, sizeof line, f)) {
+		char *p = strstr(line, "GAMEDIR=");
+		char *q;
+
+		if (!p || (p != line && p[-1] != ' ' && p[-1] != '\t')) continue;
+		q = strstr(p, "/ports/");
+		if (!q) continue;
+		q += 7;
+		snprintf(out, n, "%s/Ports/%.*s", P_ROMS, (int)strcspn(q, "\"'/ \r\n"), q);
+		ok = q[0] && q[0] != '"' && q[0] != '$';
+	}
+	fclose(f);
+	return ok;
+}
+
 static void port_launch(app *a, int o, const char *romfile, const char *title)
 {
 	const system_cfg *s = &a->sys.systems[o];
@@ -13621,7 +13795,7 @@ static void port_launch(app *a, int o, const char *romfile, const char *title)
 	plat_video_quit();
 
 	fprintf(stderr, "port %s: starting\n", romfile);
-	rc = plat_run_port(argv, envkv, NULL, &how);
+	rc = plat_run_port(argv, envkv, NULL, &how, port_power_prompt, a);
 	fprintf(stderr, "port %s exited %d (%s)\n", romfile, rc,
 	        how == PORT_POWER ? "power held" : how == PORT_QUIT ? "select+start" : "itself");
 	/* and in the port's own log, where whoever reads it about a port that
@@ -13673,6 +13847,30 @@ static void port_launch(app *a, int o, const char *romfile, const char *title)
 	if (access(TORTOS_POWEROFF_FLAG, F_OK) == 0) { a->running = false; return; }
 	/* Power held through the port: off, as asked */
 	if (how == PORT_POWER) { power_off(a); return; }
+	/* A port that stopped on a library the Brick hasn't got says so,
+	 * rather than dropping back to the shelf without a word. Looked for in
+	 * its own log too, where most ports send their output. */
+	if (how == PORT_ENDED) {
+		char lp[LIB_PATH + 48], missing[96] = "";
+
+		snprintf(lp, sizeof lp, "%s/ports/last.log", P_USERDATA);
+		port_missing_lib(lp, missing, sizeof missing);
+		if (!missing[0]) {
+			char dir[LIB_PATH * 2], gl[LIB_PATH * 2 + 16];
+
+			if (port_game_dir(script, dir, sizeof dir)) {
+				snprintf(gl, sizeof gl, "%s/log.txt", dir);
+				port_missing_lib(gl, missing, sizeof missing);
+			}
+		}
+		if (missing[0]) {
+			char msg[200];
+
+			fprintf(stderr, "port %s: needs %s, which the Brick hasn't got\n", romfile, missing);
+			snprintf(msg, sizeof msg, "This port needs %s,\nwhich ChaOS doesn't have yet", missing);
+			pick_say(a, title, msg, s->accent);
+		}
+	}
 	render(a);
 }
 
@@ -15899,6 +16097,15 @@ static void draw_letter_popup(app *a)
 		float in = (float)(now - g_lp_since) / 120.0f;
 		if (in < al) al = in;
 	}
+	/* A renderer made again since (after a port or a game the launcher
+	 * let go of the screen for) has none of the old one's textures, and
+	 * TTF_Quit took the font's library with it: both made anew, the old
+	 * ones left alone, as nothing can safely free them now */
+	{
+		static SDL_Renderer *made_for;
+
+		if (made_for != a->r) { layer = NULL; big = NULL; drawn = 0; made_for = a->r; }
+	}
 	if (!big) big = TTF_OpenFont(P_FONT, 150);
 	if (!layer) {
 		layer = SDL_CreateTexture(a->r, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, S, S);
@@ -16994,6 +17201,7 @@ static int shot_menu, shot_menu_sel;
 static int shot_gmenu = -1;           /* ChaOS: --gmenu ROW, the in-game menu */
 /* ChaOS: --pm home ROW | list SECTION ROW | detail ZIP: PortMaster's browser,
  * from the catalog in .userdata/ports */
+static int shot_port_power = -1;   /* ChaOS: --port-power ROW, power during a port */
 static const char *shot_pm;
 static const char *shot_pm_arg;
 static int shot_pm_n;
@@ -17387,6 +17595,7 @@ static void take_shot(app *a)
 		welcome_draw(a);
 	if (shot_menu) tortos_menu_draw(a, shot_menu_sel);
 	if (shot_pm) pm_shot(a);
+	if (shot_port_power >= 0) port_power_draw(a, shot_port_power);
 	if (shot_gmenu >= 0) {
 		static menu_row rows[GM_SHOWN + 4];
 		gm_bufs gb;
@@ -17679,6 +17888,7 @@ int main(int argc, char *argv[])
 		/* --menu [row] draws the TortOS menu over whichever screen --screen
 		 * asked for, so the panel can be looked at without a device. */
 		else if (!strcmp(argv[i], "--gmenu") && i + 1 < argc) shot_gmenu = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "--port-power") && i + 1 < argc) shot_port_power = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--pm") && i + 1 < argc) {
 			shot_pm = argv[++i];
 			if (i + 1 < argc && argv[i + 1][0] != '-') shot_pm_arg = argv[++i];

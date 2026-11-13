@@ -23,6 +23,7 @@ bool device_power_event(bool *down);   /* ChaOS: presses, and whether held */
  * and the volume keys read into `st` without taking them from the port, which
  * reads the same devices itself. Power is device_power_pressed's. */
 void device_child_poll(in_state *st);
+void device_child_grab(bool on);   /* ChaOS: the buttons to the launcher alone */
 
 /* A game just handed input back. Forget whatever was remembered about the
  * hardware while something else was driving: the headphone jack, a mute

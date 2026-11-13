@@ -322,7 +322,6 @@ int plat_run(char *const argv[], const char *const envkv[], const char *workdir)
  * a runtime it mounts) - so the launcher keeps a hand on it: its own process
  * group, ended as a group. The pad is only read here, never grabbed; the port
  * reads the same buttons itself. */
-#define PORT_QUIT_HOLD_MS 2000
 /* ChaOS: power held this long during a port powers off (a press pauses) */
 #define PORT_POWER_HOLD_MS 3000
 
@@ -341,8 +340,12 @@ static void port_group_end(pid_t pid, int *status)
 	waitpid(pid, status, 0);
 }
 
+void plat_child_input(in_state *st) { device_child_poll(st); }
+void plat_child_grab(bool on) { device_child_grab(on); }
+bool plat_power_event(bool *down) { return device_power_event(down); }
+
 int plat_run_port(char *const argv[], const char *const envkv[], const char *workdir,
-                  int *how)
+                  int *how, int (*on_power)(void *ctx), void *ctx)
 {
 	pid_t pid;
 	char **env = child_environ(envkv);
@@ -373,7 +376,7 @@ int plat_run_port(char *const argv[], const char *const envkv[], const char *wor
 #ifdef __linux__
 	{
 		in_state in;
-		Uint32 both_since = 0, power_since = 0;
+		Uint32 power_since = 0;
 		bool paused = false, power_down = false;
 
 		memset(&in, 0, sizeof in);
@@ -387,47 +390,57 @@ int plat_run_port(char *const argv[], const char *const envkv[], const char *wor
 			if (r < 0) return -1;
 			usleep(50 * 1000);
 			device_child_poll(&in);
-			/* ChaOS: power never ends a port on a press - a port keeps its
+			/* ChaOS: power never ends a port outright - a port keeps its
 			 * own saves, and a slip of the thumb would lose everything
-			 * since the last one. A press PAUSES it: the whole port frozen
-			 * where it is (SIGSTOP to its group) and the screen off. The
-			 * next press brings it back as it was. Holding power for
-			 * PORT_POWER_HOLD_MS, paused or not, powers off. Select+Start
-			 * held is the way out to ChaOS. */
+			 * since the last one. A press freezes the whole port where it
+			 * is (SIGSTOP to its group) and asks: Resume or Power Off
+			 * (on_power, the launcher's popup). Where it can't ask, the
+			 * screen goes off instead and the next press brings the port
+			 * back; held for PORT_POWER_HOLD_MS, power powers off. */
 			press = device_power_event(&power_down);
 			if (power_down) {
 				if (!power_since) power_since = SDL_GetTicks() | 1;
 			} else {
 				power_since = 0;
 			}
-			if (power_since && SDL_GetTicks() - power_since >= PORT_POWER_HOLD_MS) {
+			if (paused && power_since && SDL_GetTicks() - power_since >= PORT_POWER_HOLD_MS) {
 				*how = PORT_POWER;
-				if (paused) { kill(-pid, SIGCONT); plat_backlight(true); }
+				kill(-pid, SIGCONT);
+				plat_backlight(true);
 				port_group_end(pid, &status);
 				break;
 			}
-			if (press) {
-				paused = !paused;
-				if (paused) {
-					kill(-pid, SIGSTOP);
-					plat_backlight(false);
-				} else {
-					plat_backlight(true);
-					kill(-pid, SIGCONT);
-				}
-				both_since = 0;
+			if (press && paused) {
+				paused = false;
+				plat_backlight(true);
+				kill(-pid, SIGCONT);
 				memset(&in, 0, sizeof in);
+				continue;
+			}
+			if (press) {
+				int said;
+
+				kill(-pid, SIGSTOP);
+				said = on_power ? on_power(ctx) : -1;
+				device_power_event(&power_down);    /* the presses that answered it */
+				power_since = 0;
+				memset(&in, 0, sizeof in);
+				if (said == 1) {
+					*how = PORT_POWER;
+					kill(-pid, SIGCONT);
+					port_group_end(pid, &status);
+					break;
+				}
+				if (said == 0) { kill(-pid, SIGCONT); continue; }
+				paused = true;
+				plat_backlight(false);
 				continue;
 			}
 			if (paused) continue;   /* nothing else while it sleeps */
 			if (in_repeat(&in, IN_VOLUP)) plat_volume_nudge(+1);
 			if (in_repeat(&in, IN_VOLDN)) plat_volume_nudge(-1);
+			/* Select+Start: out to ChaOS, at once */
 			if (in.down[IN_SELECT] && in.down[IN_START]) {
-				if (!both_since) both_since = SDL_GetTicks() | 1;
-			} else {
-				both_since = 0;
-			}
-			if (both_since && SDL_GetTicks() - both_since >= PORT_QUIT_HOLD_MS) {
 				*how = PORT_QUIT;
 				port_group_end(pid, &status);
 				break;

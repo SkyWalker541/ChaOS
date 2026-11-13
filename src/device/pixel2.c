@@ -465,6 +465,19 @@ void device_child_poll(in_state *st)
 	poll_fd(fd_keys, st);
 }
 
+/* ChaOS: the pad and keys to the launcher alone, or back: while it asks
+ * something over a frozen port, so the answer isn't also a press the port
+ * finds waiting when it goes on */
+void device_child_grab(bool on)
+{
+#ifdef __linux__
+	if (fd_pad >= 0) ioctl(fd_pad, EVIOCGRAB, on ? 1 : 0);
+	if (fd_keys >= 0) ioctl(fd_keys, EVIOCGRAB, on ? 1 : 0);
+#else
+	(void)on;
+#endif
+}
+
 void plat_input_poll(in_state *st)
 {
 	SDL_Event e;

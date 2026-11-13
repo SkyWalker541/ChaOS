@@ -57,8 +57,8 @@ ChaOS $V for the TrimUI Brick: the source of everything in its card image.
       project's own source (SOURCES.txt says from where, at which commit):
       OpenAL Soft, mpg123 and libsndfile (LGPL-2.1), Ogg, Vorbis, FLAC,
       Opus, opusfile and Speex (BSD-3-Clause), bzip2, Zstandard (BSD),
-      libmodplug (public domain), SDL2_mixer, SDL2_gfx and SDL2 with its
-      patches (zlib).
+      libmodplug (public domain), FluidSynth (LGPL-2.1), SDL2_mixer, SDL2_net,
+      SDL2_gfx and SDL2 with its patches (zlib).
 
   unsquashfs-source.tar.xz
       squashfs-tools 4.6.1's unsquashfs (GPL-2.0-or-later), with zlib, XZ
