@@ -1,60 +1,48 @@
 #!/usr/bin/env python3
 """Draw res/cards/fancy/PORTS.png, the Ports card in Fancy Pants: an arcade
-stick, rendered (tools/shade3d.py), no images - the same object as the Plain
-Jane card's mark (tools/genportscard.py), in the round. A steel case, Ports'
-accent; a red ball top; six buttons in arcade colors.
+stick, rendered (tools/raymarch.py) from no images - the Plain Jane card's
+mark (tools/genportscard.py) as an object: a steel case with a black play
+panel, a red ball-top stick, six buttons in arcade colours.
 
     tools/genportsfancy.py
 """
 import os
+import sys
 
-from PIL import Image, ImageDraw
+import numpy as np
 
-import shade3d as s3
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import raymarch as rm  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "res", "cards", "fancy", "PORTS.png")
 
-STEEL = (160, 174, 192)
-STEEL_DARK = (118, 128, 144)
-PANEL = (52, 56, 66)
-CHROME = (205, 210, 216)
-BALL = (214, 52, 44)
-BUTTONS = [((1000, 862), (220, 58, 58)), ((1150, 850), (240, 186, 40)),
-           ((1300, 862), (60, 170, 230)), ((985, 960), (60, 186, 110)),
-           ((1135, 948), (232, 110, 40)), ((1285, 960), (156, 92, 210))]
-TOP = (0.0, -0.78)              # the top face, seen from above and in front
+M = rm.rot(0, -24, 0)          # turned a little, as the consoles are
+BTN = [(0.35, -0.22, (200, 40, 40)), (0.80, -0.30, (236, 180, 30)), (1.25, -0.22, (40, 140, 210)),
+       (0.35, 0.22, (40, 160, 90)), (0.80, 0.14, (226, 100, 30)), (1.25, 0.22, (130, 80, 190))]
+MATS = [rm.Mat((150, 158, 170), gloss=0.45, spec=0.6),            # 0 case
+        rm.Mat((22, 23, 27), gloss=0.55, spec=0.5),               # 1 panel
+        rm.Mat((205, 208, 214), gloss=0.9, metal=True),           # 2 shaft
+        rm.Mat((196, 28, 24), gloss=0.82, spec=1.2),              # 3 ball
+        rm.Mat((18, 18, 20), gloss=0.3),                          # 4 washer
+        ] + [rm.Mat(c, gloss=0.75, spec=1.0) for _, _, c in BTN]  # 5.. buttons
 
 
-def main():
-    c = s3.Canvas(1600)
-    # the case: its front, then its top rounding over onto it
-    c.slab(c.rrect_sdf(800, 1150, 650, 150, 70), STEEL_DARK, tilt=(0, 0.18),
-           bevel=50, shin=40, spec=0.5)
-    c.slab(c.rrect_sdf(800, 905, 650, 175, 90), STEEL, tilt=TOP, bevel=60,
-           shin=50, spec=0.7, env=0.5)
-    # the play panel set into the top
-    c.slab(c.rrect_sdf(800, 908, 600, 135, 60), PANEL, tilt=TOP, bevel=14,
-           shin=30, spec=0.25, amb=0.45)
-    # buttons: a dark side, then the cap
-    for (x, y), col in BUTTONS:
-        side = tuple(int(v * 0.55) for v in col)
-        c.slab(c.ellipse_sdf(x, y + 20, 64, 31), side, tilt=TOP, bevel=10,
-               shin=30, spec=0.3)
-        c.slab(c.ellipse_sdf(x, y, 64, 31), col, tilt=TOP, bevel=22,
-               shin=70, spec=0.9)
-    # the stick: its dust washer, its shaft, its ball
-    c.slab(c.ellipse_sdf(520, 905, 96, 44), (30, 32, 38), tilt=TOP, bevel=18,
-           shin=40, spec=0.4)
-    c.rod(520, 900, 520, 440, 46, CHROME, shin=90, spec=1.1, env=0.6)
-    c.sphere(520, 380, 150, BALL, shin=70, spec=1.0, env=0.4)
-    im = c.image()
-    # a little contact shadow under the ball's shaft on the panel
-    sh = Image.new("RGBA", im.size, (0, 0, 0, 0))
-    ImageDraw.Draw(sh).ellipse([470, 890, 610, 930], fill=(0, 0, 0, 120))
-    s3.overlay(im, sh, blur=8)
-    s3.finish(im, OUT)
+def scene(p):
+    q = rm.local(p, (0, -0.25, 0), M)
+    case = rm.box(q - [0, -0.1, 0], (1.75, 0.32, 0.95), 0.16)
+    panel = rm.box(q - [0, 0.235, 0.0], (1.62, 0.02, 0.82), 0.015)
+    shaft = rm.cyl(q - [-0.85, 0.65, 0], 0.07, 0.45)
+    ball = rm.sphere(q - [-0.85, 1.22, 0], 0.36)
+    washer = rm.cyl(q - [-0.85, 0.27, 0], 0.26, 0.018, 0.012)
+    ds = [case, panel, shaft, ball, washer]
+    for x, z, _ in BTN:
+        ds.append(rm.cyl(q - [x, 0.30, z], 0.17, 0.07, 0.045))
+    d = np.stack(ds, -1)
+    return d.min(-1), d.argmin(-1)
 
+
+scene.mats = MATS
 
 if __name__ == "__main__":
-    main()
+    rm.render(scene, OUT, cam=(0.0, 3.4, 8.0), look=(0, 0.15, 0), fov=27)

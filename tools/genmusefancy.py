@@ -1,94 +1,120 @@
 #!/usr/bin/env python3
 """Draw res/cards/fancy/MUSE.png, Muse's card in Fancy Pants: a pocket music
-player, rendered (tools/shade3d.py), no images. Its own design rather than any
-one maker's: an anodised body in Muse's green (9CD345, src/main.c's
-MUSE_ACCENT), a screen showing a song playing, and a round control pad with
-skip, play and a list.
+player, rendered (tools/raymarch.py) from no images. Its own design, not any
+one maker's: an anodised body in Muse's green (9CD345, MUSE_ACCENT in
+src/main.c), a lit screen showing a song playing, and a round control pad
+marked with a list, the two skips and play/pause.
 
 It replaces a photograph whose source TortOS never recorded (CREDITS.md).
 
     tools/genmusefancy.py
 """
-import math
 import os
+import sys
 
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
-import shade3d as s3
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import raymarch as rm  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "res", "cards", "fancy", "MUSE.png")
+FONT = os.path.join(ROOT, "res", "fonts", "menu.ttf")
 
 GREEN = (0x9C, 0xD3, 0x45)
-GREEN_SIDE = (92, 128, 40)
-PAD = (238, 240, 242)
-SCREEN = (20, 22, 28)
-CX, CY = 800, 800
+M = rm.rot(4, -22, -9)               # turned and leant, as the consoles are
+SCR = (-0.74, 0.74, 0.30, 1.42)      # the screen's face, local x0 x1 y0 y1
+PAD_Y, PAD_R = -0.78, 0.66
 
 
-def main():
-    c = s3.Canvas(1600)
-    # the body: its edge first, a little right and down, then the face
-    c.slab(c.rrect_sdf(CX + 34, CY + 26, 300, 560, 80), GREEN_SIDE, bevel=40,
-           shin=40, spec=0.4)
-    body = c.slab(c.rrect_sdf(CX, CY, 300, 560, 80), GREEN, bevel=46,
-                  shin=55, spec=0.8, env=0.5)
-    # the screen, a glass panel set into it
-    scr = c.slab(c.rrect_sdf(CX, CY - 270, 240, 200, 22), SCREEN, bevel=8,
-                 shin=120, spec=0.9, amb=0.9, env=0.1)
-    # the pad, domed, and its centre button
-    pad = c.slab(c.ellipse_sdf(CX, CY + 250, 200, 200), PAD, bevel=110,
-                 shin=40, spec=0.5, env=0.4)
-    c.slab(c.ellipse_sdf(CX, CY + 250, 70, 70), GREEN, bevel=40, shin=70,
-           spec=0.9)
-    im = c.image()
+def screen_picture():
+    w, h = 900, 680
+    im = Image.new("RGB", (w, h), (14, 15, 19))
     d = ImageDraw.Draw(im)
+    # the cover: a dusk sky over hills, cyan to magenta
+    cov = Image.new("RGB", (300, 300))
+    g = np.zeros((300, 300, 3), np.float64)
+    yy = np.linspace(0, 1, 300)[:, None]
+    for i, (a, b) in enumerate(zip((58, 200, 255), (214, 70, 140))):
+        g[..., i] = a + (b - a) * yy
+    cov = Image.fromarray(g.astype(np.uint8))
+    cd = ImageDraw.Draw(cov)
+    cd.ellipse([170, 70, 250, 150], fill=(255, 226, 150))
+    cd.polygon([(0, 230), (90, 170), (170, 220), (240, 160), (300, 200), (300, 300), (0, 300)], fill=(40, 30, 70))
+    cd.polygon([(0, 260), (120, 215), (300, 250), (300, 300), (0, 300)], fill=(24, 18, 44))
+    m = Image.new("L", (300, 300), 0)
+    ImageDraw.Draw(m).rounded_rectangle([0, 0, 299, 299], radius=18, fill=255)
+    im.paste(cov, (60, 70), m)
+    f1 = ImageFont.truetype(FONT, 56)
+    f2 = ImageFont.truetype(FONT, 40)
+    f3 = ImageFont.truetype(FONT, 30)
+    d.text((400, 120), "Night Drive", font=f1, fill=(240, 240, 244))
+    d.text((400, 200), "The Pixels", font=f2, fill=(150, 154, 166))
+    d.text((400, 254), "Afterglow", font=f3, fill=(110, 114, 126))
+    # the time going by
+    d.rounded_rectangle([60, 450, 840, 466], radius=8, fill=(60, 63, 72))
+    d.rounded_rectangle([60, 450, 520, 466], radius=8, fill=GREEN)
+    d.ellipse([502, 440, 538, 476], fill=(250, 250, 250))
+    d.text((60, 500), "2:14", font=f3, fill=(130, 134, 146))
+    d.text((840, 500), "3:52", font=f3, fill=(130, 134, 146), anchor="ra")
+    # a status line
+    d.text((60, 18), "Muse", font=f3, fill=(130, 134, 146))
+    d.rounded_rectangle([770, 22, 830, 46], radius=5, outline=(130, 134, 146), width=3)
+    d.rectangle([776, 28, 812, 40], fill=GREEN)
+    return im.filter(ImageFilter.GaussianBlur(0.6))
 
-    # what the screen shows: a cover, a title, an artist, the time going by
-    x0, y0 = CX - 210, CY - 440
-    cov = Image.new("RGBA", (150, 150))
-    g = np.zeros((150, 150, 4), np.uint8)
-    t = np.linspace(0, 1, 150)
-    for i, (a, b) in enumerate(zip((58, 215, 255), (194, 71, 143))):
-        g[..., i] = (a + (b - a) * (t[None, :] * 0.6 + t[:, None] * 0.4)).astype(np.uint8)
-    g[..., 3] = 255
-    cov = Image.fromarray(g)
-    m = Image.new("L", (150, 150), 0)
-    ImageDraw.Draw(m).rounded_rectangle([0, 0, 149, 149], radius=10, fill=255)
-    im.paste(cov, (x0, y0 + 20), m)
-    d.rounded_rectangle([x0 + 175, y0 + 45, x0 + 400, y0 + 65], radius=10, fill=(235, 236, 240, 255))
-    d.rounded_rectangle([x0 + 175, y0 + 85, x0 + 340, y0 + 101], radius=8, fill=(130, 134, 146, 255))
-    d.rounded_rectangle([x0 + 175, y0 + 120, x0 + 300, y0 + 134], radius=7, fill=(90, 94, 104, 255))
-    d.rounded_rectangle([x0, y0 + 220, x0 + 420, y0 + 232], radius=6, fill=(70, 74, 84, 255))
-    d.rounded_rectangle([x0, y0 + 220, x0 + 250, y0 + 232], radius=6, fill=GREEN + (255,))
-    d.ellipse([x0 + 238, y0 + 214, x0 + 262, y0 + 238], fill=(245, 245, 245, 255))
-    d.rounded_rectangle([x0, y0 + 270, x0 + 60, y0 + 282], radius=6, fill=(90, 94, 104, 255))
-    d.rounded_rectangle([x0 + 360, y0 + 270, x0 + 420, y0 + 282], radius=6, fill=(90, 94, 104, 255))
 
-    # the pad's marks: list at the top, skips at the sides, play/pause below
-    ink = (120, 126, 138, 255)
-    px, py = CX, CY + 250
+def pad_picture():
+    n = 1000
+    im = Image.new("RGB", (n, n), (226, 228, 230))
+    d = ImageDraw.Draw(im)
+    ink = (120, 126, 138)
+    c = n // 2
+    # list, top
     for k in (-1, 0, 1):
-        d.rounded_rectangle([px - 34, py - 150 + k * 16 - 4, px + 34, py - 150 + k * 16 + 4], radius=4, fill=ink)
+        d.rounded_rectangle([c - 70, 150 + k * 34 - 9, c + 70, 150 + k * 34 + 9], radius=9, fill=ink)
+    # skips, left and right
     for s in (-1, 1):
-        bx = px + s * 140
-        for off in (0, 26):
-            tri = [(bx + s * (off - 6), py), (bx + s * (off - 30), py - 20), (bx + s * (off - 30), py + 20)]
-            d.polygon(tri, fill=ink)
-        d.rectangle([bx + s * 18 - 4, py - 20, bx + s * 18 + 4, py + 20], fill=ink)
-    d.polygon([(px - 40, py + 128), (px - 40, py + 172), (px - 6, py + 150)], fill=ink)
-    d.rectangle([px + 10, py + 130, px + 20, py + 170], fill=ink)
-    d.rectangle([px + 30, py + 130, px + 40, py + 170], fill=ink)
+        bx = c + s * 345
+        for off in (0, 52):
+            tip = bx + s * (off + 26)
+            d.polygon([(tip, c), (tip - s * 52, c - 42), (tip - s * 52, c + 42)], fill=ink)
+        d.rectangle([bx + s * 84 - 8, c - 42, bx + s * 84 + 8, c + 42], fill=ink)
+    # play / pause, bottom
+    d.polygon([(c - 80, 805), (c - 80, 895), (c - 12, 850)], fill=ink)
+    d.rectangle([c + 16, 808, c + 38, 892], fill=ink)
+    d.rectangle([c + 58, 808, c + 80, 892], fill=ink)
+    return im.filter(ImageFilter.GaussianBlur(1.2))
 
-    # glass on the screen: a soft diagonal sheen
-    sheen = Image.new("RGBA", im.size, (255, 255, 255, 0))
-    sd = ImageDraw.Draw(sheen)
-    sd.polygon([(CX - 240, CY - 470), (CX - 20, CY - 470), (CX - 260, CY - 110), (CX - 240, CY - 110)],
-               fill=(255, 255, 255, 34))
-    s3.overlay(im, sheen, mask_arr=scr, blur=6)
-    s3.finish(im, OUT)
 
+SCREEN = rm.Tex(screen_picture(), *SCR)
+PADTEX = rm.Tex(pad_picture(), -PAD_R, PAD_R, PAD_Y - PAD_R, PAD_Y + PAD_R, base=(226, 228, 230))
+
+
+def frame(p):
+    return rm.local(p, (0, 0.05, 0), M)
+
+
+MATS = [rm.Mat(GREEN, gloss=0.42, spec=0.7),                                   # 0 body
+        rm.Mat(lambda p: SCREEN(frame(p)), gloss=0.95, spec=1.0, emit=0.85),   # 1 screen glass
+        rm.Mat(lambda p: PADTEX(frame(p)), gloss=0.5, spec=0.6),               # 2 pad
+        rm.Mat(GREEN, gloss=0.6, spec=0.8),                                    # 3 centre button
+        rm.Mat((12, 13, 16), gloss=0.6, spec=0.5)]                             # 4 screen bezel
+
+
+def scene(p):
+    q = frame(p)
+    body = rm.box(q, (0.98, 1.85, 0.17), 0.15)
+    bezel = rm.box(q - [0, 0.86, 0.165], (0.84, 0.62, 0.012), 0.06)
+    screen = rm.box(q - [0, 0.86, 0.172], (0.76, 0.57, 0.012), 0.03)
+    pad = rm.cyl(q - [0, PAD_Y, 0.17], PAD_R, 0.03, 0.025, axis=2)
+    btn = rm.cyl(q - [0, PAD_Y, 0.20], 0.22, 0.03, 0.025, axis=2)
+    d = np.stack([body, screen, pad, btn, bezel], -1)
+    return d.min(-1), d.argmin(-1)
+
+
+scene.mats = MATS
 
 if __name__ == "__main__":
-    main()
+    rm.render(scene, OUT, cam=(0.6, 0.9, 9.5), look=(0, 0.05, 0), fov=26)

@@ -130,7 +130,7 @@ sold, put behind a paywall, or shipped with a device that is sold.
 - **Mozilla's root certificate list**, as published by the curl project: used
   to check HTTPS servers. MPL-2.0.
 - **GNU bash** 5.1.16 (https://www.gnu.org/software/bash/, GPL-3.0-or-later): `/bin/bash` in the image, unchanged, for ports. Its licence is `Licenses/bash.txt` on the card and its source is in each release's sources archive (`dist/brick/bash-source.tar.xz`, built by `tools/build-bash.sh`).
-- **The Favorites, Muse, Recently Played and Ports cards** are ChaOS's own, with no third-party images: in Plain Jane on the drawn set's own card (`tools/cardstyle.py`), in Fancy Pants rendered as objects (`tools/shade3d.py`; `tools/genmusefancy.py`, `tools/genportsfancy.py`, `tools/genrecentfancy.py`). Muse's Fancy Pants card replaces TortOS's iPod photograph, whose source was never recorded.
+- **The Favorites, Muse, Recently Played and Ports cards** are ChaOS's own, with no third-party images: in Plain Jane on the drawn set's own card (`tools/cardstyle.py`), in Fancy Pants rendered in 3D as objects (`tools/raymarch.py`; `tools/genmusefancy.py`, `tools/genportsfancy.py`, `tools/genrecentfancy.py`). Muse's Fancy Pants card replaces TortOS's iPod photograph, whose source was never recorded.
 - **ChaOS logo** ("Handheld burst"): original pixel art made for ChaOS, drawn
   pixel by pixel in `tools/genlogo.py` with no third-party images or fonts;
   see `res/logo/SOURCE.md`.
