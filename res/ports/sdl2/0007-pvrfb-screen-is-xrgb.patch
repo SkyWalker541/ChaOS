@@ -1,0 +1,27 @@
+SDL2: the PowerVR screen is XRGB, not ARGB
+
+The display shows no alpha, and a program that makes its textures in the
+window's pixel format and fills them without alpha - Crispy Doom, whose
+palette blit leaves it 0 - had them blended as fully transparent: it ran,
+was heard, and showed black. SDL_PIXELFORMAT_RGB888, as desktop displays
+report, makes such textures opaque.
+
+ChaOS, for ports only (src/ports.h). After 0001 to 0006.
+
+diff --git a/src/video/pvrfb/SDL_pvrfbvideo.c b/src/video/pvrfb/SDL_pvrfbvideo.c
+index 787d11c..0d9a837 100644
+--- a/src/video/pvrfb/SDL_pvrfbvideo.c
++++ b/src/video/pvrfb/SDL_pvrfbvideo.c
+@@ -56,7 +56,11 @@ static int PVRFB_VideoInit(_THIS)
+     SDL_zero(mode);
+     mode.w = data->width;
+     mode.h = data->height;
+-    mode.format = data->bpp == 16 ? SDL_PIXELFORMAT_RGB565 : SDL_PIXELFORMAT_ARGB8888;
++    /* ChaOS: XRGB, as a desktop's display is: the screen shows no alpha,
++     * and a program that makes its textures in the window's format and
++     * fills them without one (Crispy Doom's palette blit leaves alpha 0)
++     * drew them fully transparent, and so black, with ARGB8888 */
++    mode.format = data->bpp == 16 ? SDL_PIXELFORMAT_RGB565 : SDL_PIXELFORMAT_RGB888;
+     mode.refresh_rate = 60;
+ 
+     SDL_zero(display);
