@@ -3,9 +3,8 @@
 res/cards/fancy/PORTS.png.
 
 Ports is not a console, so like Favorites and Muse there is no photograph to
-cut and the cards are generated - the classic one to the set's measurements
-(tools/genmusecard.py has them: 640x820, card stock (28,31,42), a 12px accent
-rule at y=587, the name in (239,239,244), 54px, baseline 727).
+cut and the cards are generated - the classic one on tools/cardstyle.py, the drawn set's own
+stock, rule and tracked name.
 
 THE MARK is an arcade stick reduced to flat shapes - a ball on a shaft over a
 base with two buttons - the generic picture of "a game", which is what a port
@@ -21,24 +20,24 @@ change the other.
 """
 import os
 
-from PIL import Image, ImageDraw, ImageFont
+import sys
+
+from PIL import Image, ImageDraw
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import cardstyle  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FONT = os.path.join(ROOT, "res", "fonts", "menu.ttf")
 CLASSIC = os.path.join(ROOT, "res", "cards", "classic", "PORTS.png")
 FANCY = os.path.join(ROOT, "res", "cards", "fancy", "PORTS.png")
 
 STEEL = (0xA0, 0xAE, 0xC0)
-W, H = 640, 820
-STOCK = (28, 31, 42)
-LABEL = (239, 239, 244)
-RULE_Y, RULE_H = 587, 12
-RADIUS = 28
 SS = 4
 
 
 def mark(d, cx, cy, fill, cut, scale=1.0):
-    """The stick, centered on (cx, cy), about 300x330 at scale 1."""
+    """The stick, about 300x363 at scale 1: its ink is centred 16px above
+    (cx, cy), which the classic card allows for."""
     k = SS * scale
     # the base: a wide slab
     bw, bh = 300 * k, 120 * k
@@ -64,20 +63,8 @@ def mark(d, cx, cy, fill, cut, scale=1.0):
 
 
 def classic():
-    im = Image.new("RGBA", (W * SS, H * SS), (0, 0, 0, 0))
-    d = ImageDraw.Draw(im)
-    d.rounded_rectangle([0, 0, W * SS - 1, H * SS - 1], radius=RADIUS * SS,
-                        fill=STOCK + (255,))
-    d.rectangle([0, RULE_Y * SS, W * SS - 1, (RULE_Y + RULE_H) * SS - 1],
-                fill=STEEL + (255,))
-    mark(d, (W // 2) * SS, 320 * SS, STEEL + (255,), STOCK + (255,))
-    im = im.resize((W, H), Image.LANCZOS)
-    d = ImageDraw.Draw(im)
-    try:
-        f = ImageFont.truetype(FONT, 54)
-    except OSError:
-        f = ImageFont.load_default()
-    d.text((W // 2, 727), "PORTS", font=f, fill=LABEL + (255,), anchor="ms")
+    im = cardstyle.card(STEEL, "PORTS",
+                        lambda d, cx, cy, k, fill, cut: mark(d, cx, cy + 16 * k, fill, cut, 0.88 * k / SS))
     im.save(CLASSIC)
     print(CLASSIC, os.path.getsize(CLASSIC), "bytes")
 

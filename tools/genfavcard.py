@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Draw res/cards/FAVORITES.png, the card for the Favorites shelf.
+"""Draw res/cards/classic/FAVORITES.png, the card for the Favorites shelf.
 
 The other nine cards are drawn by hand and nothing generates them - gencards.py
 was deleted because it could not reproduce any of the nine. This one is
@@ -8,8 +8,8 @@ TortOS's cyan rather than a machine's, and that cyan already has exactly one
 definition in tools/markdef.py. A hand-drawn copy would be a fourth place for
 it to drift.
 
-Matched to the set by measurement rather than by eye: 640x820, card stock
-(28,31,42), a 12px accent rule at y=587, the label under it in (239,239,244).
+On tools/cardstyle.py (ChaOS, 2026-11-13): the drawn set's own stock, rule
+and tracked name, where it was a flat slab matched by measurement before.
 One mark: a bookmark ribbon with markdef.heart() knocked out of it, in the
 same cyan as the rule. Three ascending stars before 2026-08-30, then three
 hearts for about an hour.
@@ -28,21 +28,14 @@ looks like is the kind of thing nobody notices and everybody feels.
 import os
 import sys
 
-from PIL import Image, ImageDraw, ImageFont
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from markdef import CYAN, heart  # noqa: E402
+import cardstyle  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(ROOT, "res", "cards", "FAVORITES.png")
-FONT = os.path.join(ROOT, "res", "fonts", "menu.ttf")
+OUT = os.path.join(ROOT, "res", "cards", "classic", "FAVORITES.png")
 
-W, H = 640, 820
-STOCK = (28, 31, 42)
-LABEL = (239, 239, 244)
-RULE_Y, RULE_H = 587, 12
-RADIUS = 28
-SS = 4                      # supersample, so the curve is not ragged
 
 
 def bookmark(cx, cy, w, h, notch):
@@ -52,40 +45,22 @@ def bookmark(cx, cy, w, h, notch):
     return [(x0, y0), (x1, y0), (x1, y1), (cx, y1 - notch), (x0, y1)]
 
 
-def mark(d, cx, cy, ribbon, stock):
-    """The ribbon, then the heart punched through it back to the card stock.
+def mark(d, cx, cy, k, ribbon, cut, scale=0.95):
+    """The ribbon, then the heart punched through it to the stock.
 
     The heart sits above the notch rather than centered in the ribbon: centered,
     its point crowds the V and the two shapes argue about where the middle is.
+    At 0.95, 314px tall, as the tallest console marks are.
     """
-    d.polygon(bookmark(cx, cy, 232 * SS, 330 * SS, 68 * SS), fill=ribbon)
-    hr, hy = 78 * SS, cy - 28 * SS
+    k = k * scale
+    d.polygon(bookmark(cx, cy, 232 * k, 330 * k, 68 * k), fill=ribbon)
+    hr, hy = 78 * k, cy - 28 * k
     d.polygon([(cx + x * 2 * hr, hy + y * 2 * hr) for x, y in heart(96)],
-              fill=stock)
+              fill=cut)
 
 
 def main():
-    im = Image.new("RGBA", (W * SS, H * SS), (0, 0, 0, 0))
-    d = ImageDraw.Draw(im)
-
-    d.rounded_rectangle([0, 0, W * SS - 1, H * SS - 1], radius=RADIUS * SS,
-                        fill=STOCK + (255,))
-    d.rectangle([0, RULE_Y * SS, W * SS - 1, (RULE_Y + RULE_H) * SS - 1],
-                fill=CYAN + (255,))
-
-    # Centered on the panel above the rule, not on the card.
-    mark(d, (W // 2) * SS, 300 * SS, CYAN + (255,), STOCK + (255,))
-
-    im = im.resize((W, H), Image.LANCZOS)
-    d = ImageDraw.Draw(im)
-    try:
-        f = ImageFont.truetype(FONT, 54)
-    except OSError:
-        f = ImageFont.load_default()
-    # Baseline and size measured off the set rather than chosen: the other
-    # nine cards put a 42px cap height with its baseline at y=727.
-    d.text((W // 2, 727), "FAVORITES", font=f, fill=LABEL + (255,), anchor="ms")
-
+    im = cardstyle.card(tuple(CYAN), "FAVORITES", mark)
     im.save(OUT)
     print(OUT, os.path.getsize(OUT), "bytes")
 
