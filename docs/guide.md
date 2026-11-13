@@ -136,7 +136,9 @@ than any one console:
 | **Appearance** | the look settings on their own page: UI Theme, UI Direction, Transition Speed, Game List View and Menu Color |
 | **UI Theme** | `Plain Jane`, `Fancy Pants`, `ChaOS Pixel Cards` or `ChaOS Pixel Names` - which art the shelves wear. On the Appearance page |
 | **UI Direction** | `Horizontal`, `Vertical` or `Cubic` - see below |
-| **Recently Played** | `On` or `Off` - whether the Recently Played shelf appears on the systems row. It lists the last twelve games played, across every system, and is hidden until something has been played |
+| **Show Favorites** (Appearance) | `On` or `Off` - whether the Favorites shelf appears on the systems row. Off, Y still marks favorites, and they come back when it's on |
+| **Show Recently Played** (Appearance) | `On` or `Off` - whether the Recently Played shelf appears on the systems row. It lists the last twelve games played, across every system, and is hidden until something has been played |
+| **Show Muse** (Appearance) | `On` or `Off` - whether Muse's shelf appears on the systems row. SELECT opens Muse either way |
 | **Box Art** | fetch what the whole library is missing |
 | **RetroAchievements** | the account, or `sign in` |
 | **Controls** | every button and what it does, a page per place |
