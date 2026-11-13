@@ -13637,6 +13637,25 @@ static void port_launch(app *a, int o, const char *romfile, const char *title)
 			                                                     : "by itself", rc);
 			fclose(lf);
 		}
+		/* and a copy kept per port, ports/logs/<script>.log: last.log is
+		 * only ever the latest, and testing a few in a row lost the rest */
+		{
+			char dir[LIB_PATH + 16], to[LIB_PATH * 2], buf[8192];
+			FILE *in, *out;
+			size_t got;
+
+			snprintf(dir, sizeof dir, "%s/ports/logs", P_USERDATA);
+			mkdir(dir, 0755);
+			snprintf(to, sizeof to, "%s/%.*s.log", dir,
+			         (int)(strlen(romfile) > 3 ? strlen(romfile) - 3 : strlen(romfile)), romfile);
+			if ((in = fopen(lp, "rb"))) {
+				if ((out = fopen(to, "wb"))) {
+					while ((got = fread(buf, 1, sizeof buf, in)) > 0) fwrite(buf, 1, got, out);
+					fclose(out);
+				}
+				fclose(in);
+			}
+		}
 	}
 
 	if (!plat_video_init() || !plat_input_init()) { a->running = false; return; }
