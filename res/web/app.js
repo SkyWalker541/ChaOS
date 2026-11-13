@@ -302,6 +302,9 @@ function draw() {
 			a.setAttribute('download', e.name);
 			acts.append(a);
 		}
+		/* ChaOS: a game in a console's folder takes a cover from here */
+		if (!e.dir && isGameFolder(cwd) && !e.name.startsWith('.'))
+			acts.append(mkbtn('Cover', () => coverPanel(e, li)));
 		if (cwd) {                       /* the roots themselves are not editable */
 			acts.append(mkbtn('Rename', () => rename(e)));
 			const d = mkbtn('Delete', () => del(e));
@@ -311,6 +314,84 @@ function draw() {
 		li.append(acts);
 		ul.append(li);
 	}
+}
+
+/* ---- ChaOS: a game's cover from the phone ----------------------------------
+ *
+ * Cover, on a game in a console's folder: a picture from the phone (shrunk
+ * here first, so a 5 MB photo doesn't cross the network to be shrunk there),
+ * or a link the Brick follows itself - a picture's address, an itch.io game's
+ * page or a Google Images result - since this page can't read another site's
+ * pictures. Either way the Brick checks it is a picture and makes it the
+ * game's cover (POST /api/cover). */
+
+const isGameFolder = (p) => /^roms\/[^/]+$/.test(p || '');
+
+let coverOpen = null;
+
+function coverPanel(e, li) {
+	if (coverOpen) { coverOpen.remove(); if (coverOpen.dataset.for === e.path) { coverOpen = null; return; } }
+	const p = document.createElement('li');
+	p.className = 'coverpanel';
+	p.dataset.for = e.path;
+	const say = document.createElement('p');
+	say.textContent = 'A cover for ' + e.name.replace(/\.[^.]+$/, '') + ':';
+	const pick = mkbtn('Choose a picture', () => file.click());
+	const link = mkbtn('Use a link', () => coverLink(e));
+	const shut = mkbtn('Cancel', () => { p.remove(); coverOpen = null; });
+	const file = document.createElement('input');
+	file.type = 'file';
+	file.accept = 'image/*';
+	file.hidden = true;
+	file.onchange = () => { if (file.files[0]) coverSend(e, file.files[0]); };
+	const hint = document.createElement('p');
+	hint.className = 'hint';
+	hint.textContent = 'A link can be a picture, an itch.io game\'s page, or a Google Images result. The Brick needs Wi-Fi to follow one.';
+	const row = document.createElement('div');
+	row.className = 'acts';
+	row.append(pick, link, shut, file);
+	p.append(say, row, hint);
+	li.after(p);
+	coverOpen = p;
+}
+
+/* Long side 640 at most, as a PNG; what won't decode here (a format this
+ * browser can't read) goes as it is, and the Brick says if it can't either */
+async function coverShrink(f) {
+	try {
+		const img = await createImageBitmap(f);
+		const k = Math.min(1, 640 / Math.max(img.width, img.height));
+		const c = document.createElement('canvas');
+		c.width = Math.max(1, Math.round(img.width * k));
+		c.height = Math.max(1, Math.round(img.height * k));
+		c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+		const b = await new Promise((ok) => c.toBlob(ok, 'image/png'));
+		return b || f;
+	} catch (err) { return f; }
+}
+
+async function coverDone(e) {
+	toast('Cover set for ' + e.name.replace(/\.[^.]+$/, ''));
+	if (coverOpen) { coverOpen.remove(); coverOpen = null; }
+	await go(cwd, 'none');
+}
+
+async function coverSend(e, f) {
+	toast('Sending the picture...');
+	try {
+		await api('POST', '/api/cover?p=' + enc(e.path), await coverShrink(f));
+		await coverDone(e);
+	} catch (err) { toast(err.message, true); }
+}
+
+async function coverLink(e) {
+	const url = (prompt('Paste a link: a picture, an itch.io game page, or a Google Images result') || '').trim();
+	if (!url) return;
+	toast('The Brick is fetching it...');
+	try {
+		await api('POST', '/api/cover?p=' + enc(e.path) + '&url=' + enc(url));
+		await coverDone(e);
+	} catch (err) { toast(err.message, true); }
 }
 
 function mkbtn(label, fn) {

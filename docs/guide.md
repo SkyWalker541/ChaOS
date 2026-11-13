@@ -527,6 +527,14 @@ onto the card the first time, from its tag feeds, and caught up once a day) and
 candidates are shown one at a time - left and right to look, A to use one - and
 the one chosen is written beside the old cover and renamed over it once whole.
 
+**A cover from the phone (ChaOS).** In ChaOS Transfer, a game in a console's
+folder has **Cover**: **Choose a picture** sends one from the phone (shrunk in
+the browser to 640 pixels on the long side first), and **Use a link** has the
+Brick fetch one over Wi-Fi - a picture's address, an itch.io game's page (the
+cover its developer chose, from the page's data.json) or a Google Images result
+(the picture it shows, from its imgurl). The Brick checks it is a picture,
+writes it as the game's cover and shrinks it like any other.
+
 **Adding a cover by hand.** Some games have no cover anywhere the fetch looks -
 fan translations, homebrew, a dump no catalog lists. Put one in yourself over
 Over The Hare: open `Roms/<system>/.media/` in its file browser and upload a

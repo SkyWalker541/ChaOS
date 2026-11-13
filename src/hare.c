@@ -392,6 +392,17 @@ void hare_set_albums(char *(*wanted)(size_t *len, char *why, size_t wn),
 
 void hare_set_after_write(void (*fn)(const char *abs)) { g_after_write = fn; }
 
+#define COVER_TMP "/tmp/chaos-cover-upload"
+#define COVER_MAX (16L << 20)
+
+static bool (*g_cover)(const char *rom, const char *url, const char *file,
+                       char *out, size_t on, char *why, size_t wn);
+void hare_set_cover(bool (*fn)(const char *rom, const char *url, const char *file,
+                               char *out, size_t on, char *why, size_t wn))
+{
+	g_cover = fn;
+}
+
 void hare_set_page(const char *page) { g_page = page ? page : "index.html"; }
 
 void hare_set_update(const char *dir, const char *version, const char *device,
@@ -1163,6 +1174,64 @@ static void on_request(httpd_req *r, bool done, void *ctx)
 		reply_json(r, g_albums_wanted(&len, why, sizeof why), len, why, "could not look");
 		return;
 	}
+	/* ChaOS: a game's cover from the phone - a picture sent as the body, or
+	 * a link (url=) the device follows itself, as a page can't read another
+	 * site's pictures. The game is named by its path, held to xfer_resolve
+	 * as every write is; the cover goes in its folder's .media. */
+	if (!strcmp(path, "/api/cover") && !strcmp(m, "POST")) {
+		char req[XFER_PATH_MAX], abs[XFER_PATH_MAX], url[1024] = "", out[XFER_PATH_MAX];
+		char why[128] = "";
+		long cl = httpd_content_len(r);
+		bool sent = cl > 0;
+
+		httpd_query(r, "p", req, sizeof req);
+		if (!done) {
+			if (!g_cover) {
+				httpd_want_body(r, HTTPD_BODY_NONE, NULL);
+				httpd_reply_status(r, 404, "no covers here");
+				return;
+			}
+			if (!xfer_resolve(req, abs, sizeof abs)) {
+				httpd_want_body(r, HTTPD_BODY_NONE, NULL);
+				httpd_reply_status(r, 403, "not somewhere you can write");
+				return;
+			}
+			if (cl > COVER_MAX) {
+				httpd_want_body(r, HTTPD_BODY_NONE, NULL);
+				httpd_reply_status(r, 413, "that picture is too big; 16 MB at most");
+				return;
+			}
+			httpd_want_body(r, sent ? HTTPD_BODY_FILE : HTTPD_BODY_NONE,
+			                sent ? COVER_TMP : NULL);
+			return;
+		}
+		if (!xfer_resolve(req, abs, sizeof abs)) {
+			remove(COVER_TMP);
+			httpd_reply_status(r, 403, "not somewhere you can write");
+			return;
+		}
+		if (!sent) {
+			char raw[1024];
+
+			httpd_query(r, "url", raw, sizeof raw);
+			if (!xfer_decode(raw, url, sizeof url) || !url[0]) {
+				httpd_reply_status(r, 400, "a picture or a link, please");
+				return;
+			}
+		}
+		if (!g_cover(abs, sent ? NULL : url, sent ? COVER_TMP : NULL, out, sizeof out,
+		             why, sizeof why)) {
+			remove(COVER_TMP);
+			httpd_reply_status(r, 422, why[0] ? why : "couldn't use that");
+			return;
+		}
+		remove(COVER_TMP);
+		note_write(out);
+		note("cover for %s", base_of(abs));
+		httpd_reply(r, 200, "text/plain", "ok", 2, NULL);
+		return;
+	}
+
 	if (!strcmp(path, "/api/albums/pick") && !strcmp(m, "POST")) {
 		char idq[16], why[128] = "";
 		size_t len = 0, n;

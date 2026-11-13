@@ -85,6 +85,12 @@ int gi_rows(menu_row *out, const game_info *gi, bool net)
 	 * choices inside say which do */
 	out[n++] = (menu_row){ gi->has_art ? "Replace Box Art" : "Get Box Art", NULL, true };
 	(void)net;
+	/* ChaOS: how to favorite it, said where people look. Still Y on the
+	 * shelf and not a row here (above); but nothing said so but the Controls
+	 * page, and the only answer to Y was a dot on the card. */
+	out[n++] = MENU_RULE;
+	out[n++] = MENU_NOTE(gi->is_fav ? "Y on the shelf: remove from Favorites"
+	                                : "Y on the shelf: add to Favorites");
 	return n;
 }
 

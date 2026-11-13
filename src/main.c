@@ -51,6 +51,7 @@
 #include "remap.h"
 #include "shots.h"
 #include "itch.h"
+#include "cover.h"
 #include "pixname.h"
 
 /* ChaOS: the button held in the in-game menu to see the game whole. Its name
@@ -78,6 +79,7 @@
 #include <string.h>
 #include <strings.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <sys/statvfs.h>
 #include <time.h>
 #include <unistd.h>
@@ -6782,6 +6784,7 @@ static void wire_up_received(const update_release *offer)
 	g_wu = WU_CHECK;
 }
 
+
 static void xfer_screen_over(app *a, bool over_cable)
 {
 	char       ssid[WIFI_SSID_MAX], ip[64];
@@ -6830,6 +6833,7 @@ static void xfer_screen_over(app *a, bool over_cable)
 	/* The page wears the screen's name. */
 	hare_set_page(cable ? "wire.html" : NULL);
 	hare_set_after_write(xfer_after_write);
+	hare_set_cover(cover_from_web);
 	g_wu = WU_NONE;
 	if (cable) {
 		char dir[CFG_STR * 3];
@@ -7271,6 +7275,7 @@ static void gi_gather(app *a, int owner, const game_entry *g, game_info *gi)
 	 * autosave each time this screen opened. */
 	box_art_path(s->folder, g->name, p, sizeof p);
 	gi->has_art = (stat(p, &st) == 0 && st.st_size > 0);
+	gi->is_fav = fav_is(a->sys.systems[owner].tag, g->file);
 
 	/* Loading the set clobbers whatever set is loaded, which is nobody's
 	 * during shelf browsing - no game is running. It stays loaded after this
@@ -9265,6 +9270,14 @@ static void update_screen(app *a)
  * shelf. Called every pass of the shelf's loop. */
 static char   g_upd_msg[96];
 static Uint32 g_upd_msg_until;
+
+/* ChaOS: a word on the shelf for a moment, in the update notice's pill */
+static void shelf_say(const char *msg, unsigned ms)
+{
+	snprintf(g_upd_msg, sizeof g_upd_msg, "%s", msg);
+	g_upd_msg_until = plat_now_ms() + ms;
+	redraw_now();
+}
 
 static void upd_poll(void)
 {
@@ -14325,9 +14338,15 @@ static void update_games(app *a)
 	 * there is no confirm step to hang the save off, and the alternative is
 	 * losing the choice to a flat battery. */
 	if (a->in.pressed[IN_Y] && n > 0) {
-		fav_toggle(a->sys.systems[shelf_owner(a, a->sys_cursor, v->cursor)].tag,
-		           v->list.items[v->cursor].file);
+		const char *ftag = a->sys.systems[shelf_owner(a, a->sys_cursor, v->cursor)].tag;
+		bool was_fav = fav_is(ftag, v->list.items[v->cursor].file);
+		bool now_fav = fav_toggle(ftag, v->list.items[v->cursor].file);
+
 		fav_save();
+		/* ChaOS: say so - a dot on the card was all Y ever answered. Neither
+		 * before nor after is a full list refusing one more. */
+		shelf_say(now_fav ? "Added to Favorites"
+		          : was_fav ? "Removed from Favorites" : "Favorites is full", 1500);
 		/* The shelf follows immediately. Everything below this line may have
 		 * moved - the system indices, sys_cursor, and v itself - so nothing
 		 * from before it can be reused. */

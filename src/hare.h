@@ -103,6 +103,14 @@ void hare_set_page(const char *page);
  * launcher can shrink a cover. Unset, nothing is told. */
 void hare_set_after_write(void (*fn)(const char *abs));
 
+/* ChaOS: a game's cover set from the page (POST /api/cover?p=<the game>):
+ * the picture in `file` (sent from the phone, already in /tmp), or else the
+ * one `url` leads to - an image, an itch.io game's page, a Google Images
+ * result. Writes Roms/<console>/.media/<stem>.png and says where in `out`;
+ * false with why. NULL (the default) answers 404. */
+void hare_set_cover(bool (*fn)(const char *rom, const char *url, const char *file,
+                               char *out, size_t on, char *why, size_t wn));
+
 /* Updating over Down To The Wire (#69). The page downloads a release itself
  * (from GitHub Pages: release downloads carry no CORS header) and sends it
  * here with GitHub's size and SHA-256; the launcher checks it and asks on the

@@ -282,6 +282,27 @@ static void rmtree(const char *dir)
 	rmdir(dir);
 }
 
+/* ChaOS: what /api/cover hands the launcher */
+static int  g_cv_calls;
+static bool g_cv_refuse, g_cv_had_file;
+static long g_cv_file_len;
+static char g_cv_rom[600], g_cv_url[600];
+
+static bool cover_stub(const char *rom, const char *url, const char *file,
+                       char *out, size_t on, char *why, size_t wn)
+{
+	struct stat st;
+
+	g_cv_calls++;
+	snprintf(g_cv_rom, sizeof g_cv_rom, "%s", rom);
+	snprintf(g_cv_url, sizeof g_cv_url, "%s", url ? url : "");
+	g_cv_had_file = file != NULL;
+	g_cv_file_len = file && stat(file, &st) == 0 ? (long)st.st_size : -1;
+	if (g_cv_refuse) { snprintf(why, wn, "that is not a picture"); return false; }
+	snprintf(out, on, "%s", rom);
+	return true;
+}
+
 int main(void)
 {
 	char body[4096];
@@ -404,6 +425,42 @@ int main(void)
 		      "rename failed");
 		CHECK(post("/api/delete?p=roms/NES/Renamed.nes", g_cookie) == 200,
 		      "delete failed");
+	}
+
+	/* ChaOS: a game's cover from the page. The device's own part (decoding,
+	 * following links) is tools/cover-check.c; here, the route: what reaches
+	 * the callback, and what never does. */
+	printf("  a cover from the page (ChaOS):\n");
+	{
+		char body[512];
+		const char png[] = "\x89PNG fake bytes";
+
+		CHECK(req("POST", "/api/cover?p=roms/NES/Contra.nes", g_cookie, png, sizeof png - 1,
+		          NULL, 0) == 404, "no cover callback answers 404");
+		hare_set_cover(cover_stub);
+		CHECK(req("POST", "/api/cover?p=roms/NES/Contra.nes", g_cookie, png, sizeof png - 1,
+		          NULL, 0) == 200, "a picture sent is taken");
+		CHECK(g_cv_calls == 1 && !g_cv_url[0] && g_cv_file_len == (long)sizeof png - 1,
+		      "and the callback has it as a file, all of it: %ld", g_cv_file_len);
+		snprintf(body, sizeof body, "%s/NES/Contra.nes", g_roms);
+		CHECK(!strcmp(g_cv_rom, body), "for the game named: %s", g_cv_rom);
+		CHECK(post("/api/cover?p=roms/NES/Contra.nes&url=https%3A%2F%2Fexample.itch.io%2Fgame",
+		           g_cookie) == 200, "a link is taken");
+		CHECK(!strcmp(g_cv_url, "https://example.itch.io/game") && !g_cv_had_file,
+		      "and the callback has it decoded, with no file: %s", g_cv_url);
+		CHECK(post("/api/cover?p=roms/NES/Contra.nes", g_cookie) == 400,
+		      "neither a picture nor a link is refused");
+		g_cv_refuse = true;
+		CHECK(req("POST", "/api/cover?p=roms/NES/Contra.nes&url=https%3A%2F%2Fx.example%2Fa",
+		          g_cookie, NULL, 0, body, sizeof body) == 422 && strstr(body, "not a picture"),
+		      "the callback's no comes back with its why: %s", body);
+		g_cv_refuse = false;
+		g_cv_calls = 0;
+		CHECK(post("/api/cover?p=roms/../../etc/passwd&url=https%3A%2F%2Fx.example%2Fa",
+		           g_cookie) == 403 && g_cv_calls == 0, "a path that climbs out never reaches it");
+		CHECK(post("/api/cover?p=roms/NES/Contra.nes&url=https%3A%2F%2Fx.example%2Fa", NULL) == 401 &&
+		      g_cv_calls == 0, "nor does a request without a session");
+		hare_set_cover(NULL);
 	}
 
 	printf("  and a session does not let a path climb out:\n");

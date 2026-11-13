@@ -64,7 +64,7 @@
 - **Appearance** (**MENU > Appearance**): the UI Theme, UI Direction, Transition Speed, Game List View and Menu Color on one page.
 - **Recently Played,** a shelf at the front of the systems row with the last twelve games you played across every system. Turn it off under **MENU > Recently Played**.
 - **ChaOS Wire:** ChaOS Transfer over the USB cable, which can also update ChaOS from your computer.
-- **Box art for homebrew,** from itch.io or one of your own screenshots, chosen from the game's **X** menu.
+- **Box art for homebrew,** from itch.io or one of your own screenshots, chosen from the game's **X** menu, or set from your phone in ChaOS Transfer: a photo, a picture's link, an itch.io page or a Google Images result.
 - **Games come first:** nothing of ChaOS's own runs while you play. An update that was downloading pauses and picks up where it left off afterwards, with its progress shown on the shelf. Muse keeps playing.
 - **Letter scrubbing:** on any game shelf, in every theme, Game List View and Cubic, **L2** and **R2** jump to the first game of the previous or next letter with each press, and a square with the letter you're on fades in over the shelf. Hold the d-pad to scroll and after two seconds the same square shows the letter you're passing through. It fades out a moment after you stop.
 
@@ -75,7 +75,7 @@
 - **Everything on the handheld:** Wi-Fi, box art, RetroAchievements, Bluetooth headphones and sending games over from your phone. You need a computer once, to set up the card.
 - **Three ways to browse** (a row, a column or a cube) and two looks (Plain Jane or Fancy Pants), plus ChaOS Pixel Cards and ChaOS Pixel Names.
 - **Muse,** a music and audiobook player, on SELECT from anywhere.
-- **Turbo buttons, fast forward, mono audio, Play Time, favorites and sorting.** **Favorites** sits at the front of the systems row once a game is favorited.
+- **Turbo buttons, fast forward, mono audio, Play Time, favorites and sorting.** **Favorites** sits at the front of the systems row once a game is favorited: press **Y** on a game to add or remove it (the shelf says which, and a game's **X** menu reminds you).
 - **The battery to the end:** a game is saved and the Brick turns off when the battery is truly empty, judged by its voltage, about half an hour later than its gauge's 2% allowed. The red dot blinks for the last stretch.
 - **Your Brick stays yours.** ChaOS runs from the SD card and changes nothing on the Brick. Take the card out and it boots its own system again.
 
@@ -296,6 +296,8 @@ For one game, press **X** on it and choose **Get Box Art** (or **Replace Box Art
 - **Use a Screenshot:** one of your own screenshots of the game (**MENU + X** while playing), such as its title screen. No Wi-Fi needed.
 
 The choices are shown one at a time, as large as they fit: **left and right** to look, **A** to use one, **B** to go back. Nothing is changed until you choose.
+
+**From your phone or computer:** in ChaOS Transfer, open a console's folder and press **Cover** beside a game. **Choose a picture** sends a photo or a saved image (it's shrunk first, so a big photo is fine). **Use a link** sends a link for the Brick to fetch over Wi-Fi: a picture's address, an itch.io game's page (its cover is used), or a Google Images result. Either way it becomes the game's cover right away.
 
 Or add your own: a PNG named like the game file, in `Roms/<console>/.media/` (`Black Castle.gb` wants `Black Castle.png`, about 512 pixels on the long side).
 

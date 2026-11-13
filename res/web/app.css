@@ -317,6 +317,23 @@ header {
 .row .acts button:hover, .row .acts a:hover { color: var(--text); border-color: var(--line); }
 .row .acts .danger:hover { color: var(--bad); border-color: var(--bad); }
 
+/* ChaOS: Cover's panel, under the game's row */
+.coverpanel {
+	list-style: none;
+	padding: 12px 16px 14px 50px;
+	border-bottom: 1px solid var(--line);
+	background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+.coverpanel p { margin: 0 0 8px; }
+.coverpanel .hint { margin: 8px 0 0; color: var(--dim); font-size: 14px; }
+.coverpanel .acts { display: flex; flex-wrap: wrap; gap: 6px; }
+.coverpanel .acts button {
+	background: none; border: 1px solid var(--line); border-radius: 8px;
+	color: var(--text); font: inherit; font-size: 14px; cursor: pointer;
+	padding: calc(6px + var(--pad-over)) 10px calc(6px + var(--pad-under));
+}
+.coverpanel .acts button:hover { border-color: var(--accent); }
+
 /* Tidy names' preview: every rename, old above new, before any is made */
 .tidy { max-width: var(--wrap); margin: 12px auto; padding: 14px 16px;
         border: 1px solid var(--accent); border-radius: 10px; }

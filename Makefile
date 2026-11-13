@@ -9,7 +9,7 @@
         check check-cheevos check-hare check-httpd check-idle check-rahash \
         check-raset check-xfer check-menus check-artscrape check-artrun check-audioout \
         check-db check-stats check-sort check-bt check-ss check-update check-asan \
-        check-release check-updater check-chaos-names check-itch
+        check-release check-updater check-chaos-names check-itch check-cover
 
 all: check
 
@@ -22,7 +22,7 @@ CHECKS = check-cheevos check-hare check-httpd check-idle check-rahash \
          check-db check-stats check-sort check-bt check-ss \
          check-muselib check-musequeue check-museart check-controls check-logpack \
          check-clock check-update check-remap check-shots check-pixfont \
-         check-release check-updater check-chaos-names check-itch
+         check-release check-updater check-chaos-names check-itch check-cover
 
 check:
 	@fail=0; for c in $(CHECKS); do \
@@ -297,6 +297,17 @@ build-native/itch-check: tools/itch-check.c src/itch.c src/itch.h src/artscrape.
 	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g -DTORTOS_VERSION='"check"' \
 	      -DCHAOS_VERSION='"check"' -Isrc -o $@ tools/itch-check.c src/itch.c src/artscrape.c \
 	      src/net.c src/urlenc.c
+
+# ChaOS: a game's cover from ChaOS Transfer's page (src/cover.c), on a card
+# in /tmp; CHAOS_NET_CHECKS=1 make check-cover follows real links too.
+check-cover: build-native/cover-check
+	@./build-native/cover-check
+
+build-native/cover-check: tools/cover-check.c src/cover.c src/cover.h src/net.c FORCE
+	@mkdir -p build-native
+	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g -DTORTOS_VERSION='"check"' \
+	      -DCHAOS_VERSION='"check"' -Isrc $$(pkg-config --cflags SDL2_image) -o $@ \
+	      tools/cover-check.c src/cover.c src/net.c $$(pkg-config --libs SDL2_image)
 
 # The device's title matcher against the host tool's. A drift here does not
 # fail, it just finds fewer games - see tools/artscrape-check.c.

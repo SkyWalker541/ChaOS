@@ -969,12 +969,15 @@ static void info_rows(void)
 
 	n = gi_rows(rows, &gi, true);
 	printf("game info, nothing scraped, art present and a network:\n");
-	ck(n == 2, "Cheevos and the art action, and nothing else to say");
+	ck(n == 4, "Cheevos and the art action, then ChaOS's favorite note under a rule");
+	ck(!strcmp(rows[3].label, "Y on the shelf: add to Favorites"),
+	   "the note says how to favorite it");
 	ck(!strcmp(rows[0].label, "RetroAchievements"), "Cheevos leads when nothing describes the game");
 	ck(!strcmp(val(&rows[0]), "12 of 78"), "and carries the count");
 	ck(rows[0].live, "and opens the set, the way the in-game row does");
 	ck(!strcmp(rows[1].label, "Replace Box Art"), "art present offers a replace");
 	for (i = 0; i < n; i++) {
+		if (!rows[i].label) continue;          /* the rule */
 		ck(strcmp(rows[i].label, "File") != 0, "no File row");
 		ck(strcmp(rows[i].label, "Size") != 0, "no Size row");
 		ck(strcmp(rows[i].label, "Box Art") != 0, "no Box Art row");
@@ -994,6 +997,11 @@ static void info_rows(void)
 	/* ChaOS: open offline too - a screenshot as the cover needs no network,
 	 * and the choices inside say which do */
 	ck(rows[1].live && !rows[1].value, "and opens offline, saying nothing");
+	gi.is_fav = true;
+	n = gi_rows(rows, &gi, false);
+	ck(!strcmp(rows[n - 1].label, "Y on the shelf: remove from Favorites"),
+	   "a favorite's note says how to take it off");
+	gi.is_fav = false;
 	k = reachable(rows, n, got, GI_MAX);
 	ck(k == 1, "the art action is the one thing to choose");
 
