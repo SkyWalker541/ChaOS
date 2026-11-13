@@ -35,9 +35,9 @@ log() { echo "chaos mount: $*" >&2; }
 
 name=$(basename "$src" .squashfs)
 cache=$(dirname "$src")/.chaos/$name
-# Which image it was unpacked from: its size and time. BusyBox has no stat
+# Which image it was unpacked from, and how (v2: past exFAT's limits): its size and time. BusyBox has no stat
 # on the Brick, so wc and date; a stamp that came out empty never matches.
-stamp="$(wc -c < "$src" | tr -d ' ') $(date -r "$src" +%s 2>/dev/null)"
+stamp="v2 $(wc -c < "$src" | tr -d ' ') $(date -r "$src" +%s 2>/dev/null)"
 have=$(cat "$cache/.chaos-stamp" 2>/dev/null)
 if [ ! -d "$cache" ] || [ -z "$have" ] || [ "$have" != "$stamp" ]; then
 	log "unpacking $name (once)"
