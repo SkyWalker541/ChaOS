@@ -48,19 +48,9 @@ if [ -d "$PM" ] && ! cmp -s "$HERE/mod_ChaOS.txt" "$PM/mod_ChaOS.txt"; then
 	cp -f "$HERE/mod_ChaOS.txt" "$PM/mod_ChaOS.txt"
 fi
 
-# The input devices once the port is going, for the log: whether gptokeyb's
-# keyboard came up, and whether pressing buttons in seconds 4 to 12 reached
-# the pad and the keyboard
-(
-	sleep 4
-	echo "inputs, 4 s in:"
-	grep -E '^(N|H):' /proc/bus/input/devices
-	for name in "Brick Gamepad" "Fake Keyboard"; do
-		ev=$(grep -A6 "Name=\"$name\"" /proc/bus/input/devices | grep -o 'event[0-9]*' | head -1)
-		[ -n "$ev" ] && ( n=$(timeout 8 cat "/dev/input/$ev" | wc -c); echo "$name ($ev): $n bytes of input in 8 s" ) &
-	done
-	wait
-) &
+# The input devices once the port is going, for the log: the pad, and the
+# keyboard gptokeyb makes of it
+( sleep 4; echo "inputs, 4 s in:"; grep '^N:' /proc/bus/input/devices ) &
 
 cd "$(dirname "$PORT")" || exit 1
 /bin/bash "$PORT"
