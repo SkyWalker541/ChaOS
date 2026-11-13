@@ -15,8 +15,6 @@
  * nothing here touches the network or the screen - and sorts the ports by
  * whether they can run on a Brick under ChaOS:
  *
- *   Runs on ChaOS     tried on a Brick under ChaOS and known to work
- *                     (ChaOS/ports/tested.txt, a zip name a line)
  *   May Run on ChaOS  nothing in what the port says it needs rules it out
  *   Show All          everything, the ones that won't run marked as such
  *

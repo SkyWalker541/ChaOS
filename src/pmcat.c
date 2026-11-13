@@ -245,7 +245,7 @@ bool pmcat_in(const pm_port *p, pm_section s)
 {
 	switch (s) {
 	case PMS_TESTED:    return (p->flags & PMF_TESTED) != 0;
-	case PMS_MAY:       return !(p->flags & (PMF_NO | PMF_TESTED));
+	case PMS_MAY:       return !(p->flags & PMF_NO);
 	case PMS_ALL:       return true;
 	case PMS_INSTALLED: return (p->flags & PMF_INSTALLED) != 0;
 	case PMS_UPDATES:   return (p->flags & PMF_UPDATE) != 0;

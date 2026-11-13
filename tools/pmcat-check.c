@@ -86,7 +86,7 @@ static void check_mini(void)
 	n = pmcat_list(&c, PMS_TESTED, NULL, idx, 8);
 	CHECK(n == 1 && idx[0] == cc, "Runs on ChaOS: c");
 	n = pmcat_list(&c, PMS_MAY, NULL, idx, 8);
-	CHECK(n == 1 && idx[0] == a, "May Run: a only (b, d ruled out, c tested), got %d", n);
+	CHECK(n == 2, "May Run: a and c (b, d ruled out), got %d", n);
 	n = pmcat_list(&c, PMS_ALL, NULL, idx, 8);
 	CHECK(n == 4, "all 4");
 	CHECK(n == 4 && !(c.p[idx[3]].flags & PMF_RTR) && c.p[idx[0]].flags & PMF_RTR, "ready to run first");

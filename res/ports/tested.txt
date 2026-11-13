@@ -1,3 +1,0 @@
-# ChaOS: ports tried on a Brick under ChaOS that work, by PortMaster's zip
-# name: the browser's "Runs on ChaOS" (src/pmcat.h)
-gonefishing.zip

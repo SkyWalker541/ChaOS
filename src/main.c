@@ -13544,6 +13544,8 @@ static bool ports_setup_screen(app *a, const char *title, unsigned accent)
  * memory handed over whole - the launcher lets go of its display as the
  * standalone emulator path does, and the idle resident emulator is ended and
  * started again after. */
+static bool pm_launch_runtimes(app *a, const char *script, const char *title, unsigned accent);
+
 static void port_launch(app *a, int o, const char *romfile, const char *title)
 {
 	const system_cfg *s = &a->sys.systems[o];
@@ -13565,6 +13567,9 @@ static void port_launch(app *a, int o, const char *romfile, const char *title)
 	}
 	if (!ports_pm_ready(P_ROMS) && !ports_setup_screen(a, title, s->accent)) return;
 	if (!a->running) return;
+	/* A runtime it needs and hasn't got - a port put on the card some
+	 * other way, or one PortMaster's own app installed - fetched first */
+	if (!pm_launch_runtimes(a, romfile, title, s->accent) || !a->running) return;
 
 	remember_place(a);
 	snprintf(ud, sizeof ud, "CHAOS_USERDATA=%s", P_USERDATA);
@@ -13672,13 +13677,12 @@ static void pm_img_path(const pm_port *p, char *out, size_t n)
 
 static bool pm_reload(void)
 {
-	char cat[LIB_PATH], ports[LIB_PATH], tested[LIB_PATH];
+	char cat[LIB_PATH], ports[LIB_PATH];
 
 	if (g_pmc_loaded) pmcat_free(&g_pmc);
 	pm_cat_path(cat, sizeof cat);
 	pm_ports_dir(ports, sizeof ports);
-	snprintf(tested, sizeof tested, "%s/ports/tested.txt", P_ROOT);
-	g_pmc_loaded = pmcat_load(&g_pmc, cat, ports, tested);
+	g_pmc_loaded = pmcat_load(&g_pmc, cat, ports, NULL);
 	if (g_pmc_loaded) fprintf(stderr, "portmaster: catalog of %d ports\n", g_pmc.n);
 	return g_pmc_loaded;
 }
@@ -13942,6 +13946,63 @@ static void pm_box_art(app *a, const pm_port *p, unsigned accent)
 		mkdir(media, 0755);
 	}
 	cover_save(a, img, "Ports", stem);
+}
+
+/* Before a port starts: the runtimes it needs, by PortMaster's catalog,
+ * fetched and unpacked if they aren't there. True to go ahead - also when
+ * there is no catalog to ask, or the port isn't in it, and its own script
+ * says what's wrong. */
+static bool pm_launch_runtimes(app *a, const char *script, const char *title, unsigned accent)
+{
+	char libs[LIB_PATH], rt[8][64], why[160], nice[64], msg[200];
+	bool loaded_here = !g_pmc_loaded, ok = true, missing = false;
+	int i, at = -1, n;
+
+	if (pm_cat_age() < 0) return true;
+	if (!g_pmc_loaded && !pm_reload()) return true;
+	for (i = 0; i < g_pmc.n && at < 0; i++)
+		if (!strcasecmp(g_pmc.p[i].script, script)) at = i;
+	if (at < 0) goto done;
+	n = pmcat_runtimes(&g_pmc.p[at], rt, 8);
+	snprintf(libs, sizeof libs, "%s/Ports/PortMaster/libs", P_ROMS);
+	for (i = 0; i < n && !missing; i++) {
+		char path[LIB_PATH * 2], unpacked[LIB_PATH * 2];
+		size_t l = strlen(rt[i]);
+
+		snprintf(path, sizeof path, "%s/%s", libs, rt[i]);
+		snprintf(unpacked, sizeof unpacked, "%s/.chaos/%.*s/.chaos-stamp", libs,
+		         (int)(l > 9 ? l - 9 : l), rt[i]);
+		if (access(path, R_OK) != 0 || access(unpacked, R_OK) != 0) {
+			missing = true;
+			pm_runtime_name(rt[i], nice, sizeof nice);
+		}
+	}
+	if (!missing) goto done;
+	if (!net_online()) {
+		/* Only the download needs Wi-Fi: one already here is unpacked */
+		bool have_all = true;
+
+		for (i = 0; i < n; i++) {
+			char path[LIB_PATH * 2];
+
+			snprintf(path, sizeof path, "%s/%s", libs, rt[i]);
+			if (access(path, R_OK) != 0) have_all = false;
+		}
+		if (!have_all) {
+			snprintf(msg, sizeof msg, "It runs on %s:\nconnect to Wi-Fi once to get it", nice);
+			pick_say(a, title, msg, accent);
+			ok = false;
+			goto done;
+		}
+	}
+	fprintf(stderr, "port %s: getting its runtime (%s) first\n", script, nice);
+	if (!pm_runtimes(a, &g_pmc.p[at], accent, why, sizeof why)) {
+		if (strcmp(why, "Stopped")) pick_say(a, title, why, accent);
+		ok = false;
+	}
+done:
+	if (loaded_here && g_pmc_loaded) { pmcat_free(&g_pmc); g_pmc_loaded = false; }
+	return ok;
 }
 
 /* ---- install, update, remove ---------------------------------------------- */
@@ -14735,13 +14796,10 @@ typedef struct {
 
 static int pm_genre_count(const char *g)
 {
-	int *idx = NULL, n = pm_list_build(PMS_MAY, g, &idx), t;
+	int *idx = NULL, n = pm_list_build(PMS_MAY, g, &idx);
 
 	free(idx);
-	idx = NULL;
-	t = pm_list_build(PMS_TESTED, g, &idx);
-	free(idx);
-	return n + t;
+	return n;
 }
 
 static int pm_genre_build(void *ctx, menu_row *rows, int max, const char **heading)
@@ -14770,7 +14828,7 @@ static menu_result pm_genre_key(app *a, void *ctx, in_button key, int sel)
 
 /* ---- PortMaster's first page ---------------------------------------------- */
 
-enum { PMH_TESTED, PMH_MAY, PMH_ALL, PMH_GENRES, PMH_INSTALLED, PMH_UPDATES, PMH_RTR,
+enum { PMH_MAY, PMH_ALL, PMH_GENRES, PMH_INSTALLED, PMH_UPDATES, PMH_RTR,
        PMH_REFRESH, PMH_PM, PMH_UNINSTALL, PMH_ROWS };
 
 typedef struct {
@@ -14781,7 +14839,7 @@ typedef struct {
 
 static void pm_home_counts(pm_home_ctx *c)
 {
-	static const pm_section sec[] = { PMS_TESTED, PMS_MAY, PMS_ALL, 0, PMS_INSTALLED, PMS_UPDATES };
+	static const pm_section sec[] = { PMS_MAY, PMS_ALL, 0, PMS_INSTALLED, PMS_UPDATES };
 	int i;
 	long age = pm_cat_age();
 
@@ -14809,8 +14867,6 @@ static int pm_home_build(void *ctx, menu_row *rows, int max, const char **headin
 
 	(void)max;
 	*heading = "PortMaster";
-	rows[n] = (menu_row){ "Runs on ChaOS", c->counts[PMH_TESTED], have, true };
-	rows[n++].hint = "Tried on a Brick under ChaOS, and known to work";
 	rows[n] = (menu_row){ "May Run on ChaOS", c->counts[PMH_MAY], have, true };
 	rows[n++].hint = "Nothing it needs rules out the Brick";
 	rows[n] = (menu_row){ "Show All", c->counts[PMH_ALL], have, true };
@@ -14839,9 +14895,9 @@ static int pm_home_build(void *ctx, menu_row *rows, int max, const char **headin
 static menu_result pm_home_key(app *a, void *ctx, in_button key, int sel)
 {
 	pm_home_ctx *c = ctx;
-	static const char *const heads[] = { "Runs on ChaOS", "May Run on ChaOS", "All Ports",
+	static const char *const heads[] = { "May Run on ChaOS", "All Ports",
 	                                     NULL, "Installed", "Updates" };
-	static const pm_section sec[] = { PMS_TESTED, PMS_MAY, PMS_ALL, 0, PMS_INSTALLED, PMS_UPDATES };
+	static const pm_section sec[] = { PMS_MAY, PMS_ALL, 0, PMS_INSTALLED, PMS_UPDATES };
 
 	if (sel == PMH_RTR && (key == IN_ACCEPT || key == IN_LEFT || key == IN_RIGHT)) {
 		g_pm_rtr_only = !g_pm_rtr_only;
@@ -14851,7 +14907,7 @@ static menu_result pm_home_key(app *a, void *ctx, in_button key, int sel)
 	}
 	if (key != IN_ACCEPT) return MENU_STAY;
 	switch (sel) {
-	case PMH_TESTED: case PMH_MAY: case PMH_ALL: case PMH_INSTALLED: case PMH_UPDATES:
+	case PMH_MAY: case PMH_ALL: case PMH_INSTALLED: case PMH_UPDATES:
 		if (!g_pmc_loaded) return MENU_STAY;
 		pm_list_screen(a, heads[sel], sec[sel], NULL, c->accent);
 		break;
@@ -17175,14 +17231,13 @@ static void pm_shot(app *a)
 		SDL_RenderFillRect(a->r, NULL);
 		menu_draw(a, heading, rows, n, shot_pm_arg ? atoi(shot_pm_arg) : 0, menu_std_width(a), accent);
 	} else if (!strcmp(shot_pm, "list")) {
-		static const pm_section sec[] = { PMS_TESTED, PMS_MAY, PMS_ALL, PMS_INSTALLED, PMS_UPDATES };
-		static const char *const heads[] = { "Runs on ChaOS", "May Run on ChaOS", "All Ports",
-		                                     "Installed", "Updates" };
-		int which = shot_pm_arg ? atoi(shot_pm_arg) : 1, *idx = NULL, n, sel = shot_pm_n, first;
+		static const pm_section sec[] = { PMS_MAY, PMS_ALL, PMS_INSTALLED, PMS_UPDATES };
+		static const char *const heads[] = { "May Run on ChaOS", "All Ports", "Installed", "Updates" };
+		int which = shot_pm_arg ? atoi(shot_pm_arg) : 0, *idx = NULL, n, sel = shot_pm_n, first;
 		int vis = (PM_PANEL.h - 100 - 24 - ui_font_line(UI_F_META) - 16) / menu_row_h();
 		pm_pic pp;
 
-		if (which < 0 || which > 4) which = 1;
+		if (which < 0 || which > 3) which = 0;
 		n = pm_list_build(sec[which], NULL, &idx);
 		if (sel >= n) sel = n ? n - 1 : 0;
 		first = sel >= vis ? sel - vis + 1 : 0;
