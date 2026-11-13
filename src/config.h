@@ -4,7 +4,7 @@
 
 #include <stdbool.h>
 
-#define CFG_MAX_SYSTEMS 16   /* eleven shipped, plus Favorites and Muse; 12 was exact */
+#define CFG_MAX_SYSTEMS 20   /* ChaOS: twelve shipped (Ports the twelfth), plus Favorites, Recently Played and Muse - 15 - with room to grow */
 #define CFG_STR 256
 
 typedef struct {
