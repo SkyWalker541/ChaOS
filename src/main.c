@@ -969,6 +969,8 @@ static void letter_note(sysview *v);
 static void letter_hold(sysview *v, bool held);
 static void draw_letter_popup(app *a);
 static int shelf_letter_jump(sysview *v, int dir);
+static char shelf_initial(const char *s);
+static void letter_show(char c);   /* ChaOS: the popup for a letter, any list */
 
 static void pn_speed_load(void)
 {
@@ -14710,7 +14712,8 @@ static void pm_list_draw(app *a, const char *heading, const int *idx, int n, int
 			ui_text(a->r, fs, fit, shot.x, y, -1, UI_TEXT_DIM);
 		}
 	}
-	pm_footer(a, "A: open   \xE2\x80\xB9 \xE2\x80\xBA: page   B: back");
+	pm_footer(a, "A: open   \xE2\x80\xB9 \xE2\x80\xBA: page   L2 R2: letter   B: back");
+	draw_letter_popup(a);
 	pm_frame_end(a);
 }
 
@@ -14727,9 +14730,35 @@ static int pm_list_build(pm_section s, const char *genre, int **out)
 	return m;
 }
 
+/* L2 and R2 in a list of ports: to the next initial, or back to the start
+ * of this one and then the one before, as on the shelves
+ * (shelf_letter_jump). The list is ready-to-run first, so the letters run
+ * A to Z twice when it has both kinds; the scrub goes through both. */
+static int pm_letter_jump(const int *idx, int n, int cur, int dir)
+{
+	char c0;
+	int i;
+
+	if (n <= 1) return cur;
+	c0 = shelf_initial(g_pmc.p[idx[cur]].title);
+	if (dir > 0) {
+		for (i = cur + 1; i < n; i++)
+			if (shelf_initial(g_pmc.p[idx[i]].title) != c0) return i;
+		return 0;                          /* past the end: round to the top */
+	}
+	i = cur;
+	while (i > 0 && shelf_initial(g_pmc.p[idx[i - 1]].title) == c0) i--;
+	if (i != cur) return i;
+	i = cur == 0 ? n - 1 : cur - 1;        /* before the top: round to the end */
+	c0 = shelf_initial(g_pmc.p[idx[i]].title);
+	while (i > 0 && shelf_initial(g_pmc.p[idx[i - 1]].title) == c0) i--;
+	return i;
+}
+
 static void pm_list_screen(app *a, const char *heading, pm_section s, const char *genre,
                            unsigned accent)
 {
+	Uint32 held = 0;
 	SDL_Rect panel = PM_PANEL;
 	int *idx = NULL, n = pm_list_build(s, genre, &idx), sel = 0, first = 0;
 	int vis = (panel.h - 100 - 24 - ui_font_line(UI_F_META) - 16) / menu_row_h();
@@ -14759,6 +14788,22 @@ static void pm_list_screen(app *a, const char *heading, pm_section s, const char
 				sel = sel + vis < n ? sel + vis : n - 1;
 			if (in_repeat(&a->in, IN_LEFT) || in_repeat(&a->in, IN_L1))
 				sel = sel - vis > 0 ? sel - vis : 0;
+			/* L2 and R2 scrub by letter, with the letter shown; holding up
+			 * or down for two seconds shows it too, as on the shelves */
+			if (in_repeat(&a->in, IN_R2)) {
+				sel = pm_letter_jump(idx, n, sel, +1);
+				letter_show(shelf_initial(g_pmc.p[idx[sel]].title));
+			}
+			if (in_repeat(&a->in, IN_L2)) {
+				sel = pm_letter_jump(idx, n, sel, -1);
+				letter_show(shelf_initial(g_pmc.p[idx[sel]].title));
+			}
+			if (a->in.down[IN_UP] || a->in.down[IN_DOWN]) {
+				if (!held) held = plat_now_ms();
+				if (plat_now_ms() - held >= 2000) letter_show(shelf_initial(g_pmc.p[idx[sel]].title));
+			} else {
+				held = 0;
+			}
 			if (a->in.pressed[IN_ACCEPT]) {
 				int at = idx[sel];
 
@@ -15763,6 +15808,16 @@ static void letter_note(sysview *v)
 	if (v->list.count <= 0) return;
 	c = shelf_initial(v->jump_by_name ? v->list.items[v->cursor].name
 	                                  : v->list.items[v->cursor].title);
+	g_lp_letter = c ? c : '#';
+	if (!g_lp_last || now - g_lp_last > 1100) g_lp_since = now;
+	g_lp_last = now;
+}
+
+/* The same for a list that isn't a shelf (PortMaster's) */
+static void letter_show(char c)
+{
+	Uint32 now = plat_now_ms();
+
 	g_lp_letter = c ? c : '#';
 	if (!g_lp_last || now - g_lp_last > 1100) g_lp_since = now;
 	g_lp_last = now;
@@ -17243,6 +17298,8 @@ static void pm_shot(app *a)
 		first = sel >= vis ? sel - vis + 1 : 0;
 		pm_pic_init(&pp);
 		if (n) { pm_pic_want(&pp, idx[sel]); pm_pic_step(a, &pp); }
+		/* --pm list SECTION ROW letter: with the scrub's letter up */
+		if (n && getenv("CHAOS_SHOT_LETTER")) letter_show(shelf_initial(g_pmc.p[idx[sel]].title));
 		pm_list_draw(a, heads[which], idx, n, sel, first, vis, &pp, accent);
 		pm_pic_free(&pp);
 		free(idx);
