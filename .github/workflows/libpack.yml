@@ -1,0 +1,44 @@
+# The port library pack: the libraries in dist/libpack, published as the
+# "portlibs" release that ChaOS fetches them from (src/libpack.h's LIBPACK_BASE)
+# when a port needs one the Brick hasn't got. Its sources come along: each
+# archive in SOURCES.txt, fetched from Ubuntu's archive and checked against its
+# sha256. Never the latest release, so updates and ChaOS Installer, which look
+# at the latest, never take it for ChaOS.
+name: libpack
+
+on:
+  push:
+    branches: [main]
+    paths: ['dist/libpack/**', '.github/workflows/libpack.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  libpack:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: The sources, checked
+        run: |
+          mkdir -p src-dl
+          grep -v '^#' dist/libpack/SOURCES.txt | while read -r sum file url; do
+            [ -n "$url" ] || continue
+            curl -fsSL --retry 3 -o "src-dl/$file" "$url"
+            echo "$sum  src-dl/$file" | sha256sum -c -
+          done
+
+      - name: Publish
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          R=portlibs
+          if ! gh release view $R --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release create $R --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title "Port library pack" --prerelease --latest=false \
+              --notes "Libraries some PortMaster ports need that the Brick doesn't have. ChaOS fetches them by itself when a port needs one (libpack.json lists them); nothing here needs downloading by hand.
+
+          Each library keeps its own license. SOURCES.txt says where each one's source came from, with its checksum, and those sources are attached here. libpulse-simple.so.0 is ChaOS's own (res/ports/libpack/pulse-simple.c, GPL-3.0-or-later); Ogg's source is in each ChaOS release's sources."
+          fi
+          gh release upload $R --repo "$GITHUB_REPOSITORY" --clobber dist/libpack/* src-dl/*
