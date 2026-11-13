@@ -96,12 +96,13 @@ mkdir -p "$C/TortOS/ports"
 install -m 755 "$ROOT/res/ports/run.sh" "$C/TortOS/ports/run.sh"
 install -m 644 "$ROOT/res/ports/mod_ChaOS.txt" "$C/TortOS/ports/mod_ChaOS.txt"
 # The shelf: ChaOS's systems.cfg, with the Ports row, and the cards for the
-# shelves ChaOS adds - Ports and Recently Played - in both of TortOS's sets
-# (ChaOS's own two sets are drawn, not files)
+# shelves that aren't consoles - Favorites, Muse, Recently Played, Ports - in
+# both of TortOS's sets, as ChaOS draws them (tools/cardstyle.py,
+# tools/gen*fancy.py); ChaOS's own two sets are drawn by the launcher)
 [ -d "$C/TortOS/cards/classic" ] && [ -d "$C/TortOS/cards/fancy" ] || { echo "no cards in the image: check ports" >&2; exit 1; }
 install -m 644 "$ROOT/config/systems.cfg" "$C/TortOS/systems.cfg"
 for set in classic fancy; do
-	for card in PORTS RECENT; do
+	for card in FAVORITES MUSE PORTS RECENT; do
 		install -m 644 "$ROOT/res/cards/$set/$card.png" "$C/TortOS/cards/$set/$card.png"
 	done
 done
