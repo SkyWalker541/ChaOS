@@ -9,7 +9,7 @@
         check check-cheevos check-hare check-httpd check-idle check-rahash \
         check-raset check-xfer check-menus check-artscrape check-artrun check-audioout \
         check-db check-stats check-sort check-bt check-ss check-update check-asan \
-        check-release check-updater check-chaos-names
+        check-release check-updater check-chaos-names check-itch
 
 all: check
 
@@ -22,7 +22,7 @@ CHECKS = check-cheevos check-hare check-httpd check-idle check-rahash \
          check-db check-stats check-sort check-bt check-ss \
          check-muselib check-musequeue check-museart check-controls check-logpack \
          check-clock check-update check-remap check-shots check-pixfont \
-         check-release check-updater check-chaos-names
+         check-release check-updater check-chaos-names check-itch
 
 check:
 	@fail=0; for c in $(CHECKS); do \
@@ -285,6 +285,18 @@ check-chaos-names: FORCE
 	      src/muselib.c src/release.c src/rajson.c src/net.c src/atomic.c
 	@./$(CHAOS_NAMES)/release-check
 	@./$(CHAOS_NAMES)/hare-check
+
+# ChaOS: itch.io's feeds read, titles matched and the card's list kept, from a
+# feed page itch.io served (tools/fixtures/itch); no network - see src/itch.h.
+check-itch: build-native/itch-check
+	@./build-native/itch-check
+
+build-native/itch-check: tools/itch-check.c src/itch.c src/itch.h src/artscrape.c src/net.c \
+                         src/urlenc.c FORCE
+	@mkdir -p build-native
+	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g -DTORTOS_VERSION='"check"' \
+	      -DCHAOS_VERSION='"check"' -Isrc -o $@ tools/itch-check.c src/itch.c src/artscrape.c \
+	      src/net.c src/urlenc.c
 
 # The device's title matcher against the host tool's. A drift here does not
 # fail, it just finds fewer games - see tools/artscrape-check.c.

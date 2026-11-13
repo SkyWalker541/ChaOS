@@ -70,6 +70,9 @@ static void cfg_quote(FILE *f, const char *v)
 #endif
 #define NET_UA "ChaOS/" CHAOS_VERSION " ( https://github.com/SkyWalker541/ChaOS )"
 
+/* ChaOS: set for the next net_get_spawn_resume only */
+static bool g_resume;
+
 static bool write_get_config(const char *path, const char *url,
                             const char *body_path, int timeout_s)
 {
@@ -104,6 +107,8 @@ static bool write_get_config(const char *path, const char *url,
 	fprintf(f, "write-out = "); cfg_quote(f, "%{http_code}"); fputc('\n', f);
 	if (body_path) { fprintf(f, "output = "); cfg_quote(f, body_path); fputc('\n', f); }
 	fprintf(f, "max-time = %d\n", timeout_s);
+	/* ChaOS: on from where the file left off (a download held for a game) */
+	if (g_resume) fprintf(f, "continue-at = -\n");
 	if (g_ca[0]) { fprintf(f, "cacert = "); cfg_quote(f, g_ca); fputc('\n', f); }
 	fprintf(f, "user-agent = "); cfg_quote(f, NET_UA); fputc('\n', f);
 	fprintf(f, "url = "); cfg_quote(f, url); fputc('\n', f);
@@ -444,6 +449,16 @@ pid_t net_get_spawn(const char *url, const char *path, int timeout_s)
 		FILE *f = fopen(link, "w");
 		if (f) { fputs(cfg, f); fclose(f); }
 	}
+	return pid;
+}
+
+pid_t net_get_spawn_resume(const char *url, const char *path, int timeout_s)
+{
+	pid_t pid;
+
+	g_resume = true;
+	pid = net_get_spawn(url, path, timeout_s);
+	g_resume = false;
 	return pid;
 }
 

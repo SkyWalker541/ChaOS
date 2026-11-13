@@ -16,4 +16,9 @@ void art_shrink(const char *path);
  * no cover was ever fetched this session, since the thread starts on the first. */
 void art_shrink_stop(void);
 
+/* ChaOS: true while a game runs: covers still queued wait, and the one in
+ * hand (a few milliseconds) finishes; false lets them go on. */
+#include <stdbool.h>
+void art_shrink_hold(bool hold);
+
 #endif

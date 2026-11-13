@@ -173,6 +173,7 @@ static SDL_Thread *g_thread;
 static SDL_mutex  *g_lock;
 static SDL_cond   *g_wake;
 static bool        g_stop;
+static bool        g_hold;    /* ChaOS: a game is running: take nothing new */
 static struct job *g_head, *g_tail;
 
 static int worker(void *unused)
@@ -186,7 +187,7 @@ static int worker(void *unused)
 	for (;;) {
 		struct job *j;
 
-		while (!g_stop && !g_head) SDL_CondWait(g_wake, g_lock);
+		while (!g_stop && (!g_head || g_hold)) SDL_CondWait(g_wake, g_lock);
 		if (g_stop) break;
 		j = g_head;
 		g_head = j->next;
@@ -200,6 +201,15 @@ static int worker(void *unused)
 	}
 	SDL_UnlockMutex(g_lock);
 	return 0;
+}
+
+void art_shrink_hold(bool hold)
+{
+	if (!g_thread) return;
+	SDL_LockMutex(g_lock);
+	g_hold = hold;
+	SDL_CondSignal(g_wake);
+	SDL_UnlockMutex(g_lock);
 }
 
 static bool started(void)

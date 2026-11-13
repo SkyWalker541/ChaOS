@@ -81,8 +81,10 @@ int gi_rows(menu_row *out, const game_info *gi, bool net)
 	 * is holding; publisher and developer run to 214 and 417 distinct values
 	 * of pure trivia. They stay stored - re-scraping to add a column is an
 	 * hour - and stay off this screen. */
-	out[n++] = (menu_row){ gi->has_art ? "Replace Box Art" : "Get Box Art",
-	                       net ? NULL : "needs Wi-Fi", net };
+	/* ChaOS: open with or without Wi-Fi, as a screenshot needs none; the
+	 * choices inside say which do */
+	out[n++] = (menu_row){ gi->has_art ? "Replace Box Art" : "Get Box Art", NULL, true };
+	(void)net;
 	return n;
 }
 

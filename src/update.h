@@ -108,7 +108,10 @@ bool upd_check(void);
  * Install is offered for the version already installed too, to repair it.
  * Either keeps games, saves and settings: they are not ChaOS's files. */
 bool upd_download(bool small);
-void upd_cancel(void);               /* a download or unpack in progress */
+void upd_cancel(void);
+/* ChaOS: true while a game runs - a download stops, keeping what it has, and
+ * unpacking freezes - and false after, when both carry on. */
+void upd_hold(bool hold);               /* a download or unpack in progress */
 bool upd_remove(void);               /* a finished download, unwanted */
 /* The boot partition told to install it at the next boot. The caller then
  * restarts the device (launch.sh's /tmp/chaos_reboot). */

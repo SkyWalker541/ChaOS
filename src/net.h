@@ -92,6 +92,9 @@ bool net_get_async(const char *url, const char *path, int timeout_s);
 #include <sys/types.h>
 pid_t net_get_spawn(const char *url, const char *path, int timeout_s);
 void  net_spawn_done(pid_t pid);
+/* ChaOS: as net_get_spawn, but on from the end of what is already at `path`
+ * (curl's continue-at): a download stopped for a game, carried on after. */
+pid_t net_get_spawn_resume(const char *url, const char *path, int timeout_s);
 
 /* What the server answered with, once net_async_poll has returned non-zero:
  * an HTTP status, or 0 when the request never reached a server at all.

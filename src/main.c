@@ -50,6 +50,7 @@
 #include "update.h"
 #include "remap.h"
 #include "shots.h"
+#include "itch.h"
 #include "pixname.h"
 
 /* ChaOS: the button held in the in-game menu to see the game whole. Its name
@@ -7581,6 +7582,381 @@ static void synopsis_screen(app *a, const char *title, const char *text,
  * the player is. */
 static void cheevos_screen(app *a, SDL_Texture *bg, bool over_shelf);
 
+/* ---- ChaOS: choosing a cover (Get / Replace Box Art) ----------------------
+ *
+ * For the games libretro's thumbnails don't have - homebrew above all - the
+ * player chooses: libretro's own match as before, a cover from itch.io (where
+ * most new homebrew for these consoles is published, src/itch.h), or one of
+ * the game's own screenshots, its title screen most often. The candidates are
+ * shown one at a time, as large as the panel allows, left and right to look
+ * and A to use one; a downloaded one is fetched only when it is looked at,
+ * and the next one meanwhile. */
+
+#define PICK_MAX   24
+#define PICK_TMP   "/tmp/chaos-pick-%d"
+
+typedef struct {
+	char label[160];   /* what the caption says: where it is from, and what */
+	char url[256];     /* to download, or "" */
+	char path[512];    /* on the card, or where the download goes */
+	int  state;        /* 0 not yet, 1 coming, 2 here, -1 couldn't */
+} pick_item;
+
+/* The cover the player chose, as the game's box art: decoded and written as
+ * a PNG beside the old one and renamed over it once whole, so nothing is
+ * lost if it fails, then shrunk to the size covers are drawn at. */
+static bool cover_save(app *a, const char *src, const char *folder, const char *stem)
+{
+	char dest[LIB_PATH * 3], tmp[LIB_PATH * 3 + 8], dir[LIB_PATH * 3];
+	SDL_Surface *s = IMG_Load(src);
+	char *slash;
+	bool ok;
+
+	if (!s) {
+		fprintf(stderr, "cover: couldn't read %s: %s\n", src, IMG_GetError());
+		return false;
+	}
+	box_art_path(folder, stem, dest, sizeof dest);
+	snprintf(dir, sizeof dir, "%s", dest);
+	if ((slash = strrchr(dir, '/'))) { *slash = '\0'; mkdir(dir, 0755); }
+	snprintf(tmp, sizeof tmp, "%s.new", dest);
+	ok = IMG_SavePNG(s, tmp) == 0 && rename(tmp, dest) == 0;
+	SDL_FreeSurface(s);
+	if (!ok) {
+		unlink(tmp);
+		fprintf(stderr, "cover: couldn't write %s\n", dest);
+		return false;
+	}
+	art_shrink(dest);
+	free_all_textures(a);
+	fprintf(stderr, "cover: %s/%s from %s\n", folder, stem, src);
+	return true;
+}
+
+static void pick_draw(app *a, const char *title, pick_item *it, int n, int sel,
+                      SDL_Texture *tex, int tw, int th, const char *note, unsigned accent)
+{
+	TTF_Font *fh = ui_font(UI_F_LABEL), *fm = ui_font(UI_F_MENU), *fs = ui_font(UI_F_META);
+	SDL_Rect panel = { 96, 40, TORTOS_SCREEN_W - 192, TORTOS_SCREEN_H - 80 };
+	SDL_Rect area = { panel.x + 48, panel.y + 104, panel.w - 96, panel.h - 250 };
+	char line[192], fit[192];
+
+	tick_tint(a);
+	draw_shelf(a);
+	SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+	SDL_SetRenderDrawColor(a->r, 0, 0, 0, 140);
+	SDL_RenderFillRect(a->r, NULL);
+	ui_panel(a->r, &panel, 28, accent);
+	ui_fit_text(fh, title, fit, sizeof fit, panel.w - 96);
+	ui_text(a->r, fh, fit, panel.x + panel.w / 2, panel.y + 28, 0, UI_TEXT);
+
+	if (tex && tw > 0 && th > 0) {
+		/* As large as fits, whole, centred, and smoothly: a cover is a
+		 * picture, not pixel art, and itch.io's are 315x250 */
+		float k = (float)area.w / tw < (float)area.h / th ? (float)area.w / tw : (float)area.h / th;
+		SDL_Rect d;
+
+		SDL_SetTextureScaleMode(tex, SDL_ScaleModeLinear);
+		d.w = (int)(tw * k);
+		d.h = (int)(th * k);
+		d.x = area.x + (area.w - d.w) / 2;
+		d.y = area.y + (area.h - d.h) / 2;
+		SDL_RenderCopy(a->r, tex, NULL, &d);
+	} else {
+		const char *say = n <= 0 ? note
+		                : it[sel].state < 0 ? "Couldn't load this one" : "Loading...";
+
+		ui_text(a->r, fm, say ? say : "", area.x + area.w / 2,
+		        area.y + area.h / 2 - ui_font_height(UI_F_MENU) / 2, 0, UI_TEXT_DIM);
+	}
+	if (n > 0) {
+		ui_fit_text(fm, it[sel].label, fit, sizeof fit, panel.w - 96);
+		ui_text(a->r, fm, fit, panel.x + panel.w / 2, area.y + area.h + 22, 0, UI_TEXT_SOFT);
+		snprintf(line, sizeof line, "%s%d of %d%s   A: use   B: back",
+		         sel > 0 ? "\xE2\x80\xB9 " : "", sel + 1, n, sel + 1 < n ? " \xE2\x80\xBA" : "");
+	} else {
+		snprintf(line, sizeof line, "B: back");
+	}
+	ui_text(a->r, fs, line, panel.x + panel.w / 2, panel.y + panel.h - 56, 0, UI_TEXT_DIM);
+}
+
+static void pick_frame(app *a, const char *title, pick_item *it, int n, int sel,
+                       SDL_Texture *tex, int tw, int th, const char *note, unsigned accent)
+{
+	pick_draw(a, title, it, n, sel, tex, tw, th, note, accent);
+	plat_draw_osd(a->r);
+	plat_present();
+}
+
+/* The picker itself: the index chosen, or -1. Downloads one candidate at a
+ * time in the one request slot: the one on screen first, then the next. */
+static int pick_cover(app *a, const char *title, pick_item *it, int n, unsigned accent)
+{
+	SDL_Texture *tex = NULL;
+	int sel = 0, shown = -1, fetching = -1, tw = 0, th = 0, chosen = -1;
+
+	sync_abandon();
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+	for (;;) {
+		/* The download in flight */
+		if (fetching >= 0) {
+			int got = net_async_poll();
+
+			if (got != 0) {
+				it[fetching].state = got > 0 ? 2 : -1;
+				if (got < 0) unlink(it[fetching].path);
+				fetching = -1;
+			}
+		}
+		/* The next to ask for: the one on screen, else the one after it */
+		if (fetching < 0) {
+			int want = -1;
+
+			if (it[sel].state == 0) want = sel;
+			else if (sel + 1 < n && it[sel + 1].state == 0) want = sel + 1;
+			if (want >= 0) {
+				if (!it[want].url[0]) it[want].state = 2;
+				else if (net_get_async(it[want].url, it[want].path, 20)) {
+					it[want].state = 1;
+					fetching = want;
+				} else {
+					it[want].state = -1;
+				}
+			}
+		}
+		/* The picture on screen, once it is here */
+		if (shown != sel && it[sel].state == 2) {
+			SDL_Surface *s = IMG_Load(it[sel].path);
+
+			if (tex) SDL_DestroyTexture(tex);
+			tex = NULL;
+			if (s) {
+				tex = SDL_CreateTextureFromSurface(a->r, s);
+				tw = s->w;
+				th = s->h;
+				SDL_FreeSurface(s);
+			} else {
+				it[sel].state = -1;
+			}
+			shown = sel;
+		}
+
+		plat_input_poll(&a->in);
+		if (a->in.quit_requested) { a->running = false; break; }
+		if (a->in.pressed[IN_POWER] || idle_due(a)) { power_off(a); break; }
+		if (menu_leaving(a)) break;
+		if (in_repeat(&a->in, IN_LEFT) && sel > 0) { sel--; shown = -1; }
+		if (in_repeat(&a->in, IN_RIGHT) && sel + 1 < n) { sel++; shown = -1; }
+		if (shown != sel && tex) { SDL_DestroyTexture(tex); tex = NULL; }
+		if (a->in.pressed[IN_ACCEPT] && it[sel].state == 2 && tex) { chosen = sel; break; }
+		if (in_repeat(&a->in, IN_VOLUP))    plat_volume_nudge(+1);
+		if (in_repeat(&a->in, IN_VOLDN))    plat_volume_nudge(-1);
+		if (in_repeat(&a->in, IN_BRIGHTUP)) plat_brightness_nudge(+1);
+		if (in_repeat(&a->in, IN_BRIGHTDN)) plat_brightness_nudge(-1);
+
+		pick_frame(a, title, it, n, sel, shown == sel ? tex : NULL, tw, th, NULL, accent);
+		SDL_Delay(8);
+	}
+	if (fetching >= 0) net_async_abort();
+	if (tex) SDL_DestroyTexture(tex);
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+	return chosen;
+}
+
+/* A line on the panel for a moment: why there is nothing to choose from */
+static void pick_say(app *a, const char *title, const char *say, unsigned accent)
+{
+	unsigned t0 = plat_now_ms();
+
+	while (plat_now_ms() - t0 < 1800 && a->running) {
+		plat_input_poll(&a->in);
+		if (a->in.pressed[IN_ACCEPT] || menu_leaving(a)) break;
+		pick_frame(a, title, NULL, 0, 0, NULL, 0, 0, say, accent);
+		SDL_Delay(16);
+	}
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+}
+
+static void itch_index_path(const char *folder, char *out, size_t n)
+{
+	char dir[LIB_PATH * 2];
+
+	snprintf(dir, sizeof dir, "%s/itch", P_USERDATA);
+	mkdir(dir, 0755);
+	snprintf(out, n, "%s/%s.list", dir, folder);
+}
+
+/* A day between catch-ups: new homebrew is a handful a day across all of
+ * itch.io, and one look a day keeps the list fresh for the price of a page. */
+#define ITCH_FRESH_S (24 * 60 * 60)
+
+static bool itch_cover_screen(app *a, const char *folder, const char *stem,
+                              const char *title, unsigned accent)
+{
+	char path[LIB_PATH * 3], now[96];
+	itch_game *games;
+	int count = 0, best[PICK_MAX], k, i;
+	time_t when = 0;
+	bool whole = false, picked = false;
+
+	itch_index_path(folder, path, sizeof path);
+	games = itch_index_load(path, &count, &when, &whole);
+	/* Read the list first when there is none, it isn't whole, or it is a
+	 * day old; a list on the card that can't be brought up to date is
+	 * still used */
+	if (!games || !whole || time(NULL) - when > ITCH_FRESH_S) {
+		if (!net_online()) {
+			if (!games) { pick_say(a, title, "Needs Wi-Fi", accent); return false; }
+		} else {
+			bool going = true;
+
+			free(games);
+			games = NULL;
+			sync_abandon();
+			if (!itch_fetch_begin(folder, path)) going = false;
+			while (going && a->running) {
+				int st = itch_fetch_step(), g, pg;
+
+				plat_input_poll(&a->in);
+				if (a->in.quit_requested) { itch_fetch_cancel(); a->running = false; return false; }
+				if (a->in.pressed[IN_POWER] || idle_due(a)) { itch_fetch_cancel(); power_off(a); return false; }
+				if (menu_leaving(a)) { itch_fetch_cancel(); break; }
+				if (st <= 0) {
+					if (st < 0) fprintf(stderr, "itch: %s\n", itch_fetch_problem());
+					going = false;
+					break;
+				}
+				itch_fetch_progress(&g, &pg);
+				snprintf(now, sizeof now, "Reading itch.io's %s games... %d", folder, g);
+				pick_frame(a, title, NULL, 0, 0, NULL, 0, 0, now, accent);
+				SDL_Delay(8);
+			}
+			/* Whatever is on the card now, new or as it was */
+			games = itch_index_load(path, &count, &when, &whole);
+			if (!games) {
+				const char *why = itch_fetch_problem();
+				pick_say(a, title, why && why[0] ? why : "Couldn't read itch.io", accent);
+				return false;
+			}
+		}
+	}
+	k = itch_match(stem, games, count, best, PICK_MAX);
+	/* The title shown, when it isn't the file's name, is tried too */
+	if (!k && title && strcmp(title, stem)) k = itch_match(title, games, count, best, PICK_MAX);
+	if (!k) {
+		free(games);
+		pick_say(a, title, "No match on itch.io", accent);
+		return false;
+	}
+	{
+		pick_item it[PICK_MAX];
+
+		memset(it, 0, sizeof it);
+		for (i = 0; i < k; i++) {
+			snprintf(it[i].label, sizeof it[i].label, "itch.io: %s", games[best[i]].title);
+			snprintf(it[i].url, sizeof it[i].url, "%s", games[best[i]].image);
+			snprintf(it[i].path, sizeof it[i].path, PICK_TMP, i);
+		}
+		free(games);
+		i = pick_cover(a, title, it, k, accent);
+		if (i >= 0) picked = cover_save(a, it[i].path, folder, stem);
+		for (int j = 0; j < k; j++) unlink(it[j].path);
+	}
+	return picked;
+}
+
+static bool shot_cover_screen(app *a, const char *folder, const char *file,
+                              const char *stem, const char *title, unsigned accent)
+{
+	static char names[PICK_MAX][SHOTS_NAME];
+	char dir[LIB_PATH * 3], when[64];
+	pick_item it[PICK_MAX];
+	int n, i;
+
+	shots_dir(P_CARD, folder, file, dir, sizeof dir);
+	n = shots_list(dir, names, PICK_MAX);
+	if (n <= 0) { pick_say(a, title, "No screenshots of this game", accent); return false; }
+	memset(it, 0, sizeof it);
+	for (i = 0; i < n; i++) {
+		shots_label(names[i], when, sizeof when);
+		snprintf(it[i].label, sizeof it[i].label, "Screenshot, %s", when);
+		snprintf(it[i].path, sizeof it[i].path, "%s/%s", dir, names[i]);
+	}
+	i = pick_cover(a, title, it, n, accent);
+	return i >= 0 && cover_save(a, it[i].path, folder, stem);
+}
+
+/* Get / Replace Box Art: where from */
+typedef struct {
+	info_ctx *ic;
+	int       shots;
+	bool      itch;
+} boxart_ctx;
+
+enum { BA_AUTO, BA_ITCH, BA_SHOT };
+
+static int boxart_build(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	boxart_ctx *c = ctx;
+	static char shots[24];
+	bool net = menu_wifi(NULL, 0) == WIFI_CONNECTED;
+	int n = 0;
+
+	(void)max;
+	*heading = "Box Art";
+	rows[n++] = (menu_row){ "Find Automatically", net ? NULL : "needs Wi-Fi", true };
+	if (c->itch)
+		rows[n++] = (menu_row){ "Search itch.io", net ? NULL : "needs Wi-Fi", true };
+	snprintf(shots, sizeof shots, "%d", c->shots);
+	rows[n++] = (menu_row){ "Use a Screenshot", c->shots ? shots : "none yet", c->shots > 0 };
+	rows[n++] = MENU_RULE;
+	rows[n++] = MENU_NOTE("itch.io: homebrew; screenshots: MENU+X");
+	return n;
+}
+
+static menu_result boxart_key(app *a, void *ctx, in_button key, int sel)
+{
+	boxart_ctx *c = ctx;
+	info_ctx *ic = c->ic;
+	const char *folder = a->sys.systems[ic->owner].folder;
+	unsigned accent = a->sys.systems[ic->owner].accent;
+	int id = sel == 0 ? BA_AUTO : (c->itch && sel == 1) ? BA_ITCH : BA_SHOT;
+	bool done = false;
+
+	if (key != IN_ACCEPT) return MENU_STAY;
+	if (id == BA_AUTO) {
+		/* The ordinary scrape, over this one game: nothing deleted first,
+		 * the new cover renamed over the old only once it has arrived whole */
+		art_screen(a, folder, ic->g->title, ic->g->name, ic->g->file, accent);
+		return MENU_DONE;
+	}
+	if (id == BA_ITCH) {
+		if (!net_online()) return MENU_STAY;
+		done = itch_cover_screen(a, folder, ic->g->name, ic->g->title, accent);
+	} else {
+		done = shot_cover_screen(a, folder, ic->g->file, ic->g->name, ic->g->title, accent);
+	}
+	return done ? MENU_DONE : MENU_STAY;
+}
+
+static void boxart_screen(app *a, info_ctx *ic)
+{
+	boxart_ctx c = { .ic = ic };
+	static char names[PICK_MAX][SHOTS_NAME];
+	char dir[LIB_PATH * 3];
+	const char *folder = a->sys.systems[ic->owner].folder;
+
+	shots_dir(P_CARD, folder, ic->g->file, dir, sizeof dir);
+	c.shots = shots_list(dir, names, PICK_MAX);
+	if (c.shots < 0) c.shots = 0;
+	c.itch = itch_slugs(folder) != NULL;
+	menu_run(a, &(menu_style){ .accent = a->sys.systems[ic->owner].accent },
+	         boxart_build, boxart_key, &c);
+}
+
 static menu_result info_key(app *a, void *ctx, in_button key, int sel)
 {
 	info_ctx *c = ctx;
@@ -7619,8 +7995,8 @@ static menu_result info_key(app *a, void *ctx, in_button key, int sel)
 		 * which for a translation, homebrew or a hand-added cover is one the
 		 * scraper can never bring back. The new one is renamed over the old
 		 * only once it has arrived whole. */
-		art_screen(a, a->sys.systems[c->owner].folder, c->g->title, c->g->name,
-		           c->g->file, a->sys.systems[c->owner].accent);
+		/* ChaOS: where from - libretro as before, itch.io, or a screenshot */
+		boxart_screen(a, c);
 	}
 	gi_gather(a, c->owner, c->g, &c->gi);
 	plat_input_flush();
@@ -8897,8 +9273,26 @@ static void draw_upd_notice(app *a)
 	SDL_Color edge = { (Uint8)(acc >> 16), (Uint8)(acc >> 8), (Uint8)acc, 255 };
 	int w, h;
 
-	if (!g_upd_msg[0] || now >= g_upd_msg_until) return;
-	w = ui_text_width(f, g_upd_msg) + 48;
+	const char *say = g_upd_msg;
+	char work[96];
+
+	/* ChaOS: an update going on in the background says how far, for as long
+	 * as it goes - after a game too, which held it (launch) */
+	if (upd_get() == UPD_DOWNLOADING || upd_get() == UPD_UNPACKING) {
+		const ota_info *o = upd_latest();
+
+		if (upd_get() == UPD_DOWNLOADING)
+			snprintf(work, sizeof work, "Downloading ChaOS %s \xC2\xB7 %d%%",
+			         o ? o->version : "", upd_percent());
+		else
+			snprintf(work, sizeof work, "Preparing ChaOS %s%.*s", o ? o->version : "",
+			         (int)(now / 500 % 4), "...");
+		say = work;
+		redraw_at(now + 500);
+	} else if (!g_upd_msg[0] || now >= g_upd_msg_until) {
+		return;
+	}
+	w = ui_text_width(f, say) + 48;
 	h = ui_font_height(UI_F_META) + 20;
 	{
 		SDL_Rect outer = { (TORTOS_SCREEN_W - w) / 2 - 2, 22, w + 4, h + 4 };
@@ -8906,8 +9300,8 @@ static void draw_upd_notice(app *a)
 		ui_round_rect(a->r, &outer, h / 2 + 2, edge);
 		ui_round_rect(a->r, &inner, h / 2, (SDL_Color){ 23, 21, 28, 255 });
 	}
-	ui_text(a->r, f, g_upd_msg, TORTOS_SCREEN_W / 2, 34, 0, UI_TEXT);
-	redraw_at(g_upd_msg_until);
+	ui_text(a->r, f, say, TORTOS_SCREEN_W / 2, 34, 0, UI_TEXT);
+	if (say == g_upd_msg) redraw_at(g_upd_msg_until);
 }
 
 /* ChaOS: the whole image, for an update ChaOS's own over-the-air one can't
@@ -12931,7 +13325,23 @@ static void respawn_resident(app *a)
 	plat_spawn_detached(argv, NULL, P_ROOT);
 }
 
+static void launch_game(app *a);
+
+/* ChaOS: a game first. Nothing of ChaOS's own runs while one does - an
+ * update's download stops and its unpacking freezes, covers still to resize
+ * wait - and all of it carries on once the game is over; the shelf's notice
+ * says how far it has got (draw_upd_notice). Muse is the exception, by
+ * design: music plays on through a game. */
 static void launch(app *a)
+{
+	upd_hold(true);
+	art_shrink_hold(true);
+	launch_game(a);
+	art_shrink_hold(false);
+	upd_hold(false);
+}
+
+static void launch_game(app *a)
 {
 	sysview *v = &a->view[a->sys_cursor];
 	/* The game's system, not the shelf's. Launching a favorite off the
@@ -14748,6 +15158,7 @@ static const char *shot_path;
 static int shot_screen = -1;
 static int shot_menu, shot_menu_sel;
 static bool shot_clock;                    /* ChaOS: --datetime [row] */
+static const char *shot_pick;              /* ChaOS: --pick IMAGE, the cover picker */
 /* --shader [group [row]]: the shader's page, -1, or a group's (ChaOS). */
 static int shot_shader = -2, shot_shader_sel;
 static const char *shot_shots;      /* --shots DIR [asking]: the viewer */
@@ -14775,6 +15186,7 @@ static int shot_info;
  * to look at all three without setting the device three times. */
 static int shot_controls = -1;
 static int shot_updates = -1;   /* ChaOS: --updates <upd_state> */
+static int shot_upd_pill = -1;  /* ChaOS: --update-pill <upd_state>, the shelf's notice */
 static const char *shot_remap;  /* ChaOS: --remap <TAG>: its Button Mapping */
 static int shot_cc_page = -1;  /* ChaOS: --cc <page>, with --remap: its Controls */
 static int shot_art;
@@ -15079,6 +15491,24 @@ static void take_shot(app *a)
 		n = clock_build(&cu, rows, MENU_MAX_ROWS, &head);
 		menu_draw(a, head, rows, n, shot_menu_sel, menu_std_width(a), MENU_ACCENT);
 	}
+	if (shot_upd_pill >= 0) {
+		upd_demo((upd_state)shot_upd_pill, "1.2.0", NULL);
+		draw_upd_notice(a);
+	}
+	if (shot_pick) {
+		pick_item it[3];
+		SDL_Surface *sf = IMG_Load(shot_pick);
+		SDL_Texture *t = sf ? SDL_CreateTextureFromSurface(a->r, sf) : NULL;
+
+		memset(it, 0, sizeof it);
+		snprintf(it[0].label, sizeof it[0].label, "itch.io: Super Tilt Bro. for NES");
+		snprintf(it[1].label, sizeof it[1].label, "itch.io: Super Tilt Bro. (Demo)");
+		it[0].state = 2;
+		pick_draw(a, "Super Tilt Bro", it, 2, 0, t, sf ? sf->w : 0, sf ? sf->h : 0,
+		          NULL, MENU_ACCENT);
+		if (t) SDL_DestroyTexture(t);
+		if (sf) SDL_FreeSurface(sf);
+	}
 	if (shot_shader > -2) shader_shot(a, shot_shader, shot_shader_sel);
 	if (shot_ss) ss_shot(a);
 	if (shot_shots) {
@@ -15345,6 +15775,7 @@ int main(int argc, char *argv[])
 			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9')
 				shot_menu_sel = atoi(argv[++i]);
 		}
+		else if (!strcmp(argv[i], "--pick") && i + 1 < argc) shot_pick = argv[++i];
 		/* ChaOS: --datetime [row], the Date & Time screen */
 		else if (!strcmp(argv[i], "--datetime")) {
 			shot_clock = true;
@@ -15422,6 +15853,8 @@ int main(int argc, char *argv[])
 			shot_cc_page = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--remap") && i + 1 < argc)
 			shot_remap = argv[++i];
+		else if (!strcmp(argv[i], "--update-pill") && i + 1 < argc)
+			shot_upd_pill = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--updates") && i + 1 < argc)
 			shot_updates = atoi(argv[++i]);   /* an upd_state, +100 offline */
 		else if (!strcmp(argv[i], "--controls")) {

@@ -425,7 +425,12 @@ static void unpack(void)
 	if (rename(g_dl_part, g_dl) != 0) { fail("The download went missing"); return; }
 	pid = fork();
 	if (pid < 0) { fail("Couldn't check the download"); return; }
-	if (pid == 0) background_priority(0);      /* the child, and what it runs */
+	if (pid == 0) {
+		/* Its own process group, so a game can stop the whole of it - the
+		 * shell, sha256sum, xz and tar - and start it again (upd_hold) */
+		setpgid(0, 0);
+		background_priority(0);                  /* the child, and what it runs */
+	}
 	if (pid == 0 && g_latest.small) {
 		/* The small one: unpacked beside the card's ChaOS, and only the
 		 * launcher there taken as proof it is whole */
@@ -477,10 +482,54 @@ static void unpacked(int code)
 	else fail("Couldn't check the download");
 }
 
+/* ChaOS: nothing of an update runs while a game does (upd_hold). A
+ * download is stopped, keeping what it has, and carried on from there after;
+ * unpacking - the card's own work, nothing to time out - is frozen and let go
+ * where it was. */
+static bool g_held_dl, g_held_unpack;
+
+void upd_hold(bool hold)
+{
+	if (hold) {
+		if (g_pid > 0 && g_state == UPD_DOWNLOADING && !g_held_dl) {
+			kill(g_pid, SIGTERM);
+			waitpid(g_pid, NULL, 0);
+			net_spawn_done(g_pid);
+			g_pid = -1;
+			g_held_dl = true;
+			fprintf(stderr, "update: download held for a game\n");
+		} else if (g_pid > 0 && g_state == UPD_UNPACKING && !g_held_unpack) {
+			kill(-g_pid, SIGSTOP);
+			g_held_unpack = true;
+			fprintf(stderr, "update: unpacking held for a game\n");
+		}
+		return;
+	}
+	if (g_held_unpack) {
+		g_held_unpack = false;
+		if (g_pid > 0) kill(-g_pid, SIGCONT);
+		fprintf(stderr, "update: unpacking goes on\n");
+	}
+	if (g_held_dl) {
+		char url[400];
+
+		g_held_dl = false;
+		if (g_state != UPD_DOWNLOADING) return;
+		snprintf(url, sizeof url, DL_URL, g_latest.version,
+		         g_latest.small ? g_latest.app : g_latest.root);
+		g_pid = net_get_spawn_resume(url, g_dl_part, 1800);
+		if (g_pid <= 0) { fail("Couldn't start the download"); return; }
+		background_priority(g_pid);
+		fprintf(stderr, "update: download goes on\n");
+	}
+}
+
 void upd_cancel(void)
 {
+	if (g_held_unpack && g_pid > 0) kill(-g_pid, SIGCONT);
+	g_held_dl = g_held_unpack = false;
 	if (g_pid > 0 && (g_state == UPD_DOWNLOADING || g_state == UPD_UNPACKING)) {
-		kill(g_pid, SIGTERM);
+		kill(g_state == UPD_UNPACKING ? -g_pid : g_pid, SIGTERM);
 		waitpid(g_pid, NULL, 0);
 		net_spawn_done(g_pid);
 		g_pid = -1;

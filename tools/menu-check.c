@@ -991,10 +991,11 @@ static void info_rows(void)
 	printf("game info, no set, no art and no network:\n");
 	ck(!rows[0].live, "a game with no set has nothing to open");
 	ck(!strcmp(rows[1].label, "Get Box Art"), "no art offers a get, not a replace");
-	ck(!strcmp(val(&rows[1]), "needs Wi-Fi"), "and says why it is dead");
-	ck(!rows[1].live, "which it is");
+	/* ChaOS: open offline too - a screenshot as the cover needs no network,
+	 * and the choices inside say which do */
+	ck(rows[1].live && !rows[1].value, "and opens offline, saying nothing");
 	k = reachable(rows, n, got, GI_MAX);
-	ck(k == 0, "nothing on the screen can be chosen");
+	ck(k == 1, "the art action is the one thing to choose");
 
 	/* Scraped, which adds the three rows ABOVE Cheevos and nowhere else. The
 	 * shapes below are the whole of what a scrape can leave behind. */
