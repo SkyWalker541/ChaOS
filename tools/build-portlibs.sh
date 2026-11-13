@@ -13,6 +13,7 @@
 set -e
 SYSROOT=$(cd "${1:?usage: $0 SYSROOT OUT.tar.xz}" && pwd)
 OUT=${2:?usage: $0 SYSROOT OUT.tar.xz}
+case "$OUT" in /*) ;; *) OUT=$(pwd)/$OUT ;; esac
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 W=$(mktemp -d)
 trap 'rm -rf "$W"' EXIT
@@ -65,9 +66,31 @@ cm SDL_mixer -DSDL2MIXER_SAMPLES=OFF -DSDL2MIXER_VENDORED=OFF -DSDL2MIXER_DEPS_S
 	-DSDL2MIXER_MP3_MPG123=ON -DSDL2MIXER_MP3_DRMP3=OFF -DSDL2MIXER_MOD=OFF \
 	-DSDL2MIXER_MIDI=ON -DSDL2MIXER_MIDI_TIMIDITY=ON -DSDL2MIXER_MIDI_FLUIDSYNTH=OFF \
 	-DSDL2MIXER_WAVPACK=OFF -DSDL2MIXER_GME=OFF
+# SDL2 for ports: the Brick's own (plastron's: 2.32.10 with its PowerVR
+# driver, patches 0001 and 0002 in the sources) and one more, 0003, so that a
+# port's keyboard is found with no udev (res/ports/sdl2). In a folder of its
+# own, ahead of /usr/lib on a port's LD_LIBRARY_PATH (res/ports/run.sh); the
+# launcher and the emulator keep plastron's.
+cd "$S/SDL2"
+for p in "$S"/SDL2-patches/*; do patch -p1 -s < "$p"; done
+mkdir -p "$W/b-sdl" && cd "$W/b-sdl"
+PKG_CONFIG_SYSROOT_DIR=$SYSROOT PKG_CONFIG_LIBDIR=$SYSROOT/usr/lib/pkgconfig "$S/SDL2/configure" \
+	--host=aarch64-linux-gnu --prefix=/usr --with-sysroot="$SYSROOT" \
+	CC="aarch64-linux-gnu-gcc --sysroot=$SYSROOT" CFLAGS=-O2 \
+	--enable-video-pvrfb --enable-video-opengles --disable-video-opengl --disable-video-x11 \
+	--disable-video-wayland --disable-video-kmsdrm --disable-video-directfb --disable-video-vulkan \
+	--disable-video-rpi --disable-video-vivante --enable-alsa --disable-pulseaudio --disable-pipewire \
+	--disable-jack --disable-sndio --disable-esd --disable-arts --disable-nas --disable-dbus \
+	--disable-ibus --disable-fcitx --disable-libudev --disable-hidapi --disable-rpath \
+	--disable-static > /dev/null
+make -j"$(nproc)" > /dev/null
+echo "built SDL2 for ports"
+cd "$W"
+
 # The libraries and their names alone: no headers, CMake files or programs
-mkdir -p "$W/out/usr/lib"
+mkdir -p "$W/out/usr/lib/chaos-ports"
 cp -a "$ST"/usr/lib/lib*.so.* "$W/out/usr/lib/"
-aarch64-linux-gnu-strip --strip-unneeded "$W"/out/usr/lib/*.so.*.* 2>/dev/null || true
+cp -a "$W"/b-sdl/build/.libs/libSDL2-2.0.so.0* "$W/out/usr/lib/chaos-ports/"
+aarch64-linux-gnu-strip --strip-unneeded "$W"/out/usr/lib/*.so.*.* "$W"/out/usr/lib/chaos-ports/*.so.*.* 2>/dev/null || true
 tar -C "$W/out" --owner=0 --group=0 --sort=name -cJf "$OUT" usr
 echo "wrote $OUT"

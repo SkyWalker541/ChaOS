@@ -1,0 +1,108 @@
+SDL2: keyboards and mice on Linux without udev, as they come and go
+
+Without libudev, SDL_EVDEV takes devices only from SDL_EVDEV_DEVICES and
+otherwise finds none ("TODO: Scan the devices manually, like a caveman").
+The TrimUI Brick has no udev, and a port's buttons arrive as keys on a
+virtual keyboard (gptokeyb's, through uinput) made around when the game
+starts, so the game had no keyboard at all. This scans /dev/input for the
+event devices that are keyboards, mice or touch surfaces, by their
+capabilities as SDL_EVDEV_GuessDeviceClass reads them, at start and then
+once a second while events are pumped.
+
+ChaOS, for ports only (src/ports.h). After plastron's 0001 and 0002.
+
+diff --git a/src/core/linux/SDL_evdev.c b/src/core/linux/SDL_evdev.c
+index de1b758..372bfe8 100644
+--- a/src/core/linux/SDL_evdev.c
++++ b/src/core/linux/SDL_evdev.c
+@@ -33,6 +33,7 @@
+ #include "SDL_evdev_kbd.h"
+ 
+ #include <sys/stat.h>
++#include <dirent.h>
+ #include <unistd.h>
+ #include <fcntl.h>
+ #include <sys/ioctl.h>
+@@ -160,6 +161,62 @@ static void SDL_EVDEV_UpdateKeyboardMute(void)
+     }
+ }
+ 
++#ifndef SDL_USE_LIBUDEV
++/* ChaOS: with no udev, the keyboards, mice and touch surfaces in /dev/input,
++ * by what each can do; again once a second from SDL_EVDEV_Poll, for one made
++ * after the start (a port's gptokeyb, through uinput) */
++static Uint32 caveman_next_scan;
++
++static void SDL_EVDEV_caveman_scan(void)
++{
++    DIR *dir;
++    struct dirent *e;
++
++    caveman_next_scan = SDL_GetTicks() + 1000;
++    dir = opendir("/dev/input");
++    if (!dir) {
++        return;
++    }
++    while ((e = readdir(dir)) != NULL) {
++        char path[64];
++        unsigned long ev[NBITS(EV_MAX)] = { 0 };
++        unsigned long abs_[NBITS(ABS_MAX)] = { 0 };
++        unsigned long key[NBITS(KEY_MAX)] = { 0 };
++        unsigned long rel[NBITS(REL_MAX)] = { 0 };
++        SDL_evdevlist_item *item;
++        int fd, cls;
++
++        if (SDL_strncmp(e->d_name, "event", 5) != 0) {
++            continue;
++        }
++        SDL_snprintf(path, sizeof(path), "/dev/input/%s", e->d_name);
++        for (item = _this->first; item; item = item->next) {
++            if (SDL_strcmp(path, item->path) == 0) {
++                break;
++            }
++        }
++        if (item) {
++            continue;
++        }
++        fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
++        if (fd < 0) {
++            continue;
++        }
++        ioctl(fd, EVIOCGBIT(0, sizeof(ev)), ev);
++        ioctl(fd, EVIOCGBIT(EV_ABS, sizeof(abs_)), abs_);
++        ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(key)), key);
++        ioctl(fd, EVIOCGBIT(EV_REL, sizeof(rel)), rel);
++        close(fd);
++        cls = SDL_EVDEV_GuessDeviceClass(ev, abs_, key, rel);
++        if (cls & (SDL_UDEV_DEVICE_MOUSE | SDL_UDEV_DEVICE_KEYBOARD |
++                   SDL_UDEV_DEVICE_TOUCHSCREEN | SDL_UDEV_DEVICE_TOUCHPAD)) {
++            SDL_EVDEV_device_added(path, cls);
++        }
++    }
++    closedir(dir);
++}
++#endif
++
+ int SDL_EVDEV_Init(void)
+ {
+     if (!_this) {
+@@ -207,7 +264,7 @@ int SDL_EVDEV_Init(void)
+                     }
+                 }
+             } else {
+-                /* TODO: Scan the devices manually, like a caveman */
++                SDL_EVDEV_caveman_scan();
+             }
+         }
+ #endif /* SDL_USE_LIBUDEV */
+@@ -320,6 +377,10 @@ void SDL_EVDEV_Poll(void)
+ 
+ #ifdef SDL_USE_LIBUDEV
+     SDL_UDEV_Poll();
++#else
++    if (!SDL_getenv("SDL_EVDEV_DEVICES") && SDL_TICKS_PASSED(SDL_GetTicks(), caveman_next_scan)) {
++        SDL_EVDEV_caveman_scan();
++    }
+ #endif
+ 
+     SDL_EVDEV_kbd_update(_this->kbd);

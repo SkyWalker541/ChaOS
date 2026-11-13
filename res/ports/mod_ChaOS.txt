@@ -55,11 +55,11 @@ pm_platform_helper() {
     PortMasterDialogExit
   fi
 
-  # gptokeyb's keyboard, before the game looks for keyboards. A port starts
-  # gptokeyb in the background and calls this just before its game; the
-  # game's SDL looks once, when it starts (run.sh's SDL_EVDEV_DEVICES), so a
-  # keyboard that came a moment later was never seen. Up to 2 s, for a new
-  # event node beyond the ones there when the port began.
+  # gptokeyb's keyboard, before the game starts: a port starts gptokeyb in
+  # the background and calls this just before its game. The port SDL finds a
+  # keyboard that comes later too (run.sh), but a game that reads its keys
+  # from the first frame would lose them. Up to 2 s, for a new event node
+  # beyond the ones there when the port began.
   if pgrep -f gptokeyb > /dev/null 2>&1; then
     i=0
     while [ $i -lt 40 ]; do

@@ -92,6 +92,7 @@ for f in $(tar -tJf "$ROOT/dist/brick/portlibs.tar.xz" | grep '^usr/lib/lib'); d
 	[ ! -e "$W/root/$f" ] || { echo "the root has $f already: check the port libraries" >&2; exit 1; }
 done
 tar -xJf "$ROOT/dist/brick/portlibs.tar.xz" -C "$W/root" --no-same-owner
+[ ! -e "$W/root/usr/lib/chaos-ports" ] || { echo "the root has /usr/lib/chaos-ports already" >&2; exit 1; }
 [ ! -e "$W/root/roms" ] || { echo "the root has a /roms already: check ports" >&2; exit 1; }
 ln -s /mnt/SDCARD/Roms "$W/root/roms"
 OSR=$W/root/etc/os-release
@@ -122,7 +123,8 @@ chmod 644 "$C/Licenses/bash.txt"
 # and the port libraries' licenses, each project's own text
 mkdir -p "$C/Licenses/ports"
 for p in "ogg COPYING" "vorbis COPYING" "flac COPYING.Xiph" "flac COPYING.GPL" "opus COPYING" \
-         "opusfile COPYING" "mpg123 COPYING" "openal-soft COPYING" "SDL_mixer LICENSE.txt"; do
+         "opusfile COPYING" "mpg123 COPYING" "openal-soft COPYING" "SDL_mixer LICENSE.txt" \
+         "SDL2 LICENSE.txt"; do
 	set -- $p
 	tar -xJOf "$ROOT/dist/brick/portlibs-source.tar.xz" "portlibs-source/$1/$2" > "$C/Licenses/ports/$1-${2%.txt}.txt"
 done
