@@ -71,7 +71,7 @@ class H(BaseHTTPRequestHandler):
         if not self.authed():
             return
         if p == '/api/users/me':
-            return self.send(200, {'id': 1, 'username': 'luke'})
+            return self.send(200, {'id': 1, 'username': 'player'})
         if p == '/api/platforms':
             return self.send(200, PLATFORMS)
         if p == '/api/roms':

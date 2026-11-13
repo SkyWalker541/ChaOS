@@ -13,6 +13,7 @@ parts carry themselves.*
 
 This OS is a fork of TortOS: the launcher, menus, Muse, Over The Hare, box art,
 RetroAchievements and the rest of what makes it work on the Brick are Eric's
+(Over The Hare and Down To The Wire are ChaOS Transfer and ChaOS Wire here)
 work. Licence: **GNU General Public License, version 3 or later**. TortOS
 releases up to v1.6.0 were MIT. This fork stays under GPL-3.0-or-later, so its
 full source is published with every build that is shared.
@@ -133,10 +134,22 @@ sold, put behind a paywall, or shipped with a device that is sold.
 
 - **The port library pack** (`dist/libpack/`, the "portlibs" release, `tools/build-libpack.sh`): libraries a port may need that the Brick hasn't got, fetched by ChaOS only for a port that needs one, into `.userdata/brick/ports/lib`: **libtheora** 1.1.1 (BSD-3-Clause), **pixman** 0.42.2 (MIT), **GMP** 6.3.0 (LGPL-3.0-or-later or GPL-2.0-or-later), **cairo** 1.18.0 (LGPL-2.1 or MPL-1.1), **fontconfig** 2.15.0 (MIT), **FLAC** 1.3.3 (BSD-3-Clause), **libevdev** 1.13.1 (MIT), GCC 13.3.0's **libgomp** (GPL-3.0-or-later with the GCC Runtime Library Exception), and ChaOS's own stand-in for PulseAudio's **libpulse-simple** (MIT). `dist/libpack/SOURCES.txt` says where each source came from; the sources go with the release.
 - **GNU bash** 5.1.16 (https://www.gnu.org/software/bash/, GPL-3.0-or-later): `/bin/bash` in the image, unchanged, for ports. Its licence is `Licenses/bash.txt` on the card and its source is in each release's sources archive (`dist/brick/bash-source.tar.xz`, built by `tools/build-bash.sh`).
+- **squashfs-tools** 4.6.1's **unsquashfs** (https://github.com/plougher/squashfs-tools, GPL-2.0-or-later), built static with **zlib** 1.3.1 (zlib licence), **xz** 5.6.3 (0BSD and public domain), **Zstandard** 1.5.6 (BSD) and **LZ4** 1.10.0 (BSD-2-Clause): unpacks ports' runtimes on the card (`TortOS/ports/bin/unsquashfs`), unchanged. Its licence is `Licenses/squashfs-tools.txt` on the card and its source is in each release's sources archive (`dist/brick/unsquashfs-source.tar.xz`, built by `tools/build-unsquashfs.sh`).
 - **The Favorites, Muse, Recently Played and Ports cards** are ChaOS's own, with no third-party images: in Plain Jane on the drawn set's own card (`tools/cardstyle.py`), in Fancy Pants rendered in 3D as objects (`tools/raymarch.py`; `tools/genmusefancy.py`, `tools/genportsfancy.py`, `tools/genrecentfancy.py`). Muse's Fancy Pants card replaces TortOS's iPod photograph, whose source was never recorded.
 - **ChaOS logo** ("Handheld burst"): original pixel art made for ChaOS, drawn
   pixel by pixel in `tools/genlogo.py` with no third-party images or fonts;
   see `res/logo/SOURCE.md`.
+
+---
+
+## The website
+
+The site at https://skywalker541.github.io/ChaOS/ (`web/`) is ChaOS's own:
+its pictures are ChaOS's screens, captured from the launcher, and its opening
+is the boot animation's own squares and paths (`tools/genwebboot.py`, from
+`tools/genchaosmotion.py`). It uses **Josefin Sans** by Santiago Orozco (SIL
+Open Font License 1.1, `web/OFL.txt`). The games on its screens are invented
+names, and the port screenshot shown is from PortMaster's catalog.
 
 ---
 
@@ -147,8 +160,9 @@ sold, put behind a paywall, or shipped with a device that is sold.
 - **MusicBrainz Cover Art Archive** (https://musicbrainz.org): album art.
 - **itch.io** (https://itch.io): box art for homebrew, from its public tag feeds; each cover is its developer's. ChaOS is not affiliated with itch.io.
 - **NextUI-Itchio-Pak** by Christophe Vanlancker (https://github.com/carroarmato0/NextUI-Itchio-Pak, MIT): how to read itch.io's tag feeds on a handheld, which ChaOS's own itch.io code (src/itch.c) follows.
-- **PortMaster** (https://portmaster.games, https://github.com/PortsMaster/PortMaster-GUI, MIT): ports, and the files they run with. Not in the image: the Brick downloads PortMaster's own release the first time a port is started. ChaOS's settings for it (`res/ports/mod_ChaOS.txt`, MIT) follow its other systems' `mod_*.txt`.
+- **PortMaster** (https://portmaster.games, https://github.com/PortsMaster/PortMaster-GUI, MIT): ports, and the files they run with. Not in the image: the Brick downloads PortMaster's own release only when you choose **Get PortMaster**. Each port's screenshot in ChaOS's PortMaster browser comes from PortMaster's catalog and is its porter's or developer's. ChaOS's settings for it (`res/ports/mod_ChaOS.txt`, MIT) follow its other systems' `mod_*.txt`.
 - **minui-portmaster** by ben16w (https://github.com/ben16w/minui-portmaster, MIT), which NextUI's PortMaster pak now points to: the reference for running PortMaster on a TrimUI Brick.
+- **RomM** support speaks [RomM](https://github.com/rommapp/romm)'s own API (AGPL-3.0 server, not included), as its handheld client [Grout](https://github.com/rommapp/grout) (MIT) uses it; no code from either is in ChaOS.
 
 ---
 
@@ -181,4 +195,3 @@ SOFTWARE.
 ### PT SkyWalker541 (MIT)
 
 The full text is in ChaOS-diatom, `shaders/pt/LICENSE`.
-- **RomM** support speaks [RomM](https://github.com/rommapp/romm)'s own API (AGPL-3.0 server, not included), as its handheld client [Grout](https://github.com/rommapp/grout) (MIT) uses it; no code from either is in ChaOS.

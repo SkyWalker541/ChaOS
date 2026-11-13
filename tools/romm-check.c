@@ -76,10 +76,10 @@ int main(void)
 	CHECK(romm_pair_poll(&c, &pair, why, sizeof why) == ROMM_PAIR_WAIT, "waits first");
 	CHECK(romm_pair_poll(&c, &pair, why, sizeof why) == ROMM_PAIR_OK, "then approved: %s", why);
 	CHECK(!strcmp(c.token, "rmm_testtoken") && !strcmp(c.device_id, "dev-brick-1"), "token and device");
-	CHECK(romm_whoami(&c, why, sizeof why) && !strcmp(c.user, "luke"), "who: %s", c.user);
+	CHECK(romm_whoami(&c, why, sizeof why) && !strcmp(c.user, "player"), "who: %s", c.user);
 	CHECK(romm_register(&c, "x", why, sizeof why), "already a device: nothing to do");
 	CHECK(romm_save(&c, dir), "kept");
-	CHECK(romm_load(&again, dir) && !strcmp(again.token, c.token) && !strcmp(again.user, "luke"), "read back");
+	CHECK(romm_load(&again, dir) && !strcmp(again.token, c.token) && !strcmp(again.user, "player"), "read back");
 	snprintf(p, sizeof p, "%s/token", dir);
 	{
 		struct stat st;

@@ -1,19 +1,21 @@
-# TortOS guide
+# ChaOS guide
+
+> Adapted from [TortOS](https://github.com/ericreinsmidt/TortOS)'s guide by Eric Reinsmidt (GPL-3.0-or-later), with ChaOS's changes. Parts about the GKD Pixel 2 are TortOS's: ChaOS runs on the TrimUI Brick only. The [website](https://skywalker541.github.io/ChaOS/) has the short version.
 
 The [README](../README.md) keeps each topic short. This is the long version:
 every control, menu row and setting, and the reasons behind them.
 
 ## Installing
 
-The [TortOS Installer](https://github.com/ericreinsmidt/TortOS-Installer/releases/latest)
+The [ChaOS Installer](https://github.com/SkyWalker541/ChaOS-Installer/releases/latest)
 does all of this for either device. By hand, each device's card is a disk
 image written over the whole card, as the [README](../README.md#install) says.
 
 The image is [plastron](https://github.com/ericreinsmidt/plastron), the small
-Linux both devices run TortOS on: a boot partition and the system itself,
+Linux both devices run ChaOS on: a boot partition and the system itself,
 read-only, and on the Brick a small partition for what the system keeps, like
 the Bluetooth pairings. The first boot turns the rest of the card into TORTOS,
-an exFAT partition, and puts TortOS on it. That is where games, music, saves
+an exFAT partition, and puts ChaOS on it. That is where games, music, saves
 and settings go, and the part a computer opens.
 
 Nothing is written to the device itself. The Brick starts from the card ahead
@@ -35,7 +37,7 @@ inside it:
 Bios/syscard3.pce             TurboGrafx-16 CD games (.chd, .cue, .m3u ...)
 ```
 
-That one is required: a PC Engine CD will not start without it, and TortOS says
+That one is required: a PC Engine CD will not start without it, and ChaOS says
 so by name rather than letting the core refuse the disc. HuCards on the same
 shelf need nothing and are unaffected.
 
@@ -50,11 +52,11 @@ something in it.
 
 ### Undoing it
 
-On the Brick, take the card out: TortOS writes nothing to the device, so its
+On the Brick, take the card out: ChaOS writes nothing to the device, so its
 own system starts as it always did. On the Pixel 2 the card is the system, and
 another card with another system replaces it.
 
-Everything TortOS keeps is on the card: battery saves in `Saves/`; settings,
+Everything ChaOS keeps is on the card: battery saves in `Saves/`; settings,
 states and achievements in `.userdata/`; the Wi-Fi networks and their
 passwords in `.userdata/brick/wifi/` (`pixel2` on the Pixel 2); and the
 Brick's Bluetooth pairings on its small system partition. Reformatting the
@@ -75,9 +77,9 @@ card is the thing to wipe before it goes to anyone else.
 | **Y** | favorite it - Favorites is a shelf of its own. Nothing on Muse's shelf |
 | **Volume rocker** | volume, everywhere, including in game |
 | **F1/F2** | brightness, everywhere, including in game |
-| **MENU** (on the systems row) | the TortOS menu - settings that are about the firmware |
+| **MENU** (on the systems row) | the main menu - settings that are about the firmware |
 | **MENU** (inside a system) | that system's menu, below |
-| **MENU** (in `Cubic`) | always the TortOS menu; B is the system's |
+| **MENU** (in `Cubic`) | always the main menu; B is the system's |
 | **MENU** (in game) | the in-game menu: Continue, Save, Load, Display, RetroAchievements, Reset, Quit. It opens when you let go, so MENU can be held for fast forward |
 | **MENU+R1** (in game) | fast forward: 2x, 3x, 4x, then back to normal |
 | **MENU** (inside any menu) | closes the whole menu, however deep in it you are. B goes back one screen |
@@ -119,7 +121,7 @@ that follows your UI Direction, so the page shows the axes as they are on your
 device rather than all three at once. This guide is the long version of the
 same thing.
 
-The TortOS menu opens from the systems row and is about the device rather
+The main menu opens from the systems row and is about the device rather
 than any one console:
 
 | | |
@@ -130,7 +132,7 @@ than any one console:
 | **Audio Output** | `Auto` or `Speaker`, and where Auto landed - see **Audio** below |
 | **Audio Channels** | `stereo`, `mono`, `mono left` or `mono right` - see **Audio** below |
 | **Night Mode** | `On` or `Off`, on the Brick only - eight quieter volume steps under the floor (its hint reads "quieter volume"), see **Night Mode** below |
-| **Over The Hare** | the file server; needs Wi-Fi and says so when there is none. While a computer is on the USB cable it is **Down To The Wire** instead, always at `10.55.0.2` on the Brick and `10.42.0.1` on the Pixel 2 |
+| **ChaOS Transfer** | the file server; needs Wi-Fi and says so when there is none. While a computer is on the USB cable it is **ChaOS Wire** instead, always at `10.55.0.2` on the Brick and `10.42.0.1` on the Pixel 2 |
 | **Date & Time** | the clock and the time zone, set with left and right - see below |
 | **Auto Off** | how long without a button before the device powers itself down |
 | **Appearance** | the look settings on their own page: UI Theme, UI Direction, Transition Speed, Game List View and Menu Color |
@@ -142,11 +144,11 @@ than any one console:
 | **Box Art** | fetch what the whole library is missing |
 | **RetroAchievements** | the account, or `sign in` |
 | **Controls** | every button and what it does, a page per place |
-| **About TortOS** | version, address, battery, uptime |
+| **About ChaOS** | version, address, battery, uptime |
 
 On the Pixel 2, which has no radio of its own, the rows that need Wi-Fi are
 there only while a USB Wi-Fi adapter is plugged in: Wi-Fi, Box Art, RetroAchievements
-and Over The Hare here (Down To The Wire stays, with a computer
+and ChaOS Transfer here (ChaOS Wire stays, with a computer
 on the cable), Box Art in a console's menu, and Album Art in Muse's. Bluetooth
 is never there.
 
@@ -164,7 +166,7 @@ and shelf, so you can see the time and the charge without opening anything.
 The low-battery dot is still drawn when the charge runs low; with the battery
 shown it moves in beside it, so the two don't overlap.
 
-Over The Hare and Box Art need a network, and go quiet without one rather than
+ChaOS Transfer and Box Art need a network, and go quiet without one rather than
 disappearing - a row that vanishes teaches nobody why. RetroAchievements stays reachable
 either way, because signing in is the thing you go there to do, and Bluetooth
 and Play Time need no network at all.
@@ -213,7 +215,7 @@ fall back to name - a shelf that reshuffles itself when nothing has changed
 reads as broken even when the top of it is right.
 
 Rescan Folder is what makes a ROM that arrived after boot appear without a
-restart. Over The Hare already does it for you on the way out of the transfer
+restart. ChaOS Transfer already does it for you on the way out of the transfer
 screen; this is the same thing by hand, for a card written some other way.
 
 **In a game, X and Y are turbo A and turbo B** - hold one down and it presses
@@ -230,7 +232,7 @@ Diatom does the pulsing, not the emulator core, which is why it works the same
 on all nine rather than only on the one core that happens to implement turbo.
 
 **On Game Boy Advance, L2 and R2 are turbo L and turbo R.** That one is the
-emulator's own turbo rather than TortOS's, so it is only there on Game Boy
+emulator's own turbo rather than ChaOS's, so it is only there on Game Boy
 Advance; on Game Boy and Game Boy Color, which have no L and R, they do nothing.
 
 **Fast forward** is MENU+R1 in a game. Each press steps the speed to 2x, 3x,
@@ -251,7 +253,7 @@ volume, so the line says what it is without a glyph or a number on it.
 
 ## Audio
 
-Sound can come out of four places, and TortOS picks in a fixed order:
+Sound can come out of four places, and ChaOS picks in a fixed order:
 
 **a USB-C headphone adapter, then wired headphones, then Bluetooth, then the
 speaker.**
@@ -363,7 +365,7 @@ goes by the initial of whichever it is: an artist's, or an album's.
 shelf, every menu, and the in-game menu, where the game waits paused
 underneath. SELECT again closes it from any screen in Muse, and the music keeps
 playing. B goes back one screen: Now Playing to the album's tracks, the tracks
-to the shelf, and the shelf out of Muse. The exceptions are Over The Hare and a
+to the shelf, and the shelf out of Muse. The exceptions are ChaOS Transfer and a
 Box Art fetch, which only keep working while they are on screen.
 
 Albums go in `Music/`, a folder per artist and one inside it per album:
@@ -375,7 +377,7 @@ clearly who that is
 podcast, a mix - stays an album of its own. Songs straight in `Music/`, in no
 folder at all, are moved into `Music/Singles/` the next time the shelf is
 read, a name already there getting " (2)", and Singles has a cover of its own
-at `Music/.media/Singles.png` until you replace it. Over The Hare
+at `Music/.media/Singles.png` until you replace it. ChaOS Transfer
 reaches `Music/` too, and albums sent that way are on the shelf when you leave
 its screen. MP3, M4A, M4B, MP4, AAC, FLAC, Ogg, Opus and WAV play. Tracks play in
 file-name order, and the number at the front of a file name is left off the
@@ -571,7 +573,7 @@ writes it as the game's cover and shrinks it like any other.
 
 **Adding a cover by hand.** Some games have no cover anywhere the fetch looks -
 fan translations, homebrew, a dump no catalog lists. Put one in yourself over
-Over The Hare: open `Roms/<system>/.media/` in its file browser and upload a
+ChaOS Transfer: open `Roms/<system>/.media/` in its file browser and upload a
 PNG named exactly like the ROM file, with `.png` in place of its extension -
 `Black Castle.gb` wants `Black Castle.png`. Box Art never overwrites a cover
 that is already there, and Replace only swaps yours out when

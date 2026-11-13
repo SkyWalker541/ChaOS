@@ -166,10 +166,10 @@ build-native/remap-check: tools/remap-check.c src/remap.c src/remap.h FORCE
 # ChaOS: updates over Wi-Fi, what src/update.c decides without the network
 check-update: build-native/update-check
 	@./build-native/update-check
-	@# Every message the Updates screen can show is explained in the README
+	@# Every message the Updates screen can show is explained on the website (web/index.html)
 	@missing=0; grep -o 'fail("[^"]*")' src/update.c | sed 's/^fail("//; s/")$$//' | sort -u | \
-	 while read -r m; do grep -qF "$$m" README.md || { echo "  FAIL README does not explain: $$m"; exit 1; }; done && \
-	 echo "ok: the README explains every update message"
+	 while read -r m; do grep -qF "$$m" web/index.html || { echo "  FAIL the website does not explain: $$m"; exit 1; }; done && \
+	 echo "ok: the website explains every update message"
 
 build-native/update-check: tools/update-check.c src/update.c src/update.h src/net.c FORCE
 	@mkdir -p build-native

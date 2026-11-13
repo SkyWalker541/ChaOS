@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ChaOS for the TrimUI Brick</title>
+<meta name="description" content="ChaOS: custom firmware for the TrimUI Brick. Classic consoles with shader and overlay support, PortMaster ports, RomM, music and audiobooks, all from the handheld.">
+<meta name="theme-color" content="#17151c">
+<link rel="icon" type="image/png" href="img/mark-64.png">
+<link rel="stylesheet" href="style.css">
+<script>try{if(sessionStorage.getItem('chaos-booted'))document.documentElement.classList.add('booted')}catch(e){}</script>
+</head>
+<body>
+
+<div id="boot" aria-hidden="true"><canvas id="boot-canvas"></canvas><span class="boot-skip">press any key</span></div>
+
+<header class="top">
+  <a class="brand" href="#top"><img src="img/mark-64.png" alt="" width="28" height="28"><span>Cha<b>OS</b></span></a>
+  <nav class="links" aria-label="Sections">
+    <a href="#start">Get started</a>
+    <a href="#buttons">Buttons</a>
+    <a href="#features">Features</a>
+    <a href="#shaders">Shaders</a>
+    <a href="#ports">Ports</a>
+    <a href="#updates">Updates</a>
+    <a href="#faq">FAQ</a>
+    <a href="#credits">Credits</a>
+  </nav>
+  <a class="gh" href="https://github.com/SkyWalker541/ChaOS">GitHub</a>
+</header>
+
+<main id="top">
+
+<section class="hero">
+  <div class="hero-text">
+    <img class="lockup" id="lockup" src="img/lockup.png" alt="ChaOS" width="588" height="192" title="Play the boot again">
+    <p class="lede">Custom firmware for the <b>TrimUI Brick</b>. Eleven classic consoles with shader and overlay support, PC games through PortMaster, your own RomM library, and your music, all from the handheld.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/SkyWalker541/ChaOS-Installer/releases/latest">Get ChaOS Installer</a>
+      <a class="btn" href="https://github.com/SkyWalker541/ChaOS/releases/latest">Latest release</a>
+    </div>
+    <p class="small">Built on <a href="https://github.com/ericreinsmidt/TortOS">TortOS</a> by Eric Reinsmidt. For the Brick and Brick Hammer only. Still in testing: keep a copy of your saves.</p>
+  </div>
+  <figure class="device hero-device" data-cycle>
+    <div class="bezel"><img src="img/home-pixelnames.webp" alt="The ChaOS shelf in the Pixel Names theme" width="1024" height="768"></div>
+  </figure>
+</section>
+
+<section class="glance">
+  <div class="tile"><h3>Games start instantly</h3><p>The emulator is already running, so a game is up the moment you press A, and picks up where you stopped.</p></div>
+  <div class="tile"><h3>Shaders and overlays</h3><p>CRT, LCD and PT SkyWalker541 looks you can tune, frames around the picture, and a check that says if the game keeps its speed.</p></div>
+  <div class="tile"><h3>Ports from the Brick</h3><p>Browse PortMaster's catalog and install ports, with their runtimes and libraries.</p></div>
+  <div class="tile"><h3>Your RomM library</h3><p>Download games from your own server, sync saves, fetch BIOS files.</p></div>
+  <div class="tile"><h3>Music and audiobooks</h3><p>Muse plays from anywhere, with Bluetooth headphones and a pocket lock screen.</p></div>
+  <div class="tile"><h3>Your Brick stays yours</h3><p>ChaOS runs from the SD card. Take it out and the Brick boots its own system.</p></div>
+</section>
+
+<!-- ============================================================ -->
+<section id="start" class="band">
+  <h2>Get started</h2>
+  <p class="intro">You need a Brick or Brick Hammer, a microSD card, and a computer just this once.</p>
+
+  <ol class="steps">
+    <li>
+      <div class="step-text">
+        <h3>Put ChaOS on the card</h3>
+        <p><a href="https://github.com/SkyWalker541/ChaOS-Installer/releases/latest">ChaOS Installer</a> (macOS, Windows, Linux) downloads the latest ChaOS and writes it to the card. It also updates a card that already has ChaOS or TortOS, keeping everything on it.</p>
+        <details><summary>Or by hand</summary>
+          <p>Download <code>ChaOS-v&lt;version&gt;-brick.img.xz</code> from <a href="https://github.com/SkyWalker541/ChaOS/releases/latest">Releases</a> and write it with Raspberry Pi Imager or balenaEtcher. This erases the card.</p>
+        </details>
+      </div>
+    </li>
+    <li>
+      <div class="step-text">
+        <h3>Turn it on</h3>
+        <p>Put the card in and power on. The first boot takes a little longer while the rest of the card becomes space for games, music and saves. The logo's pixels fly in, then the shelf.</p>
+      </div>
+    </li>
+    <li class="with-screen">
+      <div class="step-text">
+        <h3>Set the clock</h3>
+        <p>Press <kbd>MENU</kbd> on the systems row, then <b>Date &amp; Time</b>. Left and right change each row; set your time zone. Wi-Fi keeps the clock right after that.</p>
+      </div>
+      <figure class="device small"><div class="bezel"><img src="img/datetime.webp" alt="The Date and Time screen" loading="lazy" width="1024" height="768"></div></figure>
+    </li>
+    <li class="with-screen">
+      <div class="step-text">
+        <h3>Join Wi-Fi</h3>
+        <p><kbd>MENU</kbd> &gt; <b>Wi-Fi</b>, pick your network, and type the password on the on-screen keyboard. <kbd>Y</kbd> rescans; <kbd>X</kbd> forgets a network.</p>
+      </div>
+      <figure class="device small"><div class="bezel"><img src="img/keyboard.webp" alt="The on-screen keyboard" loading="lazy" width="1024" height="768"></div></figure>
+    </li>
+    <li class="with-screen">
+      <div class="step-text">
+        <h3>Add games</h3>
+        <p><kbd>MENU</kbd> &gt; <b>ChaOS Transfer</b> shows an address and a PIN. Open the address in a browser on your phone or computer, type the PIN, and drag games into their console's folder. Or copy them straight onto the card from a computer, into <code>Roms/&lt;console&gt;</code>.</p>
+      </div>
+      <figure class="device small"><div class="bezel"><img src="img/hare.webp" alt="ChaOS Transfer on the Brick, showing its address and PIN" loading="lazy" width="1024" height="768"></div></figure>
+    </li>
+    <li class="with-screen">
+      <div class="step-text">
+        <h3>Get the covers</h3>
+        <p><kbd>MENU</kbd> &gt; <b>Box Art</b> fetches every missing cover over Wi-Fi. Then pick a console and press <kbd>A</kbd> on a game.</p>
+      </div>
+      <figure class="device small"><div class="bezel"><img src="img/art.webp" alt="Box Art fetching covers" loading="lazy" width="1024" height="768"></div></figure>
+    </li>
+  </ol>
+</section>
+
+<!-- ============================================================ -->
+<section id="buttons" class="band alt">
+  <h2>Quick button guide</h2>
+  <p class="intro">The Brick carries this too, under <kbd>MENU</kbd> &gt; <b>Controls</b>.</p>
+  <div class="tabs" role="tablist" aria-label="Where">
+    <button role="tab" aria-selected="true" data-tab="b-any">Anywhere</button>
+    <button role="tab" aria-selected="false" data-tab="b-shelf">Shelves</button>
+    <button role="tab" aria-selected="false" data-tab="b-game">In a game</button>
+    <button role="tab" aria-selected="false" data-tab="b-port">In a port</button>
+    <button role="tab" aria-selected="false" data-tab="b-muse">In Muse</button>
+  </div>
+  <div class="panel" id="b-any" role="tabpanel">
+    <table class="keys">
+      <tr><td><kbd>Volume</kbd></td><td>Volume, in games too</td></tr>
+      <tr><td><kbd>F1</kbd> <kbd>F2</kbd></td><td>Brightness down and up, in games too</td></tr>
+      <tr><td><kbd>SELECT</kbd></td><td>Open or close Muse (everywhere but a running game; the in-game menu counts)</td></tr>
+      <tr><td><kbd>MENU</kbd></td><td>Settings for what you're looking at. Inside a menu, closes the whole menu at once</td></tr>
+      <tr><td><kbd>B</kbd></td><td>Back one screen</td></tr>
+      <tr><td><kbd>POWER</kbd></td><td>Save and turn off</td></tr>
+      <tr><td><kbd>←</kbd> <kbd>→</kbd> in menus</td><td>Change a setting; hold to keep changing it. <kbd>A</kbd> opens a row marked ›</td></tr>
+    </table>
+  </div>
+  <div class="panel" id="b-shelf" role="tabpanel" hidden>
+    <table class="keys">
+      <tr><td><kbd>A</kbd></td><td>Open a console, or start a game</td></tr>
+      <tr><td><kbd>X</kbd></td><td>A game's info: synopsis, year, genre, achievements, box art</td></tr>
+      <tr><td><kbd>Y</kbd></td><td>Add to or remove from Favorites</td></tr>
+      <tr><td><kbd>L1</kbd> <kbd>R1</kbd></td><td>Jump a screenful</td></tr>
+      <tr><td><kbd>L2</kbd> <kbd>R2</kbd></td><td>Jump to the previous or next letter</td></tr>
+      <tr><td>Other d-pad axis</td><td>Jump by letter too (not in Cubic)</td></tr>
+      <tr><td><kbd>MENU</kbd></td><td>On the systems row, the main menu. On a console's shelf, that console's menu</td></tr>
+    </table>
+  </div>
+  <div class="panel" id="b-game" role="tabpanel" hidden>
+    <table class="keys">
+      <tr><td><kbd>MENU</kbd></td><td>The in-game menu</td></tr>
+      <tr><td><kbd>MENU</kbd> + <kbd>R1</kbd></td><td>Fast forward: 2×, 3×, 4×, then normal</td></tr>
+      <tr><td><kbd>MENU</kbd> + <kbd>L1</kbd> (hold)</td><td>Rewind, when it's on for the console</td></tr>
+      <tr><td><kbd>MENU</kbd> + <kbd>X</kbd></td><td>Screenshot</td></tr>
+      <tr><td><kbd>X</kbd> <kbd>Y</kbd></td><td>Turbo A and turbo B, on consoles with two face buttons</td></tr>
+      <tr><td><kbd>L2</kbd> <kbd>R2</kbd></td><td>Turbo L and turbo R, on Game Boy Advance</td></tr>
+      <tr><td><kbd>Y</kbd> (hold, in the menu)</td><td>Hide the menu to see the game behind it</td></tr>
+      <tr><td><kbd>POWER</kbd></td><td>Save the game and turn off</td></tr>
+    </table>
+  </div>
+  <div class="panel" id="b-port" role="tabpanel" hidden>
+    <table class="keys">
+      <tr><td><kbd>SELECT</kbd> + <kbd>START</kbd></td><td>Quit the port</td></tr>
+      <tr><td><kbd>POWER</kbd></td><td>Freeze it and ask: Resume, Close Port or Power Off</td></tr>
+    </table>
+  </div>
+  <div class="panel" id="b-muse" role="tabpanel" hidden>
+    <table class="keys">
+      <tr><td><kbd>A</kbd></td><td>Play or pause</td></tr>
+      <tr><td><kbd>L1</kbd> <kbd>R1</kbd></td><td>Previous or next track (or chapter)</td></tr>
+      <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Back or ahead ten seconds; hold to go faster</td></tr>
+      <tr><td><kbd>Y</kbd></td><td>Play mode: in order, repeat all, repeat one, shuffle. For a book, its speed</td></tr>
+      <tr><td><kbd>F1</kbd> + <kbd>F2</kbd> (hold)</td><td>Lock the screen, and unlock it</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="features" class="band">
+  <h2>Features</h2>
+  <p class="intro">Everything ChaOS adds to TortOS, grouped the way you'll use it. <span class="tag">ChaOS</span> marks what ChaOS brings; the rest comes from TortOS. The pictures are the Brick's own screens: tap the labels under one to see more.</p>
+  <nav class="subnav" aria-label="Feature groups">
+    <a href="#playing">Playing</a><a href="#shaders">Shaders</a><a href="#speed">Speed check</a><a href="#display">Display &amp; overlays</a><a href="#shelves">Shelves &amp; themes</a><a href="#boxart">Box art</a><a href="#transfer">Transfer &amp; Wire</a><a href="#ports">Ports</a><a href="#romm">RomM</a><a href="#muse">Muse &amp; sound</a><a href="#look">Look &amp; settings</a>
+  </nav>
+
+  <!-- Playing -->
+  <article class="feature" id="playing">
+    <div class="feature-text">
+      <h3>Playing games</h3>
+      <ul>
+        <li><b>Instant start.</b> The emulator is already running, so nothing loads between you and the game.</li>
+        <li><b>Resume.</b> Quit from the menu or press power: the game is saved on the way out and continues from that moment next time.</li>
+        <li><b>Six save slots</b> per game, each with a picture of where you were, from <b>Save</b> and <b>Load</b> in the in-game menu.</li>
+        <li><b>Fast forward</b> with <kbd>MENU</kbd>+<kbd>R1</kbd>: 2×, 3×, 4×, then normal. Silent while fast; heavy SNES and GBA games top out around 2.5×.</li>
+        <li><b>Rewind</b> <span class="tag">ChaOS</span>: turn it on in a console's menu, then hold <kbd>MENU</kbd>+<kbd>L1</kbd> to step back through the last minutes. It costs a little speed, so it's off until you want it.</li>
+        <li><b>Button mapping</b> <span class="tag">ChaOS</span>: a console's <b>Controls</b> shows every button and lets you change it, for the console or just one game, with turbo on any button.</li>
+        <li><b>Turbo</b>: <kbd>X</kbd> and <kbd>Y</kbd> are turbo A and B on the consoles with two face buttons; <kbd>L2</kbd>/<kbd>R2</kbd> are turbo L and R on Game Boy Advance.</li>
+        <li><b>Screenshots</b> <span class="tag">ChaOS</span> with <kbd>MENU</kbd>+<kbd>X</kbd>, looked at full screen from <b>Screenshots</b> in the in-game menu. They're PNGs in <code>Screenshots/&lt;console&gt;/&lt;game&gt;/</code>.</li>
+        <li><b>RetroAchievements</b>: sign in under <b>MENU &gt; RetroAchievements</b>. Unlocks pop up as you play; ones earned offline are sent later.</li>
+      </ul>
+    </div>
+    <figure class="device" data-screens='[["gmenu","In-game menu"],["slots","Save slots"],["controls","Controls"]]'>
+      <div class="bezel"><img src="img/gmenu.webp" alt="" loading="lazy" width="1024" height="768"></div>
+      <figcaption class="chips"></figcaption>
+    </figure>
+  </article>
+  <div class="cards3">
+    <div class="mini"><h4>Games come first <span class="tag">ChaOS</span></h4><p>Nothing of ChaOS's own runs while you play. An update that was downloading pauses and carries on afterwards, its progress shown on the shelf.</p></div>
+    <div class="mini"><h4>The battery to the end</h4><p>The game is saved and the Brick turns off when the battery is truly empty, judged by its voltage: about half an hour past the gauge's 2%. A red dot blinks for the last stretch.</p></div>
+    <div class="mini"><h4>Play Time</h4><p><b>MENU &gt; Play Time</b>: per game or per console, for today, the week, month, year or all time. <kbd>Y</kbd> switches; the bottom line has launches, longest session and last played.</p></div>
+  </div>
+
+  <!-- Shaders -->
+  <article class="feature flip" id="shaders">
+    <div class="feature-text">
+      <h3>Shader support <span class="tag">ChaOS</span></h3>
+      <p>ChaOS adds shaders to every console: CRT, LCD and PT SkyWalker541 looks, each with settings to tune, drawn by the Brick's CPU in <a href="https://github.com/SkyWalker541/ChaOS-diatom">ChaOS-diatom</a>. Find the <b>Shader</b> row in a console's menu (<kbd>MENU</kbd> on its shelf) or in the in-game menu.</p>
+      <ul>
+        <li><b>Left and right</b> switch it on and off; <kbd>A</kbd> opens its settings.</li>
+        <li><b>See it before you choose it.</b> In a game, the paused picture shows each setting as you scroll. Hold <kbd>Y</kbd> to hide the menu and look at the whole screen.</li>
+        <li><b>Reset to Recommended</b> puts back the shader's own settings.</li>
+        <li>Settings are kept per console, and survive updates.</li>
+      </ul>
+    </div>
+    <figure class="device" data-screens='[["chaos-shader","NES: CRT"],["shader-gb","Game Boy: PT"],["sysmenu","Console menu"]]'>
+      <div class="bezel"><img src="img/chaos-shader.webp" alt="" loading="lazy" width="1024" height="768"></div>
+      <figcaption class="chips"></figcaption>
+    </figure>
+  </article>
+
+  <div class="table-wrap">
+  <table class="data">
+    <thead><tr><th>Consoles</th><th>Styles</th><th>What you can set</th></tr></thead>
+    <tbody>
+      <tr><td>NES, SNES, Genesis, Master System, TurboGrafx-16</td><td><b>crt-lottes-fast</b> (by Timothy Lottes, adapted by hunterk), or the lighter <b>Scanlines</b> (by RiskyJumps)</td><td>Mask Type (Grille Lite, Grille, Shadow Mask), Mask Intensity, Scanline Intensity, Sharpness, Curvature, Trinitron-style Curve, Corner Round, CRT Gamma. Scanlines: Brightness and Line Brightness.</td></tr>
+      <tr><td>Game Boy, Game Boy Color, Game Boy Advance</td><td><b>PT SkyWalker541</b>, or <b>lcd3x</b> (by Gigaherz)</td><td>Game System (which screen it imitates). Pages for <b>Screen</b> (backing colour, transparency, darken), <b>Pixels</b> (grid or dots, gap colour, line width), <b>Shadows</b> (drop shadow, direction, bezel edge) and <b>Glare and Sheen</b> (light position and drift, sheen bands and ripple).</td></tr>
+      <tr><td>Game Gear, Neo Geo Pocket, Neo Geo Pocket Color</td><td><b>lcd3x</b></td><td>Brighten Scanlines, Brighten LCD.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="cards3 tight">
+    <div class="tip"><h4>Scanlines for speed</h4><p>Scanlines costs about a tenth of crt-lottes-fast. If a heavy SNES game slows down with the CRT, try it.</p></div>
+    <div class="tip"><h4>Curvature costs</h4><p>The CRT starts flat. Curvature works, but takes about twice the CPU, so check the speed after turning it on.</p></div>
+    <div class="tip"><h4>PT's grid wants Integer</h4><p>PT's <b>Pixel Effect</b> follows the game's pixels, so it's drawn in Display Mode <b>Integer</b> only. For a grid in Aspect or Stretch, use lcd3x.</p></div>
+  </div>
+
+  <!-- Speed check -->
+  <article class="feature" id="speed">
+    <div class="feature-text">
+      <h3>The speed check <span class="tag">ChaOS</span></h3>
+      <p>In a game, the Shader menu says whether the game keeps full speed with the shader as you've set it. It's measured from the frames you actually play, not guessed.</p>
+      <dl class="readings">
+        <dt class="ok">Full Speed</dt><dd>The whole frame takes under 85% of the time a frame has. Room to spare.</dd>
+        <dt class="warn">Near the Limit</dt><dd>It fits, just. A busy scene may slow it down.</dd>
+        <dt class="bad">Too Slow</dt><dd>The game can't keep up. Lighten the shader or try another style.</dd>
+        <dt>(est.)</dt><dd>An estimate: the new settings haven't been played with yet.</dd>
+      </dl>
+      <ul>
+        <li><b>Shader Time</b> is the shader's share of each frame. <b>Frame Time</b> is the whole frame's work, against the time a frame has (16.7 ms at 60 fps).</li>
+        <li>If Frame Time is high but Shader Time small, the console's emulator is the slow part, not the shader.</li>
+      </ul>
+    </div>
+    <figure class="device" data-screens='[["shader-gb-speed","Measured"],["shader-est","Estimate"],["speed","CRT"]]'>
+      <div class="bezel"><img src="img/shader-gb-speed.webp" alt="" loading="lazy" width="1024" height="768"></div>
+      <figcaption class="chips"></figcaption>
+    </figure>
+  </article>
+  <div class="callout">
+    <div class="callout-icon" aria-hidden="true">!</div>
+    <div>
+      <h4>Get a good reading</h4>
+      <p>The check averages every frame played since the shader was last changed, and needs at least half a second of play before it stops estimating. For a reading you can trust:</p>
+      <ol>
+        <li>Set the shader the way you like it, then close the menu.</li>
+        <li><b>Play for a minute or two</b>, ideally through a busy part of the game: lots of sprites, scrolling, effects. Quiet title screens flatter it.</li>
+        <li>Open the in-game menu and the Shader page again. Without <b>(est.)</b>, the reading is real.</li>
+      </ol>
+      <p>Change any setting and the count starts over, so check again after each change you want to judge.</p>
+    </div>
+  </div>
+
+  <!-- Display & overlays -->
+  <article class="feature flip" id="display">
+    <div class="feature-text">
+      <h3>Display Mode and overlays <span class="tag">ChaOS</span></h3>
+      <ul>
+        <li><b>Display Mode</b> per console: <b>Integer</b> (whole-number scaling, every pixel the same size), <b>Aspect</b> (as large as the game's shape allows) or <b>Stretch</b> (the whole screen). Every shader works in all three. Changed in a game, it changes as you press.</li>
+        <li><b>Overlays</b>: frames drawn around the picture. Included for Game Boy, Game Boy Color and Game Boy Advance (by SkyWalker541 and KrutzOtrem), Game Gear and Neo Geo Pocket Color (by KrutzOtrem).</li>
+        <li><b>Add your own</b>: every console has a folder in <code>Overlays/</code>. Use <b>1024×768</b> PNGs with a transparent window for the game. The <a href="https://github.com/LoveRetro/nextui-community-overlays">NextUI Community Overlays</a> has many more.</li>
+        <li>The included overlays are framed for Integer, and come back after an update if missing. Yours are never touched.</li>
+      </ul>
+    </div>
+    <figure class="device" data-screens='[["gmenu","In-game menu"]]'>
+      <div class="bezel"><img src="img/gmenu.webp" alt="" loading="lazy" width="1024" height="768"></div>
+      <figcaption class="chips"></figcaption>
+    </figure>
+  </article>
+
+  <!-- Shelves -->
+  <article class="feature" id="shelves">
+    <div class="feature-text">
+      <h3>Shelves and themes</h3>
+      <ul>
+        <li><b>Four UI Themes</b>: <b>Plain Jane</b> (a drawn card per console), <b>Fancy Pants</b> (the consoles themselves, rendered in 3D), and ChaOS's own <b>Pixel Cards</b> and <b>Pixel Names</b> <span class="tag">ChaOS</span>, where each console is its name in the logo's pixel letters, last word in the console's colour.</li>
+        <li><b>Pixel animation</b> <span class="tag">ChaOS</span>: the name you land on flies together pixel by pixel. <b>Transition Speed</b> sets how fast (Slow, Normal, Fast, or <b>Static</b> for none), separately for each direction.</li>
+        <li><b>Three UI Directions</b>: Horizontal, Vertical, or <b>Cubic</b>, a cube where up and down change console and left and right change game. Pixel Cards has no Cubic; Pixel Names is Horizontal only.</li>
+        <li><b>Game List View</b> <span class="tag">ChaOS</span>: a console's games as a scrolling list in the menus' style instead of cards.</li>
+        <li><b>Favorites</b> (<kbd>Y</kbd> on a game, and it says so) and <b>Recently Played</b> <span class="tag">ChaOS</span> (your last twelve games, every console) are shelves at the front, either one hideable. Up to 20 shelves.</li>
+        <li><b>Letter scrubbing</b> <span class="tag">ChaOS</span>: <kbd>L2</kbd>/<kbd>R2</kbd> jump to the previous or next letter on any game shelf, in every theme, list and Cubic, with the letter shown big. Hold the d-pad and after two seconds it shows the letter you're passing.</li>
+        <li><b>Sort By</b> per console: Name, Play Time, Last Played or Recently Added. <b>Game info</b> on <kbd>X</kbd>: synopsis, year, genre and achievements.</li>
+      </ul>
+    </div>
+    <figure class="device" data-screens='[["home-pixelnames","Pixel Names"],["home-pixelcards","Pixel Cards"],["games-pixelcards","Pixel Cards: games"],["home-plainjane","Plain Jane"],["home-fancy","Fancy Pants"],["home-vertical","Vertical"],["home-cubic","Cubic"],["listview","Game List View"],["listview-letter","Letter jump"],["info","Game info"]]'>
+      <div class="bezel"><img src="img/home-pixelnames.webp" alt="" loading="lazy" width="1024" height="768"></div>
+      <figcaption class="chips"></figcaption>
+    </figure>
+  </article>
+
+  <!-- Box art -->
+  <article class="feature flip" id="boxart">
+    <div class="feature-text">
+      <h3>Box art</h3>
+      <ul>
+        <li><b>MENU &gt; Box Art</b> fetches every missing cover over Wi-Fi from libretro's collection, by file name or, where none matches, by the ROM's checksum. A console's menu does just that console.</li>
+        <li><b>For one game</b> <span class="tag">ChaOS</span>: <kbd>X</kbd> on it, then <b>Get Box Art</b> or <b>Replace Box Art</b>: <b>Find Automatically</b>, <b>Search itch.io</b> (where most new homebrew lives), or <b>Use a Screenshot</b> of your own. Left and right look through them; <kbd>A</kbd> uses one.</li>
+        <li><b>From your phone</b> <span class="tag">ChaOS</span>: in ChaOS Transfer, open a console's folder and press <b>Cover</b> beside a game. Send a photo or saved picture, or give a link: a picture, an itch.io page, or a Google Images result.</li>
+        <li>Covers you put in <code>Roms/&lt;console&gt;/.media/&lt;game&gt;.png</code> yourself are never touched. A game without one shows its last moment of play, or a card with its name.</li>
+      </ul>
+    </div>
+    <figure class="device" data-screens='[["art","Box Art"],["info","Get Box Art"]]'>
+      <div class="bezel"><img src="img/art.webp" alt="" loading="lazy" width="1024" height="768"></div>
+      <figcaption class="chips"></figcaption>
+    </figure>
+  </article>
+
+  <!-- Transfer -->
+  <article class="feature" id="transfer">
+    <div class="feature-text">
+      <h3>ChaOS Transfer and ChaOS Wire <span class="tag">ChaOS</span></h3>
+      <ul>
+        <li><b>ChaOS Transfer</b>, over Wi-Fi: <b>MENU &gt; ChaOS Transfer</b>, open the address it shows in any browser, and type the PIN (new every time).</li>
+        <li>Drag in games, music, audiobooks, BIOS files and overlays; get at your saves, save states and screenshots; set covers from your phone.</li>
+        <li>New games are on the shelf when you leave the Transfer screen.</li>
+        <li><b>ChaOS Wire</b>: the same page over the USB cable, no Wi-Fi needed (Mac, Linux, Windows 11). Plug in, <b>MENU &gt; ChaOS Wire</b>, open <code>http://10.55.0.2</code>. It can also update ChaOS from the computer.</li>
+        <li><b>Download logs</b> at the bottom of the first page gives one file with the last ten boots, Wi-Fi, headset and account names masked.</li>
+      </ul>
+    </div>
+    <figure class="device browser" data-screens='[["chaos-transfer","In your browser"],["hare","On the Brick"]]'>
+      <div class="bezel"><img src="img/chaos-transfer.webp" alt="" loading="lazy" width="600" height="460"></div>
+      <figcaption class="chips"></figcaption>
+    </figure>
+  </article>
+
+  <!-- Ports -->
+  <article class="feature flip" id="ports">
+    <div class="feature-text">
+      <h3>Ports with PortMaster <span class="tag">ChaOS</span></h3>
+      <p>PC games rebuilt for handhelds, packaged by <a href="https://portmaster.games">PortMaster</a>: Cave Story, Doom, OpenTyrian, Spelunky Classic and over a thousand more, most of them free.</p>
+      <ol>
+        <li><b>MENU &gt; Get PortMaster</b> downloads it over Wi-Fi. Nothing about ports is on the card until you choose this.</li>
+        <li>A <b>Ports</b> shelf appears. Its first card, <b>PortMaster</b>, opens the catalog.</li>
+        <li><kbd>A</kbd> on a port installs it, checked against PortMaster's checksum. Its screenshot becomes its cover.</li>
+      </ol>
+      <ul>
+        <li><b>May Run on ChaOS</b> lists what the Brick can run, as PortMaster's own site filters it: no second analog stick, 2 GB of memory or OpenGL needed. <b>Show All</b> lists everything. Also <b>Genres</b>, <b>Installed</b>, <b>Updates</b> and <b>Ready to Run Only</b>.</li>
+        <li>Each port shows its screenshot, genre, size, porter, needs, and description (<kbd>Y</kbd> reads it all). <kbd>L2</kbd>/<kbd>R2</kbd> jump by letter.</li>
+        <li><b>Runtimes and libraries come with it</b>: Godot, .NET, Java, Pyxel and the rest are fetched and unpacked with the port, and any library it needs that the Brick hasn't got comes from ChaOS's library pack.</li>
+      </ul>
+    </div>
+    <figure class="device" data-screens='[["pm-home","PortMaster"],["pm-list","Browsing"],["power","Power in a port"]]'>
+      <div class="bezel"><img src="img/pm-home.webp" alt="" loading="lazy" width="1024" height="768"></div>
+      <figcaption class="chips"></figcaption>
+    </figure>
+  </article>
+  <div class="cards3">
+    <div class="mini"><h4>Playing a port</h4><p><kbd>SELECT</kbd>+<kbd>START</kbd> quits at once. <kbd>POWER</kbd> freezes the port and asks <b>Resume</b> (exactly where it was), <b>Close Port</b> or <b>Power Off</b>. The d-pad works as the left stick too.</p></div>
+    <div class="mini"><h4>Removing</h4><p><kbd>X</kbd> on a port's page: <b>Keep Saves and Settings</b> (they wait for a reinstall) or <b>Remove Everything</b>. <b>Uninstall PortMaster</b> does the same for all of it.</p></div>
+    <div class="mini"><h4>Updates keep your saves</h4><p>A port's update unpacks over the old one, so its saves and any game files you copied in stay. <b>Update PortMaster</b> keeps its runtimes and settings.</p></div>
+  </div>
+  <div class="callout">
+    <div class="callout-icon" aria-hidden="true">i</div>
+    <div>
+      <h4>Ports that need your files</h4>
+      <p>Some ports need data from a game you own, like Doom's WAD files. After installing, the port says which files and where they go. <b>Ready to Run Only</b> hides those. If a port stops on a library ChaOS doesn't have, it says which, and each port's last run is logged in <code>.userdata/brick/ports/logs/</code>.</p>
+    </div>
+  </div>
+
+  <!-- RomM -->
+  <article class="feature" id="romm">
+    <div class="feature-text">
+      <h3>RomM <span class="tag">ChaOS</span></h3>
+      <p><a href="https://romm.app">RomM</a> is a game library you run on your own computer or NAS. <b>MENU &gt; RomM</b> connects the Brick to it over Wi-Fi.</p>
+      <ul>
+        <li><b>Sign in</b>: set <b>Server</b> to its address, like <code>nas.local:8080</code>, then <b>Sign In</b>. On RomM 5 the Brick shows a short code to approve in RomM's web page; on RomM 4, make a pairing code in RomM (your profile, Client API Tokens) and type it in. Only a device token is kept, never a password.</li>
+        <li><b>Games</b>: your library by console, with covers. <kbd>A</kbd> downloads a game onto its shelf with RomM's cover as its box art. A game in several files comes as a folder.</li>
+        <li><b>Sync Saves</b>: RomM's own save sync for the games you got from it. A save the server replaces is backed up first to <code>Saves/.romm-backup</code>; when both changed, yours goes up beside the server's, so nothing is lost. It runs only when you choose it.</li>
+        <li><b>BIOS</b>: the firmware RomM keeps for ChaOS's consoles, into <code>Bios/</code>.</li>
+      </ul>
+    </div>
+    <figure class="device" data-screens='[["romm","RomM"]]'>
+      <div class="bezel"><img src="img/romm.webp" alt="" loading="lazy" width="1024" height="768"></div>
+      <figcaption class="chips"></figcaption>
+    </figure>
+  </article>
+
+  <!-- Muse -->
+  <article class="feature flip" id="muse">
+    <div class="feature-text">
+      <h3>Muse: music and audiobooks</h3>
+      <ul>
+        <li><kbd>SELECT</kbd> opens Muse from anywhere but a running game (the in-game menu counts), and closes it again. Music keeps playing everywhere; a game goes quiet while it plays and comes back when you pause.</li>
+        <li><b>Music</b> in <code>Music/&lt;artist&gt;/&lt;album&gt;/</code>. Loose album folders are filed by their tags; loose songs go to <b>Singles</b>.</li>
+        <li><b>Audiobooks</b> in <code>Audiobooks/</code>, one M4B or a folder of files per book. A book remembers its place and its own speed (0.75× to 2×), and says Finished at the end.</li>
+        <li>MP3, M4A, M4B, MP4, AAC, FLAC, Ogg, Opus and WAV. Play modes: in order, repeat all, repeat one, shuffle.</li>
+        <li><b>Album Art</b> in Muse's menu fetches covers from MusicBrainz for albums without one.</li>
+        <li><b>Lock Screen</b>: hold <kbd>F1</kbd>+<kbd>F2</kbd> to switch the screen off and lock the buttons while it plays: about 10 hours of listening instead of 6. Volume, power and headset buttons still work.</li>
+      </ul>
+    </div>
+    <div class="aside-card">
+      <h4>Sound and Bluetooth</h4>
+      <ul>
+        <li><b>Bluetooth headphones</b>: <b>MENU &gt; Bluetooth</b>, <kbd>Y</kbd> to search, <kbd>A</kbd> to pair, <kbd>X</kbd> to forget. They reconnect by themselves, even mid-game. The volume buttons reach them, and their play, pause and skip buttons control Muse.</li>
+        <li><b>Audio Output</b>: Auto (cable, then Bluetooth, then speaker) or Speaker.</li>
+        <li><b>Audio Channels</b>: stereo, mono, mono left or mono right, for hearing with one ear.</li>
+        <li><b>Night Mode</b> <span class="tag">ChaOS</span>: eight volume steps below the quietest, for playing in bed. Turning it on or off keeps the loudness you have.</li>
+        <li>Wired headphones get their own volume range, so plugging in never jumps loud.</li>
+      </ul>
+    </div>
+  </article>
+
+  <!-- Look & settings -->
+  <article class="feature" id="look">
+    <div class="feature-text">
+      <h3>Look and settings</h3>
+      <ul>
+        <li><b>Appearance</b> <span class="tag">ChaOS</span> on one page: UI Theme, UI Direction, Transition Speed, Game List View, Menu Color, and <b>Show Favorites</b>, <b>Show Recently Played</b> and <b>Show Muse</b>.</li>
+        <li><b>Every menu says what its rows do</b> <span class="tag">ChaOS</span>, in a line at the bottom.</li>
+        <li><b>The clock and battery</b> <span class="tag">ChaOS</span> in every menu's heading. <b>MENU &gt; Date &amp; Time</b> sets the zone, 12- or 24-hour, and the battery as an icon, a percent or both. Wi-Fi keeps the clock right.</li>
+        <li><b>Boot and power-off</b> <span class="tag">ChaOS</span>: the logo's pixels fly in, and fly out again, like the top of this page.</li>
+        <li><b>Auto Off</b> after a while without a button (not while music plays or it's charging).</li>
+        <li><b>About ChaOS</b>: version, the TortOS it's built on, free space on the card, address, battery, time awake.</li>
+      </ul>
+      <h4 class="swatch-head">Menu Color <span class="tag">ChaOS</span></h4>
+      <div class="swatches">
+        <span style="--c:#FF7A2F">ChaOS Orange</span><span style="--c:#39C5D6">ChaOS Cyan</span><span style="--c:#F4EAD5">Cream</span><span style="--c:#3DD6FF">TortOS Cyan</span><span style="--c:#9BE15D">Lime</span><span style="--c:#FFC23D">Gold</span><span style="--c:#FF4F5A">Red</span><span style="--c:#FF6FB5">Pink</span><span style="--c:#A98BFF">Purple</span><span style="--c:#5B8CFF">Blue</span>
+      </div>
+    </div>
+    <figure class="device" data-screens='[["chaos-menu","Main menu"],["chaos-appearance","Appearance"],["menu","Menu hints"],["datetime","Date & Time"],["about","About ChaOS"]]'>
+      <div class="bezel"><img src="img/chaos-menu.webp" alt="" loading="lazy" width="1024" height="768"></div>
+      <figcaption class="chips"></figcaption>
+    </figure>
+  </article>
+</section>
+
+<!-- ============================================================ -->
+<section id="consoles" class="band alt">
+  <h2>Consoles</h2>
+  <p class="intro">Each console has a folder in <code>Roms/</code>. A console with nothing in its folder is hidden.</p>
+  <div class="table-wrap">
+  <table class="data">
+    <thead><tr><th>Console</th><th>Folder</th><th>Files</th><th>Core</th></tr></thead>
+    <tbody>
+      <tr><td>NES</td><td><code>Roms/NES</code></td><td>.nes .fds .unf .unif .zip</td><td>FCEUmm</td></tr>
+      <tr><td>SNES</td><td><code>Roms/SNES</code></td><td>.sfc .smc .zip</td><td>Snes9x 2010</td></tr>
+      <tr><td>Genesis</td><td><code>Roms/Genesis</code></td><td>.md .gen .bin .smd .zip</td><td>Genesis Plus GX</td></tr>
+      <tr><td>Master System</td><td><code>Roms/Master System</code></td><td>.sms .zip</td><td>Genesis Plus GX</td></tr>
+      <tr><td>TurboGrafx-16 and CD</td><td><code>Roms/TurboGrafx-16</code></td><td>.pce .sgx .cue .ccd .chd .toc .m3u .zip</td><td>Beetle PCE Fast</td></tr>
+      <tr><td>Game Boy</td><td><code>Roms/Game Boy</code></td><td>.gb .dmg .zip</td><td>mGBA</td></tr>
+      <tr><td>Game Boy Color</td><td><code>Roms/Game Boy Color</code></td><td>.gbc .cgb .zip</td><td>mGBA</td></tr>
+      <tr><td>Game Boy Advance</td><td><code>Roms/Game Boy Advance</code></td><td>.gba .agb .zip</td><td>mGBA</td></tr>
+      <tr><td>Game Gear</td><td><code>Roms/Game Gear</code></td><td>.gg .zip</td><td>Genesis Plus GX</td></tr>
+      <tr><td>Neo Geo Pocket</td><td><code>Roms/Neo Geo Pocket</code></td><td>.ngp .ngc .ngpc .npc .zip</td><td>Beetle NeoPop</td></tr>
+      <tr><td>Neo Geo Pocket Color</td><td><code>Roms/Neo Geo Pocket Color</code></td><td>.ngp .ngc .ngpc .npc .zip</td><td>Beetle NeoPop</td></tr>
+      <tr><td>Ports</td><td><code>Roms/Ports</code></td><td>installed from the Brick</td><td>PortMaster</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="note"><b>BIOS files</b> go loose in <code>Bios/</code>. Only TurboGrafx-CD needs one, <code>syscard3.pce</code>. Game Boy Advance runs without; add <code>gba_bios.bin</code> for its boot animation.</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="updates" class="band">
+  <h2>Updates</h2>
+  <div class="feature">
+    <div class="feature-text">
+      <ul>
+        <li><kbd>MENU</kbd> &gt; <b>Updates</b>, over Wi-Fi. Your games, music, saves, settings and ports always stay.</li>
+        <li>When the Brick joins Wi-Fi it checks once and says if there's a newer ChaOS. It never installs by itself.</li>
+        <li><b>What's New</b> shows what a release changes. <b>Update</b> downloads only what changed when it can.</li>
+        <li><b>Full Install</b> is always offered, and repairs a card whose files have gone wrong.</li>
+        <li>Needs the charger or a quarter charge. If the power goes out, the Brick finishes on the next start.</li>
+        <li>Or update over the cable with ChaOS Wire, or with ChaOS Installer on a computer.</li>
+      </ul>
+    </div>
+    <figure class="device" data-screens='[["updates","Updates"]]'>
+      <div class="bezel"><img src="img/updates.webp" alt="" loading="lazy" width="1024" height="768"></div>
+      <figcaption class="chips"></figcaption>
+    </figure>
+  </div>
+  <details class="msgs">
+    <summary>What the Updates screen's messages mean</summary>
+    <div class="table-wrap">
+    <table class="data">
+      <thead><tr><th>Message</th><th>What it means</th><th>What to do</th></tr></thead>
+      <tbody>
+        <tr><td>needs Wi-Fi</td><td>The Brick isn't online.</td><td>Join a network under <b>MENU &gt; Wi-Fi</b>.</td></tr>
+        <tr><td>Wi-Fi is off</td><td>Wi-Fi is turned off.</td><td>Turn it on under <b>MENU &gt; Wi-Fi</b>, then <b>Try Again</b>.</td></tr>
+        <tr><td>Wi-Fi isn't connected</td><td>No network, or no internet address yet.</td><td>Connect, wait a moment, then <b>Try Again</b>.</td></tr>
+        <tr><td>charge to 25%</td><td>The battery is too low to install safely.</td><td>Charge to 25%, or plug in the charger.</td></tr>
+        <tr><td>This one needs ChaOS Installer</td><td>The new version changes parts of the card the Brick can't update by itself.</td><td>Update with ChaOS Installer on a computer.</td></tr>
+        <tr><td>Couldn't reach GitHub</td><td>No internet on this network, or GitHub is down.</td><td>Check the network, then <b>Try Again</b>.</td></tr>
+        <tr><td>Couldn't start the check</td><td>The check couldn't start at all.</td><td>Restart the Brick. If it keeps happening, send the logs.</td></tr>
+        <tr><td>Update info unreadable</td><td>The release's update information is damaged or missing.</td><td>Try again later.</td></tr>
+        <tr><td>Not enough space on the card</td><td>An update needs about 200 MB free.</td><td>Free up space, then <b>Try Again</b>.</td></tr>
+        <tr><td>Couldn't start the download</td><td>The download couldn't start.</td><td><b>Try Again</b>, or restart the Brick.</td></tr>
+        <tr><td>The download stopped</td><td>The connection dropped partway.</td><td><b>Try Again</b> on a steadier connection.</td></tr>
+        <tr><td>The download went missing</td><td>The partial download disappeared from the card.</td><td><b>Try Again</b>, and leave <code>.dev</code> alone while it downloads.</td></tr>
+        <tr><td>Checksum didn't match</td><td>The download arrived damaged and was deleted. Nothing changed.</td><td><b>Try Again</b>, or another network.</td></tr>
+        <tr><td>The download wouldn't unpack</td><td>Usually a full or failing card. It was deleted.</td><td>Free up space and <b>Try Again</b>.</td></tr>
+        <tr><td>Couldn't check the download</td><td>The check couldn't run.</td><td><b>Try Again</b>. If it keeps happening, send the logs.</td></tr>
+        <tr><td>The download is gone</td><td>The finished download was removed before installing.</td><td>Download it again.</td></tr>
+        <tr><td>The download isn't a system</td><td>The file on the card isn't a ChaOS update. Nothing changed.</td><td><b>Remove Download</b>, then download again.</td></tr>
+        <tr><td>Too big for this card</td><td>The new system doesn't fit the system partition. Nothing changed.</td><td>Update with ChaOS Installer.</td></tr>
+        <tr><td>No boot partition found</td><td>The card's boot partition is missing. Nothing changed.</td><td>Update with ChaOS Installer.</td></tr>
+        <tr><td>Couldn't open the boot files</td><td>The boot partition wouldn't open. Nothing changed.</td><td>Restart and try again, or use ChaOS Installer.</td></tr>
+        <tr><td>Couldn't write to the card</td><td>The card couldn't be written to. Nothing changed.</td><td>Restart and try again, or check the card on a computer.</td></tr>
+        <tr><td>Couldn't copy the update</td><td>A small update stopped partway. The download stays on the card.</td><td><b>Install and Restart</b> again.</td></tr>
+        <tr><td>Needs ChaOS Installer</td><td>This card's start-up files can't install updates by themselves.</td><td>Update with ChaOS Installer once.</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="note">If <b>About ChaOS</b> still shows the old version after a restart, the install didn't finish: start the Brick again, or use ChaOS Installer.</p>
+  </details>
+</section>
+
+<!-- ============================================================ -->
+<section id="faq" class="band alt">
+  <h2>FAQ</h2>
+  <div class="faq">
+    <details><summary>My games don't show up.</summary>
+      <p>Check the folder name against the <a href="#consoles">console table</a>, spelled exactly, and that the file type is listed. Games sent over ChaOS Transfer appear when you leave its screen; games copied another way while the Brick is on appear after <b>Rescan Folder</b> in the console's menu, or a restart.</p></details>
+    <details><summary>Will an update or reinstall lose my saves?</summary>
+      <p>No. Updates over Wi-Fi, ChaOS Wire and ChaOS Installer's <b>Update</b> all keep your games, music, saves, settings, ports and port saves. Only writing the image by hand erases the card.</p></details>
+    <details><summary>A port won't start, or shows a black screen.</summary>
+      <p>Check it's under <b>May Run on ChaOS</b>. If ChaOS names a missing library, it may come in a later library pack. Otherwise send the port's log from <code>.userdata/brick/ports/logs/</code>.</p></details>
+    <details><summary>Something went wrong. How do I send the logs?</summary>
+      <p>Open <b>MENU &gt; ChaOS Transfer</b>, open its address in a browser, and click <b>Download logs</b>. Then <a href="https://github.com/SkyWalker541/ChaOS/issues">open an issue</a> with it attached.</p></details>
+    <details><summary>How do I go back to the Brick's own system?</summary>
+      <p>Take the card out. ChaOS changes nothing on the Brick itself. Everything ChaOS keeps, Wi-Fi passwords and Bluetooth pairings included, is on the card, so reformat it before you give it away.</p></details>
+  </div>
+</section>
+
+</main>
+
+<!-- ============================================================ -->
+<section id="credits" class="band">
+  <h2>Credits</h2>
+  <p class="intro">ChaOS stands on a lot of other people's work. Every name here is in <a href="https://github.com/SkyWalker541/ChaOS/blob/main/CREDITS.md">CREDITS.md</a>, with licences, sources and notices.</p>
+  <div class="credits">
+    <div class="credit lead">
+      <h4>TortOS, Diatom and plastron</h4>
+      <p>by <b>Eric Reinsmidt</b>. ChaOS is a fork of <a href="https://github.com/ericreinsmidt/TortOS">TortOS</a>: the launcher, menus, Muse, file transfer, box art, RetroAchievements and the rest of what makes it work on the Brick are Eric's. Games run in <a href="https://github.com/SkyWalker541/ChaOS-diatom">ChaOS-diatom</a>, a fork of his <a href="https://github.com/ericreinsmidt/diatom">Diatom</a>, on his <a href="https://github.com/ericreinsmidt/plastron">plastron</a> system.</p>
+    </div>
+    <div class="credit">
+      <h4>ChaOS</h4>
+      <p>by <b>SkyWalker541</b>: the shaders' ports and PT SkyWalker541, the pixel themes, logo and animations, PortMaster and RomM support, and the rest marked <span class="tag">ChaOS</span> above.</p>
+    </div>
+    <div class="credit">
+      <h4>Shaders</h4>
+      <p><b>crt-lottes-fast</b> by Timothy Lottes, adapted by hunterk. <b>lcd3x</b> by Gigaherz. <b>Scanlines</b> after RiskyJumps. PT SkyWalker541 uses <b>Hash without Sine</b> by David Hoskins, and its dot mode is inspired by <b>Themaister</b>'s.</p>
+    </div>
+    <div class="credit">
+      <h4>Emulator cores</h4>
+      <p><b>FCEUmm</b>, <b>Snes9x 2010</b>, <b>Genesis Plus GX</b>, <b>Beetle PCE Fast</b>, <b>Beetle NeoPop</b> and <b>mGBA</b>, from <a href="https://www.libretro.com">libretro</a>, each its authors' work. Snes9x 2010 and Genesis Plus GX forbid commercial use, so ChaOS may never be sold.</p>
+    </div>
+    <div class="credit">
+      <h4>Overlays and art</h4>
+      <p>Overlays by <b>SkyWalker541</b> (CC0) and <b>KrutzOtrem</b> (MIT), via NextUI Community Overlays. Fancy Pants console photographs by <b>Evan Amos</b>. <b>Josefin Sans</b> by Santiago Orozco (OFL).</p>
+    </div>
+    <div class="credit">
+      <h4>Ports and services</h4>
+      <p><a href="https://portmaster.games">PortMaster</a> and its porters; <b>minui-portmaster</b> by ben16w. <a href="https://romm.app">RomM</a> and its client Grout. <a href="https://retroachievements.org">RetroAchievements</a>, libretro thumbnails, MusicBrainz and the Cover Art Archive, and itch.io (with NextUI-Itchio-Pak by Christophe Vanlancker).</p>
+    </div>
+    <div class="credit">
+      <h4>Libraries</h4>
+      <p>SDL2 and its mixer, net and gfx libraries, OpenAL Soft, FluidSynth, libsndfile, Xiph's Ogg, Vorbis, FLAC and Opus, GNU bash, squashfs-tools, and the port library pack's cairo, pixman, fontconfig, GMP, libtheora and libevdev, each under its own licence.</p>
+    </div>
+  </div>
+</section>
+
+<footer class="foot">
+  <p>ChaOS is <a href="https://github.com/ericreinsmidt/TortOS">TortOS</a> by Eric Reinsmidt, with ChaOS's changes by SkyWalker541. Games run in <a href="https://github.com/SkyWalker541/ChaOS-diatom">ChaOS-diatom</a>; ports come from <a href="https://portmaster.games">PortMaster</a>.</p>
+  <p>Free software under the <a href="https://github.com/SkyWalker541/ChaOS/blob/main/LICENSE">GPL-3.0-or-later</a>. <a href="https://github.com/SkyWalker541/ChaOS/blob/main/CREDITS.md">Credits</a> · <a href="https://github.com/SkyWalker541/ChaOS/blob/main/THIRD-PARTY-LICENSES.md">Third-party licenses</a> · Josefin Sans by Santiago Orozco, <a href="OFL.txt">OFL</a>.</p>
+</footer>
+
+<script src="boot.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
