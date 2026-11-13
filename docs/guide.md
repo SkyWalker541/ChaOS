@@ -531,7 +531,8 @@ device: the launcher lets go of the screen, Muse pauses, and the idle emulator
 is stopped, all of it put back when the port ends. A port is ended by Select
 + Start, as the whole of what it started (`plat_run_port`); the volume buttons
 work throughout. Power doesn't end a port: a press freezes it (SIGSTOP to its
-process group) and the launcher asks Resume or Power Off in its own panel,
+process group) and the launcher asks Resume, Close Port or Power Off in its
+own panel,
 drawn by SDL's software renderer into the framebuffer page on show
 (`port_power_prompt`), with the pad grabbed so the answer never reaches the
 port. Where that can't be drawn, the screen goes off instead, the next press

@@ -13620,13 +13620,17 @@ static void port_libs_before(app *a, const char *script, const char *romfile,
  * on show, then the frame put back as it was before the port goes on. */
 static const menu_row *port_power_rows(int *n)
 {
-	static menu_row rows[2];
+	static menu_row rows[3];
 
+	/* in the order plat_run_port reads the answer: 0 go on, 1 power off,
+	 * 2 out to ChaOS - drawn Resume, Close Port, Power Off */
 	rows[0] = (menu_row){ "Resume", NULL, true };
 	rows[0].hint = "Back to the game, just as it was";
-	rows[1] = (menu_row){ "Power Off", NULL, true };
-	rows[1].hint = "Anything the port hasn't saved is lost";
-	*n = 2;
+	rows[1] = (menu_row){ "Close Port", NULL, true };
+	rows[1].hint = "Back to ChaOS. What the port hasn't saved is lost";
+	rows[2] = (menu_row){ "Power Off", NULL, true };
+	rows[2].hint = "Turn the Brick off. What the port hasn't saved is lost";
+	*n = 3;
 	return rows;
 }
 
@@ -13704,16 +13708,18 @@ static int port_power_prompt(void *ctx)
 		usleep(16 * 1000);
 		plat_child_input(&in);
 		if (plat_power_event(&down)) { said = 0; break; }   /* again: back to it */
-		if (in_repeat(&in, IN_UP) || in_repeat(&in, IN_DOWN)) sel ^= 1;
+		if (in_repeat(&in, IN_DOWN)) sel = (sel + 1) % 3;
+		if (in_repeat(&in, IN_UP)) sel = (sel + 2) % 3;
 		if (in_repeat(&in, IN_VOLUP)) plat_volume_nudge(+1);
 		if (in_repeat(&in, IN_VOLDN)) plat_volume_nudge(-1);
 		if (in.pressed[IN_BACK]) { said = 0; break; }
-		if (in.pressed[IN_ACCEPT]) { said = sel; break; }
+		/* Resume 0, Close Port 2, Power Off 1 */
+		if (in.pressed[IN_ACCEPT]) { said = sel == 0 ? 0 : sel == 1 ? 2 : 1; break; }
 	}
 	/* the button that answered, let go before the port has the pad back */
 	while (in.down[IN_ACCEPT] || in.down[IN_BACK]) { usleep(16 * 1000); plat_child_input(&in); }
 	plat_child_grab(false);
-	fprintf(stderr, "port: power - %s\n", said == 1 ? "power off" : "resume");
+	fprintf(stderr, "port: power - %s\n", said == 1 ? "power off" : said == 2 ? "close" : "resume");
 	/* the frame back as it was, for a port that only draws when it changes */
 	if (said == 0) memcpy(page, save, (size_t)fix.line_length * var.yres);
 	ui_quit();

@@ -425,8 +425,8 @@ int plat_run_port(char *const argv[], const char *const envkv[], const char *wor
 				device_power_event(&power_down);    /* the presses that answered it */
 				power_since = 0;
 				memset(&in, 0, sizeof in);
-				if (said == 1) {
-					*how = PORT_POWER;
+				if (said == 1 || said == 2) {
+					*how = said == 1 ? PORT_POWER : PORT_QUIT;
 					kill(-pid, SIGCONT);
 					port_group_end(pid, &status);
 					break;

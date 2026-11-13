@@ -92,7 +92,8 @@ bool plat_run_power_pressed(void);
  * own, since a port is a script that starts programs of its own. While it runs
  * the volume keys work, and Select+Start ends it: the whole group, SIGTERM and
  * then SIGKILL. Power freezes it (SIGSTOP to the group) and asks `on_power`
- * what now: 1 power off (the port ended, *how PORT_POWER), 0 go on (SIGCONT),
+ * what now: 1 power off (the port ended, *how PORT_POWER), 2 close it (PORT_QUIT),
+ * 0 go on (SIGCONT),
  * -1 couldn't ask - then the screen goes off and the next press brings the
  * port back, and power held three seconds powers off. How it ended goes in
  * *how. */
