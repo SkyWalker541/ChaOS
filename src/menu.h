@@ -28,6 +28,9 @@ typedef struct {
 	/* A short description, drawn dim straight after the label on the same
 	 * line, if the row has room for it; dropped quietly where it has not. */
 	const char *hint;
+	/* ChaOS: a dot after the label, in the panel's color: something new
+	 * there (an update waiting) */
+	bool badge;
 } menu_row;
 
 /* A row that is only a rule, separating a list from a footer that is not part

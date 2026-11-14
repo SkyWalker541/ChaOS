@@ -127,14 +127,19 @@ than any one console:
 | | |
 |---|---|
 | **Play Time** | per game or per system, by day, week, month, year or all time |
-| **Wi-Fi** | the network's name when connected, or why it is not. WPA2 and WPA3 networks both join, whatever is in the name |
-| **Bluetooth** | the connected headset, or `not connected` - pair, connect and forget |
-| **Audio Output** | `Auto` or `Speaker`, and where Auto landed - see **Audio** below |
-| **Audio Channels** | `stereo`, `mono`, `mono left` or `mono right` - see **Audio** below |
-| **Night Mode** | `On` or `Off`, on the Brick only - eight quieter volume steps under the floor (its hint reads "quieter volume"), see **Night Mode** below |
 | **ChaOS Transfer** | the file server; needs Wi-Fi and says so when there is none. While a computer is on the USB cable it is **ChaOS Wire** instead, always at `10.55.0.2` on the Brick and `10.42.0.1` on the Pixel 2 |
-| **Date & Time** | the clock and the time zone, set with left and right - see below |
-| **Auto Off** | how long without a button before the device powers itself down |
+| **Wi-Fi & Bluetooth** | a page with both, its row showing the network and the headset |
+| **Wi-Fi** (Wi-Fi & Bluetooth) | the network's name when connected, or why it is not. WPA2 and WPA3 networks both join, whatever is in the name |
+| **Bluetooth** (Wi-Fi & Bluetooth) | the connected headset, or `not connected` - pair, connect and forget |
+| **System Settings** | a page of the device's own settings: the sound, the clock, the status line and Auto Off |
+| **Audio Output** (System Settings) | `Auto` or `Speaker`, and where Auto landed - see **Audio** below |
+| **Audio Channels** (System Settings) | `stereo`, `mono`, `mono left` or `mono right` - see **Audio** below |
+| **Night Mode** (System Settings) | `On` or `Off`, on the Brick only - eight quieter volume steps under the floor (its hint reads "quieter volume"), see **Night Mode** below |
+| **Date & Time** (System Settings) | the clock, the time zone and 12- or 24-hour, set with left and right - see below |
+| **Show Clock** (System Settings) | `On` or `Off` - the time at the top of every menu |
+| **Show Battery** (System Settings) | `Icon`, `Percent`, `Icon and percent` or `Off` - the battery at the top of every menu |
+| **Update Available Dot** (System Settings) | `On` or `Off` - a dot beside **Updates** while a newer ChaOS is waiting |
+| **Auto Off** (System Settings) | how long without a button before the device powers itself down |
 | **Appearance** | the look settings on their own page: UI Theme, UI Direction, Transition Speed, Game List View and Menu Color |
 | **UI Theme** | `Plain Jane`, `Fancy Pants`, `ChaOS Pixel Cards` or `ChaOS Pixel Names` - which art the shelves wear. On the Appearance page |
 | **UI Direction** | `Horizontal`, `Vertical` or `Cubic` - see below |
@@ -143,6 +148,7 @@ than any one console:
 | **Show Muse** (Appearance) | `On` or `Off` - whether Muse's shelf appears on the systems row. SELECT opens Muse either way |
 | **Box Art** | fetch what the whole library is missing |
 | **RetroAchievements** | the account, or `sign in` |
+| **Updates** | a newer ChaOS, and installing it; a dot beside it while one is waiting (unless **Update Available Dot** is off) |
 | **Controls** | every button and what it does, a page per place |
 | **About ChaOS** | version, address, battery, uptime |
 

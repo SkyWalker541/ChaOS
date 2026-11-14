@@ -1001,6 +1001,11 @@ static void appearance_screen(app *a);
 /* ChaOS: the ROM Management page, RomM and Syncthing (syncthing.h) */
 static bool g_rom_page;
 static void rom_page_screen(app *a);
+/* ChaOS: the Wi-Fi & Bluetooth page, and the System Settings page */
+static bool g_net_page, g_sys_page;
+static bool g_update_dot = true;   /* ChaOS: Update Available Dot, "update.dot" */
+static void net_page_screen(app *a);
+static void sys_page_screen(app *a);
 static void sth_screen(app *a);
 static const char *sth_row_value(void);
 /* ChaOS: Game Boy games into their folders (gbsort.h) */
@@ -5453,6 +5458,20 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 			draw_chevron(a->r, (float)(content_x + content_w + pad / 2),
 			             y + ROW_H(rows[i]) / 2.0f, (float)text_h * 0.5f, +1,
 			             rows[i].value ? vc : lc);
+		/* ChaOS: a dot after the label, in the panel's color: something new
+		 * there (menu.h, badge) */
+		if (rows[i].badge && rows[i].label && !ROW_IS_NOTE(rows[i])) {
+			int rad = text_h / 6 > 4 ? text_h / 6 : 4;
+			int cx = content_x + ui_text_width(fm, rows[i].label) + rad * 3;
+			int cy = y + ROW_H(rows[i]) / 2;
+
+			SDL_SetRenderDrawColor(a->r, (Uint8)(accent >> 16), (Uint8)(accent >> 8),
+			                       (Uint8)accent, 255);
+			for (int dy = -rad; dy <= rad; dy++) {
+				int dx = (int)(sqrt((double)(rad * rad - dy * dy)) + 0.5);
+				SDL_RenderDrawLine(a->r, cx - dx, cy + dy, cx + dx, cy + dy);
+			}
+		}
 
 		/* Trimmed to the panel, HERE, rather than by every caller.
 		 *
@@ -5922,6 +5941,13 @@ static int menu_build(app *a, screen_id screen, int sys,
 		u.night_ok  = plat_volume_night_ok();
 		u.appearance = g_appearance_page;
 		u.rom_page  = g_rom_page;
+		u.net_page  = g_net_page;
+		u.sys_page  = g_sys_page;
+		u.show_clock = g_status_clock ? "On" : "Off";
+		u.show_batt  = STATUS_BATT_NAMES[g_status_batt];
+		u.update_dot = g_update_dot ? "On" : "Off";
+		u.update_new = upd_get() == UPD_AVAILABLE || upd_get() == UPD_INSTALLER ||
+		               upd_get() == UPD_READY;
 		u.sync      = sth_row_value();
 		u.menu_color = MENU_COLORS[g_menu_color].name;
 		u.update    = upd_row_value();
@@ -10340,14 +10366,12 @@ static int clock_build(void *ctx, menu_row *rows, int max, const char **heading)
 	z = clock_zone_find(id);
 	snprintf(c->zone, sizeof c->zone, "%s", z >= 0 ? CLOCK_ZONES[z].city : id);
 	if (n < max) rows[n++] = (menu_row){ "Time Zone", c->zone, true };
-	/* The status bar: the clock top left, the battery top right. Their rows
-	 * sit straight under Time Zone, in the order clock_key reads them. */
-	if (n + 3 <= max) {
-		rows[n++] = (menu_row){ "Clock", g_status_clock ? "On" : "Off", true, .toggle = true };
+	/* The clock's style, straight under Time Zone. Showing the clock and the
+	 * battery at all are System Settings' Show Clock and Show Battery. */
+	if (n + 1 <= max) {
 		/* Which of two, so a value and arrows rather than a switch: a switch
 		 * reads On or Off, and neither says which format is on */
 		rows[n++] = (menu_row){ "12h/24h Clock", g_status_clock24 ? "24h" : "12h", true, .cycles = true };
-		rows[n++] = (menu_row){ "Battery", STATUS_BATT_NAMES[g_status_batt], true, .cycles = true };
 	}
 	if (n + 3 <= max) {
 		rows[n++] = MENU_RULE;
@@ -10378,14 +10402,8 @@ static menu_result clock_key(app *a, void *ctx, in_button key, int sel)
 		db_set_str(db_lib(), "timezone", CLOCK_ZONES[z].id);
 		plat_clock_zone(CLOCK_ZONES[z].id);
 	} else if (sel == CLK_FIELDS + 1) {
-		g_status_clock = !g_status_clock;
-		db_set_int(db_dev(), "status.clock", g_status_clock ? 1 : 0);
-	} else if (sel == CLK_FIELDS + 2) {
 		g_status_clock24 = !g_status_clock24;
 		db_set_int(db_dev(), "status.clock24", g_status_clock24 ? 1 : 0);
-	} else if (sel == CLK_FIELDS + 3) {
-		g_status_batt = (g_status_batt + (d ? d : 1) + STATUS_BATT_COUNT) % STATUS_BATT_COUNT;
-		db_set_int(db_dev(), "status.battery", g_status_batt);
 	}
 	return MENU_STAY;
 }
@@ -10416,7 +10434,8 @@ static void tortos_menu_draw(app *a, int sel)
 	SDL_RenderFillRect(a->r, NULL);
 	/* The shelf's menu is TortOS's own on the systems screen and a system's on
 	 * a game list, which is where it gains rows that belong to that system. */
-	g_menu_root = !g_appearance_page && !g_rom_page;   /* ChaOS: those are submenus */
+	g_menu_root = !g_appearance_page && !g_rom_page &&   /* ChaOS: those are submenus */
+	              !g_net_page && !g_sys_page;
 	menu_draw(a, heading, rows, n, sel, menu_shelf_width(a),
 	          a->screen == SCREEN_SYSTEMS ? MENU_ACCENT : a->tint);
 	g_menu_root = false;
@@ -10506,19 +10525,13 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 
 			sel = sel >= 0 && sel < n ? (int)ids[sel] : SM_ROWS;
 		}
-		/* ChaOS. Shader: left and right turn it on and off, A opens its
-		 * settings. Overlay: left, right and A go through None and the
-		 * console's PNGs. Both saved the moment they change, as there is no
-		 * confirm step to hang the write off. */
+		/* ChaOS. Shader: A opens its page, whose first row turns it on and
+		 * off - the row itself only says which; a switch here as well as
+		 * there was two ways to one setting. Overlay: left, right and A go
+		 * through None and the console's PNGs, saved the moment they change,
+		 * as there is no confirm step to hang the write off. */
 		if (sel == SM_SHADER) {
-			sysview *v = &a->view[a->sys_cursor];
-
-			if (d) {
-				v->look.on = !v->look.on;
-				look_save(a, a->sys_cursor);
-			} else if (key == IN_ACCEPT) {
-				shader_screen(a, a->sys_cursor, NULL);
-			}
+			if (key == IN_ACCEPT) shader_screen(a, a->sys_cursor, NULL);
 			return MENU_STAY;
 		}
 		if (sel == SM_OVERLAY) {
@@ -10619,7 +10632,7 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 		               .cable_xfer = plat_cable_link(NULL, 0), .ss_have = ss_have_dev(),
 		               .pm_have = ports_pm_ready(P_ROMS),
 		               .night_ok = plat_volume_night_ok(), .appearance = g_appearance_page,
-		               .rom_page = g_rom_page,
+		               .rom_page = g_rom_page, .net_page = g_net_page, .sys_page = g_sys_page,
 		               .name_speed = CARDS_DRAWN(g_cards) ? PN_SPEEDS[g_pn_speed[g_dir]].name
 		                                                  : NULL,
 		               .list_view = CARD_DIRS[g_dir].both ? NULL : "" };
@@ -10755,6 +10768,23 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 		return MENU_STAY;
 	}
 
+	/* ChaOS: the status line's clock and battery, from System Settings */
+	if (sel == PM_SHOWCLOCK && (d || key == IN_ACCEPT)) {
+		g_status_clock = !g_status_clock;
+		db_set_int(db_dev(), "status.clock", g_status_clock ? 1 : 0);
+		return MENU_STAY;
+	}
+	if (sel == PM_UPDDOT && (d || key == IN_ACCEPT)) {
+		g_update_dot = !g_update_dot;
+		db_set_int(db_dev(), "update.dot", g_update_dot ? 1 : 0);
+		return MENU_STAY;
+	}
+	if (sel == PM_SHOWBATT && (d || key == IN_ACCEPT)) {
+		g_status_batt = (g_status_batt + (d ? d : 1) + STATUS_BATT_COUNT) % STATUS_BATT_COUNT;
+		db_set_int(db_dev(), "status.battery", g_status_batt);
+		return MENU_STAY;
+	}
+
 	/* Four positions, stepped either way like the card sets, A going forward.
 	 * Applied at once, to Muse and to Diatom if they are there to be told, so
 	 * a player trying them over music hears each as it is chosen. */
@@ -10776,6 +10806,8 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 	case PM_BT:           bt_screen(a); break;
 	case PM_CLOCK:        clock_screen(a); break;
 	case PM_APPEARANCE:   appearance_screen(a); break;
+	case PM_NETPAGE:      net_page_screen(a); break;
+	case PM_SYSPAGE:      sys_page_screen(a); break;
 	case PM_STATS:        if (stats_screen(a)) return MENU_DONE; break;
 	case PM_CONTROLS:     controls_screen(a); break;
 	case PM_PORTS:        pm_get(a); break;
@@ -10848,6 +10880,28 @@ static void rom_page_screen(app *a)
 	menu_run(a, &st, sysmenu_build, sysmenu_key, &c);
 	g_rom_page = false;
 }
+
+/* ChaOS: MENU > Wi-Fi & Bluetooth, and MENU > System Settings, pages of the
+ * menu as Appearance is */
+static void page_screen(app *a, bool *flag)
+{
+	sysmenu_ctx c;
+	menu_style st = {
+		.fixed_w     = menu_std_width(a),
+		.accent      = MENU_ACCENT,
+		.follow_tint = a->screen != SCREEN_SYSTEMS,
+	};
+
+	memset(&c, 0, sizeof c);
+	c.a = a;
+	c.screen = a->screen;
+	*flag = true;
+	menu_run(a, &st, sysmenu_build, sysmenu_key, &c);
+	*flag = false;
+}
+
+static void net_page_screen(app *a) { page_screen(a, &g_net_page); }
+static void sys_page_screen(app *a) { page_screen(a, &g_sys_page); }
 
 static void tortos_menu(app *a)
 {
@@ -13799,14 +13853,8 @@ static menu_result gm_key(app *a, void *ctx, in_button key, int sel)
 	 * of these rows being here is judging them against the game. Left and
 	 * right turn the shader on and off; A opens its settings. The overlay
 	 * goes round on left, right and A. */
-	if (sel == GM_SHADER && (key == IN_LEFT || key == IN_RIGHT)) {
-		int o = gm_owner(a);
-
-		a->view[o].look.on = !a->view[o].look.on;
-		look_save(a, o);
-		gm_apply_shader(c);
-		return MENU_STAY;
-	}
+	/* ChaOS: Shader is turned on and off on its own page (A), not here */
+	if (sel == GM_SHADER && (key == IN_LEFT || key == IN_RIGHT)) return MENU_STAY;
 	if (sel == GM_DISPLAY && (key == IN_LEFT || key == IN_RIGHT || key == IN_ACCEPT)) {
 		gm_cycle_display(c, key == IN_LEFT ? -1 : 1);
 		return MENU_STAY;
@@ -20881,6 +20929,12 @@ int main(int argc, char *argv[])
 			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9')
 				shot_menu_sel = atoi(argv[++i]);
 		}
+		else if (!strcmp(argv[i], "--netpage") || !strcmp(argv[i], "--syspage")) {
+			shot_menu = 1;
+			if (argv[i][2] == 'n') g_net_page = true; else g_sys_page = true;
+			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9')
+				shot_menu_sel = atoi(argv[++i]);
+		}
 		else if (!strcmp(argv[i], "--appearance")) {
 			shot_menu = 1;
 			g_appearance_page = true;
@@ -21362,6 +21416,32 @@ int main(int argc, char *argv[])
 		net_set_ca_path(cp);
 		/* ChaOS: what is installed, and any update waiting on the card */
 		upd_init(P_CARD, P_ROOT, CHAOS_VERSION, TORTOS_VERSION);
+		/* ChaOS: what lights and charger controls this kernel offers, once
+		 * a boot, for deciding on a charging LED setting (only a list of
+		 * names: nothing is written) */
+		{
+			static const char *const dirs[] = { "/sys/class/leds", "/sys/class/led_anim",
+			                                    "/sys/class/power_supply", NULL };
+			int di;
+			for (di = 0; dirs[di]; di++) {
+				DIR *dd = opendir(dirs[di]);
+				struct dirent *de;
+				char line[1024];
+				size_t used = 0;
+
+				line[0] = '\0';
+				if (dd) {
+					while ((de = readdir(dd)) && used + 40 < sizeof line)
+						if (de->d_name[0] != '.')
+							used += (size_t)snprintf(line + used, sizeof line - used, " %s", de->d_name);
+					closedir(dd);
+				}
+				fprintf(stderr, "lights: %s:%s\n", dirs[di], dd ? line : " (none)");
+			}
+		}
+		/* --update-pill N: that update state from the start, so a shot of
+		 * the menu shows it too (the Updates row's dot) */
+		if (shot_upd_pill >= 0) upd_demo((upd_state)shot_upd_pill, "1.2.0", NULL);
 		ra_creds_load();
 		ss_creds_load();
 		{
@@ -21404,6 +21484,7 @@ int main(int argc, char *argv[])
 		g_status_clock   = db_get_int(db_dev(), "status.clock", 1) != 0;
 		g_status_clock24 = db_get_int(db_dev(), "status.clock24", 0) != 0;
 		g_status_batt    = db_get_int(db_dev(), "status.battery", STATUS_BATT_ICON);
+		g_update_dot     = db_get_int(db_dev(), "update.dot", 1) != 0;
 		if (g_status_batt < 0 || g_status_batt >= STATUS_BATT_COUNT) g_status_batt = STATUS_BATT_ICON;
 	}
 	scan_all(&a);

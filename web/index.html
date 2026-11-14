@@ -87,7 +87,7 @@
     <li class="with-screen">
       <div class="step-text">
         <h3>Join Wi-Fi</h3>
-        <p><kbd>MENU</kbd> &gt; <b>Wi-Fi</b>, pick your network, and type the password on the on-screen keyboard. WPA2 and WPA3 both work. <kbd>Y</kbd> rescans; <kbd>X</kbd> forgets a network.</p>
+        <p><kbd>MENU</kbd> &gt; <b>Wi-Fi &amp; Bluetooth</b> &gt; <b>Wi-Fi</b>, pick your network, and type the password on the on-screen keyboard. WPA2 and WPA3 both work. <kbd>Y</kbd> rescans; <kbd>X</kbd> forgets a network.</p>
       </div>
       <figure class="device small"><div class="bezel"><img src="img/keyboard.webp" alt="The on-screen keyboard" loading="lazy" width="1024" height="768"></div></figure>
     </li>
@@ -241,7 +241,7 @@
       <h3>Shader support <span class="tag">ChaOS</span></h3>
       <p>ChaOS adds shaders to every console: CRT, LCD and PT SkyWalker541 looks, each with settings to tune, drawn by the Brick's CPU in <a href="https://github.com/SkyWalker541/ChaOS-diatom">ChaOS-diatom</a>. Find the <b>Shader</b> row in a console's menu (<kbd>MENU</kbd> on its shelf) or in the in-game menu.</p>
       <ul>
-        <li><b>Left and right</b> switch it on and off; <kbd>A</kbd> opens its settings.</li>
+        <li><kbd>A</kbd> opens it: its first row turns it on and off, and the rest are its settings.</li>
         <li><b>See it before you choose it.</b> In a game, the paused picture shows each setting as you scroll. Hold <kbd>Y</kbd> to hide the menu and look at the whole screen.</li>
         <li><b>Reset to Recommended</b> puts back the shader's own settings.</li>
         <li>Settings are kept per console, and survive updates.</li>
@@ -525,8 +525,8 @@
     <div class="aside-card">
       <h4>Sound and Bluetooth</h4>
       <ul>
-        <li><b>Bluetooth headphones</b>: <b>MENU &gt; Bluetooth</b>, <kbd>Y</kbd> to search, <kbd>A</kbd> to pair, <kbd>X</kbd> to forget. They reconnect by themselves, even mid-game. The volume buttons reach them, and their play, pause and skip buttons control Muse.</li>
-        <li><b>Audio Output</b>: Auto (cable, then Bluetooth, then speaker) or Speaker.</li>
+        <li><b>Bluetooth headphones</b>: <b>MENU &gt; Wi-Fi &amp; Bluetooth &gt; Bluetooth</b>, <kbd>Y</kbd> to search, <kbd>A</kbd> to pair, <kbd>X</kbd> to forget. They reconnect by themselves, even mid-game. The volume buttons reach them, and their play, pause and skip buttons control Muse.</li>
+        <li><b>Audio Output</b> (<b>MENU &gt; System Settings</b>, with Audio Channels and Night Mode): Auto (cable, then Bluetooth, then speaker) or Speaker.</li>
         <li><b>Audio Channels</b>: stereo, mono, mono left or mono right, for hearing with one ear.</li>
         <li><b>Night Mode</b> <span class="tag">ChaOS</span>: eight volume steps below the quietest, for playing in bed. Turning it on or off keeps the loudness you have.</li>
         <li>Wired headphones get their own volume range, so plugging in never jumps loud.</li>
@@ -541,7 +541,7 @@
       <ul>
         <li><b>Appearance</b> <span class="tag">ChaOS</span> on one page: UI Theme, UI Direction, Transition Speed, Game List View, Menu Color, and <b>Show Favorites</b>, <b>Show Recently Played</b> and <b>Show Muse</b>.</li>
         <li><b>Every menu says what its rows do</b> <span class="tag">ChaOS</span>, in a line at the bottom.</li>
-        <li><b>The clock and battery</b> <span class="tag">ChaOS</span> in every menu's heading. <b>MENU &gt; Date &amp; Time</b> sets the zone, 12- or 24-hour, and the battery as an icon, a percent or both. Wi-Fi keeps the clock right.</li>
+        <li><b>The clock and battery</b> <span class="tag">ChaOS</span> in every menu's heading. <b>MENU &gt; System Settings</b> has Date &amp; Time (the zone, 12- or 24-hour), <b>Show Clock</b>, and <b>Show Battery</b> as an icon, a percent or both. Wi-Fi keeps the clock right.</li>
         <li><b>Boot and power-off</b> <span class="tag">ChaOS</span>: the logo's pixels fly in, and fly out again, like the top of this page.</li>
         <li><b>Auto Off</b> after a while without a button (not while music plays or it's charging).</li>
         <li><b>About ChaOS</b>: version, the TortOS it's built on, free space on the card, address, battery, time awake.</li>
@@ -623,8 +623,8 @@
     <table class="data">
       <thead><tr><th>Message</th><th>What it means</th><th>What to do</th></tr></thead>
       <tbody>
-        <tr><td>needs Wi-Fi</td><td>The Brick isn't online.</td><td>Join a network under <b>MENU &gt; Wi-Fi</b>.</td></tr>
-        <tr><td>Wi-Fi is off</td><td>Wi-Fi is turned off.</td><td>Turn it on under <b>MENU &gt; Wi-Fi</b>, then <b>Try Again</b>.</td></tr>
+        <tr><td>needs Wi-Fi</td><td>The Brick isn't online.</td><td>Join a network under <b>MENU &gt; Wi-Fi &amp; Bluetooth</b>.</td></tr>
+        <tr><td>Wi-Fi is off</td><td>Wi-Fi is turned off.</td><td>Turn it on under <b>MENU &gt; Wi-Fi &amp; Bluetooth</b>, then <b>Try Again</b>.</td></tr>
         <tr><td>Wi-Fi isn't connected</td><td>No network, or no internet address yet.</td><td>Connect, wait a moment, then <b>Try Again</b>.</td></tr>
         <tr><td>charge to 25%</td><td>The battery is too low to install safely.</td><td>Charge to 25%, or plug in the charger.</td></tr>
         <tr><td>This one needs ChaOS Installer</td><td>The new version changes parts of the card the Brick can't update by itself.</td><td>Update with ChaOS Installer on a computer.</td></tr>

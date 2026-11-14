@@ -136,7 +136,7 @@ int gm_rows(const gm_ui *u, menu_row *out, gm_bufs *b)
 	out[GM_OVERSCAN].cycles = true;
 	out[GM_DISC].value = u->disc ? u->disc : "";
 	out[GM_DISC].cycles = true;
-	out[GM_SHADER].toggle = u->shader != NULL;
+	out[GM_SHADER].toggle = false;   /* ChaOS: switched on its page (A) */
 	out[GM_SHADER].value = u->shader ? u->shader : "none";
 	out[GM_SHADER].live = u->shader != NULL;
 	out[GM_OVERLAY].value = u->overlay ? u->overlay : "None";

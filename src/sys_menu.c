@@ -6,6 +6,8 @@
 
 #include "sys_menu.h"
 
+#include <string.h>
+
 void sys_menu_auto_off_label(int seconds, char *out, size_t n)
 {
 	if (seconds <= 0)      snprintf(out, n, "never");
@@ -44,16 +46,25 @@ int sys_menu_tortos_rows(const sys_ui *u, pm_row *out)
 		if (!u->name_speed && r == PM_SPEED) continue;
 		if (!u->list_view && r == PM_LISTVIEW) continue;
 		if (!u->night_ok && r == PM_NIGHT) continue;
+		/* ChaOS: the Wi-Fi & Bluetooth page only where there is a radio */
+		if (r == PM_NETPAGE && u->no_wifi && u->no_bt) continue;
 		/* The look rows live on the Appearance page, and ChaOS's RomM and
-		 * Syncthing on the ROM Management page; the menu has one row for
-		 * each page, where the first of its rows sat */
+		 * Syncthing on the ROM Management page, Wi-Fi and Bluetooth on theirs
+		 * and the device's own settings on System Settings; the menu has one
+		 * row for each page */
 		{
 			bool look = r == PM_THEME || r == PM_DIR || r == PM_SPEED ||
 			            r == PM_LISTVIEW || r == PM_COLOR || r == PM_SHELF_FAV ||
 			            r == PM_RECENT || r == PM_SHELF_MUSE;
 			bool roms = r == PM_ROMM || r == PM_SYNC || r == PM_GBSORT;
-			int page = look ? 1 : roms ? 2 : 0;
-			int want = u->appearance ? 1 : u->rom_page ? 2 : 0;
+			bool net  = r == PM_WIFI || r == PM_BT;
+			bool sys  = r == PM_AUDIO || r == PM_CHANNELS || r == PM_NIGHT ||
+			            r == PM_CLOCK || r == PM_SHOWCLOCK || r == PM_SHOWBATT ||
+			            r == PM_UPDDOT ||
+			            r == PM_SLEEP;
+			int page = look ? 1 : roms ? 2 : net ? 3 : sys ? 4 : 0;
+			int want = u->appearance ? 1 : u->rom_page ? 2 : u->net_page ? 3
+			         : u->sys_page ? 4 : 0;
 
 			if (page != want) continue;
 		}
@@ -205,7 +216,10 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 		/* no overlay fits this Display Mode (Stretch, say): nothing to
 		 * choose, and the row says so by being dim */
 		if (u->no_overlays) full[SM_OVERLAY].live = full[SM_OVERLAY].cycles = false;
-		full[SM_SHADER].toggle = full[SM_REWIND].toggle = true;
+		full[SM_REWIND].toggle = true;
+		/* ChaOS: Shader says On or Off and opens its page, where it is
+		 * switched: one place for the switch */
+		full[SM_SHADER].toggle = false;
 		{
 			sm_row ids[SM_ROWS];
 			int k, n = sys_menu_system_rows(u, ids);
@@ -217,7 +231,8 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 
 	menu_row full[PM_ROWS];
 
-	*heading = u->appearance ? "Appearance" : u->rom_page ? "ROM Management" : "ChaOS";
+	*heading = u->appearance ? "Appearance" : u->rom_page ? "ROM Management"
+	         : u->net_page ? "Wi-Fi & Bluetooth" : u->sys_page ? "System Settings" : "ChaOS";
 	/* The network's name, not its address. A settings row should say what the
 	 * setting IS; the address is a fact about the machine and lives on the
 	 * About page with the other ones. */
@@ -228,6 +243,24 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 		         u->wifi == WIFI_CONNECTING ? "connecting" :
 		         u->wifi == WIFI_IDLE       ? "not connected" : "off");
 	full[PM_WIFI]         = (menu_row){ "Wi-Fi",     b->b,      true  };
+	/* ChaOS: the page's row says what both are doing at a glance: the
+	 * network, then the headset, and only the halves the device has */
+	{
+		static char net[600];
+		const char *w = u->no_wifi ? NULL : b->b;
+		const char *h = u->no_bt ? NULL : u->bt_name;
+
+		if (w && h) snprintf(net, sizeof net, "%s \xc2\xb7 %s", w, h);
+		else snprintf(net, sizeof net, "%s", w ? w : h ? h : "");
+		full[PM_NETPAGE] = (menu_row){ "Wi-Fi & Bluetooth", net, true };
+	}
+	full[PM_SYSPAGE] = (menu_row){ "System Settings", NULL, true };
+	full[PM_SHOWCLOCK] = (menu_row){ "Show Clock", u->show_clock ? u->show_clock : "On", true };
+	full[PM_SHOWBATT]  = (menu_row){ "Show Battery", u->show_batt ? u->show_batt : "Icon", true };
+	full[PM_UPDDOT] = (menu_row){ "Update Available Dot",
+	                              u->update_dot ? u->update_dot : "On", true };
+	full[PM_SHOWCLOCK].toggle = full[PM_UPDDOT].toggle = true;
+	full[PM_SHOWBATT].cycles = true;
 	full[PM_BT]           = (menu_row){ "Bluetooth",
 	                                   u->bt_name ? u->bt_name : "not connected",
 	                                   true  };
@@ -318,6 +351,8 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	full[PM_SYNC]         = (menu_row){ "Syncthing", u->sync ? u->sync : "Off", true };
 	full[PM_GBSORT]       = (menu_row){ "Sort Game Boy Games", NULL, true };
 	full[PM_UPDATE]       = (menu_row){ "Updates", u->update, true };
+	/* ChaOS: a dot while one waits, unless the player turned it off */
+	full[PM_UPDATE].badge = u->update_new && !(u->update_dot && !strcmp(u->update_dot, "Off"));
 	full[PM_CONTROLS]     = (menu_row){ "Controls",    NULL,   true  };
 	full[PM_ABOUT]        = (menu_row){ "About ChaOS", NULL,   true  };
 	/* ChaOS: what each row does, shown under the menu while it is the one
@@ -330,7 +365,12 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	full[PM_NIGHT].hint        = "Extra-quiet volume steps for playing at night";
 	full[PM_XFER].hint         = u->cable_xfer ? "Copy games and music over the USB cable"
 	                                           : "Copy games and music from a phone or computer";
-	full[PM_CLOCK].hint        = "Time zone, clock style and battery display";
+	full[PM_CLOCK].hint        = "The date, time, time zone and 12 or 24 hours";
+	full[PM_NETPAGE].hint      = "Join a network, pair headphones";
+	full[PM_SYSPAGE].hint      = "Sound, clock, battery and Auto Off";
+	full[PM_SHOWCLOCK].hint    = "The time at the top of the menus";
+	full[PM_SHOWBATT].hint     = "The battery at the top of the menus";
+	full[PM_UPDDOT].hint       = "A dot on Updates when a new ChaOS is out";
 	full[PM_SLEEP].hint        = "Power off after this long with no buttons pressed";
 	full[PM_APPEARANCE].hint   = "Theme, layout, menu color and which shelves show";
 	full[PM_THEME].hint        = "The look of the cards on the shelf";
@@ -360,6 +400,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	full[PM_UPDATE].opens = full[PM_PORTS].opens = full[PM_ROMM].opens = true;
 	full[PM_ROMMGMT].opens = full[PM_SYNC].opens = full[PM_GBSORT].opens = true;
 	full[PM_APPEARANCE].opens = true;
+	full[PM_NETPAGE].opens = full[PM_SYSPAGE].opens = true;
 	/* ChaOS: the rows left and right go round (menu.h, cycles) */
 	full[PM_AUDIO].cycles = full[PM_CHANNELS].cycles = full[PM_SLEEP].cycles = true;
 	full[PM_THEME].cycles = full[PM_DIR].cycles = full[PM_SPEED].cycles = true;

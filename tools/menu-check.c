@@ -179,7 +179,12 @@ static bool has_label(const menu_row *rows, int n, const char *label);
 #define PAGE_ROWS 8
 /* ChaOS: and the ROM Management page's two, RomM and Syncthing */
 #define ROM_ROWS 3
-#define TOP_ROWS (PM_ROWS - PAGE_ROWS - ROM_ROWS)
+/* ChaOS: and the Wi-Fi & Bluetooth page's two, and System Settings' eight
+ * (Audio Output, Audio Channels, Night Mode, Date & Time, Show Clock, Show
+ * Battery, Update Available Dot, Auto Off) */
+#define NET_ROWS 2
+#define SYS_ROWS 8
+#define TOP_ROWS (PM_ROWS - PAGE_ROWS - ROM_ROWS - NET_ROWS - SYS_ROWS)
 /* (the page's description line is drawn by menu_draw, not a row) */
 #define PAGE_NOTE 0
 static const menu_row *by_id(const sys_ui *u, const menu_row *rows, int n, pm_row id);
@@ -393,15 +398,19 @@ static void tortos_menu_online(void)
 	u.recent = u.fav_shelf = u.muse_shelf = NULL;
 	/* Night Mode: a switch on a device with a night ladder, gone without one */
 	u.night = "On";
+	u.sys_page = true;
 	n = sys_menu_build(&u, rows, &b, &heading);
+	u.sys_page = false;
 	{
 		int k, at = -1;
 		for (k = 0; k < n; k++) if (!strcmp(rows[k].label, "Night Mode")) at = k;
 		ck(at >= 0 && rows[at].toggle && !strcmp(val(&rows[at]), "On"), "Night Mode is a switch that says On");
 	}
 	u.night_ok = false;
+	u.sys_page = true;
 	n = sys_menu_build(&u, rows, &b, &heading);
-	ck(!has_label(rows, n, "Night Mode") && n == TOP_ROWS - 1, "no Night Mode row where there is no night ladder");
+	ck(!has_label(rows, n, "Night Mode") && n == SYS_ROWS - 1, "no Night Mode row where there is no night ladder");
+	u.sys_page = false;
 	u.night_ok = true;
 	u.night = NULL;
 	printf("Game List View:\n");
@@ -767,10 +776,10 @@ static void cursor_reaches(void)
 	printf("TortOS menu offline, what the cursor can reach:\n");
 	/* No network needed to pair a headset, so it stays reachable offline -
 	 * unlike the three rows above, which do need one. */
-	ck(holds_id(&u, got, k, PM_BT), "Bluetooth is reachable with no network");
+	ck(holds_id(&u, got, k, PM_NETPAGE), "Wi-Fi & Bluetooth is reachable with no network");
 	ck(!holds_id(&u, got, k, PM_XFER), "OTH is skipped with no network");
 	ck(!holds_id(&u, got, k, PM_SCRAPE), "Box Art is skipped with no network");
-	ck(holds_id(&u, got, k, PM_WIFI), "Wi-Fi is reachable, which is how you fix that");
+	ck(holds_id(&u, got, k, PM_SYSPAGE), "System Settings is reachable offline");
 	ck(holds_id(&u, got, k, PM_ABOUT), "About is reachable");
 	/* Play Time reads what is already stored and asks nothing of the network,
 	 * so it stays reachable when everything else is grayed out. */
@@ -784,11 +793,29 @@ static void cursor_reaches(void)
 static const menu_row *by_id(const sys_ui *u, const menu_row *rows, int n, pm_row id)
 {
 	static const menu_row none;
+	static menu_row page[MENU_MAX_ROWS];
+	static menu_bufs pb;
 	pm_row ids[PM_ROWS];
 	int k, cnt = sys_menu_tortos_rows(u, ids);
 
 	for (k = 0; k < cnt && k < n; k++)
 		if (ids[k] == id) return &rows[k];
+	/* ChaOS: a row on a page of its own (Wi-Fi & Bluetooth, System
+	 * Settings): looked for on that page, as a player would open it */
+	if (!u->net_page && !u->sys_page && !u->appearance && !u->rom_page) {
+		int p;
+		for (p = 0; p < 2; p++) {
+			sys_ui v = *u;
+			const char *h;
+			int m;
+
+			if (p == 0) v.net_page = true; else v.sys_page = true;
+			m = sys_menu_build(&v, page, &pb, &h);
+			cnt = sys_menu_tortos_rows(&v, ids);
+			for (k = 0; k < cnt && k < m; k++)
+				if (ids[k] == id) return &page[k];
+		}
+	}
 	return &none;
 }
 
@@ -836,7 +863,10 @@ static void radio_less(void)
 		if (pm[i] == PM_THEME || pm[i] == PM_DIR || pm[i] == PM_SPEED ||
 		    pm[i] == PM_LISTVIEW || pm[i] == PM_COLOR || pm[i] == PM_SHELF_FAV ||
 		    pm[i] == PM_RECENT || pm[i] == PM_SHELF_MUSE || pm[i] == PM_ROMM ||
-		    pm[i] == PM_SYNC || pm[i] == PM_GBSORT) ok = false;
+		    pm[i] == PM_SYNC || pm[i] == PM_GBSORT || pm[i] == PM_WIFI ||
+		    pm[i] == PM_BT || pm[i] == PM_AUDIO || pm[i] == PM_CHANNELS ||
+		    pm[i] == PM_NIGHT || pm[i] == PM_CLOCK || pm[i] == PM_SHOWCLOCK ||
+		    pm[i] == PM_SHOWBATT || pm[i] == PM_UPDDOT || pm[i] == PM_SLEEP) ok = false;
 	/* The top level, in the enum's order, with the Appearance rows on their page
 	 * and Appearance in their place */
 	ck(k == TOP_ROWS && ok, "every TortOS row, in the enum's order");
@@ -863,7 +893,7 @@ static void radio_less(void)
 	n = sys_menu_build(&u, rows, &b, &heading);
 	k = sys_menu_tortos_rows(&u, pm);
 	printf("ChaOS menu, no radio at all:\n");
-	ck(n == k && n == TOP_ROWS - 8, "eight rows fewer (Updates and Get PortMaster too; ROM Management stays, for sorting Game Boy games), and the build agrees with the list");
+	ck(n == k && n == TOP_ROWS - 7, "seven rows fewer (Wi-Fi & Bluetooth, the transfer, Box Art, both sign-ins, Updates, Get PortMaster; ROM Management stays, for sorting Game Boy games), and the build agrees with the list");
 	ck(!has_label(rows, n, "Wi-Fi") && !has_label(rows, n, "Bluetooth"),
 	   "no Wi-Fi, no Bluetooth");
 	ck(!has_label(rows, n, XFER_NAME_WIFI) && !has_label(rows, n, XFER_NAME_CABLE) &&
@@ -872,10 +902,19 @@ static void radio_less(void)
 	ck(!has_label(rows, n, "RetroAchievements") && !has_label(rows, n, "ScreenScraper"),
 	   "and no sign-ins");
 	ck(!has_label(rows, n, "Updates"), "and no Updates, which come over Wi-Fi");
-	ck(has_label(rows, n, "Audio Output") && has_label(rows, n, "Play Time") &&
+	ck(has_label(rows, n, "System Settings") && has_label(rows, n, "Play Time") &&
 	   has_label(rows, n, "Controls") && has_label(rows, n, "About ChaOS") &&
-	   has_label(rows, n, "Date & Time"),
-	   "the rest is all there, Date & Time with it");
+	   !has_label(rows, n, "Wi-Fi & Bluetooth"),
+	   "the rest is all there, System Settings with it, and no Wi-Fi & Bluetooth page");
+	u.sys_page = true;
+	n = sys_menu_build(&u, rows, &b, &heading);
+	ck(has_label(rows, n, "Audio Output") && has_label(rows, n, "Date & Time") &&
+	   has_label(rows, n, "Show Clock") && has_label(rows, n, "Show Battery") &&
+	   has_label(rows, n, "Update Available Dot") && !strcmp(heading, "System Settings"),
+	   "System Settings holds the sound, the clock and the status line");
+	u.sys_page = false;
+	n = sys_menu_build(&u, rows, &b, &heading);
+	k = sys_menu_tortos_rows(&u, pm);
 	ck(pm[n - 1] == PM_ABOUT && !strcmp(rows[n - 1].label, "About ChaOS") &&
 	   pm[0] == PM_STATS && !strcmp(rows[0].label, "Play Time"),
 	   "and the list names the rows the build drew, first to last");
@@ -885,7 +924,7 @@ static void radio_less(void)
 	n = sys_menu_build(&u, rows, &b, &heading);
 	k = sys_menu_tortos_rows(&u, pm);
 	printf("ChaOS menu, no radio, files over the cable:\n");
-	ck(n == k && n == TOP_ROWS - 7, "seven rows fewer: the transfer row stays");
+	ck(n == k && n == TOP_ROWS - 6, "six rows fewer: the transfer row stays");
 	for (i = 0; i < k && pm[i] != PM_XFER; i++) { }
 	ck(i < k && !strcmp(rows[i].label, XFER_NAME_CABLE),
 	   "as ChaOS Wire, where the list says it is");

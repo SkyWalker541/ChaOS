@@ -36,8 +36,12 @@
 /* Audio Channels directly under Audio Output: the two together are how the
  * sound reaches you, where it goes and which ears hear what. */
 typedef enum {
-	PM_STATS,
-	PM_WIFI, PM_BT, PM_AUDIO, PM_CHANNELS, PM_NIGHT, PM_XFER, PM_CLOCK,
+	PM_STATS, PM_XFER,
+	/* ChaOS: two pages of their own, as Appearance is: Wi-Fi & Bluetooth
+	 * (net_page), and System Settings (sys_page) - the sound, the clock, the
+	 * status line's clock and battery, Auto Off */
+	PM_NETPAGE, PM_WIFI, PM_BT,
+	PM_SYSPAGE, PM_AUDIO, PM_CHANNELS, PM_NIGHT, PM_CLOCK, PM_SHOWCLOCK, PM_SHOWBATT, PM_UPDDOT,
 	PM_SLEEP, PM_APPEARANCE, PM_THEME, PM_DIR, PM_SPEED, PM_LISTVIEW, PM_COLOR,
 	/* ChaOS: which of the shelves that aren't consoles are on the systems row */
 	PM_SHELF_FAV, PM_RECENT, PM_SHELF_MUSE,
@@ -106,7 +110,7 @@ typedef enum { SMM_COUNT, SMM_SHOW, SMM_SORT, SMM_LOCK, SMM_ART, SMM_RESCAN } sm
  * two cannot disagree about what row 2 is. */
 int sys_menu_muse_rows(bool books, bool both, bool no_wifi, sm_muse_row *out);
 
-#define MENU_MAX_ROWS 30
+#define MENU_MAX_ROWS 34
 
 /* The array every caller declares must hold every row a build can produce, and
  * on 2026-09-16 it stopped: PM_ROWS went to 13 against a cap of 12 when the
@@ -199,6 +203,13 @@ typedef struct {
 	bool        appearance;
 	/* ChaOS: the ROM Management page, as appearance is the Appearance one */
 	bool        rom_page;
+	/* ChaOS: the Wi-Fi & Bluetooth page, and the System Settings page */
+	bool        net_page;
+	bool        sys_page;
+	const char *show_clock;  /* ChaOS: the status line's clock, "On" or "Off" */
+	const char *show_batt;   /* ChaOS: its battery, "Icon", "Percent", "Both", "Off" */
+	bool        update_new;  /* ChaOS: an update is waiting: a dot on Updates */
+	const char *update_dot;  /* ChaOS: whether that dot is wanted, "On" or "Off" */
 	const char *sync;        /* ChaOS: Syncthing's state, sync_row_value */
 	const char *menu_color;  /* ChaOS: the menus' accent's name, from theme.h */
 	const char *update;      /* ChaOS: Updates' value, upd_row_value */
