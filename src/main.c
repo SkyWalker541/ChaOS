@@ -19003,6 +19003,14 @@ static void drop_virtual_shelf(app *a, const char *tag)
 	a->sys.count--;
 	memset(&a->view[a->sys.count], 0, sizeof a->view[0]);
 	a->sys_tex[a->sys.count] = NULL;
+	/* Every system after it moved down one; so must what the other virtual
+	 * shelf points at. */
+	for (k = 0; k < a->sys.count; k++)
+		if (a->view[k].owner) {
+			int j;
+			for (j = 0; j < a->view[k].list.count; j++)
+				if (a->view[k].owner[j] > i) a->view[k].owner[j]--;
+		}
 }
 
 /* Put a shelf of `n` games at the front of the systems row. The caller owns
@@ -19028,6 +19036,15 @@ static bool vshelf_insert(app *a, const char *name, const char *tag, const char 
 	}
 	a->sys_tex[0] = NULL;
 	for (i = 0; i < n; i++) owner[i]++;          /* everything moved up one */
+	/* ...and so did the systems a virtual shelf already in the row points
+	 * at. Recently Played goes in first and Favorites in front of it; without
+	 * this, Recently Played's games all belonged to the system one before
+	 * their own - another folder's box art, another console's colour. */
+	for (i = 1; i <= a->sys.count; i++)
+		if (a->view[i].owner) {
+			int k;
+			for (k = 0; k < a->view[i].list.count; k++) a->view[i].owner[k]++;
+		}
 
 	memset(&a->sys.systems[0], 0, sizeof a->sys.systems[0]);
 	snprintf(a->sys.systems[0].name, CFG_STR, "%s", name);
@@ -19059,6 +19076,10 @@ static bool vshelf_insert(app *a, const char *name, const char *tag, const char 
 			a->sys_w[i] = a->sys_w[i + 1];
 			a->sys_cb[i] = a->sys_cb[i + 1];
 			a->sys_h[i] = a->sys_h[i + 1];
+			if (a->view[i].owner) {
+				int k;
+				for (k = 0; k < a->view[i].list.count; k++) a->view[i].owner[k]--;
+			}
 		}
 		return false;
 	}
