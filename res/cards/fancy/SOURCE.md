@@ -39,3 +39,13 @@ for Muse's card; where the photograph came from is not recorded here. The
 original is kept outside the repository in `cards_backup_photos/muse.png`, and
 `tools/genmusecard.py` cuts this card from it: trimmed to its alpha, longest
 side 96% of 384 and centred, in the 384 canvas because it is taller than wide.
+
+## RECENT.png
+
+Not a console: Recently Played's card, a steel watch with ChaOS on its dial,
+made by SkyWalker541 for ChaOS (generated with Gemini) and given to the
+project on 2026-11-14. Its source is `source/recent-watch.jpg`, kept here;
+`tools/genrecentwatch.py` cuts the watch from it (the source paints a
+checkerboard where transparency would be), turns it as the rendered cards
+are, and frames it as above. It replaces the rendered alarm clock
+(`tools/genrecentfancy.py`), which is kept.
