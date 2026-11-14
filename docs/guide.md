@@ -212,7 +212,7 @@ meant to, never colorized. A `.zip` is looked into for this.
 
 **Sorting them.** ChaOS also looks, now and then, for games in the other
 folder for their cartridge: once after the update that brings this, after
-ChaOS Transfer sends anything, and every two days, in the background and
+ChaOS Transfer sends anything, and once a week, in the background and
 never while a game plays (it remembers what it has read, so a look reads
 only new files). When it finds some, the shelf asks *"N Game Boy games are
 in the wrong folder for their cartridge. Move them, saves and all?"*, with

@@ -16644,13 +16644,13 @@ static void sth_screen(app *a)
 /* ---- ChaOS: Game Boy games into their folders (src/gbsort.h) -------------
  *
  * Looked for in the background - once after the update that brings this,
- * after ChaOS Transfer sends something, and every two days - and asked about
+ * after ChaOS Transfer sends something, and once a week - and asked about
  * on the shelf when there's something to move. "Not now" is kept, so the same
  * games aren't asked about again unless the player opens ROM Management >
  * Sort Game Boy Games, which lists everything and moves what's chosen. The
  * look reads only what's new (gbsort.cache), and never runs during a game. */
 
-#define GBS_EVERY (2L * 24 * 3600)
+#define GBS_EVERY (7L * 24 * 3600)
 #define GBS_RESULT "/tmp/chaos-gbsort.txt"
 
 static pid_t g_gbs_pid = -1;   /* g_gbs_due, above: a look wanted once the shelf is quiet */
@@ -16892,7 +16892,7 @@ static void gbs_poll(app *a)
 	}
 	/* never in the first twenty seconds: the boot's own work first */
 	if (now - since < 20000) return;
-	/* the first after the update that brings this, and every two days (a
+	/* the first after the update that brings this, and once a week (a
 	 * clock that went back counts as due); or one asked for */
 	if (g_gbs_due || last == 0 || wall - last > GBS_EVERY || wall < last) gbs_start();
 }

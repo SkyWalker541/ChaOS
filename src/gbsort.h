@@ -15,7 +15,8 @@
  * and only ones whose header can be read.
  *
  * What's found is the player's to move or not: ChaOS asks once, in the
- * background after the update that brings this, and again whenever MENU >
+ * background after the update that brings this, after ChaOS Transfer sends
+ * anything and once a week, and again whenever MENU >
  * ROM Management > Sort Game Boy Games is chosen.
  *
  * A move takes the game's things with it. The files are here (gbs_move_files):
