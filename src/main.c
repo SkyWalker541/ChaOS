@@ -17844,6 +17844,11 @@ static void launch_game(app *a)
 				argv[n++] = (char *)"--core-option";
 				argv[n++] = (char *)plat_coreopt(s->tag, ci);
 			}
+			/* ChaOS: this game's own, after the folder's (platform.c) */
+			if (plat_coreopt_extra(s->tag, rom) && n < (int)(sizeof argv / sizeof argv[0]) - 3) {
+				argv[n++] = (char *)"--core-option";
+				argv[n++] = (char *)plat_coreopt_extra(s->tag, rom);
+			}
 		}
 		argv[n] = NULL;
 		sth_hold(true);

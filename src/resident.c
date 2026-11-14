@@ -317,6 +317,12 @@ bool plat_resident_send(const char *tag, const char *core, const char *rom,
 				dsend("SETOPT\tkey=%.*s\tvalue=%s",
 				      (int)(eq - kv), kv, eq + 1);
 			}
+			/* ChaOS: and this game's own, after the folder's, so it wins */
+			{
+				const char *kv = plat_coreopt_extra(tag, rom), *eq = kv ? strchr(kv, '=') : NULL;
+
+				if (eq) dsend("SETOPT\tkey=%.*s\tvalue=%s", (int)(eq - kv), kv, eq + 1);
+			}
 		}
 
 		/* Quiet BEFORE RUN, and on every RUN. Diatom holds it across RUN,

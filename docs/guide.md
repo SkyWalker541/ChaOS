@@ -199,6 +199,19 @@ On Favorites the menu is only Games and Sort By. The rest is about one
 console, and a game there takes its console's Display Mode wherever it was
 started from.
 
+### Game Boy and Game Boy Color (ChaOS)
+
+The two folders take each other's files: `Roms/Game Boy` lists `.gbc` and
+`.cgb` as well as `.gb` and `.dmg`, and `Roms/Game Boy Color` the same the
+other way round. The folder decides, not the file's name. GB Studio and other
+homebrew often ship a color game as `.gb`; put it in Game Boy Color and it
+plays on a Game Boy Color, with that shelf's shader, overlay, buttons and
+settings. In the Game Boy folder everything plays on a Game Boy, in its
+greens, except a cartridge made only for the Color (its header says so), which
+would refuse to start on a Game Boy and gets the Color instead. A plain Game
+Boy game put in Game Boy Color plays as a Game Boy Color plays one, in the
+colors it gives them.
+
 Display Mode is per-system, because a Game Boy and a Genesis do not want the
 same answer. Set here it applies from the next launch; the same row in the
 in-game menu changes the running game as you press it, which is the one to use

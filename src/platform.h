@@ -254,6 +254,7 @@ void plat_resident_demo_speed(const plat_shade_speed *s);
 void        plat_coreopt_reload(void);
 int         plat_coreopt_count(const char *tag);
 const char *plat_coreopt(const char *tag, int i);
+const char *plat_coreopt_extra(const char *tag, const char *rom);
 /* The turbo map for this system, or NULL. */
 const char *plat_turbo_map(const char *tag);
 

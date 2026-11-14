@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/resource.h>
 #include <sys/types.h>
 #include <sys/time.h>
@@ -114,6 +115,29 @@ const char *plat_coreopt(const char *tag, int i)
 	if (ncoreopts < 0) coreopts_load();
 	coreopt_nth(tag, i, &kv);
 	return kv;
+}
+
+/* ChaOS: one more option for this game in particular, after the folder's, or
+ * NULL. The Game Boy folder runs everything as a Game Boy (mgba_gb_model),
+ * whatever the file is called; but a cartridge that is Game Boy Color ONLY
+ * (header byte 0x143 = 0xC0) won't start on one and shows its "for Game Boy
+ * Color" screen, so it alone gets the Color. Its shelf's settings, shader and
+ * overlay are still the Game Boy folder's. A .zip isn't looked into. */
+const char *plat_coreopt_extra(const char *tag, const char *rom)
+{
+	unsigned char b;
+	FILE *f;
+	const char *dot;
+	bool only = false;
+
+	if (!tag || strcmp(tag, "GB") || !rom) return NULL;
+	dot = strrchr(rom, '.');
+	if (!dot || !strcasecmp(dot, ".zip")) return NULL;
+	if ((f = fopen(rom, "rb"))) {
+		only = fseek(f, 0x143, SEEK_SET) == 0 && fread(&b, 1, 1, f) == 1 && b == 0xC0;
+		fclose(f);
+	}
+	return only ? "mgba_gb_model=Game Boy Color" : NULL;
 }
 
 /* ---- turbo, read once from the library database -------------------------- */
