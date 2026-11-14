@@ -156,6 +156,47 @@ void wifi_down(void)
 }
 
 /* Saved networks, so the list can say which ones are already known. */
+/* ChaOS: an SSID as wpa_cli prints it, back to its own bytes, in place.
+ *
+ * wpa_cli escapes what isn't printable ASCII (its printf_encode): "Luke's"
+ * with a curly apostrophe arrives as "Luke\xe2\x80\x99s", a quote as \",
+ * a backslash as \\. Used as it came, that text was both what the menu showed
+ * and the name ChaOS asked to join - a network by that literal name, which
+ * nobody has - so a network with an accent, an emoji or a curly quote in its
+ * name could never be joined, whatever the password. Decoded here wherever an
+ * SSID is read; given back to wpa_supplicant as hex (wifi_connect), which
+ * takes any 32 bytes as they are. */
+static void unescape_ssid(char *s)
+{
+	char *r = s, *w = s;
+
+	while (*r) {
+		if (*r != '\\' || !r[1]) { *w++ = *r++; continue; }
+		r++;
+		switch (*r) {
+		case 'x': {
+			int v = 0, k;
+			for (k = 1; k <= 2; k++) {
+				char c = r[k];
+				int d = c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10
+				      : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1;
+				if (d < 0) break;
+				v = v * 16 + d;
+			}
+			if (k == 3) { *w++ = (char)v; r += 3; }
+			else { *w++ = '\\'; *w++ = *r++; }
+			break;
+		}
+		case 'n': *w++ = '\n'; r++; break;
+		case 'r': *w++ = '\r'; r++; break;
+		case 't': *w++ = '\t'; r++; break;
+		case 'e': *w++ = '\033'; r++; break;
+		default:  *w++ = *r++; break;      /* \\ and \" */
+		}
+	}
+	*w = '\0';
+}
+
 static int known_ssids(char list[][WIFI_SSID_MAX], int max)
 {
 	char out[4096];
@@ -171,6 +212,7 @@ static int known_ssids(char list[][WIFI_SSID_MAX], int max)
 		if (!strncmp(line, "network id", 10)) continue;
 		end = strchr(++tab, '\t');
 		if (end) *end = '\0';
+		unescape_ssid(tab);
 		if (n < max) snprintf(list[n++], WIFI_SSID_MAX, "%s", tab);
 	}
 	return n;
@@ -203,6 +245,7 @@ static int parse_results(char *buf, wifi_net *out, int max)
 		}
 		if (col < 5) continue;                    /* hidden: no ssid column */
 		if (!f[4][0]) continue;
+		unescape_ssid(f[4]);
 
 		memset(&e, 0, sizeof e);
 		snprintf(e.ssid, sizeof e.ssid, "%s", f[4]);
@@ -407,7 +450,10 @@ wifi_state wifi_status(char *ssid, int ssid_cap, char *ip, int ip_cap)
 	if (wpa(out, sizeof out, "status", NULL, NULL, NULL) != 0) return WIFI_OFF;
 	if (!kv(out, "wpa_state", state, sizeof state)) return WIFI_OFF;
 
-	if (ssid && ssid_cap) kv(out, "ssid", ssid, ssid_cap);
+	if (ssid && ssid_cap) {
+		kv(out, "ssid", ssid, ssid_cap);
+		unescape_ssid(ssid);
+	}
 	if (ip && ip_cap) kv(out, "ip_address", ip, ip_cap);
 
 	/* COMPLETED is associated, which is not the same as usable.
@@ -455,6 +501,7 @@ static int saved_id(const char *ssid, char *out_id, size_t cap)
 		*tab = '\0';
 		end = strchr(++tab, '\t');
 		if (end) *end = '\0';
+		unescape_ssid(tab);
 		if (strcmp(tab, ssid)) continue;
 		snprintf(out_id, cap, "%.15s", line);
 		return 0;
@@ -464,7 +511,7 @@ static int saved_id(const char *ssid, char *out_id, size_t cap)
 
 bool wifi_connect(const char *ssid, const char *psk)
 {
-	char out[256], id[16], quoted[WIFI_SSID_MAX + 4], qpsk[80];
+	char out[256], id[16], hexssid[WIFI_SSID_MAX * 2 + 1], qpsk[80];
 	bool reused = false;
 	int i;
 
@@ -501,12 +548,31 @@ bool wifi_connect(const char *ssid, const char *psk)
 	 * are part of the config syntax, not shell quoting, and execv would never
 	 * have stripped them anyway. */
 	if (!reused) {
-		snprintf(quoted, sizeof quoted, "\"%s\"", ssid);
-		if (!wpa_ok("set_network", id, "ssid", quoted)) goto fail;
+		/* ChaOS: the SSID as hex, unquoted: wpa_supplicant's form for any
+		 * bytes at all, so a name with an accent, an emoji or a quote in it
+		 * is the network's own name and not an escaped spelling of it */
+		size_t k;
+		for (k = 0; ssid[k] && k < WIFI_SSID_MAX - 1; k++)
+			snprintf(hexssid + k * 2, 3, "%02x", (unsigned char)ssid[k]);
+		hexssid[k * 2] = '\0';
+		if (!wpa_ok("set_network", id, "ssid", hexssid)) goto fail;
 
 		if (psk && *psk) {
-			snprintf(qpsk, sizeof qpsk, "\"%s\"", psk);
+			/* ChaOS: 64 hex digits are the key itself, which goes in
+			 * unquoted; anything else is a passphrase, quoted */
+			size_t len = strlen(psk), h = 0;
+			while (h < len && strchr("0123456789abcdefABCDEF", psk[h])) h++;
+			if (len == 64 && h == 64) snprintf(qpsk, sizeof qpsk, "%s", psk);
+			else snprintf(qpsk, sizeof qpsk, "\"%s\"", psk);
 			if (!wpa_ok("set_network", id, "psk", qpsk)) goto fail;
+			/* ChaOS: WPA3 too. Only WPA-PSK was ever asked for, so a router
+			 * set to WPA3 alone - newer mesh systems, some ISPs' - never let
+			 * the Brick on, the password right or not. The same password
+			 * serves both; WPA2 routers are joined as before, and Protected
+			 * Management Frames (which WPA3 requires) are used where offered. */
+			if (!wpa_ok("set_network", id, "key_mgmt", "WPA-PSK SAE"))
+				wpa_ok("set_network", id, "key_mgmt", "WPA-PSK");
+			wpa_ok("set_network", id, "ieee80211w", "1");
 		} else {
 			/* Genuinely open, and only because the scan said so. */
 			if (!wpa_ok("set_network", id, "key_mgmt", "NONE")) goto fail;
@@ -558,6 +624,7 @@ bool wifi_forget(const char *ssid)
 		snprintf(id, sizeof id, "%.15s", line);
 		end = strchr(++tab, '\t');
 		if (end) *end = '\0';
+		unescape_ssid(tab);
 		if (strcmp(tab, ssid)) continue;
 		if (wpa_ok("remove_network", id, NULL, NULL)) hit = true;
 	}
