@@ -128,7 +128,7 @@ than any one console:
 |---|---|
 | **Play Time** | per game or per system, by day, week, month, year or all time |
 | **ChaOS Transfer** | the file server; needs Wi-Fi and says so when there is none. While a computer is on the USB cable it is **ChaOS Wire** instead, always at `10.55.0.2` on the Brick and `10.42.0.1` on the Pixel 2 |
-| **Wi-Fi & Bluetooth** | a page with both, its row showing the network and the headset |
+| **Wi-Fi & Bluetooth** | a page with both, each showing its own state there |
 | **Wi-Fi** (Wi-Fi & Bluetooth) | the network's name when connected, or why it is not. WPA2 and WPA3 networks both join, whatever is in the name |
 | **Bluetooth** (Wi-Fi & Bluetooth) | the connected headset, or `not connected` - pair, connect and forget |
 | **System Settings** | a page of the device's own settings: the sound, the clock, the status line and Auto Off |
