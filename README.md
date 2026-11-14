@@ -23,6 +23,7 @@ ChaOS is custom firmware for the **TrimUI Brick** and **Brick Hammer**. It runs 
 | Feature | What it does |
 |---|---|
 | **[Shaders and overlays](https://skywalker541.github.io/ChaOS/#shaders)** | CRT, LCD and PT SkyWalker541 looks you can tune, frames around the picture, and a [speed check](https://skywalker541.github.io/ChaOS/#speed) that says whether a game keeps full speed |
+| **[Cheats](https://skywalker541.github.io/ChaOS/#cheats)** | Game Genie, Action Replay and GameShark codes from libretro's cheat database, switched on and off in the in-game menu |
 | **[Ports](https://skywalker541.github.io/ChaOS/#ports)** | PortMaster's catalog on the Brick, with runtimes and libraries fetched for you |
 | **[RomM](https://skywalker541.github.io/ChaOS/#romm)** | Games, save sync and BIOS files from your own server |
 | **[A look of its own](https://skywalker541.github.io/ChaOS/#shelves)** | Pixel Names and Pixel Cards themes, Game List View, letter scrubbing, menu colors |

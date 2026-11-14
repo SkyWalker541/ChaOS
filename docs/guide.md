@@ -80,7 +80,7 @@ card is the thing to wipe before it goes to anyone else.
 | **MENU** (on the systems row) | the main menu - settings that are about the firmware |
 | **MENU** (inside a system) | that system's menu, below |
 | **MENU** (in `Cubic`) | always the main menu; B is the system's |
-| **MENU** (in game) | the in-game menu: Continue, Save, Load, Display, RetroAchievements, Reset, Quit. It opens when you let go, so MENU can be held for fast forward |
+| **MENU** (in game) | the in-game menu: Continue, Save, Load, Display, Cheats, RetroAchievements, Reset, Quit. It opens when you let go, so MENU can be held for fast forward |
 | **MENU+R1** (in game) | fast forward: 2x, 3x, 4x, then back to normal |
 | **MENU** (inside any menu) | closes the whole menu, however deep in it you are. B goes back one screen |
 | **SELECT** | Muse, the music and audiobook player, from anywhere but a running game - the in-game menu included. Again to close it |
@@ -524,6 +524,42 @@ Card art comes from, in order:
 
 (ChaOS) The game's name over the shelf is shown only for a card with a
 picture on it. A generated slab already says the name, so it isn't said twice.
+
+### Cheats (ChaOS)
+
+**Cheats** in the in-game menu is offered for a game with a cheat file on the
+card, or one libretro's cheat database
+([libretro-database](https://github.com/libretro/libretro-database), `cht/`,
+CC BY-SA 4.0) has. Which games those are is known with no network: each
+console's list of cheat files is kept in `.userdata/brick/cheats/`, fetched in
+the background on the shelf, never during a game, at most once a week, from
+the website (`cheats/<collection>.txt`, made by `pages.yml` with
+`tools/cheat-index.py`). Before any list has been fetched, the row is offered
+for every game, so Get Cheats can go and look.
+
+**Get Cheats** matches the game's name to the list as box art is matched,
+region and revision set aside, and lists the files that fit, the best first,
+then **Show All** for the console's whole list, L2 and R2 jumping by letter.
+The file chosen is fetched from libretro's repository at the commit the list
+was made from, and kept as `Cheats/<console>/<game>.cht`. Fetching another
+keeps on whichever cheats of the same name were on.
+
+Each cheat is a switch, applied to the paused game at once. Which are on is
+kept in the `.cht` itself (`cheatN_enable`), as RetroArch keeps it, so the
+file means the same in RetroArch. A game's cheats that are on go to the
+emulator with the game when it starts. Codes (Game Genie, Pro Action Replay,
+GameShark, Code Breaker) are decoded by the core, through `retro_cheat_set`;
+RetroArch's memory cheats (`handler = 1`) are written by ChaOS-diatom after
+every frame. Beetle NeoPop decodes no codes, so the Neo Geo Pockets take
+memory cheats only. A cheat that asks for a number of the player's (`??`) is
+shown as Can't use, and files that only drive a controller's rumble are left
+out of the lists.
+
+While any cheat has been on, achievements are paused for the rest of that
+game, as RetroAchievements requires, and the menu says **Paused**: the set is
+unloaded, and one arriving later is not loaded. Starting the game again with
+the cheats off brings them back. Your own `.cht` files go in
+`Cheats/<console>/`, named as the game is; ChaOS Transfer reaches the folder.
 
 ### Ports (ChaOS)
 

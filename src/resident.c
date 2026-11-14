@@ -22,6 +22,7 @@ static char g_play_map[512];
 static bool g_play_rewind;
 static char g_play_mode[16];     /* Display Mode, Diatom's name: "integer" */
 static char g_play_tz[64];       /* the player's zone, an id such as "America/New_York" */
+static char g_play_cheats[1024]; /* the cheats on, as a file for Diatom, or "" */
 
 /* One connection, held across games. Diatom is fine with that - it is the
  * fifo pair that needed reopening per game - and holding it means peer death
@@ -382,8 +383,11 @@ bool plat_resident_send(const char *tag, const char *core, const char *rom,
 			        tm && *tm ? tm : "(none)");
 			if (tm && *tm) dsend("SETMAP\tmap=%s", tm);
 			dsend("SETREWIND\ton=%d", g_play_rewind ? 1 : 0);
+			/* ChaOS: the game's cheats, when any are on */
+			if (g_play_cheats[0]) dsend("SETCHEATS\tpath=%s", g_play_cheats);
 			g_play_map[0] = '\0';
 			g_play_rewind = false;
+			g_play_cheats[0] = '\0';
 		}
 
 		/* The launcher owns levels while it draws, and it is done drawing
@@ -488,6 +492,31 @@ void plat_resident_set_play(const char *map, bool rewind)
 {
 	snprintf(g_play_map, sizeof g_play_map, "%s", map ? map : "");
 	g_play_rewind = rewind;
+}
+
+void plat_resident_set_cheats(const char *path)
+{
+	snprintf(g_play_cheats, sizeof g_play_cheats, "%s", path ? path : "");
+}
+
+/* ChaOS: cheats, mid-game. Diatom answers CHEATS with what it took; this is
+ * only called paused, where nothing else can be in flight but levels. */
+bool plat_resident_sync_cheats(const char *path, int timeout_ms)
+{
+	unsigned t0 = SDL_GetTicks();
+	char *l;
+
+	if (dsock < 0) return false;
+	if (!plat_resident_line("SETCHEATS\tpath=%s", path ? path : "")) return false;
+	while ((int)(SDL_GetTicks() - t0) < timeout_ms) {
+		l = dline(timeout_ms);
+		if (!l) break;
+		if (strncmp(l, "CHEATS", 6) == 0) return true;
+		if (strncmp(l, "LEVEL\t", 6) == 0) d_note_level(l);
+		else if (strncmp(l, "AUDIO\t", 6) == 0) d_note_audio(l);
+		else if (strncmp(l, "DISPLAY\t", 8) == 0) d_note_display(l);
+	}
+	return false;
 }
 
 void plat_resident_set_display(const char *mode)

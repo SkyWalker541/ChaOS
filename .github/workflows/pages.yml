@@ -12,6 +12,10 @@
 # starts this one itself (workflow_dispatch, which that token may do), on
 # main, with no tag: the latest release.
 #
+# ChaOS: and the cheat lists (cheats/, src/cheats.h, tools/cheat-index.py),
+# made from libretro-database's newest commit on each run, and weekly so they
+# follow it.
+#
 # Set up once, on GitHub (Settings > Pages > Source: GitHub Actions, or):
 #   gh api -X POST repos/SkyWalker541/ChaOS/pages -f build_type=workflow
 name: Release files to Pages
@@ -21,7 +25,9 @@ on:
     types: [published]
   push:
     branches: [main]
-    paths: ['web/**', '.github/workflows/pages.yml']
+    paths: ['web/**', '.github/workflows/pages.yml', 'tools/cheat-index.py']
+  schedule:
+    - cron: '23 10 * * 1'
   workflow_dispatch:
 
 permissions:
@@ -58,6 +64,12 @@ jobs:
         run: sha256sum --check --ignore-missing --strict SHA256SUMS
       - name: The website
         run: cp -R web/. site/
+      - name: The cheat lists
+        run: |
+          git clone -q --depth 1 --filter=blob:none --no-checkout \
+            https://github.com/libretro/libretro-database cheatdb
+          git -C cheatdb ls-tree -z -r --name-only HEAD cht/ |
+            python3 tools/cheat-index.py "$(git -C cheatdb rev-parse HEAD)" site/cheats
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:

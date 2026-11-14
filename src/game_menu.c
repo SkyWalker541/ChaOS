@@ -101,7 +101,7 @@ int gm_rows(const gm_ui *u, menu_row *out, gm_bufs *b)
 {
 	static const char *label[GM_ROWS] = {
 		"Continue", "Save", "Load", "Take Screenshot", "Screenshots",
-		"Display Mode", "Shader", "Overlay", "Controls", "RetroAchievements", "Reset", "Quit"
+		"Display Mode", "Shader", "Overlay", "Controls", "Cheats", "RetroAchievements", "Reset", "Quit"
 	};
 	int i;
 
@@ -118,6 +118,7 @@ int gm_rows(const gm_ui *u, menu_row *out, gm_bufs *b)
 			"A screen effect, like a CRT's or a Game Boy's LCD",
 			"A frame drawn around the picture",
 			"What each button does in this console's games",
+			"Codes for this game, turned on and off here",
 			"This game's achievements and how many you have",
 			"Start the game over, as if switched off and on",
 			"Back to the shelf. Your place is kept"
@@ -140,6 +141,11 @@ int gm_rows(const gm_ui *u, menu_row *out, gm_bufs *b)
 	out[GM_SHADER].opens = u->shader != NULL;
 	out[GM_CHEEVOS].opens = true;
 	out[GM_BUTTONS].opens = true;   /* ChaOS: Button Mapping, for this game */
+	/* ChaOS: Cheats, how many are on */
+	out[GM_CHEATS].opens = true;
+	if (u->cheats_on > 0) snprintf(b->cheats, sizeof b->cheats, "%d On", u->cheats_on);
+	else                  snprintf(b->cheats, sizeof b->cheats, "Off");
+	out[GM_CHEATS].value = b->cheats;
 
 	/* ChaOS: screenshots of this game, the paused frame. Take Screenshot says
 	 * "Saved" for a moment after; Screenshots counts them and opens the
@@ -155,7 +161,10 @@ int gm_rows(const gm_ui *u, menu_row *out, gm_bufs *b)
 	 * than one that is missing: "none" answers the question the player opened
 	 * the menu to ask. Drawn quiet, and does nothing when chosen - so the
 	 * cursor steps over it rather than resting on a row that ignores A. */
-	if (u->total > 0)
+	if (u->total > 0 && u->cheated)
+		/* ChaOS: still openable, to see them; none can be earned */
+		snprintf(b->cheevos, sizeof b->cheevos, "Paused");
+	else if (u->total > 0)
 		snprintf(b->cheevos, sizeof b->cheevos, "%d / %d", u->earned, u->total);
 	else {
 		snprintf(b->cheevos, sizeof b->cheevos, "none");

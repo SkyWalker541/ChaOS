@@ -27,6 +27,7 @@
 #include "texload.h"
 #include "artshrink.h"
 #include "artscrape.h"
+#include "cheats.h"
 #include "favorites.h"
 #include "hare.h"
 #include "hareart.h"
@@ -480,6 +481,15 @@ static void overlay_dirs_ensure(const app *a)
 		if (seed) overlay_seed(a, i, d);
 	}
 	if (seed) db_set_str(db_lib(), "overlays.seeded.version", CHAOS_VERSION);
+	/* ChaOS: and Cheats/, a folder per console that has a cheat list, so
+	 * ChaOS Transfer can put the player's own .cht files there */
+	snprintf(d, sizeof d, "%s/Cheats", P_CARD);
+	mkdir(d, 0755);
+	for (i = 0; i < a->sys.count; i++) {
+		if (!a->sys.systems[i].folder[0] || !art_collection(a->sys.systems[i].folder, 0)) continue;
+		snprintf(d, sizeof d, "%s/Cheats/%s", P_CARD, a->sys.systems[i].folder);
+		mkdir(d, 0755);
+	}
 }
 
 static void overlay_key(const app *a, int i, char *key, size_t n)
@@ -9255,8 +9265,12 @@ static char *up_slurp(const char *path, size_t max, size_t *len)
  * check (upd_poll, src/update.c) runs from the shelf and says so with its
  * notice. Nothing asks in the background here, so there is nothing to give
  * up. */
+static void cht_refresh_abandon(void);
+
 static void upbg_abandon(void)
 {
+	/* ChaOS: the cheat lists' fetch, which is the shelf's own */
+	cht_refresh_abandon();
 }
 
 /* Clear .update/ of everything but `keep`, the updater's log and its last
@@ -9406,6 +9420,124 @@ static void shelf_say(const char *msg, unsigned ms)
 	snprintf(g_upd_msg, sizeof g_upd_msg, "%s", msg);
 	g_upd_msg_until = plat_now_ms() + ms;
 	redraw_now();
+}
+
+/* ChaOS: each console's list of cheat files, kept on the card so the in-game
+ * menu can tell, with no network and nothing running during the game, which
+ * games have cheats to get. Fetched here on the shelf, one at a time in the
+ * background, at most once a week each; given up the moment a game starts
+ * (upbg_abandon). */
+#define CHT_FRESH_S (7 * 24 * 60 * 60)
+
+static pid_t g_chtr_pid;
+static int   g_chtr_at;             /* the next collection to look at */
+static bool  g_chtr_done;           /* all of them, this boot */
+static char  g_chtr_dest[LIB_PATH * 2];
+
+static void cht_cache_path(const char *coll, char *out, size_t n)
+{
+	snprintf(out, n, "%s/cheats/%s.txt", P_USERDATA, coll);
+}
+
+/* The nth collection across the systems, or NULL past the last */
+static const char *cht_coll_nth(const systems_cfg *sys, int k)
+{
+	int i, c;
+
+	for (i = 0; i < sys->count; i++)
+		for (c = 0; c < 2; c++) {
+			const char *coll = art_collection(sys->systems[i].folder, c);
+			if (coll && k-- == 0) return coll;
+		}
+	return NULL;
+}
+
+static void cht_refresh_abandon(void)
+{
+	char part[LIB_PATH * 2 + 8];
+
+	if (g_chtr_pid <= 0) return;
+	kill(g_chtr_pid, SIGTERM);
+	waitpid(g_chtr_pid, NULL, 0);
+	net_spawn_done(g_chtr_pid);
+	snprintf(part, sizeof part, "%s.part", g_chtr_dest);
+	unlink(part);
+	g_chtr_pid = 0;
+}
+
+static void cht_refresh_poll(const systems_cfg *sys, bool online)
+{
+	char part[LIB_PATH * 2 + 8], url[1200], dir[LIB_PATH];
+	const char *coll;
+	struct stat st;
+
+	snprintf(part, sizeof part, "%s.part", g_chtr_dest);
+	if (g_chtr_pid > 0) {
+		int status = 0;
+		pid_t r = waitpid(g_chtr_pid, &status, WNOHANG);
+		char head[4] = "";
+		FILE *f;
+
+		if (r == 0) return;
+		net_spawn_done(g_chtr_pid);
+		g_chtr_pid = 0;
+		/* An index begins "# <commit>"; anything else is not one */
+		if (r > 0 && WIFEXITED(status) && WEXITSTATUS(status) == 0 && (f = fopen(part, "r"))) {
+			if (fread(head, 1, 2, f) != 2) head[0] = '\0';
+			fclose(f);
+		}
+		if (!strncmp(head, "# ", 2)) rename(part, g_chtr_dest);
+		else unlink(part);
+		g_chtr_at++;
+	}
+	if (g_chtr_done || !online) return;
+	snprintf(dir, sizeof dir, "%s/cheats", P_USERDATA);
+	for (;; g_chtr_at++) {
+		coll = cht_coll_nth(sys, g_chtr_at);
+		if (!coll) { g_chtr_done = true; return; }
+		cht_cache_path(coll, g_chtr_dest, sizeof g_chtr_dest);
+		if (stat(g_chtr_dest, &st) == 0 && time(NULL) - st.st_mtime < CHT_FRESH_S) continue;
+		break;
+	}
+	mkdir(dir, 0755);
+	snprintf(part, sizeof part, "%s.part", g_chtr_dest);
+	cht_index_url(coll, url, sizeof url);
+	g_chtr_pid = net_get_spawn(url, part, 60);
+	if (g_chtr_pid <= 0) { g_chtr_pid = 0; g_chtr_at++; }
+}
+
+/* Whether the in-game menu offers Cheats for this game: it has a file, or the
+ * kept list has one for it - or there is no list kept yet, so Get Cheats can
+ * go and look. */
+static bool cht_offered(const systems_cfg *sys, int o, const char *file)
+{
+	char path[LIB_PATH * 3];
+	int c;
+	bool any_list = false;
+
+	cht_path(P_CARD, sys->systems[o].folder, file, path, sizeof path);
+	if (access(path, R_OK) == 0) return true;
+	for (c = 0; c < 2; c++) {
+		const char *coll = art_collection(sys->systems[o].folder, c);
+		char cache[LIB_PATH * 2], *text;
+		size_t len;
+		cht_index x;
+		int idx[2];
+
+		if (!coll) break;
+		cht_cache_path(coll, cache, sizeof cache);
+		if (!(text = up_slurp(cache, 4 * 1024 * 1024, &len))) continue;
+		any_list = true;
+		if (cht_index_parse(text, &x)) {
+			int n = cht_candidates(&x, file, idx, 1);
+			cht_index_free(&x);
+			free(text);
+			if (n > 0) return true;
+		} else {
+			free(text);
+		}
+	}
+	return !any_list && art_collection(sys->systems[o].folder, 0) != NULL;
 }
 
 static void upd_poll(void)
@@ -10885,6 +11017,12 @@ static int slot_strip(app *a, SDL_Texture *bg, int saving)
 
 /* What the in-game menu needs from the app, handed to gm_rows to become rows.
  * Same split as everywhere else. */
+/* ChaOS: the game's cheats on, and whether one has been on this game - which
+ * put its achievements away until it starts again. Set at its start and by
+ * the Cheats screen. */
+static int  g_cht_on;
+static bool g_cht_cheated;
+
 static int gm_build(app *a, menu_row *out, gm_bufs *b, int shots, const char *shot_said)
 {
 	gm_ui u;
@@ -10907,6 +11045,8 @@ static int gm_build(app *a, menu_row *out, gm_bufs *b, int shots, const char *sh
 	}
 	u.earned = chv_earned();
 	u.total  = chv_count();
+	u.cheats_on = g_cht_on;
+	u.cheated   = g_cht_cheated;
 	return gm_rows(&u, out, b);
 }
 
@@ -12873,6 +13013,7 @@ typedef struct {
 	int          shots;        /* ChaOS: this game's screenshots */
 	Uint32       shot_said;    /* when Take Screenshot last said "Saved", or 0 */
 	bool         shot_ok;
+	bool         cht_shown;    /* ChaOS: Cheats offered for this game (cht_offered) */
 } gm_ctx;
 
 /* The overlay as Diatom draws it: around the game's picture, never over it
@@ -12990,8 +13131,18 @@ static int gm_menu_build(void *ctx, menu_row *rows, int max,
 	*heading = NULL;       /* no title: the game behind it is the title */
 	/* "Saved" for a moment after Take Screenshot */
 	if (c->shot_said && SDL_GetTicks() - c->shot_said > 1500) c->shot_said = 0;
-	return gm_build(c->a, rows, &c->bufs, c->shots,
-	                c->shot_said ? (c->shot_ok ? "Saved" : "Couldn't save") : NULL);
+	{
+		int n = gm_build(c->a, rows, &c->bufs, c->shots,
+		                 c->shot_said ? (c->shot_ok ? "Saved" : "Couldn't save") : NULL);
+
+		/* ChaOS: Cheats only for a game that has some to get; gm_key
+		 * counts past the gap */
+		if (!c->cht_shown) {
+			memmove(&rows[GM_CHEATS], &rows[GM_CHEATS + 1], sizeof *rows * (size_t)(n - GM_CHEATS - 1));
+			n--;
+		}
+		return n;
+	}
 }
 
 /* The paused game, not the shelf. Diatom reports its rect with every DISPLAY
@@ -13025,9 +13176,414 @@ static menu_result gm_power(app *a, void *ctx)
 	return MENU_DONE;
 }
 
+/* ---- Cheats (ChaOS) ---------------------------------------------------------
+ *
+ * A game's cheats, from the in-game menu: each one turned on and off here, to
+ * the paused game at once, and kept in its .cht (src/cheats.h). Get Cheats
+ * finds the game in libretro's cheat database, by an index the website keeps,
+ * and fetches its file over Wi-Fi. */
+
+typedef struct {
+	gm_ctx  *g;
+	char     path[LIB_PATH * 3];
+	char     folder[CFG_STR], core[CFG_STR], file[LIB_PATH];
+	bool     codes_ok;
+	cht_list l;
+	bool     have;
+	char     count[48];
+} cht_ui;
+
+static void cht_active_path(char *out, size_t n)
+{
+	snprintf(out, n, "%s/cheats-active.txt", P_USERDATA);
+}
+
+static int cht_count_on(const cht_list *l, bool codes_ok)
+{
+	int i, n = 0;
+
+	for (i = 0; l && i < l->n; i++)
+		if (l->e[i].on && cht_usable(&l->e[i], codes_ok)) n++;
+	return n;
+}
+
+/* At a game's start: its cheats that are on, with the RUN */
+static void cht_for_launch(app *a, int o, const char *file)
+{
+	char path[LIB_PATH * 3], act[LIB_PATH];
+	cht_list l;
+	bool codes = cht_core_takes_codes(a->sys.systems[o].core);
+
+	g_cht_on = 0;
+	g_cht_cheated = false;
+	plat_resident_set_cheats("");
+	cht_path(P_CARD, a->sys.systems[o].folder, file, path, sizeof path);
+	if (!cht_read(path, &l)) return;
+	cht_active_path(act, sizeof act);
+	g_cht_on = cht_write_active(act, &l, codes);
+	cht_free(&l);
+	if (g_cht_on > 0) {
+		plat_resident_set_cheats(act);
+		g_cht_cheated = true;
+		fprintf(stderr, "cheats: %d on for %s\n", g_cht_on, file);
+	} else {
+		g_cht_on = 0;
+	}
+}
+
+static void cht_ui_load(cht_ui *u)
+{
+	cht_free(&u->l);
+	u->have = cht_read(u->path, &u->l);
+}
+
+/* What is on, to the file and to the paused game */
+static void cht_apply(cht_ui *u)
+{
+	char act[LIB_PATH];
+
+	if (!cht_save_enables(u->path, &u->l))
+		fprintf(stderr, "cheats: couldn't save %s\n", u->path);
+	cht_active_path(act, sizeof act);
+	g_cht_on = cht_write_active(act, &u->l, u->codes_ok);
+	if (g_cht_on < 0) g_cht_on = 0;
+	if (g_cht_on > 0) g_cht_cheated = true;
+	if (!plat_resident_sync_cheats(act, 1500))
+		fprintf(stderr, "cheats: Diatom didn't answer\n");
+}
+
+/* One frame: the paused game, and a panel over it */
+static void cht_frame(app *a, gm_ctx *g, const char *heading, const menu_row *rows, int n, int sel)
+{
+	gm_backdrop(a, g);
+	menu_draw(a, heading, rows, n, sel, g->st.fixed_w, a->tint);
+	draw_letter_popup(a);
+	plat_draw_osd(a->r);
+	plat_present();
+}
+
+/* A message, until A, B or a moment passes */
+static void cht_say(app *a, gm_ctx *g, const char *msg)
+{
+	menu_row r[1] = { MENU_NOTE(msg) };
+	unsigned t0 = plat_now_ms();
+
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+	while (a->running && plat_now_ms() - t0 < 2500) {
+		plat_input_poll(&a->in);
+		if (a->in.pressed[IN_ACCEPT] || a->in.pressed[IN_BACK] || a->in.pressed[IN_MENU]) break;
+		cht_frame(a, g, "Cheats", r, 1, 0);
+		SDL_Delay(16);
+	}
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+}
+
+static void cht_busy(app *a, gm_ctx *g, const char *msg)
+{
+	menu_row r[1] = { MENU_NOTE(msg) };
+	cht_frame(a, g, "Cheats", r, 1, 0);
+}
+
+/* A GET into a buffer the caller frees; NULL when it failed */
+static char *cht_get_text(const char *url, size_t cap)
+{
+	net_req r;
+	char *buf = malloc(cap);
+	int http = 0;
+	long n;
+
+	if (!buf) return NULL;
+	memset(&r, 0, sizeof r);
+	r.url = url;
+	r.timeout_s = 30;
+	n = net_request(&r, buf, cap, &http);
+	if (n <= 0 || http != 200 || (size_t)n >= cap - 1) {
+		fprintf(stderr, "cheats: %s: HTTP %d, %ld bytes\n", url, http, n);
+		free(buf);
+		return NULL;
+	}
+	return buf;
+}
+
+/* A list to choose from: the files that are this game, or a whole console's.
+ * Drawn a window at a time, so a list of thousands costs what thirty do.
+ * L2 and R2 jump by letter. The index chosen, or -1. */
+#define CHT_WIN 40
+static int cht_pick(app *a, gm_ctx *g, const char *heading, char **names, const int *idx,
+                    int n, int sel, const char *extra)
+{
+	menu_row rows[CHT_WIN + 3];
+	char foot[64];
+	int total = n + (extra ? 1 : 0);
+	Uint32 held = 0;
+
+	if (total <= 0) return -1;
+	if (sel < 0 || sel >= total) sel = 0;
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+	while (a->running) {
+		int first, k, w = 0;
+
+		plat_input_poll(&a->in);
+		if (a->in.quit_requested) { a->running = false; return -1; }
+		if (a->in.pressed[IN_POWER] || idle_due(a)) { gm_power(a, g); return -1; }
+		if (menu_leaving(a)) return -1;
+		if (in_repeat(&a->in, IN_VOLUP)) plat_volume_nudge(+1);
+		if (in_repeat(&a->in, IN_VOLDN)) plat_volume_nudge(-1);
+		if (in_repeat(&a->in, IN_BRIGHTUP)) plat_brightness_nudge(+1);
+		if (in_repeat(&a->in, IN_BRIGHTDN)) plat_brightness_nudge(-1);
+		if (in_repeat(&a->in, IN_DOWN)) sel = sel + 1 < total ? sel + 1 : 0;
+		if (in_repeat(&a->in, IN_UP)) sel = sel > 0 ? sel - 1 : total - 1;
+		if (in_repeat(&a->in, IN_R1) || in_repeat(&a->in, IN_RIGHT)) sel = sel + 10 < total ? sel + 10 : total - 1;
+		if (in_repeat(&a->in, IN_L1) || in_repeat(&a->in, IN_LEFT)) sel = sel - 10 > 0 ? sel - 10 : 0;
+		if (sel < n && (in_repeat(&a->in, IN_R2) || in_repeat(&a->in, IN_L2))) {
+			int d = in_repeat(&a->in, IN_R2) ? 1 : -1;
+			char c = shelf_initial(names[idx[sel]]), cc;
+			int j = sel;
+
+			/* to the first of the next letter, or of this one going back */
+			if (d > 0) { while (j + 1 < n && shelf_initial(names[idx[j + 1]]) == c) j++; if (j + 1 < n) j++; }
+			else {
+				while (j > 0 && shelf_initial(names[idx[j - 1]]) == c) j--;
+				if (j == sel && j > 0) { cc = shelf_initial(names[idx[j - 1]]); j--; while (j > 0 && shelf_initial(names[idx[j - 1]]) == cc) j--; }
+			}
+			sel = j;
+			letter_show(shelf_initial(names[idx[sel]]));
+		}
+		if (sel < n && (a->in.down[IN_UP] || a->in.down[IN_DOWN])) {
+			if (!held) held = plat_now_ms();
+			if (plat_now_ms() - held >= 2000) letter_show(shelf_initial(names[idx[sel]]));
+		} else {
+			held = 0;
+		}
+		if (a->in.pressed[IN_ACCEPT]) {
+			plat_input_flush();
+			memset(&a->in, 0, sizeof a->in);
+			return sel;
+		}
+
+		first = sel - CHT_WIN / 2;
+		if (first > total - CHT_WIN) first = total - CHT_WIN;
+		if (first < 0) first = 0;
+		for (k = first; k < total && w < CHT_WIN; k++, w++)
+			rows[w] = k < n ? (menu_row){ names[idx[k]], NULL, true }
+			                : (menu_row){ extra, NULL, true, true };
+		if (total > CHT_WIN) {
+			snprintf(foot, sizeof foot, "%d of %d", sel + 1, total);
+			rows[w++] = MENU_RULE;
+			rows[w++] = MENU_NOTE(foot);
+		}
+		cht_frame(a, g, heading, rows, w, sel - first);
+		SDL_Delay(8);
+	}
+	return -1;
+}
+
+/* Get Cheats: the index, the file that is this game, and it onto the card */
+static void cht_get(app *a, cht_ui *u)
+{
+	gm_ctx *g = u->g;
+	cht_index x[2];
+	const char *coll[2] = { art_collection(u->folder, 0), art_collection(u->folder, 1) };
+	int cand[24], nc = 0, c, chosen = -1, from = 0;
+	char url[1400], *text, dir[LIB_PATH * 2], part[LIB_PATH * 3 + 8];
+	cht_list fresh, old;
+
+	memset(x, 0, sizeof x);
+	if (!coll[0]) { cht_say(a, g, "There's no cheat list for this console"); return; }
+	if (!net_online()) { cht_say(a, g, "Connect to Wi-Fi first"); return; }
+
+	/* The collection the game is in: its cartridges first, then (TurboGrafx-16's
+	 * and Genesis's) its discs, only if the first has nothing */
+	for (c = 0; c < 2 && coll[c] && nc == 0; c++) {
+		cht_busy(a, g, "Getting the cheat list");
+		cht_index_url(coll[c], url, sizeof url);
+		text = cht_get_text(url, 2 * 1024 * 1024);
+		if (!text) {
+			if (c == 0) { cht_say(a, g, "Couldn't get the cheat list"); return; }
+			break;
+		}
+		if (!cht_index_parse(text, &x[c])) {
+			free(text);
+			if (c == 0) { cht_say(a, g, "The cheat list was unreadable"); return; }
+			break;
+		}
+		free(text);
+		nc = cht_candidates(&x[c], u->file, cand, 23);
+		from = c;
+	}
+
+	if (nc > 0) {
+		/* The files that are this game, best first, and the whole list after */
+		int k = cht_pick(a, g, "Choose Cheats", x[from].names, cand, nc, 0, "Show All");
+
+		if (k >= 0 && k < nc) chosen = cand[k];
+		else if (k == nc) nc = 0;
+		else goto done;
+	}
+	if (nc == 0 && chosen < 0) {
+		int *all = malloc(sizeof *all * (size_t)(x[0].n > 0 ? x[0].n : 1)), i, k;
+
+		from = 0;
+		if (!all || x[0].n == 0) { free(all); cht_say(a, g, "No cheats for this console"); goto done; }
+		for (i = 0; i < x[0].n; i++) all[i] = i;
+		k = cht_pick(a, g, "All Cheats", x[0].names, all, x[0].n, cht_nearest(&x[0], u->file), NULL);
+		free(all);
+		if (k < 0) goto done;
+		chosen = k;
+	}
+	if (chosen < 0 || g_menu_closing || !a->running) goto done;
+
+	cht_busy(a, g, "Downloading cheats");
+	cht_file_url(&x[from], coll[from], x[from].names[chosen], url, sizeof url);
+	text = cht_get_text(url, 8 * 1024 * 1024);
+	if (!text) { cht_say(a, g, "Couldn't download them"); goto done; }
+	snprintf(dir, sizeof dir, "%s/Cheats", P_CARD);
+	mkdir(dir, 0755);
+	snprintf(dir, sizeof dir, "%s/Cheats/%s", P_CARD, u->folder);
+	mkdir(dir, 0755);
+	snprintf(part, sizeof part, "%s.part", u->path);
+	{
+		FILE *f = fopen(part, "w");
+		bool ok = f && fputs(text, f) >= 0;
+
+		if (f && fclose(f) != 0) ok = false;
+		free(text);
+		if (!ok || !cht_read(part, &fresh)) {
+			unlink(part);
+			cht_say(a, g, ok ? "Those had no cheats in them" : "Couldn't save them to the card");
+			goto done;
+		}
+	}
+	/* Replacing a file: the cheats that were on stay on, by name */
+	if (cht_read(u->path, &old)) {
+		int i, j;
+
+		for (i = 0; i < fresh.n; i++) {
+			fresh.e[i].on = false;
+			for (j = 0; j < old.n; j++)
+				if (old.e[j].on && fresh.e[i].desc && old.e[j].desc && !strcmp(fresh.e[i].desc, old.e[j].desc))
+					fresh.e[i].on = true;
+		}
+		cht_free(&old);
+	} else {
+		int i;
+		for (i = 0; i < fresh.n; i++) fresh.e[i].on = false;
+	}
+	cht_save_enables(part, &fresh);
+	cht_free(&fresh);
+	if (rename(part, u->path) != 0) { unlink(part); cht_say(a, g, "Couldn't save them to the card"); goto done; }
+	sync();
+	fprintf(stderr, "cheats: %s from %s\n", u->path, x[from].names[chosen]);
+	cht_ui_load(u);
+	cht_apply(u);
+done:
+	cht_index_free(&x[0]);
+	cht_index_free(&x[1]);
+}
+
+/* The rows: Get Cheats, what is on, then the cheats (from CHT_FIRST) */
+#define CHT_FIRST 3
+static int cht_rows(cht_ui *u, menu_row *rows, int max)
+{
+	int i, n = 0, on = cht_count_on(&u->l, u->codes_ok), usable = 0;
+
+	for (i = 0; u->have && i < u->l.n; i++) usable += cht_usable(&u->l.e[i], u->codes_ok);
+	if (!u->have) snprintf(u->count, sizeof u->count, "No cheats for this game yet");
+	else if (g_cht_cheated && chv_count() > 0)
+		snprintf(u->count, sizeof u->count, "%d on. Achievements paused this game", on);
+	else snprintf(u->count, sizeof u->count, "%d of %d on", on, usable);
+
+	rows[n++] = (menu_row){ u->have ? "Get Other Cheats" : "Get Cheats", NULL, true, true };
+	rows[n++] = MENU_NOTE(u->count);
+	if (u->have) rows[n++] = MENU_RULE;
+	for (i = 0; u->have && i < u->l.n && n < max; i++) {
+		cht_entry *e = &u->l.e[i];
+		bool ok = cht_usable(e, u->codes_ok);
+
+		rows[n] = (menu_row){ e->desc && e->desc[0] ? e->desc : "(no name)",
+		                      ok ? (e->on ? "On" : "Off") : "Can't use", ok };
+		rows[n].toggle = ok;
+		rows[n].hint = !ok ? (e->code && strchr(e->code, '?') ? "Asks for a number ChaOS can't take"
+		                                                      : "Not a kind this console takes")
+		             : NULL;
+		n++;
+	}
+	return n;
+}
+
+static void cheats_screen(app *a, gm_ctx *g)
+{
+	cht_ui *u = calloc(1, sizeof *u);
+	menu_row *rows;
+	sysview *sv = &a->view[a->sys_cursor];
+	int o = gm_owner(a), sel = 0, n, max;
+
+	if (!u) return;
+	u->g = g;
+	snprintf(u->folder, sizeof u->folder, "%s", a->sys.systems[o].folder);
+	snprintf(u->core, sizeof u->core, "%s", a->sys.systems[o].core);
+	snprintf(u->file, sizeof u->file, "%s", sv->list.items[sv->cursor].file);
+	u->codes_ok = cht_core_takes_codes(u->core);
+	cht_path(P_CARD, u->folder, u->file, u->path, sizeof u->path);
+	cht_ui_load(u);
+
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+	while (a->running) {
+		max = (u->have ? u->l.n : 0) + 6;
+		rows = calloc((size_t)max, sizeof *rows);
+		if (!rows) break;
+		n = cht_rows(u, rows, max);
+		if (sel >= n) sel = n - 1;
+		if (!rows[sel].live) sel = menu_step_sel(rows, n, sel, +1);
+
+		plat_input_poll(&a->in);
+		if (a->in.quit_requested) { a->running = false; free(rows); break; }
+		if (a->in.pressed[IN_POWER] || idle_due(a)) { gm_power(a, g); free(rows); break; }
+		if (menu_leaving(a)) { free(rows); break; }
+		if (in_repeat(&a->in, IN_VOLUP)) plat_volume_nudge(+1);
+		if (in_repeat(&a->in, IN_VOLDN)) plat_volume_nudge(-1);
+		if (in_repeat(&a->in, IN_BRIGHTUP)) plat_brightness_nudge(+1);
+		if (in_repeat(&a->in, IN_BRIGHTDN)) plat_brightness_nudge(-1);
+		if (in_repeat(&a->in, IN_UP))   sel = menu_step_sel(rows, n, sel, -1);
+		if (in_repeat(&a->in, IN_DOWN)) sel = menu_step_sel(rows, n, sel, +1);
+
+		if (sel == 0 && a->in.pressed[IN_ACCEPT]) {
+			free(rows);
+			cht_get(a, u);
+			if (g_menu_closing || !a->running || plat_run_power_pressed()) break;
+			plat_input_flush();
+			memset(&a->in, 0, sizeof a->in);
+			continue;
+		}
+		if (sel >= CHT_FIRST && u->have && rows[sel].toggle &&
+		    (a->in.pressed[IN_ACCEPT] || a->in.pressed[IN_LEFT] || a->in.pressed[IN_RIGHT])) {
+			cht_entry *e = &u->l.e[sel - CHT_FIRST];
+
+			e->on = !e->on;
+			cht_apply(u);
+			free(rows);
+			continue;
+		}
+		cht_frame(a, g, "Cheats", rows, n, sel);
+		free(rows);
+		SDL_Delay(8);
+	}
+	cht_free(&u->l);
+	free(u);
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+}
+
 static menu_result gm_key(app *a, void *ctx, in_button key, int sel)
 {
 	gm_ctx *c = ctx;
+
+	/* ChaOS: the rows as gm_row counts them, past a Cheats row not shown */
+	if (!c->cht_shown && sel >= GM_CHEATS) sel++;
 
 	/* ChaOS. Applied to the paused game at once, not on resume: the point
 	 * of these rows being here is judging them against the game. Left and
@@ -13109,6 +13665,9 @@ static menu_result gm_key(app *a, void *ctx, in_button key, int sel)
 		console_controls_screen(a, gm_owner(a), sv->list.items[sv->cursor].file, c, &c->st);
 		break;
 	}
+	case GM_CHEATS:
+		cheats_screen(a, c);
+		break;
 	case GM_CHEEVOS:
 		cheevos_screen(a, c->bg, false);
 		break;
@@ -13420,6 +13979,11 @@ static void game_menu(app *a)
 
 	c.a = a;
 	c.shots = gm_count_shots();
+	{
+		sysview *sv = &a->view[a->sys_cursor];
+		c.cht_shown = g_cht_on > 0 ||
+		              cht_offered(&a->sys, gm_owner(a), sv->list.items[sv->cursor].file);
+	}
 	/* The frame as the shader drew it, when it did: what the player was
 	 * looking at. And the overlay over it. */
 	gm_load_bg(&c);
@@ -16536,6 +17100,8 @@ static void launch_game(app *a)
 			plat_resident_set_play(remap_spec(otag, v->list.items[v->cursor].file,
 			                                  spec, sizeof spec),
 			                       rewind_load(otag));
+			/* and its cheats, those that are on */
+			cht_for_launch(a, o, v->list.items[v->cursor].file);
 		}
 		if (plat_resident_send(s->tag, core, rom, st, st, pv,
 		                       console, active[0] ? active : NULL)) {
@@ -18262,6 +18828,10 @@ static const char *shot_path;
 static int shot_screen = -1;
 static int shot_menu, shot_menu_sel;
 static int shot_gmenu = -1;           /* ChaOS: --gmenu ROW, the in-game menu */
+static int shot_cheats = -1;          /* ChaOS: --cheats ROW FILE.cht, the Cheats screen */
+static const char *shot_cheats_file;
+static int shot_chtpick = -1;         /* ChaOS: --cheatpick ROW INDEX GAME, choosing cheats */
+static const char *shot_chtpick_index, *shot_chtpick_game;
 /* ChaOS: --pm home ROW | list SECTION ROW | detail ZIP: PortMaster's browser,
  * from the catalog in .userdata/ports */
 static int shot_port_power = -1;   /* ChaOS: --port-power ROW, power during a port */
@@ -18704,6 +19274,43 @@ static void take_shot(app *a)
 	if (shot_port_power >= 0) port_power_draw(a, shot_port_power);
 	if (shot_romm) romm_shot(a);
 	if (g_about_shot) about_screen(a);
+	if (shot_cheats >= 0) {
+		static cht_ui u;
+		menu_row *rows;
+		int n;
+
+		snprintf(u.path, sizeof u.path, "%s", shot_cheats_file ? shot_cheats_file : "");
+		u.codes_ok = true;
+		cht_ui_load(&u);
+		rows = calloc((size_t)(u.l.n + 6), sizeof *rows);
+		n = cht_rows(&u, rows, u.l.n + 6);
+		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
+		SDL_RenderFillRect(a->r, NULL);
+		menu_draw(a, "Cheats", rows, n, shot_cheats < n ? shot_cheats : 0, gm_width(a), MENU_ACCENT);
+		free(rows);
+	}
+	if (shot_chtpick >= 0) {
+		cht_index x;
+		FILE *f = fopen(shot_chtpick_index ? shot_chtpick_index : "", "r");
+		static char text[2 * 1024 * 1024];
+		size_t got = f ? fread(text, 1, sizeof text - 1, f) : 0;
+
+		if (f) fclose(f);
+		text[got] = '\0';
+		if (cht_index_parse(text, &x)) {
+			int cand[24], nc = cht_candidates(&x, shot_chtpick_game ? shot_chtpick_game : "", cand, 23), k;
+			menu_row rows[30];
+
+			for (k = 0; k < nc; k++) rows[k] = (menu_row){ x.names[cand[k]], NULL, true };
+			rows[k++] = (menu_row){ "Show All", NULL, true, true };
+			SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+			SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
+			SDL_RenderFillRect(a->r, NULL);
+			menu_draw(a, "Choose Cheats", rows, k, shot_chtpick < k ? shot_chtpick : 0, gm_width(a), MENU_ACCENT);
+			cht_index_free(&x);
+		}
+	}
 	if (shot_gmenu >= 0) {
 		static menu_row rows[GM_SHOWN + 4];
 		gm_bufs gb;
@@ -18996,6 +19603,15 @@ int main(int argc, char *argv[])
 		/* --menu [row] draws the TortOS menu over whichever screen --screen
 		 * asked for, so the panel can be looked at without a device. */
 		else if (!strcmp(argv[i], "--gmenu") && i + 1 < argc) shot_gmenu = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "--cheats") && i + 2 < argc) {
+			shot_cheats = atoi(argv[++i]);
+			shot_cheats_file = argv[++i];
+		}
+		else if (!strcmp(argv[i], "--cheatpick") && i + 3 < argc) {
+			shot_chtpick = atoi(argv[++i]);
+			shot_chtpick_index = argv[++i];
+			shot_chtpick_game = argv[++i];
+		}
 		else if (!strcmp(argv[i], "--port-power") && i + 1 < argc) shot_port_power = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--about")) g_about_shot = true;
 		else if (!strcmp(argv[i], "--romm") && i + 1 < argc) {
@@ -19822,6 +20438,13 @@ int main(int argc, char *argv[])
 
 		/* ChaOS: the boot's update check, and whatever download is running */
 		upd_poll();
+		/* ChaOS: the cheat lists, kept for the in-game menu */
+		{
+			static Uint32 next;
+			static bool online;
+			if (plat_now_ms() >= next) { online = net_online(); next = plat_now_ms() + 5000; }
+			cht_refresh_poll(&a.sys, online);
+		}
 
 		/* What Muse said since the last pass - including END, which is how
 		 * the next track of an album starts while nobody is on its screen -

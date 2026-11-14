@@ -142,7 +142,7 @@
   </div>
   <div class="panel" id="b-game" role="tabpanel" hidden>
     <table class="keys">
-      <tr><td><kbd>MENU</kbd></td><td>The in-game menu</td></tr>
+      <tr><td><kbd>MENU</kbd></td><td>The in-game menu, with Cheats, shaders, saves and more</td></tr>
       <tr><td><kbd>MENU</kbd> + <kbd>R1</kbd></td><td>Fast forward: 2×, 3×, 4×, then normal</td></tr>
       <tr><td><kbd>MENU</kbd> + <kbd>L1</kbd> (hold)</td><td>Rewind, when it's on for the console</td></tr>
       <tr><td><kbd>MENU</kbd> + <kbd>X</kbd></td><td>Screenshot</td></tr>
@@ -174,7 +174,7 @@
   <h2>Features</h2>
   <p class="intro">Everything ChaOS adds to TortOS, grouped the way you'll use it. <span class="tag">ChaOS</span> marks what ChaOS brings; the rest comes from TortOS. The pictures are the Brick's own screens: tap the labels under one to see more.</p>
   <nav class="subnav" aria-label="Feature groups">
-    <a href="#playing">Playing</a><a href="#shaders">Shaders</a><a href="#speed">Speed check</a><a href="#display">Display &amp; overlays</a><a href="#shelves">Shelves &amp; themes</a><a href="#boxart">Box art</a><a href="#transfer">Transfer &amp; Wire</a><a href="#ports">Ports</a><a href="#romm">RomM</a><a href="#muse">Muse &amp; sound</a><a href="#look">Look &amp; settings</a>
+    <a href="#playing">Playing</a><a href="#cheats">Cheats</a><a href="#shaders">Shaders</a><a href="#speed">Speed check</a><a href="#display">Display &amp; overlays</a><a href="#shelves">Shelves &amp; themes</a><a href="#boxart">Box art</a><a href="#transfer">Transfer &amp; Wire</a><a href="#ports">Ports</a><a href="#romm">RomM</a><a href="#muse">Muse &amp; sound</a><a href="#look">Look &amp; settings</a>
   </nav>
 
   <!-- Playing -->
@@ -202,6 +202,36 @@
     <div class="mini"><h4>Games come first <span class="tag">ChaOS</span></h4><p>Nothing of ChaOS's own runs while you play. An update that was downloading pauses and carries on afterwards, its progress shown on the shelf.</p></div>
     <div class="mini"><h4>The battery to the end</h4><p>The game is saved and the Brick turns off when the battery is truly empty, judged by its voltage: about half an hour past the gauge's 2%. A red dot blinks for the last stretch.</p></div>
     <div class="mini"><h4>Play Time</h4><p><b>MENU &gt; Play Time</b>: per game or per console, for today, the week, month, year or all time. <kbd>Y</kbd> switches; the bottom line has launches, longest session and last played.</p></div>
+  </div>
+
+  <!-- Cheats -->
+  <article class="feature flip" id="cheats">
+    <div class="feature-text">
+      <h3>Cheats <span class="tag">ChaOS</span></h3>
+      <p>Game Genie, Action Replay, GameShark and Code Breaker codes, and RetroArch's memory cheats, from the in-game menu.</p>
+      <ol>
+        <li>In a game, press <kbd>MENU</kbd> and choose <b>Cheats</b>. It's there for any game with cheats to get.</li>
+        <li><b>Get Cheats</b> finds the game in <a href="https://github.com/libretro/libretro-database">libretro's cheat database</a> over Wi-Fi and lists its cheat files, best match first. <b>Show All</b> lists the console's whole collection, with <kbd>L2</kbd>/<kbd>R2</kbd> to jump by letter.</li>
+        <li>Each cheat has a switch. <kbd>A</kbd> turns it on or off, and it takes effect in the game at once.</li>
+      </ol>
+      <ul>
+        <li>Your choices are kept per game and come back next time you play it.</li>
+        <li><b>Your own cheats</b>: put RetroArch <code>.cht</code> files in <code>Cheats/&lt;console&gt;/</code>, named like the game, or send them with ChaOS Transfer.</li>
+        <li>Works on NES, SNES, Genesis, Master System, Game Gear, TurboGrafx-16 and the Game Boys. Neo Geo Pocket takes memory cheats only.</li>
+      </ul>
+    </div>
+    <figure class="device" data-screens='[["cheats","Cheats"],["cheatpick","Choose Cheats"],["gmenu-cheats","In-game menu"]]'>
+      <div class="bezel"><img src="img/cheats.webp" alt="" loading="lazy" width="1024" height="768"></div>
+      <figcaption class="chips"></figcaption>
+    </figure>
+  </article>
+  <div class="callout">
+    <div class="callout-icon" aria-hidden="true">!</div>
+    <div>
+      <h4>Cheats and achievements</h4>
+      <p>RetroAchievements doesn't count unlocks made with cheats. The moment a cheat goes on, achievements pause for the rest of that game, and the in-game menu says <b>Paused</b>. Turn the cheats off and start the game again to earn them.</p>
+      <p>Cheats are a list kept by the community, so some may not work with every version of a game. Cheats that ask for a number of your own (shown as <b>Can't use</b>) aren't offered.</p>
+    </div>
   </div>
 
   <!-- Shaders -->
@@ -573,7 +603,7 @@
     </div>
     <div class="credit">
       <h4>Ports and services</h4>
-      <p><a href="https://portmaster.games">PortMaster</a> and its porters; <b>minui-portmaster</b> by ben16w. <a href="https://romm.app">RomM</a> and its client Grout. <a href="https://retroachievements.org">RetroAchievements</a>, libretro thumbnails, MusicBrainz and the Cover Art Archive, and itch.io (with NextUI-Itchio-Pak by Christophe Vanlancker).</p>
+      <p><a href="https://portmaster.games">PortMaster</a> and its porters; <b>minui-portmaster</b> by ben16w. <a href="https://romm.app">RomM</a> and its client Grout. <a href="https://retroachievements.org">RetroAchievements</a>, libretro thumbnails, <a href="https://github.com/libretro/libretro-database">libretro's cheat database</a> (CC BY-SA 4.0), MusicBrainz and the Cover Art Archive, and itch.io (with NextUI-Itchio-Pak by Christophe Vanlancker).</p>
     </div>
     <div class="credit">
       <h4>Libraries</h4>

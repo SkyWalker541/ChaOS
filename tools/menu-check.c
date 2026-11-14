@@ -1106,7 +1106,7 @@ static void ingame_rows(void)
 	n = gm_rows(&u, rows, &b);
 
 	printf("in-game menu, a game with a set:\n");
-	ck(n == GM_SHOWN, "eleven rows, then a rule and a note");
+	ck(n == GM_SHOWN, "thirteen rows, then a rule and a note");
 	ck(!strcmp(rows[GM_SHOT].label, "Take Screenshot") && rows[GM_SHOT].live,
 	   "Take Screenshot is always there");
 	ck(!strcmp(val(&rows[GM_SHOTS]), "3") && rows[GM_SHOTS].live,
@@ -1118,8 +1118,18 @@ static void ingame_rows(void)
 	ck(!strcmp(val(&rows[GM_OVERLAY]), "None"), "Overlay says None with none chosen");
 	ck(!strcmp(val(&rows[GM_CHEEVOS]), "12 / 40"), "Cheevos counts the set");
 	ck(rows[GM_CHEEVOS].live, "and is reachable");
+	ck(!strcmp(rows[GM_CHEATS].label, "Cheats") && !strcmp(val(&rows[GM_CHEATS]), "Off")
+	   && rows[GM_CHEATS].opens, "Cheats says Off, and opens");
 	k = reachable(rows, n, got, GM_ROWS);
 	ck(k == GM_ROWS, "every row is a stop");
+
+	u.cheats_on = 2; u.cheated = true;
+	n = gm_rows(&u, rows, &b);
+	printf("in-game menu, with cheats on:\n");
+	ck(!strcmp(val(&rows[GM_CHEATS]), "2 On"), "Cheats counts those on");
+	ck(!strcmp(val(&rows[GM_CHEEVOS]), "Paused") && rows[GM_CHEEVOS].live,
+	   "achievements say Paused, and can still be looked at");
+	u.cheats_on = 0; u.cheated = false;
 
 	u.earned = 0; u.total = 0; u.shots = 0;
 	n = gm_rows(&u, rows, &b);

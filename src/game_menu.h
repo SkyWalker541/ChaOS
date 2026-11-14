@@ -102,7 +102,8 @@ int gi_rows(menu_row *out, const game_info *gi, bool net);
 /* ---------- the in-game menu ---------------------------------------------- */
 
 typedef enum {
-	GM_CONTINUE, GM_SAVE, GM_LOAD, GM_SHOT, GM_SHOTS, GM_DISPLAY, GM_SHADER, GM_OVERLAY, GM_BUTTONS, GM_CHEEVOS, GM_RESET,
+	GM_CONTINUE, GM_SAVE, GM_LOAD, GM_SHOT, GM_SHOTS, GM_DISPLAY, GM_SHADER, GM_OVERLAY, GM_BUTTONS, GM_CHEATS,
+	GM_CHEEVOS, GM_RESET,
 	GM_QUIT,
 	GM_ROWS
 } gm_row;
@@ -126,11 +127,15 @@ typedef struct {
 	 * says just after it is chosen ("Saved"), or NULL */
 	int         shots;
 	const char *shot_said;
+	/* ChaOS: how many of this game's cheats are on; and whether one has been
+	 * on this game, which puts its achievements away until it starts again */
+	int         cheats_on;
+	bool        cheated;
 } gm_ui;
 
 /* Where the Cheevos row's text lives; the caller owns it, because a row holds
  * a pointer rather than a copy. */
-typedef struct { char cheevos[24]; char shots[16]; } gm_bufs;
+typedef struct { char cheevos[24]; char shots[16]; char cheats[16]; } gm_bufs;
 
 int gm_rows(const gm_ui *u, menu_row *out, gm_bufs *b);
 

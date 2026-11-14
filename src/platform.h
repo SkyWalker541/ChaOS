@@ -225,6 +225,10 @@ void plat_resident_set_play(const char *map, bool rewind);
 /* ChaOS: the next RUN's Display Mode, by Diatom's name ("integer",
  * "aspect", "stretch"); NULL or "" for Diatom's own */
 void plat_resident_set_display(const char *mode);
+/* ChaOS: the next RUN's cheats, a file for Diatom (src/cheats.h), "" none */
+void plat_resident_set_cheats(const char *path);
+/* ChaOS: cheats now, to the paused game; true when Diatom took them */
+bool plat_resident_sync_cheats(const char *path, int timeout_ms);
 void plat_resident_set_zone(const char *tz);
 /* The paused frame as the shader draws it, the size of the game's rect, or
  * NULL when the game is not shaded. Written by Diatom on the way into its

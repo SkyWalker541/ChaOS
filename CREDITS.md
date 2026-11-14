@@ -155,6 +155,13 @@ names, and the port screenshot shown is from PortMaster's catalog.
 
 ## Services
 
+- **libretro-database**'s cheat files (https://github.com/libretro/libretro-database,
+  `cht/`, CC BY-SA 4.0, by libretro and its contributors): not in the image. The
+  Brick fetches a game's file when the player asks (Get Cheats); the website's
+  lists of those files (`cheats/`, made by `tools/cheat-index.py`) are shared
+  under the same licence, with a LICENSE.txt saying so. ChaOS-diatom applies
+  RetroArch's memory cheats as RetroArch's cheat manager does, written from
+  its behaviour rather than its code.
 - **RetroAchievements** (https://retroachievements.org): achievements.
 - **libretro thumbnails** (https://thumbnails.libretro.com): box art.
 - **MusicBrainz Cover Art Archive** (https://musicbrainz.org): album art.
