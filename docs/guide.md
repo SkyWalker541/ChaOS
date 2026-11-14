@@ -127,7 +127,7 @@ than any one console:
 | | |
 |---|---|
 | **Play Time** | per game or per system, by day, week, month, year or all time |
-| **Wi-Fi** | the network's name when connected, or why it is not |
+| **Wi-Fi** | the network's name when connected, or why it is not. WPA2 and WPA3 networks both join, whatever is in the name |
 | **Bluetooth** | the connected headset, or `not connected` - pair, connect and forget |
 | **Audio Output** | `Auto` or `Speaker`, and where Auto landed - see **Audio** below |
 | **Audio Channels** | `stereo`, `mono`, `mono left` or `mono right` - see **Audio** below |
