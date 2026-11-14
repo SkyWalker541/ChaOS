@@ -485,7 +485,7 @@ bool db_write_boot_env(void)
 	 * default" by seeding, which is why launch.sh needs no fallback for
 	 * either. */
 	n = snprintf(body, sizeof body,
-	             "# Written by TortOS from the settings database. Derived, not\n"
+	             "# Written by ChaOS from the settings database. Derived, not\n"
 	             "# authoritative: delete it and the next settings change\n"
 	             "# rewrites it. Sourced by launch.sh before tortos.elf runs.\n"
 	             "WIFI='%d'\n"

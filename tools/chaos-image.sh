@@ -239,6 +239,12 @@ grep -q "TortOS's old folder removed" "$INIT" || { echo "init.d/tortos: the move
 tr -d ' \n' < "$ROOT/TORTOS_BASE" > "$C/ChaOS/BASE"
 chmod 644 "$C/ChaOS/BASE"
 L=$C/ChaOS/launch.sh
+# ChaOS's logs are chaos.log (and .1 to .9), as a player sees them on the card
+# and in Download logs; a card's older tortos.log files take the new name on
+# its first boot with this, so they still rotate out
+grep -q '^LOG=$LOGS_PATH/tortos.log$' "$L" || { echo "launch.sh has changed: check its log" >&2; exit 1; }
+sed -i 's|^LOG=$LOGS_PATH/tortos.log$|for f in "$LOGS_PATH"/tortos.log*; do [ -f "$f" ] \&\& mv -f "$f" "$LOGS_PATH/chaos.log${f#"$LOGS_PATH"/tortos.log}"; done\nLOG=$LOGS_PATH/chaos.log|; s|this one and tortos.log.1 to .9|this one and chaos.log.1 to .9|' "$L"
+grep -q '^LOG=$LOGS_PATH/chaos.log$' "$L" || { echo "launch.sh: the log did not take its name" >&2; exit 1; }
 [ "$(tail -n 1 "$L")" = "poweroff" ] || { echo "launch.sh has changed: check how it ends" >&2; exit 1; }
 sed -i '$d' "$L"
 cat >> "$L" <<'EOF2'

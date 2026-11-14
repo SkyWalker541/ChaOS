@@ -21,7 +21,7 @@ static const menu_color MENU_COLORS[] = {
 	{ "chaos",  "ChaOS Orange", 0xFF7A2Fu },
 	{ "cyan",   "ChaOS Cyan",   0x39C5D6u },
 	{ "cream",  "Cream",        0xF4EAD5u },
-	{ "tortos", "TortOS Cyan",  0x3DD6FFu },
+	{ "tortos", "Sky Cyan",     0x3DD6FFu },   /* ChaOS: once "TortOS Cyan"; the id stays, so a choice is kept */
 	{ "lime",   "Lime",         0x9BE15Du },
 	{ "gold",   "Gold",         0xFFC23Du },
 	{ "red",    "Red",          0xFF4F5Au },

@@ -142,9 +142,14 @@ bool logpack_build(const char *logs_dir, const char *about,
 
 	if ((d = opendir(logs_dir))) {
 		while ((e = readdir(d))) {
-			if (strncmp(e->d_name, "tortos.log", 10) != 0) continue;
+			/* ChaOS: chaos.log, and tortos.log from before the rename,
+			 * both packed as chaos.log so the download names one system */
+			const char *rest;
+			if (!strncmp(e->d_name, "chaos.log", 9)) rest = e->d_name + 9;
+			else if (!strncmp(e->d_name, "tortos.log", 10)) rest = e->d_name + 10;
+			else continue;
 			snprintf(from, sizeof from, "%s/%s", logs_dir, e->d_name);
-			snprintf(path, sizeof path, "%s/%s", dir, e->d_name);
+			snprintf(path, sizeof path, "%s/chaos.log%s", dir, rest);
 			if (copy_masked(from, path, secrets, n)) logs++;
 		}
 		closedir(d);

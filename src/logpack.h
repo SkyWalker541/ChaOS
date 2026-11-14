@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-/* The logs, packed to send to whoever is helping: every boot's tortos.log, an
+/* The logs, packed to send to whoever is helping: every boot's chaos.log, an
  * about.txt the caller writes, gzipped into one tar by the device's own tar.
  * Over The Hare's Download logs button is the one caller.
  *
@@ -31,7 +31,7 @@ void logpack_mask_word(const char *word, char *out, size_t n);
  * `cap` is the buffer's size; a line that would outgrow it is cut. */
 void logpack_mask_line(char *line, size_t cap, const char *const *secrets, int n);
 
-/* Pack `logs_dir`'s tortos.log files and `about` into `out` (a .tar.gz), with
+/* Pack `logs_dir`'s chaos.log files (tortos.log from before, too, as chaos.log) and `about` into `out` (a .tar.gz), with
  * everything inside one folder named `folder`. The staging happens under
  * /tmp and is removed again. False with a reason in `err` when it could not. */
 bool logpack_build(const char *logs_dir, const char *about,
