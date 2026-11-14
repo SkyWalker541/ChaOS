@@ -52,6 +52,7 @@ Prefer to do it by hand? Write `ChaOS-v<version>-brick.img.xz` from [Releases](h
 | **[Guide](docs/guide.md)** | Every menu row and setting, in depth |
 | **[Building](docs/building.md)** | Building ChaOS from source |
 | **[Release images](dist/README.md)** | How a ChaOS image is put together |
+| **[Releases](https://github.com/SkyWalker541/ChaOS/releases)** | What each release changed; the latest few are on the [website](https://skywalker541.github.io/ChaOS/#updates) |
 | **[Credits](CREDITS.md)** | Everyone whose work is in ChaOS, with sources and licences |
 
 ## Credits and license

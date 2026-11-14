@@ -9582,6 +9582,13 @@ static void draw_upd_notice(app *a)
 	} else if (!g_upd_msg[0] || now >= g_upd_msg_until) {
 		return;
 	}
+	{
+		/* ChaOS: never wider than the screen, however long the message */
+		static char said[160];
+		if (say == g_upd_msg) redraw_at(g_upd_msg_until);
+		ui_fit_text(f, say, said, sizeof said, TORTOS_SCREEN_W - 2 * MENU_MARGIN - 48);
+		say = said;
+	}
 	w = ui_text_width(f, say) + 48;
 	h = ui_font_height(UI_F_META) + 20;
 	{
@@ -9591,7 +9598,6 @@ static void draw_upd_notice(app *a)
 		ui_round_rect(a->r, &inner, h / 2, (SDL_Color){ 23, 21, 28, 255 });
 	}
 	ui_text(a->r, f, say, TORTOS_SCREEN_W / 2, 34, 0, UI_TEXT);
-	if (say == g_upd_msg) redraw_at(g_upd_msg_until);
 }
 
 /* ChaOS: the whole image, for an update ChaOS's own over-the-air one can't
@@ -10204,8 +10210,14 @@ static int menu_std_width(app *a)
 {
 	int content = 800 - menu_pad() * 2;
 	int floor   = menu_shelf_width(a);
+	int w = floor > content ? floor : content;
+	/* ChaOS: never wider than a panel can be. menu_draw caps the panel's
+	 * text to the screen, so text wrapped to more than that ran past the
+	 * panel's edge and slid, and slid lines drew outside the card (What's
+	 * New, 2.1.1) */
+	int cap = TORTOS_SCREEN_W - MENU_MARGIN * 2 - menu_pad() * 2;
 
-	return floor > content ? floor : content;
+	return w < cap ? w : cap;
 }
 
 /* Date & Time (src/clock.h). Each row is one part of the clock, changed with
@@ -15494,12 +15506,26 @@ static void pm_detail_draw(app *a, int idx, pm_pic *pp, const char (*desc)[CHV_W
 	pm_frame_begin(a, accent, p->title, NULL);
 	pm_pic_draw(a, pp, shot);
 
+/* One line each, label then value, the value cut to what is left of the
+ * column: six of them fit beside the screenshot, where two lines each ran
+ * down into the description (2.1.1). A NULL label gives the value the line. */
 #define INFO(label, val, col) do { \
-		ui_text(a->r, fs, label, x, y, -1, UI_TEXT_DIM); \
-		y += ls; \
-		ui_fit_text(fs, val, fit, sizeof fit, w); \
-		ui_text(a->r, fs, fit, x, y, -1, col); \
-		y += ls + 12; \
+		int lw_ = 0; \
+		if (label) { \
+			snprintf(fit, sizeof fit, "%s: ", (const char *)(label)); \
+			lw_ = ui_text_width(fs, fit); \
+			ui_text(a->r, fs, fit, x, y, -1, UI_TEXT_DIM); \
+		} \
+		{ \
+			char wl_[2][CHV_WRAP_COLS]; \
+			int nw_ = wrap_text(fs, val, w - lw_, wl_, 2), k_; \
+			for (k_ = 0; k_ < nw_; k_++) { \
+				ui_fit_text(fs, wl_[k_], fit, sizeof fit, w - lw_); \
+				ui_text(a->r, fs, fit, x + lw_, y, -1, col); \
+				y += ls; \
+			} \
+		} \
+		y += 10; \
 	} while (0)
 
 	{
@@ -15509,7 +15535,7 @@ static void pm_detail_draw(app *a, int idx, pm_pic *pp, const char (*desc)[CHV_W
 		INFO("Ported by", p->porter[0] ? p->porter : "unknown", UI_TEXT);
 		INFO("Genre", g[0] ? g : "-", UI_TEXT);
 	}
-	INFO("Needs", pm_needs(p), p->flags & PMF_NO ? PM_RED : p->flags & PMF_RTR ? PM_GREEN : PM_AMBER);
+	INFO(NULL, pm_needs(p), p->flags & PMF_NO ? PM_RED : p->flags & PMF_RTR ? PM_GREEN : PM_AMBER);
 	{
 		char rt[4][64], nice[64];
 		int nr = pmcat_runtimes(p, rt, 4);
@@ -15524,16 +15550,18 @@ static void pm_detail_draw(app *a, int idx, pm_pic *pp, const char (*desc)[CHV_W
 		snprintf(line, sizeof line, p->flags & PMF_UPDATE ? "Installed, update ready"
 		                                                  : "Installed");
 	else
-		snprintf(line, sizeof line, "%.1f MB download", p->size / 1048576.0);
-	INFO(p->flags & PMF_INSTALLED ? "On this Brick" : "Size", line,
+		snprintf(line, sizeof line, "%.1f MB", p->size / 1048576.0);
+	INFO(p->flags & PMF_INSTALLED ? "On this Brick" : "Download", line,
 	     p->flags & PMF_UPDATE ? PM_AMBER : UI_TEXT_SOFT);
 	if (p->flags & (PMF_POWER | PMF_EXP))
-		INFO("Note", p->flags & PMF_EXP ? "Experimental: it may not work well"
-		                                : "Made for stronger devices: it may run slowly", PM_AMBER);
+		INFO(NULL, p->flags & PMF_EXP ? "Experimental: it may not work well"
+		                              : "Made for stronger devices: may run slowly", PM_AMBER);
 #undef INFO
 
-	/* The description under it all, as much as fits; Y reads the whole */
-	dy = shot.y + shot.h + 28;
+	/* The description under it all - under the screenshot or the facts,
+	 * whichever reaches lower, so neither can run into it - as much as
+	 * fits; Y reads the whole */
+	dy = (y - 10 > shot.y + shot.h ? y - 10 : shot.y + shot.h) + 28;
 	vis = (panel.y + panel.h - 24 - ls - 20 - dy) / lm;
 	for (i = 0; i < vis && top + i < ndesc; i++)
 		ui_text(a->r, fm, desc[top + i], shot.x, dy + i * lm, -1, UI_TEXT_SOFT);
@@ -16425,7 +16453,8 @@ static void romm_list_draw(app *a, const char *heading, const romm_list *l, int 
 		y += lm + 4;
 		snprintf(line, sizeof line, "%.1f MB%s%s", g->size / 1048576.0, g->multi ? "  \xC2\xB7  several files" : "",
 		         l->have[sel][0] ? "  \xC2\xB7  on this Brick" : "");
-		ui_text(a->r, fs, line, box.x, y, -1, UI_TEXT_DIM);
+		ui_fit_text(fs, line, fit, sizeof fit, box.w);
+		ui_text(a->r, fs, fit, box.x, y, -1, UI_TEXT_DIM);
 		(void)y;
 	}
 	pm_footer(a, "A: download   \xE2\x80\xB9 \xE2\x80\xBA: page   L2 R2: letter   B: back");
@@ -18865,6 +18894,8 @@ static float shot_sysmove;
 static float shot_gamemove;
 static const char *shot_cheevos_game = "Hagane: The Final Conflict";
 static int shot_syn;       /* --synopsis: the card a scraped game opens */
+static const char *shot_notes; /* ChaOS: --notes FILE MS, What's New MS into its scroll */
+static int shot_notes_ms;
 static int shot_info;
 /* --controls [page] draws MENU > Controls, page 0-3, over whichever screen
  * --screen asked for: the page follows UI Direction, so this is the only way
@@ -19471,6 +19502,26 @@ shot_done:
 		             "12 KB / 41 MB", shot_hare_head);
 	/* The synopsis card, from the card's own games table - so a shot of it is a
 	 * picture of real scraped text rather than a fixture. */
+	if (shot_notes) {
+		static char text[8192];
+		FILE *f = fopen(shot_notes, "r");
+		size_t got = f ? fread(text, 1, sizeof text - 1, f) : 0;
+		char lines[SYN_WRAP_LINES][CHV_WRAP_COLS];
+		menu_row rows[SYN_ROWS];
+		int fixed = menu_std_width(a), loop_at = 0, nl;
+
+		if (f) fclose(f);
+		text[got] = '\0';
+		nl = syn_layout(text, fixed, lines, rows, &loop_at);
+		mq_reset(MQ_VSCROLL);
+		menu_draw_ex(a, "What's New in 2.1.0", rows, nl, -1, fixed, MENU_ACCENT, NULL, false, loop_at);
+		SDL_Delay((Uint32)shot_notes_ms);
+		draw_shelf(a);
+		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
+		SDL_RenderFillRect(a->r, NULL);
+		menu_draw_ex(a, "What's New in 2.1.0", rows, nl, -1, fixed, MENU_ACCENT, NULL, false, loop_at);
+	}
 	if (shot_syn) {
 		sysview *v = &a->view[a->sys_cursor];
 		const system_cfg *s = &a->sys.systems[shelf_owner(a, a->sys_cursor, v->cursor)];
@@ -19668,6 +19719,10 @@ int main(int argc, char *argv[])
 			if (i + 1 < argc && argv[i + 1][0] != '-') shot_cheevos_game = argv[++i];
 		}
 		else if (!strcmp(argv[i], "--synopsis")) shot_syn = 1;
+		else if (!strcmp(argv[i], "--notes") && i + 2 < argc) {
+			shot_notes = argv[++i];
+			shot_notes_ms = atoi(argv[++i]);
+		}
 		/* --nowplaying ALBUM [TRACK [SECONDS]] draws Now Playing for an album
 		 * of the card's Music folder, by its number in the scan, without a
 		 * daemon: the cover has to be on the card already, or the album is

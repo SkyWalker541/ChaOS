@@ -393,6 +393,21 @@ unsigned ui_pingpong_wait(int over, unsigned phase)
 	return 0;
 }
 
+/* A clip inside the one the caller set, if it set one: a slice of sliding
+ * text must stay inside both. False when nothing of it is left to draw - an
+ * empty rect can't be handed to SDL, which reads it as no clip at all. Until
+ * 2.1.1 the slices replaced the caller's clip, so a long line in a scrolling
+ * card (What's New) drew above and below the card's window. */
+static bool clip_within(SDL_Renderer *r, const SDL_Rect *c, SDL_bool had, const SDL_Rect *was)
+{
+	SDL_Rect in;
+
+	if (!had) { SDL_RenderSetClipRect(r, c); return true; }
+	if (!SDL_IntersectRect(c, was, &in)) return false;
+	SDL_RenderSetClipRect(r, &in);
+	return true;
+}
+
 void ui_text_marquee(SDL_Renderer *r, TTF_Font *f, const char *s,
                      int x, int y, int w, unsigned phase, SDL_Color col)
 {
@@ -413,7 +428,7 @@ void ui_text_marquee(SDL_Renderer *r, TTF_Font *f, const char *s,
 	if (had) SDL_RenderGetClipRect(r, &was);
 	clip.x = x; clip.y = y;
 	clip.w = w; clip.h = TTF_FontHeight(f);
-	SDL_RenderSetClipRect(r, &clip);
+	if (!clip_within(r, &clip, had, &was)) { SDL_RenderSetClipRect(r, had ? &was : NULL); return; }
 
 	/* Faded at both edges, and faded in the TEXT rather than by laying a
 	 * gradient of the background over it. The background here is a coverflow
@@ -451,8 +466,7 @@ void ui_text_marquee(SDL_Renderer *r, TTF_Font *f, const char *s,
 
 		clip.x = x + lf;
 		clip.w = w - lf - rf;
-		if (clip.w > 0) {
-			SDL_RenderSetClipRect(r, &clip);
+		if (clip.w > 0 && clip_within(r, &clip, had, &was)) {
 			SDL_SetTextureAlphaMod(e->tex, col.a);
 			SDL_RenderCopy(r, e->tex, NULL, &dst);
 		}
@@ -461,8 +475,7 @@ void ui_text_marquee(SDL_Renderer *r, TTF_Font *f, const char *s,
 			SDL_SetTextureAlphaMod(e->tex, (Uint8)(col.a * i / lf));
 			clip.x = x + i;
 			clip.w = lf - i < MQ_FADE_STEP ? lf - i : MQ_FADE_STEP;
-			SDL_RenderSetClipRect(r, &clip);
-			SDL_RenderCopy(r, e->tex, NULL, &dst);
+			if (clip_within(r, &clip, had, &was)) SDL_RenderCopy(r, e->tex, NULL, &dst);
 		}
 		for (i = 0; i < rf; i += MQ_FADE_STEP) {
 			int sw = rf - i < MQ_FADE_STEP ? rf - i : MQ_FADE_STEP;
@@ -470,8 +483,7 @@ void ui_text_marquee(SDL_Renderer *r, TTF_Font *f, const char *s,
 			SDL_SetTextureAlphaMod(e->tex, (Uint8)(col.a * i / rf));
 			clip.x = x + w - sw - i;
 			clip.w = sw;
-			SDL_RenderSetClipRect(r, &clip);
-			SDL_RenderCopy(r, e->tex, NULL, &dst);
+			if (clip_within(r, &clip, had, &was)) SDL_RenderCopy(r, e->tex, NULL, &dst);
 		}
 		SDL_SetTextureAlphaMod(e->tex, 255);
 	}

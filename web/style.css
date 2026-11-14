@@ -315,3 +315,13 @@ h3 .tag, h4 .tag { vertical-align: 0.3em; }
 .credit.lead { grid-column: 1 / -1; border-color: rgba(57, 197, 214, 0.45); background: linear-gradient(135deg, rgba(57,197,214,0.10), var(--panel) 60%); }
 .credit.lead h4 { font-size: 21px; }
 @media (max-width: 860px) { .credits { grid-template-columns: 1fr; } }
+
+/* ---- recent releases -------------------------------------------------- */
+.releases { margin: 8px 0 28px; }
+.releases h3 { font-size: 24px; margin-bottom: 14px; }
+.rel { display: grid; grid-template-columns: 76px 1fr; gap: 16px; align-items: baseline;
+  padding: 14px 0; border-top: 1px solid var(--line); }
+.rel:last-of-type { border-bottom: 1px solid var(--line); }
+.rel p { margin: 0; font-size: 17px; }
+.ver { font-weight: 700; color: var(--orange); font-size: 18px; }
+.rel:nth-of-type(even) .ver { color: var(--cyan); }
