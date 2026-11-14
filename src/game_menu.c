@@ -100,7 +100,7 @@ int gi_rows(menu_row *out, const game_info *gi, bool net)
 int gm_rows(const gm_ui *u, menu_row *out, gm_bufs *b)
 {
 	static const char *label[GM_ROWS] = {
-		"Continue", "Save", "Load", "Take Screenshot", "Screenshots",
+		"Continue", "Save", "Load", "Disc", "Take Screenshot", "Screenshots",
 		"Display Mode", "Shader", "Overlay", "Crop Overscan", "Controls", "Cheats", "RetroAchievements", "Reset", "Quit"
 	};
 	int i;
@@ -112,6 +112,7 @@ int gm_rows(const gm_ui *u, menu_row *out, gm_bufs *b)
 			"Back to the game",
 			"Save your place in a slot",
 			"Go back to a saved place",
+			"Change discs, when the game asks for the next one",
 			"A picture of the game, kept on the card",
 			"This game's screenshots",
 			"How the picture fills the screen",
@@ -133,6 +134,8 @@ int gm_rows(const gm_ui *u, menu_row *out, gm_bufs *b)
 	out[GM_DISPLAY].cycles = out[GM_OVERLAY].cycles = true;
 	out[GM_OVERSCAN].value = u->overscan ? u->overscan : "Off";
 	out[GM_OVERSCAN].cycles = true;
+	out[GM_DISC].value = u->disc ? u->disc : "";
+	out[GM_DISC].cycles = true;
 	out[GM_SHADER].toggle = u->shader != NULL;
 	out[GM_SHADER].value = u->shader ? u->shader : "none";
 	out[GM_SHADER].live = u->shader != NULL;

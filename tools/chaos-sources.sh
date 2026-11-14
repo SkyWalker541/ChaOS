@@ -26,6 +26,7 @@ cp "$ROOT/dist/brick/ChaOS-diatom-source.tar.gz" "$S/"
 cp "$ROOT/dist/brick/bash-source.tar.xz" "$S/"
 cp "$ROOT/dist/brick/portlibs-source.tar.xz" "$S/"
 cp "$ROOT/dist/brick/unsquashfs-source.tar.xz" "$S/"
+cp "$ROOT/dist/brick/pcsx_rearmed-source.tar.xz" "$S/"
 cat > "$S/README.txt" <<EOF
 ChaOS $V for the TrimUI Brick: the source of everything in its card image.
 
@@ -66,6 +67,11 @@ ChaOS $V for the TrimUI Brick: the source of everything in its card image.
       ChaOS/ports/bin: ports' runtimes are unpacked with it, as the Brick's
       kernel can't mount them (tools/build-unsquashfs.sh builds it).
       tools/build-portlibs.sh builds them.
+
+  pcsx_rearmed-source.tar.xz
+      PCSX-ReARMed, the PlayStation core (pcsx_rearmed_libretro.so), at
+      libretro/pcsx_rearmed 7b0e8f8f, unchanged (tools/build-pcsx.sh builds
+      it). GPL-2.0. https://github.com/libretro/pcsx_rearmed
 
 The licenses are in the image's Licenses/ folder and in each archive.
 EOF

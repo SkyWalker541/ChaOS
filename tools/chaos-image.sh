@@ -78,6 +78,11 @@ install -m 755 "$ELF" "$C/TortOS/tortos.elf"
 grep -q '::restart:/usr/sbin/tortos-update' "$W/root/etc/inittab" || { echo "inittab has changed: check the updater" >&2; exit 1; }
 install -m 755 "$UPDATER" "$W/root/usr/sbin/tortos-update"
 install -m 755 "$DIATOM" "$C/TortOS/diatom"
+# ChaOS: PlayStation, on PCSX-ReARMed (tools/build-pcsx.sh): ChaOS's own core,
+# beside TortOS's
+[ -d "$C/TortOS/cores" ] || { echo "no cores folder in this image: check the PlayStation core" >&2; exit 1; }
+[ ! -e "$C/TortOS/cores/pcsx_rearmed_libretro.so" ] || { echo "TortOS ships PCSX-ReARMed now: check which to use" >&2; exit 1; }
+install -m 755 "$ROOT/dist/brick/pcsx_rearmed_libretro.so" "$C/TortOS/cores/pcsx_rearmed_libretro.so"
 # ChaOS: ports (src/ports.h). PortMaster's standard places, so its ports and
 # its own app work unchanged: bash at /bin/bash (the root has only BusyBox's
 # sh), /roms for the card's Roms (the card is case-blind, so /roms/ports is
@@ -130,7 +135,7 @@ install -m 644 "$ROOT/res/pico8/README.txt" "$C/TortOS/pico8/README.txt"
 [ -d "$C/TortOS/cards/classic" ] && [ -d "$C/TortOS/cards/fancy" ] || { echo "no cards in the image: check ports" >&2; exit 1; }
 install -m 644 "$ROOT/config/systems.cfg" "$C/TortOS/systems.cfg"
 for set in classic fancy; do
-	for card in FAVORITES MUSE PORTS RECENT PICO8; do
+	for card in FAVORITES MUSE PORTS RECENT PICO8 PS; do
 		install -m 644 "$ROOT/res/cards/$set/$card.png" "$C/TortOS/cards/$set/$card.png"
 	done
 done
@@ -141,6 +146,10 @@ tar -xJOf "$ROOT/dist/brick/bash-source.tar.xz" bash-5.1.16/COPYING > "$C/Licens
 chmod 644 "$C/Licenses/bash.txt"
 tar -xJOf "$ROOT/dist/brick/unsquashfs-source.tar.xz" unsquashfs-source/squashfs-tools/COPYING > "$C/Licenses/squashfs-tools.txt"
 chmod 644 "$C/Licenses/squashfs-tools.txt"
+# PCSX-ReARMed's (GPL-2.0), named ChaOS- so that a small update brings it with
+# the core; its source is in the sources archive
+tar -xJOf "$ROOT/dist/brick/pcsx_rearmed-source.tar.xz" pcsx_rearmed-7b0e8f8f/COPYING > "$C/Licenses/ChaOS-PCSX-ReARMed.md"
+chmod 644 "$C/Licenses/ChaOS-PCSX-ReARMed.md"
 # and the port libraries' licenses, each project's own text
 mkdir -p "$C/Licenses/ports"
 for p in "ogg COPYING" "vorbis COPYING" "flac COPYING.Xiph" "flac COPYING.GPL" "opus COPYING" \
@@ -255,7 +264,12 @@ SYS_ID=$(cd "$W/root" && find . -path ./usr/share/tortos/card -prune -o \( -type
 echo "$SYS_ID" > "$C/ChaOS/SYSTEM"
 chmod 644 "$C/ChaOS/SYSTEM"
 if [ -n "$APP_OUT" ]; then
-	tar -C "$C" --owner=0 --group=0 --sort=name --exclude=ChaOS/cores -cf - ChaOS \
+	# TortOS's cores stay out; ChaOS's PlayStation core goes in, so a small
+	# update brings it
+	EXCL=$(cd "$C" && for f in ChaOS/cores/*; do
+		[ "$f" = ChaOS/cores/pcsx_rearmed_libretro.so ] || printf -- '--exclude=%s ' "$f"; done)
+	# shellcheck disable=SC2086
+	tar -C "$C" --owner=0 --group=0 --sort=name $EXCL -cf - ChaOS \
 		$(cd "$C" && ls Licenses/ChaOS*.md 2>/dev/null) | xz -T0 -9 > "$APP_OUT"
 fi
 echo "system $SYS_ID"

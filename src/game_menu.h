@@ -102,7 +102,7 @@ int gi_rows(menu_row *out, const game_info *gi, bool net);
 /* ---------- the in-game menu ---------------------------------------------- */
 
 typedef enum {
-	GM_CONTINUE, GM_SAVE, GM_LOAD, GM_SHOT, GM_SHOTS, GM_DISPLAY, GM_SHADER, GM_OVERLAY, GM_OVERSCAN,
+	GM_CONTINUE, GM_SAVE, GM_LOAD, GM_DISC, GM_SHOT, GM_SHOTS, GM_DISPLAY, GM_SHADER, GM_OVERLAY, GM_OVERSCAN,
 	GM_BUTTONS, GM_CHEATS,
 	GM_CHEEVOS, GM_RESET,
 	GM_QUIT,
@@ -135,6 +135,9 @@ typedef struct {
 	/* ChaOS: Crop Overscan's choice (overscan.h); the caller leaves the row
 	 * out for a console with none */
 	const char *overscan;
+	/* ChaOS: the disc that is in, "1 of 3", for a game on more than one; the
+	 * caller leaves the row out for the rest */
+	const char *disc;
 } gm_ui;
 
 /* Where the Cheevos row's text lives; the caller owns it, because a row holds

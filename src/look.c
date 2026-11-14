@@ -146,10 +146,10 @@ const char *look_group_label(look_group g)
 /* By tag (systems.cfg), and the name Diatom knows each by, which is the tag
  * in lower case */
 static const char *const CONSOLE_TAG[LOOK_CONSOLES] = {
-	"", "GB", "GBC", "GBA", "NES", "SMS", "MD", "PCE", "SFC", "GG", "NGP", "NGPC"
+	"", "GB", "GBC", "GBA", "NES", "SMS", "MD", "PCE", "SFC", "GG", "NGP", "NGPC", "PS"
 };
 static const char *const CONSOLE_NAME[LOOK_CONSOLES] = {
-	"", "gb", "gbc", "gba", "nes", "sms", "md", "pce", "sfc", "gg", "ngp", "ngpc"
+	"", "gb", "gbc", "gba", "nes", "sms", "md", "pce", "sfc", "gg", "ngp", "ngpc", "ps"
 };
 
 look_console look_console_of(const char *tag)
@@ -172,6 +172,7 @@ look_shader look_shader_of(look_console c)
 	case LOOK_GB: case LOOK_GBC: case LOOK_GBA:
 		return LS_PT;
 	case LOOK_NES: case LOOK_SMS: case LOOK_MD: case LOOK_PCE: case LOOK_SFC:
+	case LOOK_PS:
 		return LS_CRT;
 	case LOOK_GG: case LOOK_NGP: case LOOK_NGPC:
 		return LS_LCD;

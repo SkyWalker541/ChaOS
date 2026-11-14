@@ -279,6 +279,20 @@ bool ra_hash_rom(const char *path, const char *tag, char *out)
 
 	if (!path || !tag || !out) return false;
 	out[0] = '\0';
+	/* ChaOS: never a disc. RetroAchievements hashes a PlayStation or CD game by
+	 * what is ON the disc - its boot program - and not the image, so the
+	 * whole-file MD5 below would be a hash it has never seen; and a disc is up
+	 * to 700MB, read here into the memory of a 1GB device. Until the disc
+	 * rule is here, a disc game has no set to find. */
+	if (!strcmp(tag, "PS")) return false;
+	{
+		const char *dot = strrchr(path, '.');
+		static const char *const discs[] = { ".chd", ".cue", ".bin", ".iso", ".img",
+		                                     ".pbp", ".m3u", ".ccd", ".toc", NULL };
+		int i;
+		for (i = 0; dot && discs[i]; i++)
+			if (!strcasecmp(dot, discs[i])) return false;
+	}
 
 	if (is_zip(path)) {
 		data = zip_largest(path, &len);
@@ -291,7 +305,8 @@ bool ra_hash_rom(const char *path, const char *tag, char *out)
 		fseek(f, 0, SEEK_END);
 		sz = ftell(f);
 		fseek(f, 0, SEEK_SET);
-		if (sz <= 0) { fclose(f); return false; }
+		/* Nothing a cartridge comes to: the largest, a GBA's, is 32MB */
+		if (sz <= 0 || sz > 64L * 1024 * 1024) { fclose(f); return false; }
 		data = malloc((size_t)sz);
 		if (!data) { fclose(f); return false; }
 		if (fread(data, 1, (size_t)sz, f) != (size_t)sz) {

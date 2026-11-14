@@ -526,6 +526,35 @@ bool plat_resident_sync_cheats(const char *path, int timeout_ms)
 	return false;
 }
 
+/* ChaOS: the discs of a game on more than one. `set` >= 0 puts that disc in
+ * first (SETDISC), -1 only asks (DISC); either way Diatom answers DISC with
+ * how many there are and which is in. Called paused, as the cheats are. */
+bool plat_resident_disc(int set, int *count, int *index, int timeout_ms)
+{
+	unsigned t0 = SDL_GetTicks();
+	char *l;
+
+	*count = 0;
+	*index = -1;
+	if (dsock < 0) return false;
+	if (set >= 0 ? !plat_resident_line("SETDISC\tindex=%d", set)
+	             : !plat_resident_line("DISC")) return false;
+	while ((int)(SDL_GetTicks() - t0) < timeout_ms) {
+		l = dline(timeout_ms);
+		if (!l) break;
+		if (strncmp(l, "DISC\t", 5) == 0) {
+			const char *c = strstr(l, "count="), *i = strstr(l, "index=");
+			if (c) *count = atoi(c + 6);
+			if (i) *index = atoi(i + 6);
+			return true;
+		}
+		if (strncmp(l, "LEVEL\t", 6) == 0) d_note_level(l);
+		else if (strncmp(l, "AUDIO\t", 6) == 0) d_note_audio(l);
+		else if (strncmp(l, "DISPLAY\t", 8) == 0) d_note_display(l);
+	}
+	return false;
+}
+
 void plat_resident_set_display(const char *mode)
 {
 	snprintf(g_play_mode, sizeof g_play_mode, "%s", mode ? mode : "");

@@ -33,6 +33,7 @@ static const struct { const char *folder; int id; } SYS[] = {
 	{ "Game Boy Color",       10 },
 	{ "Neo Geo Pocket Color", 82 },
 	{ "Game Boy Advance",     12 },
+	{ "PlayStation",          57 },
 };
 
 int ss_system_id(const char *folder)

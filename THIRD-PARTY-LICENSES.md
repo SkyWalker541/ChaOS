@@ -38,6 +38,7 @@ one it was rebuilt from identically.
 | `fceumm_libretro.so` | NES | GPL-2.0-or-later | https://github.com/libretro/libretro-fceumm at 236ccdf |
 | `mednafen_pce_fast_libretro.so` | TurboGrafx-16 and CD | GPL-2.0 (Mednafen-derived) | https://github.com/libretro/beetle-pce-fast-libretro at bebe2b1 (the binary names no commit; rebuilt from it byte for byte, see `mk/fetch-vendor.sh`) |
 | `mednafen_ngp_libretro.so` | Neo Geo Pocket and Color | GPL-2.0 (Mednafen-derived) | https://github.com/libretro/beetle-ngp-libretro at a50d5ac |
+| `pcsx_rearmed_libretro.so` | PlayStation | GPL-2.0 | https://github.com/libretro/pcsx_rearmed at 7b0e8f8, unchanged; ChaOS's own build (`tools/build-pcsx.sh`), not the buildbot's, its source in the sources archive |
 | `mgba_libretro.so` | Game Boy, Color and Advance | MPL-2.0 | https://github.com/libretro/mgba at e31759b, with mGBA's own fix 543a197 from https://github.com/mgba-emu/mgba, built by `mk/build-mgba-bridge.sh` |
 | `snes9x2010_libretro.so` | SNES | **Non-commercial** | https://github.com/libretro/snes9x2010 at 7db129b |
 | `genesis_plus_gx_libretro.so` | Genesis, Master System, Game Gear | **Non-commercial** | https://github.com/libretro/Genesis-Plus-GX at b7e79b3 |

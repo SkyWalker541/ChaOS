@@ -49,3 +49,14 @@ here. `tools/genrecentwatch.py` lays its dial and inner ring on a modelled
 steel case and crown and renders it (`tools/raymarch.py`), so it turns as the
 other rendered cards do, with the case's side showing, framed as above. It
 replaces the rendered alarm clock (`tools/genrecentfancy.py`), which is kept.
+
+## PS.png
+
+The PlayStation (SCPH-1001, the US model), supplied by SkyWalker541 on
+2026-11-14, downloaded from vhv.rs (an aggregator of PNGs:
+https://www.vhv.rs/viewpic/hxJhoJw_playstation-1-png-transparent-png/), its
+transparency flattened there onto a white and grey checkerboard. It is the photograph from Evan Amos's set on Wikimedia
+Commons, released by him into the public domain, as the consoles above are.
+The checkerboard was taken off by filling from the edges over near-white,
+neutral pixels only - the console's own grey is darker - then trimmed and
+scaled as above, longest side 96% of 384.

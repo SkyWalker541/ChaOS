@@ -229,6 +229,10 @@ void plat_resident_set_display(const char *mode);
 void plat_resident_set_cheats(const char *path);
 /* ChaOS: cheats now, to the paused game; true when Diatom took them */
 bool plat_resident_sync_cheats(const char *path, int timeout_ms);
+/* ChaOS: a game's discs, while it is paused: set >= 0 puts that one in (from
+ * 0), -1 only asks. count 0 for a game on one disc, or a Diatom without discs.
+ * False when Diatom did not answer. */
+bool plat_resident_disc(int set, int *count, int *index, int timeout_ms);
 void plat_resident_set_zone(const char *tz);
 /* The paused frame as the shader draws it, the size of the game's rect, or
  * NULL when the game is not shaded. Written by Diatom on the way into its

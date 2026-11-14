@@ -19,7 +19,7 @@ const char *rm_button_label(int i) { return i >= 0 && i < RM_BUTTONS ? BTN_LABEL
 /* Each console's pad, as its core names the retropad's buttons (their input
  * descriptors), in the order a player reads them */
 typedef struct { const char *target, *label; } pad_btn;
-typedef struct { const char *tags; pad_btn btn[9]; } pad;
+typedef struct { const char *tags; pad_btn btn[RM_BUTTONS]; } pad;
 
 static const pad PADS[] = {
 	/* FCEUmm, mGBA */
@@ -44,6 +44,11 @@ static const pad PADS[] = {
 	/* Beetle PCE Fast */
 	{ "PCE", { { "a", "I" }, { "b", "II" }, { "select", "Select" },
 	           { "start", "Run" } } },
+	/* ChaOS: PCSX-ReARMed, the PlayStation pad (its input descriptors: B is
+	 * Cross, A Circle, Y Square, X Triangle) */
+	{ "PS", { { "b", "Cross" }, { "a", "Circle" }, { "y", "Square" }, { "x", "Triangle" },
+	          { "l1", "L1" }, { "r1", "R1" }, { "l2", "L2" }, { "r2", "R2" },
+	          { "select", "Select" }, { "start", "Start" } } },
 	/* Beetle NeoPop */
 	{ "NGP NGPC", { { "a", "A" }, { "b", "B" }, { "start", "Option" } } },
 };
@@ -67,9 +72,9 @@ int rm_choices(const char *tag, rm_choice *out)
 	const pad *p = pad_of(tag);
 	int n = 0, i;
 
-	for (i = 0; i < 9 && p->btn[i].target; i++)
+	for (i = 0; i < RM_BUTTONS && p->btn[i].target; i++)
 		out[n++] = (rm_choice){ p->btn[i].target, p->btn[i].label, false };
-	for (i = 0; i < 9 && p->btn[i].target; i++)
+	for (i = 0; i < RM_BUTTONS && p->btn[i].target; i++)
 		if (strcmp(p->btn[i].target, "select") && strcmp(p->btn[i].target, "start") &&
 		    strncmp(p->btn[i].label, "Turbo", 5))
 			out[n++] = (rm_choice){ p->btn[i].target, p->btn[i].label, true };

@@ -111,6 +111,7 @@ its authors' work.
 | FCEUmm | NES | GPL-2.0-or-later | https://github.com/libretro/libretro-fceumm |
 | Beetle PCE Fast | TurboGrafx-16 and CD | GPL-2.0 | https://github.com/libretro/beetle-pce-fast-libretro |
 | Beetle NeoPop | Neo Geo Pocket and Color | GPL-2.0 | https://github.com/libretro/beetle-ngp-libretro |
+| PCSX-ReARMed | PlayStation (ChaOS's own build, `tools/build-pcsx.sh`) | GPL-2.0 | https://github.com/libretro/pcsx_rearmed |
 | mGBA | Game Boy, Color and Advance | MPL-2.0 | https://github.com/libretro/mgba |
 | Snes9x 2010 | SNES | **Non-commercial** | https://github.com/libretro/snes9x2010 |
 | Genesis Plus GX | Genesis, Master System, Game Gear | **Non-commercial** | https://github.com/libretro/Genesis-Plus-GX |

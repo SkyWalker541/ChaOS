@@ -72,6 +72,15 @@ static const db_default library_defaults[] = {
 	 * Donkey Kong Country 1.55x to 1.63x and Sonic 2.05x at 3x and 4x. */
 	{ "coreopt..snes9x_2010_frameskip",     "auto" },
 	{ "coreopt..genesis_plus_gx_frameskip", "auto" },
+	/* ChaOS: PCSX-ReARMed. The same frameskip, for fast forward. Drawing on a
+	 * second core of the four, which the game's CPU never waits on. No second
+	 * memory card, which it would otherwise keep as a shared file in Bios/
+	 * beside the firmware: a game's card is its .srm in Saves/, as every
+	 * console's save is. And none of its own messages over the game. */
+	{ "coreopt..pcsx_rearmed_frameskip_type",       "auto" },
+	{ "coreopt..pcsx_rearmed_gpu_thread_rendering", "enabled" },
+	{ "coreopt..pcsx_rearmed_memcard2",             "none" },
+	{ "coreopt..pcsx_rearmed_display_info",         "disabled" },
 };
 
 const db_default *db_defaults(db_scope scope, size_t *count)

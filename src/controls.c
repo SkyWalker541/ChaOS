@@ -112,7 +112,7 @@ const char *ctl_console_short(const char *tag, const char *name)
 	static const char *const SHORT[][2] = {
 		{ "GB", "GB" }, { "GBC", "GBC" }, { "GBA", "GBA" }, { "NES", "NES" },
 		{ "SFC", "SNES" }, { "MD", "Genesis" }, { "SMS", "SMS" }, { "GG", "GG" },
-		{ "PCE", "TG-16" }, { "NGP", "NGP" }, { "NGPC", "NGPC" },
+		{ "PCE", "TG-16" }, { "NGP", "NGP" }, { "NGPC", "NGPC" }, { "PS", "PS1" },
 	};
 	size_t i;
 	for (i = 0; tag && i < sizeof SHORT / sizeof SHORT[0]; i++)

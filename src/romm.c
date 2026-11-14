@@ -327,6 +327,7 @@ static const struct { const char *slug, *tag; } g_map[] = {
 	{ "snes", "SFC" }, { "sfam", "SFC" }, { "super-famicom", "SFC" },
 	{ "neo-geo-pocket", "NGP" }, { "ngp", "NGP" },
 	{ "neo-geo-pocket-color", "NGPC" }, { "ngpc", "NGPC" },
+	{ "ps", "PS" }, { "psx", "PS" }, { "playstation", "PS" },
 };
 
 const char *romm_tag_for(const char *slug, const char *fs_slug)

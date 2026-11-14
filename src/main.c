@@ -11190,8 +11190,13 @@ static void os_cycle(const char *tag, int d, bool live)
 static int  g_cht_on;
 static bool g_cht_cheated;
 
+/* ChaOS: the paused game's discs, asked as the in-game menu opens: how many,
+ * and which is in, from 0. Fewer than two leaves the Disc row out. */
+static int g_disc_n, g_disc_i;
+
 static int gm_build(app *a, menu_row *out, gm_bufs *b, int shots, const char *shot_said)
 {
+	static char disc[24];
 	gm_ui u;
 
 	u.shots = shots;
@@ -11217,6 +11222,11 @@ static int gm_build(app *a, menu_row *out, gm_bufs *b, int shots, const char *sh
 	{
 		sysview *sv = &a->view[a->sys_cursor];
 		u.overscan = os_label(a->sys.systems[shelf_owner(a, a->sys_cursor, sv->cursor)].tag);
+	}
+	u.disc = NULL;
+	if (g_disc_n > 1) {
+		snprintf(disc, sizeof disc, "%d of %d", g_disc_i + 1, g_disc_n);
+		u.disc = disc;
 	}
 	return gm_rows(&u, out, b);
 }
@@ -13807,6 +13817,17 @@ static menu_result gm_key(app *a, void *ctx, in_button key, int sel)
 		os_cycle(a->sys.systems[gm_owner(a)].tag, key == IN_LEFT ? -1 : 1, true);
 		return MENU_STAY;
 	}
+	if (sel == GM_DISC && g_disc_n > 1 && (key == IN_LEFT || key == IN_RIGHT || key == IN_ACCEPT)) {
+		/* ChaOS: the next disc in, or the one before, round the set. The
+		 * game sees its tray open and close, as when a disc is changed. */
+		int want = (g_disc_i + (key == IN_LEFT ? g_disc_n - 1 : 1)) % g_disc_n, n, i;
+
+		if (plat_resident_disc(want, &n, &i, 2000) && n > 1) {
+			g_disc_n = n;
+			g_disc_i = i;
+		}
+		return MENU_STAY;
+	}
 	if (sel == GM_OVERLAY && (key == IN_LEFT || key == IN_RIGHT || key == IN_ACCEPT)) {
 		overlay_cycle(a, gm_owner(a), key == IN_LEFT ? -1 : 1);
 		gm_apply_overlay(c);
@@ -14191,6 +14212,9 @@ static void game_menu(app *a)
 		              cht_offered(&a->sys, gm_owner(a), sv->list.items[sv->cursor].file);
 		c.hide[GM_CHEATS] = !c.cht_shown;
 		c.hide[GM_OVERSCAN] = !os_for(a->sys.systems[gm_owner(a)].tag);
+		/* ChaOS: the discs, for a game on more than one */
+		if (!plat_resident_disc(-1, &g_disc_n, &g_disc_i, 500)) g_disc_n = 0;
+		c.hide[GM_DISC] = g_disc_n < 2;
 	}
 	/* The frame as the shader drew it, when it did: what the player was
 	 * looking at. And the overlay over it. */
@@ -20485,9 +20509,16 @@ static void take_shot(app *a)
 
 		memset(&gb, 0, sizeof gb);
 		gn = gm_build(a, rows, &gb, 2, NULL);
-		/* ChaOS: Crop Overscan left out as gm_menu_build leaves it out */
+		/* ChaOS: Disc and Crop Overscan left out as gm_menu_build leaves
+		 * them out; a shot has a disc row only when --gmdisc gives discs */
+		if (g_disc_n < 2) {
+			memmove(&rows[GM_DISC], &rows[GM_DISC + 1], sizeof *rows * (size_t)(gn - GM_DISC - 1));
+			gn--;
+		}
 		if (!os_for(a->sys.systems[gm_owner(a)].tag)) {
-			memmove(&rows[GM_OVERSCAN], &rows[GM_OVERSCAN + 1], sizeof *rows * (size_t)(gn - GM_OVERSCAN - 1));
+			/* one up, when Disc went */
+			int at = GM_OVERSCAN - (g_disc_n < 2);
+			memmove(&rows[at], &rows[at + 1], sizeof *rows * (size_t)(gn - at - 1));
 			gn--;
 		}
 		menu_draw(a, NULL, rows, gn, shot_gmenu < gn ? shot_gmenu : 0, 0, MENU_ACCENT);
@@ -20795,6 +20826,8 @@ int main(int argc, char *argv[])
 		/* --menu [row] draws the TortOS menu over whichever screen --screen
 		 * asked for, so the panel can be looked at without a device. */
 		else if (!strcmp(argv[i], "--gmenu") && i + 1 < argc) shot_gmenu = atoi(argv[++i]);
+		/* ChaOS: --gmdisc N, the in-game menu of a game on N discs, the first in */
+		else if (!strcmp(argv[i], "--gmdisc") && i + 1 < argc) { g_disc_n = atoi(argv[++i]); g_disc_i = 0; }
 		else if (!strcmp(argv[i], "--cheats") && i + 2 < argc) {
 			shot_cheats = atoi(argv[++i]);
 			shot_cheats_file = argv[++i];

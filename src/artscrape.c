@@ -92,6 +92,7 @@ static const struct { const char *folder, *remote, *remote2; } MAP[] = {
 	 * shelves rather than one mixed one. */
 	{ "Neo Geo Pocket",       "SNK - Neo Geo Pocket", NULL },
 	{ "Neo Geo Pocket Color", "SNK - Neo Geo Pocket Color", NULL },
+	{ "PlayStation",          "Sony - PlayStation", NULL },
 };
 #define MAP_N ((int)(sizeof MAP / sizeof MAP[0]))
 
