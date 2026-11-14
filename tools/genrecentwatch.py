@@ -47,11 +47,12 @@ def frame(p):
 
 
 # The picture's polished silver: a bright metal, glossy enough to carry the
-# studio's softbox and dark floor as the picture's case carries its bands
+# studio's softbox and dark floor as the picture's case carries its bands, and
+# lifted a little (emit) so its side reads silver, not the floor's grey
 STEEL = (236, 237, 239)
-MATS = [rm.Mat(STEEL, gloss=0.8, metal=True),                                # 0 case
+MATS = [rm.Mat(STEEL, gloss=0.8, metal=True, emit=0.18),                     # 0 case
         rm.Mat(lambda p: FACE(frame(p)), gloss=0.55, spec=0.3, emit=0.95),  # 1 face, under glass
-        rm.Mat((240, 241, 243), gloss=0.9, metal=True)]                     # 2 polished rim and crown
+        rm.Mat((240, 241, 243), gloss=0.9, metal=True, emit=0.25)]           # 2 polished rim and crown
 
 
 def scene(p):
