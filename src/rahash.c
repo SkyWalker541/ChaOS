@@ -245,6 +245,27 @@ static size_t ra_skip(const char *tag, const unsigned char *d, size_t n)
 	return 0;
 }
 
+/* ChaOS: an MD5 in pieces, for rahash_disc.c */
+void ra_md5_begin(void **ctx)
+{
+	md5_ctx *m = malloc(sizeof *m);
+	if (m) md5_init(m);
+	*ctx = m;
+}
+
+void ra_md5_add(void *ctx, const void *data, size_t len)
+{
+	if (ctx) md5_update(ctx, data, len);
+}
+
+void ra_md5_end(void *ctx, char *out)
+{
+	out[0] = '\0';
+	if (!ctx) return;
+	md5_hex(ctx, out);
+	free(ctx);
+}
+
 void ra_md5_hex(const void *data, size_t len, char *out)
 {
 	md5_ctx m;
@@ -279,12 +300,11 @@ bool ra_hash_rom(const char *path, const char *tag, char *out)
 
 	if (!path || !tag || !out) return false;
 	out[0] = '\0';
-	/* ChaOS: never a disc. RetroAchievements hashes a PlayStation or CD game by
-	 * what is ON the disc - its boot program - and not the image, so the
-	 * whole-file MD5 below would be a hash it has never seen; and a disc is up
-	 * to 700MB, read here into the memory of a 1GB device. Until the disc
-	 * rule is here, a disc game has no set to find. */
-	if (!strcmp(tag, "PS")) return false;
+	/* ChaOS: a PlayStation disc by RetroAchievements' disc rule - the program
+	 * on it, not the image (rahash_disc.c). Any other disc not at all: the
+	 * whole-file MD5 below would be a hash RA has never seen, and a disc is
+	 * up to 700MB, read here into the memory of a 1GB device. */
+	if (!strcmp(tag, "PS")) return ra_hash_psx(path, out);
 	{
 		const char *dot = strrchr(path, '.');
 		static const char *const discs[] = { ".chd", ".cue", ".bin", ".iso", ".img",

@@ -24,6 +24,11 @@
  * `tag` is a systems.cfg tag - NES, SFC, MD, GB. False means the file could
  * not be read or the archive could not be opened. */
 bool ra_hash_rom(const char *path, const char *tag, char *out);
+/* ChaOS: a PlayStation disc's, by RetroAchievements' rule for it: the program
+ * the disc boots, found through SYSTEM.CNF (rahash_disc.c). `path` a .cue,
+ * .bin, .iso, .img, .ccd, .m3u or .chd; false for a .pbp, or a disc it cannot
+ * read. Same 33-byte output. */
+bool ra_hash_psx(const char *path, char *out);
 
 /* Plain MD5 of a buffer, same 33-byte output. Exposed because submitting an
  * unlock needs one too: RetroAchievements signs the request with

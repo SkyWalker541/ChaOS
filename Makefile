@@ -425,10 +425,15 @@ build-native/artrun-check: tools/artrun-check.c src/artscrape.c src/artscrape.h 
 check-rahash: build-native/rahash-check
 	@python3 tools/rahash-check.py
 
-build-native/rahash-check: tools/rahash-check.c src/rahash.c src/rahash.h FORCE
+# ChaOS: libchdr, for a .chd's hash (src/rahash_disc.c), built once
+build-native/chd.o: lib/libchdr/chaos_chd.c
+	@mkdir -p build-native
+	$(CC) -c -O2 -w -DCHDR_SYSTEM_ZLIB -Ilib/libchdr/include -o $@ $<
+
+build-native/rahash-check: tools/rahash-check.c src/rahash.c src/rahash_disc.c src/rahash.h build-native/chd.o FORCE
 	@mkdir -p build-native
 	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g \
-	      -o $@ tools/rahash-check.c src/rahash.c -lz
+	      -o $@ tools/rahash-check.c src/rahash.c src/rahash_disc.c build-native/chd.o -lz
 
 # The two set converters - one C on the device, one Python in the bulk tool -
 # over real RetroAchievements responses. Needs credentials and a network;
@@ -436,10 +441,10 @@ build-native/rahash-check: tools/rahash-check.c src/rahash.c src/rahash.h FORCE
 check-raset: build-native/raset-check
 	@python3 tools/raset-check.py
 
-build-native/raset-check: tools/raset-check.c src/rafetch.c src/rajson.c src/rahash.c src/net.c src/atomic.c src/db.c FORCE
+build-native/raset-check: tools/raset-check.c src/rafetch.c src/rajson.c src/rahash.c src/rahash_disc.c src/net.c src/atomic.c src/db.c build-native/chd.o FORCE
 	@mkdir -p build-native
 	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g -DTORTOS_VERSION='"check"' \
-	      -o $@ tools/raset-check.c src/rafetch.c src/rajson.c src/rahash.c src/net.c src/atomic.c src/db.c -lsqlite3 -lz
+	      -o $@ tools/raset-check.c src/rafetch.c src/rajson.c src/rahash.c src/rahash_disc.c src/net.c src/atomic.c src/db.c build-native/chd.o -lsqlite3 -lz
 
 # Whether this build can reach ScreenScraper, and whether an account survives
 # a restart. The live half needs a network and .screenscraper.env, and skips

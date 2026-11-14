@@ -55,6 +55,11 @@ FORCE:
 $(NOTES): FORCE
 	@sh mk/notes.sh $@
 
-$(BUILD)/tortos: $(SRC) $(CREDS) $(NOTES) $(wildcard src/*.h)
+# ChaOS: libchdr (see mk/cross.mk)
+$(BUILD)/chd.o: lib/libchdr/chaos_chd.c
 	mkdir -p $(BUILD)
-	$(CC) $(CFLAGS) -o $@ $(SRC) $(LDLIBS)
+	$(CC) -c -O2 -w -DCHDR_SYSTEM_ZLIB -Ilib/libchdr/include -o $@ $<
+
+$(BUILD)/tortos: $(SRC) $(CREDS) $(NOTES) $(wildcard src/*.h) $(BUILD)/chd.o
+	mkdir -p $(BUILD)
+	$(CC) $(CFLAGS) -o $@ $(SRC) $(BUILD)/chd.o $(LDLIBS)
