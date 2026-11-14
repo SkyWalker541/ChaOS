@@ -268,7 +268,7 @@
     <div class="tip"><h4>Curvature costs</h4><p>The CRT starts flat. Curvature works, but takes about twice the CPU, so check the speed after turning it on.</p></div>
     <div class="tip"><h4>PT's grid wants Integer</h4><p>PT's <b>Pixel Effect</b> follows the game's pixels, so it's drawn in Display Mode <b>Integer</b> only. For a grid in Aspect or Stretch, use lcd3x.</p></div>
   </div>
-  <div class="callout"><b>Game Boy or Color, by the cartridge.</b> Both folders take <code>.gb</code> and <code>.gbc</code> files, and each game plays on the machine its cartridge was made for, so a GB Studio color game named <code>.gb</code> plays in color. Now and then ChaOS also looks for games in the other folder, after ChaOS Transfer sends some and once a week, and asks before moving them, saves, play time and box art included. <b>MENU &gt; ROM Management &gt; Sort Game Boy Games</b> does it whenever you like.</div>
+  <div class="callout"><b>Game Boy or Color, by the cartridge.</b> Each Game Boy game plays on the machine it was made for, whatever its file is called, and ChaOS can sort them into the right folders: see <a href="#gbsort">Game Boy or Color, sorted</a>.</div>
   <div class="callout"><b>PT sets the emulator for you.</b> With PT on, ChaOS sets mGBA the way the shader is tuned for, by its Game System: color correction and frame blending off and a plain grayscale palette for Game Boy, GBC color correction for Game Boy Color, GBA color correction with Smart blending for GBA SP and LCD ghosting for the original GBA. Turn PT off and they go back. It all changes at once, in the in-game menu too.</div>
 
   <!-- Speed check -->
@@ -479,8 +479,26 @@
     </figure>
   </article>
 
+  <!-- Game Boy sorting -->
+  <article class="feature flip" id="gbsort">
+    <div class="feature-text">
+      <h3>Game Boy or Color, sorted <span class="tag">ChaOS</span></h3>
+      <p>Lots of new Game Boy games come from indie developers, on <a href="https://itch.io/games/tag-game-boy-color">itch.io</a> and elsewhere, many made with <b>GB Studio</b>. Plenty of them are Game Boy Color games named <code>.gb</code>, so they end up in the Game Boy folder, where they either don't show up or start in black and white, or tell you they need a Game Boy Color. Some black-and-white games come named <code>.gbc</code> the other way round.</p>
+      <ul>
+        <li><b>Every game plays right, wherever it is.</b> Both folders show <code>.gb</code>, <code>.gbc</code>, <code>.cgb</code> and <code>.dmg</code> files. ChaOS reads the game's header, which says what it was made for, and plays it on that machine: Color games in color, black-and-white games exactly as they were, never tinted. Zipped games too.</li>
+        <li><b>And ChaOS sorts them for you.</b> After ChaOS Transfer sends anything, and once a week, it looks in the background for games in the wrong folder (never while you play, and it only reads new files). If it finds any, it asks: <b>Move Them</b> or <b>Not Now</b>. Not Now is remembered.</li>
+        <li><b>Everything goes with the game:</b> its saves and save states, box art, play time and its place in Recently Played, favorite, cheats, game info and RomM link.</li>
+        <li><b>MENU &gt; ROM Management &gt; Sort Game Boy Games</b> lists every game in the wrong folder whenever you like. <kbd>A</kbd> moves one, <b>Move All</b> moves the lot.</li>
+      </ul>
+    </div>
+    <figure class="device" data-screens='[["gb-sort-ask","The question"],["gb-sort","Sort Game Boy Games"]]'>
+      <div class="bezel"><img src="img/gb-sort-ask.webp" alt="" loading="lazy" width="1024" height="768"></div>
+      <figcaption class="chips"></figcaption>
+    </figure>
+  </article>
+
   <!-- Muse -->
-  <article class="feature flip" id="muse">
+  <article class="feature" id="muse">
     <div class="feature-text">
       <h3>Muse: music and audiobooks</h3>
       <ul>
@@ -505,7 +523,7 @@
   </article>
 
   <!-- Look & settings -->
-  <article class="feature" id="look">
+  <article class="feature flip" id="look">
     <div class="feature-text">
       <h3>Look and settings</h3>
       <ul>
@@ -576,6 +594,7 @@
   </div>
   <div class="releases">
     <h3>Recent releases</h3>
+    <div class="rel"><span class="ver">2.3.0</span><p><a href="#gbsort">Game Boy or Color, sorted</a>: every Game Boy game plays on the machine it was made for, and ChaOS offers to move the ones in the wrong folder, saves and all. PT SkyWalker541 now sets the emulator the way it's tuned for. A rendered watch for Recently Played and a new arcade stick for Ports in Fancy Pants.</p></div>
     <div class="rel"><span class="ver">2.2.0</span><p><a href="#pico8">PICO-8</a> with your own copy, Splore included. <a href="#sync">Syncthing</a> for saves, games and BIOS on all your devices, beside RomM in the new <b>ROM Management</b> menu. ChaOS Transfer opens folders of thousands of games, from TortOS 2.2.1.</p></div>
     <div class="rel"><span class="ver">2.1.2</span><p><a href="#display">Crop Overscan</a> for NES, TurboGrafx-16 and Master System, in the console's menu and the in-game menu.</p></div>
     <div class="rel"><span class="ver">2.1.1</span><p>Port pages keep their facts clear of the description, and What's New and other scrolling cards keep their text inside the card, fading at its edges.</p></div>

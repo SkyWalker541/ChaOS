@@ -26,6 +26,7 @@ ChaOS is custom firmware for the **TrimUI Brick** and **Brick Hammer**. It runs 
 | **[Cheats](https://skywalker541.github.io/ChaOS/#cheats)** | Game Genie, Action Replay and GameShark codes from libretro's cheat database, switched on and off in the in-game menu |
 | **[Ports](https://skywalker541.github.io/ChaOS/#ports)** | PortMaster's catalog on the Brick, with runtimes and libraries fetched for you |
 | **[PICO-8](https://skywalker541.github.io/ChaOS/#pico8)** | Your own copy of PICO-8, with Splore for the carts people share |
+| **[Game Boy or Color, sorted](https://skywalker541.github.io/ChaOS/#gbsort)** | Indie games named `.gb` that are really Game Boy Color play in color, and ChaOS offers to move them to the right folder with their saves, play time and covers |
 | **[RomM and Syncthing](https://skywalker541.github.io/ChaOS/#sync)** | In ROM Management: games, saves and BIOS from your own RomM server, and saves, games and BIOS kept the same on all your devices |
 | **[A look of its own](https://skywalker541.github.io/ChaOS/#shelves)** | Pixel Names and Pixel Cards themes, Game List View, letter scrubbing, menu colors |
 | **[Rewind, mapping, screenshots](https://skywalker541.github.io/ChaOS/#playing)** | Alongside TortOS's instant start, resume, fast forward, turbo and RetroAchievements |
