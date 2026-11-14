@@ -67,6 +67,8 @@ void xfer_init(const char *roms_dir, const char *card_dir,
 	add_root("screenshots", "Screenshots", "%s/Screenshots", card_dir, false);
 	/* ChaOS: cheats, a .cht per game in a folder per console (cheats.h) */
 	add_root("cheats", "Cheats", "%s/Cheats", card_dir, false);
+	/* ChaOS: PICO-8, the player's own copy of it (pico8.h) */
+	add_root("pico8", "PICO-8", "%s/PICO-8", card_dir, false);
 }
 
 int xfer_root_count(void) { return g_nroots; }

@@ -25,7 +25,8 @@ ChaOS is custom firmware for the **TrimUI Brick** and **Brick Hammer**. It runs 
 | **[Shaders and overlays](https://skywalker541.github.io/ChaOS/#shaders)** | CRT, LCD and PT SkyWalker541 looks you can tune, frames around the picture, overscan cropping, and a [speed check](https://skywalker541.github.io/ChaOS/#speed) that says whether a game keeps full speed |
 | **[Cheats](https://skywalker541.github.io/ChaOS/#cheats)** | Game Genie, Action Replay and GameShark codes from libretro's cheat database, switched on and off in the in-game menu |
 | **[Ports](https://skywalker541.github.io/ChaOS/#ports)** | PortMaster's catalog on the Brick, with runtimes and libraries fetched for you |
-| **[RomM](https://skywalker541.github.io/ChaOS/#romm)** | Games, save sync and BIOS files from your own server |
+| **[PICO-8](https://skywalker541.github.io/ChaOS/#pico8)** | Your own copy of PICO-8, with Splore for the carts people share |
+| **[RomM and Syncthing](https://skywalker541.github.io/ChaOS/#sync)** | In ROM Management: games, saves and BIOS from your own RomM server, and saves, games and BIOS kept the same on all your devices |
 | **[A look of its own](https://skywalker541.github.io/ChaOS/#shelves)** | Pixel Names and Pixel Cards themes, Game List View, letter scrubbing, menu colors |
 | **[Rewind, mapping, screenshots](https://skywalker541.github.io/ChaOS/#playing)** | Alongside TortOS's instant start, resume, fast forward, turbo and RetroAchievements |
 | **[Transfer and Wire](https://skywalker541.github.io/ChaOS/#transfer)** | Add games and covers from any browser, over Wi-Fi or the USB cable |

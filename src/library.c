@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "library.h"
+#include "pico8.h"
 
 #include <dirent.h>
 #include <stdio.h>
@@ -205,6 +206,11 @@ bool lib_scan(const char *roms_root, const char *folder, const char *exts,
 			continue;
 		}
 		if (!is_file(full, e)) continue;
+		/* ChaOS: on the PICO-8 shelf a .png is a cart only as .p8.png */
+		if (ext_of(e->d_name) && !strcasecmp(ext_of(e->d_name), "png") && !p8_is_cart(e->d_name)) {
+			note_skip(out, e->d_name);
+			continue;
+		}
 		if (n == cap) {
 			/* Grow cap only once the memory is actually there. Doubling it
 			 * first and then bailing would leave the second pass believing
@@ -225,6 +231,10 @@ bool lib_scan(const char *roms_root, const char *folder, const char *exts,
 		}
 		dot = strrchr(list[n].name, '.');
 		if (dot && dot != list[n].name) *dot = '\0';
+		/* ChaOS: and a PICO-8 cart's .p8 of .p8.png */
+		if (p8_is_cart(e->d_name) && (dot = strrchr(list[n].name, '.')) &&
+		    dot != list[n].name && !strcasecmp(dot, ".p8"))
+			*dot = '\0';
 		lib_title(list[n].name, list[n].title, sizeof list[n].title);
 		n++;
 	}

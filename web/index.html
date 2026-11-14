@@ -22,6 +22,7 @@
     <a href="#features">Features</a>
     <a href="#shaders">Shaders</a>
     <a href="#ports">Ports</a>
+    <a href="#sync">Sync</a>
     <a href="#updates">Updates</a>
     <a href="#faq">FAQ</a>
     <a href="#credits">Credits</a>
@@ -34,7 +35,7 @@
 <section class="hero">
   <div class="hero-text">
     <img class="lockup" id="lockup" src="img/lockup.png" alt="ChaOS" width="588" height="192" title="Play the boot again">
-    <p class="lede">Custom firmware for the <b>TrimUI Brick</b>. Eleven classic consoles with shader and overlay support, PC games through PortMaster, your own RomM library, and your music, all from the handheld.</p>
+    <p class="lede">Custom firmware for the <b>TrimUI Brick</b>. Eleven classic consoles with shader and overlay support, PC games through PortMaster, PICO-8 with your own copy, your games and saves on all your devices with RomM and Syncthing, and your music, all from the handheld.</p>
     <div class="cta">
       <a class="btn primary" href="https://github.com/SkyWalker541/ChaOS-Installer/releases/latest">Get ChaOS Installer</a>
       <a class="btn" href="https://github.com/SkyWalker541/ChaOS/releases/latest">Latest release</a>
@@ -50,7 +51,7 @@
   <div class="tile"><h3>Games start instantly</h3><p>The emulator is already running, so a game is up the moment you press A, and picks up where you stopped.</p></div>
   <div class="tile"><h3>Shaders and overlays</h3><p>CRT, LCD and PT SkyWalker541 looks you can tune, frames around the picture, and a check that says if the game keeps its speed.</p></div>
   <div class="tile"><h3>Ports from the Brick</h3><p>Browse PortMaster's catalog and install ports, with their runtimes and libraries.</p></div>
-  <div class="tile"><h3>Your RomM library</h3><p>Download games from your own server, sync saves, fetch BIOS files.</p></div>
+  <div class="tile"><h3>Your games, everywhere</h3><p>Your own RomM library, and Syncthing to keep saves, games and BIOS the same on your other devices.</p></div>
   <div class="tile"><h3>Music and audiobooks</h3><p>Muse plays from anywhere, with Bluetooth headphones and a pocket lock screen.</p></div>
   <div class="tile"><h3>Your Brick stays yours</h3><p>ChaOS runs from the SD card. Take it out and the Brick boots its own system.</p></div>
 </section>
@@ -411,10 +412,34 @@
   </div>
 
   <!-- RomM -->
-  <article class="feature" id="romm">
+  <!-- PICO-8 -->
+  <article class="feature" id="pico8">
+    <div class="feature-text">
+      <h3>PICO-8, with your own copy <span class="tag">ChaOS</span></h3>
+      <p><a href="https://www.lexaloffle.com/pico-8.php">PICO-8</a> is Lexaloffle's fantasy console. ChaOS doesn't include it: if you've bought it, the Brick runs your copy.</p>
+      <ol>
+        <li>From your Lexaloffle account, download the <b>Raspberry Pi</b> version (<code>pico-8_&lt;version&gt;_raspi.zip</code>).</li>
+        <li>Put the zip in the card's <code>PICO-8</code> folder, with <b>ChaOS Transfer</b> (it has a <b>PICO-8</b> place) or a card reader. ChaOS takes out the two files it needs, <code>pico8_64</code> and <code>pico8.dat</code>. Copying just those two works as well.</li>
+        <li>A <b>PICO-8</b> shelf appears. Its first card is <b>Splore</b>, PICO-8's browser of the carts people share, over Wi-Fi.</li>
+      </ol>
+      <ul>
+        <li>Your own carts, <code>.p8</code> and <code>.p8.png</code>, go in <code>Roms/PICO-8</code>. A <code>.p8.png</code> cart is its own cover.</li>
+        <li><kbd>B</kbd> and <kbd>A</kbd> are PICO-8's <b>O</b> and <b>X</b>; <kbd>Y</kbd>/<kbd>X</kbd> and <kbd>L1</kbd>/<kbd>R1</kbd> are the same two again. <kbd>START</kbd> or <kbd>MENU</kbd> opens PICO-8's pause menu. Hold <kbd>SELECT</kbd>+<kbd>START</kbd> to quit; <kbd>POWER</kbd> works as it does in a port.</li>
+        <li>Its settings, cart saves and Splore favourites are kept in ChaOS's userdata and stay through updates. Play time counts as it does for any game.</li>
+        <li>Splore's downloads go through <code>curl</code>, as spruceUI does it, since the Brick's own <code>wget</code> can't reach https.</li>
+      </ul>
+    </div>
+    <figure class="device" data-screens='[["pico8-shelf","The shelf"],["pico8-games","Splore and carts"]]'>
+      <div class="bezel"><img src="img/pico8-shelf.webp" alt="" loading="lazy" width="1024" height="768"></div>
+      <figcaption class="chips"></figcaption>
+    </figure>
+  </article>
+
+  <!-- RomM -->
+  <article class="feature flip" id="romm">
     <div class="feature-text">
       <h3>RomM <span class="tag">ChaOS</span></h3>
-      <p><a href="https://romm.app">RomM</a> is a game library you run on your own computer or NAS. <b>MENU &gt; RomM</b> connects the Brick to it over Wi-Fi.</p>
+      <p><a href="https://romm.app">RomM</a> is a game library you run on your own computer or NAS. <b>MENU &gt; ROM Management &gt; RomM</b> connects the Brick to it over Wi-Fi.</p>
       <ul>
         <li><b>Sign in</b>: set <b>Server</b> to its address, like <code>nas.local:8080</code>, then <b>Sign In</b>. On RomM 5 the Brick shows a short code to approve in RomM's web page; on RomM 4, make a pairing code in RomM (your profile, Client API Tokens) and type it in. Only a device token is kept, never a password.</li>
         <li><b>Games</b>: your library by console, with covers. <kbd>A</kbd> downloads a game onto its shelf with RomM's cover as its box art. A game in several files comes as a folder.</li>
@@ -422,8 +447,32 @@
         <li><b>BIOS</b>: the firmware RomM keeps for ChaOS's consoles, into <code>Bios/</code>.</li>
       </ul>
     </div>
-    <figure class="device" data-screens='[["romm","RomM"]]'>
+    <figure class="device" data-screens='[["romm","RomM"],["rom-management","ROM Management"]]'>
       <div class="bezel"><img src="img/romm.webp" alt="" loading="lazy" width="1024" height="768"></div>
+      <figcaption class="chips"></figcaption>
+    </figure>
+  </article>
+
+  <!-- Syncthing -->
+  <article class="feature" id="sync">
+    <div class="feature-text">
+      <h3>Syncthing <span class="tag">ChaOS</span></h3>
+      <p><a href="https://syncthing.net">Syncthing</a> keeps folders the same on your devices, over your own network, with no server in between: the Brick's saves with RetroArch on your computer, its games with another Brick. <b>MENU &gt; ROM Management &gt; Syncthing</b>.</p>
+      <ol>
+        <li><b>Get Syncthing</b> downloads it (about 13 MB) from Syncthing's own release, checked against its published checksum, and turns it on.</li>
+        <li>On a computer running Syncthing, choose <b>Add Remote Device</b>. The Brick is in the list of nearby devices; pick it.</li>
+        <li>On the Brick, <i>"&lt;computer&gt; wants to pair"</i> appears. <kbd>A</kbd> pairs, <kbd>X</kbd> ignores.</li>
+        <li>The computer is offered the Brick's shared folders and asks where to keep each.</li>
+      </ol>
+      <ul>
+        <li><b>Saves</b> (saves and save states), <b>Games</b> (all of <code>Roms/</code>) and <b>BIOS</b> each switch on and off, and say <b>Up to date</b> or how far along they are. Saves is on to begin with. A folder that's on goes to every paired device, and two Bricks share the same folders with no setting up.</li>
+        <li><b>Nothing runs while you play.</b> Syncthing is stopped outright for every game, port and PICO-8 cart, and catches up when you're back on the shelf. There it runs at low priority.</li>
+        <li><b>Web Page</b> shows the Brick's address and password for Syncthing's own page in a browser, for everything else: ignore patterns, file versions, folders of your own.</li>
+        <li>Its keys, settings and database stay in ChaOS's userdata, so updates keep your pairings.</li>
+      </ul>
+    </div>
+    <figure class="device" data-screens='[["sync","Syncthing"],["sync-pair","Pairing"],["sync-get","Getting it"]]'>
+      <div class="bezel"><img src="img/sync.webp" alt="" loading="lazy" width="1024" height="768"></div>
       <figcaption class="chips"></figcaption>
     </figure>
   </article>
@@ -497,6 +546,7 @@
       <tr><td>Neo Geo Pocket</td><td><code>Roms/Neo Geo Pocket</code></td><td>.ngp .ngc .ngpc .npc .zip</td><td>Beetle NeoPop</td></tr>
       <tr><td>Neo Geo Pocket Color</td><td><code>Roms/Neo Geo Pocket Color</code></td><td>.ngp .ngc .ngpc .npc .zip</td><td>Beetle NeoPop</td></tr>
       <tr><td>Ports</td><td><code>Roms/Ports</code></td><td>installed from the Brick</td><td>PortMaster</td></tr>
+      <tr><td>PICO-8</td><td><code>Roms/PICO-8</code></td><td>.p8 .p8.png</td><td><a href="#pico8">your own PICO-8</a></td></tr>
     </tbody>
   </table>
   </div>
@@ -524,6 +574,7 @@
   </div>
   <div class="releases">
     <h3>Recent releases</h3>
+    <div class="rel"><span class="ver">2.2.0</span><p><a href="#pico8">PICO-8</a> with your own copy, Splore included. <a href="#sync">Syncthing</a> for saves, games and BIOS on all your devices, beside RomM in the new <b>ROM Management</b> menu. ChaOS Transfer opens folders of thousands of games, from TortOS 2.2.1.</p></div>
     <div class="rel"><span class="ver">2.1.2</span><p><a href="#display">Crop Overscan</a> for NES, TurboGrafx-16 and Master System, in the console's menu and the in-game menu.</p></div>
     <div class="rel"><span class="ver">2.1.1</span><p>Port pages keep their facts clear of the description, and What's New and other scrolling cards keep their text inside the card, fading at its edges.</p></div>
     <div class="rel"><span class="ver">2.1.0</span><p><a href="#cheats">Cheats</a>: Game Genie, Action Replay, GameShark and Code Breaker codes from libretro's database, switched on and off in the in-game menu.</p></div>
@@ -579,6 +630,10 @@
       <p>Check it's under <b>May Run on ChaOS</b>. If ChaOS names a missing library, it may come in a later library pack. Otherwise send the port's log from <code>.userdata/brick/ports/logs/</code>.</p></details>
     <details><summary>Something went wrong. How do I send the logs?</summary>
       <p>Open <b>MENU &gt; ChaOS Transfer</b>, open its address in a browser, and click <b>Download logs</b>. Then <a href="https://github.com/SkyWalker541/ChaOS/issues">open an issue</a> with it attached.</p></details>
+    <details><summary>Is PICO-8 included?</summary>
+      <p>No. PICO-8 is sold by Lexaloffle, and ChaOS runs your own copy: its Raspberry Pi download, put in the card's <code>PICO-8</code> folder. See <a href="#pico8">PICO-8</a>.</p></details>
+    <details><summary>Should I use RomM or Syncthing for saves?</summary>
+      <p>Either. RomM's save sync is for games you got from your RomM server, and runs when you choose it. Syncthing keeps whole folders the same on your devices all the time, with or without a server. Using both on the same saves isn't needed.</p></details>
     <details><summary>How do I go back to the Brick's own system?</summary>
       <p>Take the card out. ChaOS changes nothing on the Brick itself. Everything ChaOS keeps, Wi-Fi passwords and Bluetooth pairings included, is on the card, so reformat it before you give it away.</p></details>
   </div>
@@ -597,7 +652,7 @@
     </div>
     <div class="credit">
       <h4>ChaOS</h4>
-      <p>by <b>SkyWalker541</b>: the shaders' ports and PT SkyWalker541, the pixel themes, logo and animations, PortMaster and RomM support, and the rest marked <span class="tag">ChaOS</span> above.</p>
+      <p>by <b>SkyWalker541</b>: the shaders' ports and PT SkyWalker541, the pixel themes, logo and animations, PortMaster, RomM, Syncthing and PICO-8 support, and the rest marked <span class="tag">ChaOS</span> above.</p>
     </div>
     <div class="credit">
       <h4>Shaders</h4>
@@ -613,7 +668,7 @@
     </div>
     <div class="credit">
       <h4>Ports and services</h4>
-      <p><a href="https://portmaster.games">PortMaster</a> and its porters; <b>minui-portmaster</b> by ben16w. <a href="https://romm.app">RomM</a> and its client Grout. <a href="https://retroachievements.org">RetroAchievements</a>, libretro thumbnails, <a href="https://github.com/libretro/libretro-database">libretro's cheat database</a> (CC BY-SA 4.0), MusicBrainz and the Cover Art Archive, and itch.io (with NextUI-Itchio-Pak by Christophe Vanlancker).</p>
+      <p><a href="https://portmaster.games">PortMaster</a> and its porters; <b>minui-portmaster</b> by ben16w. <a href="https://romm.app">RomM</a> and its client Grout. <a href="https://syncthing.net">Syncthing</a> (MPL-2.0), downloaded from its own releases, not part of ChaOS. <a href="https://www.lexaloffle.com/pico-8.php">PICO-8</a> by Lexaloffle Games, not included; the way its Splore downloads with curl is <a href="https://github.com/spruceUI/spruceOS">spruceUI</a>'s. <a href="https://retroachievements.org">RetroAchievements</a>, libretro thumbnails, <a href="https://github.com/libretro/libretro-database">libretro's cheat database</a> (CC BY-SA 4.0), MusicBrainz and the Cover Art Archive, and itch.io (with NextUI-Itchio-Pak by Christophe Vanlancker).</p>
     </div>
     <div class="credit">
       <h4>Libraries</h4>

@@ -74,7 +74,7 @@ int main(void)
 	printf("xfer: what the browser can reach\n");
 
 	printf("  the roots:\n");
-	CHECK(xfer_root_count() == 9, "expected 9 roots, got %d", xfer_root_count());
+	CHECK(xfer_root_count() == 10, "expected 10 roots, got %d", xfer_root_count());
 	CHECK(xfer_root_at(0) && !strcmp(xfer_root_at(0)->path, "/mnt/SDCARD/Roms"),
 	      "roms root wrong: %s", xfer_root_at(0) ? xfer_root_at(0)->path : "(none)");
 	CHECK(xfer_root_at(1) && !strcmp(xfer_root_at(1)->path, "/mnt/SDCARD/Music"),
@@ -94,7 +94,9 @@ int main(void)
 	      "screenshots root wrong: %s", xfer_root_at(7) ? xfer_root_at(7)->path : "(none)");
 	CHECK(xfer_root_at(8) && !strcmp(xfer_root_at(8)->path, "/mnt/SDCARD/Cheats"),
 	      "cheats root wrong: %s", xfer_root_at(8) ? xfer_root_at(8)->path : "(none)");
-	CHECK(xfer_root_at(9) == NULL, "a tenth root appeared");
+	CHECK(xfer_root_at(9) && !strcmp(xfer_root_at(9)->path, "/mnt/SDCARD/PICO-8"),
+	      "pico8 root wrong: %s", xfer_root_at(9) ? xfer_root_at(9)->path : "(none)");
+	CHECK(xfer_root_at(10) == NULL, "an eleventh root appeared");
 
 	printf("  ordinary paths land where they should:\n");
 	allow("roms", "/mnt/SDCARD/Roms");

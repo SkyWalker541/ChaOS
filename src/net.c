@@ -372,6 +372,8 @@ long net_request(const net_req *r, char *out, size_t outn, int *http)
 	return len;
 }
 
+static unsigned g_spawn_n;
+
 pid_t net_request_spawn(const net_req *r, const char *path)
 {
 	const char *bin = curl_bin();
@@ -382,7 +384,10 @@ pid_t net_request_spawn(const net_req *r, const char *path)
 	if (!bin || !r || !r->url) return -1;
 	g = *r;
 	g.json = NULL;      /* a download: a GET, or what the request says */
-	snprintf(cfg, sizeof cfg, "/tmp/chaos-get-%ld-%u.curl", (long)getpid(), (unsigned)now_ms());
+	/* ChaOS: and a count, for several started in the same millisecond
+	 * (Syncthing's poll asks eight things at once) */
+	snprintf(cfg, sizeof cfg, "/tmp/chaos-get-%ld-%u-%u.curl", (long)getpid(), (unsigned)now_ms(),
+	         ++g_spawn_n);
 	if (!write_req_config(cfg, &g, path, NULL)) return -1;
 	{
 		/* `fail` here: a download that comes back 4xx is no file at all */

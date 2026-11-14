@@ -56,6 +56,8 @@ static void os_cycle(const char *tag, int d, bool live);
 #include "shots.h"
 #include "itch.h"
 #include "ports.h"
+#include "pico8.h"
+#include "syncthing.h"
 #include "pmcat.h"
 #include "libpack.h"
 #include "romm.h"
@@ -187,7 +189,12 @@ typedef struct {
  * name no script has, so nothing on the card can be mistaken for it */
 #define PM_ENTRY_FILE ".chaos-portmaster"
 #define PM_ENTRY_NAME "PortMaster"
-static bool pm_is_entry(const char *file) { return file && !strcmp(file, PM_ENTRY_FILE); }
+/* ChaOS: a shelf's own first card, not a game: PortMaster's on Ports, and
+ * Splore on PICO-8 (pico8.h) - kept first by the sort, left out of the count */
+static bool pm_is_entry(const char *file)
+{
+	return file && (!strcmp(file, PM_ENTRY_FILE) || !strcmp(file, PICO8_SPLORE_FILE));
+}
 static void pm_get(app *a);   /* the ChaOS menu's Get PortMaster */
 static romm_conn *romm_get(void);   /* the ChaOS menu's RomM */
 static void romm_screen(app *a);
@@ -478,7 +485,7 @@ static void overlay_dirs_ensure(const app *a)
 	       strcmp(was, CHAOS_VERSION) != 0;
 	if (seed) overlays_retire();
 	for (i = 0; i < a->sys.count; i++) {
-		if (!a->sys.systems[i].folder[0]) continue;
+		if (!a->sys.systems[i].folder[0] || !strcmp(a->sys.systems[i].core, PICO8_CORE)) continue;
 		overlay_dir(a, i, d, sizeof d);
 		mkdir(d, 0755);
 		if (seed) overlay_seed(a, i, d);
@@ -973,6 +980,11 @@ static bool g_muse_attach;          /* SELECT has Muse open with its shelf off *
  * key mapping alike, so the page's rows and the keys that act on them agree. */
 static bool g_appearance_page;
 static void appearance_screen(app *a);
+/* ChaOS: the ROM Management page, RomM and Syncthing (syncthing.h) */
+static bool g_rom_page;
+static void rom_page_screen(app *a);
+static void sth_screen(app *a);
+static const char *sth_row_value(void);
 
 static bool g_status_clock = true;
 static bool g_status_clock24;             /* false: 12-hour */
@@ -1528,6 +1540,12 @@ static SDL_Texture *game_get_tex(void *ctx, int i, int *w, int *h, float *cb)
 		box_art_path(a->sys.systems[o].folder, v->list.items[i].name,
 		             art, sizeof art);
 		preview_path(a, o, &v->list.items[i], prev, sizeof prev);
+		/* ChaOS: a PICO-8 .p8.png cart is a picture of itself, its label */
+		if (!strcmp(a->sys.systems[o].core, PICO8_CORE) &&
+		    p8_is_cart(v->list.items[i].file) && strchr(v->list.items[i].file, '.') &&
+		    !strcasecmp(strrchr(v->list.items[i].file, '.'), ".png"))
+			snprintf(prev, sizeof prev, "%s/%s/%s", P_ROMS, a->sys.systems[o].folder,
+			         v->list.items[i].file);
 		/* Hand it to the worker and draw nothing this frame. Asking is cheap
 		 * and ignores a card already in hand, so callers ask every frame.
 		 * With the title and the accent, so that a game with neither file
@@ -5685,6 +5703,15 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 		 * rows because there is no filled-triangle primitive and this needs
 		 * no texture. */
 		const int tw = row_h / 3, th = tw / 2, off = 8;
+		/* ChaOS: with a hint footer, the down one sits in the gap above the
+		 * footer's rule, not on the rule and the hint under it */
+		int down_y = content_y + vis * row_h + off;
+
+		if (descs) {
+			int rule_top = panel.y + panel.h - pad - desc_h + rule_h - 2;
+
+			if (down_y + th > rule_top - 2) down_y = rule_top - 2 - th;
+		}
 
 		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
 		SDL_SetRenderDrawColor(a->r, 138, 143, 163, 200);
@@ -5697,7 +5724,7 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 				                   content_y - off - th + k, up_w, 1 });
 			if (first + vis < n)
 				SDL_RenderFillRect(a->r, &(SDL_Rect){ cx - down_w / 2,
-				                   content_y + vis * row_h + off + k, down_w, 1 });
+				                   down_y + k, down_w, 1 });
 		}
 	}
 }
@@ -5829,6 +5856,8 @@ static int menu_build(app *a, screen_id screen, int sys,
 		u.muse       = is_muse(sc);
 		u.fav        = !u.muse && sc->core[0] == '\0' && sc->folder[0] == '\0';
 		u.game_count = a->view[sys].list.count;
+		/* ChaOS: PortMaster's and Splore's cards aren't games */
+		if (u.game_count > 0 && pm_is_entry(a->view[sys].list.items[0].file)) u.game_count--;
 		/* ChaOS: the shader row only for a console with a shader made for
 		 * it, and the overlay by name. */
 		{
@@ -5836,6 +5865,7 @@ static int menu_build(app *a, screen_id screen, int sys,
 
 			u.rewind  = rewind_load(sc->tag);
 			u.overscan = u.fav || u.muse ? NULL : os_label(sc->tag);
+			u.native  = !strcmp(sc->core, PICO8_CORE);
 			u.shader  = look_console_of(sc->tag) == LOOK_NONE ? NULL
 			          : a->view[sys].look.on ? "On" : "Off";
 			u.overlay = u.fav || u.muse ? NULL : overlay_label(a, sys, ovl, sizeof ovl);
@@ -5868,6 +5898,8 @@ static int menu_build(app *a, screen_id screen, int sys,
 		u.night     = plat_volume_night_get() ? "On" : "Off";
 		u.night_ok  = plat_volume_night_ok();
 		u.appearance = g_appearance_page;
+		u.rom_page  = g_rom_page;
+		u.sync      = sth_row_value();
 		u.menu_color = MENU_COLORS[g_menu_color].name;
 		u.update    = upd_row_value();
 		u.auto_off  = a->auto_off;
@@ -10330,7 +10362,7 @@ static void tortos_menu_draw(app *a, int sel)
 	SDL_RenderFillRect(a->r, NULL);
 	/* The shelf's menu is TortOS's own on the systems screen and a system's on
 	 * a game list, which is where it gains rows that belong to that system. */
-	g_menu_root = !g_appearance_page;   /* ChaOS: Appearance is a submenu */
+	g_menu_root = !g_appearance_page && !g_rom_page;   /* ChaOS: those are submenus */
 	menu_draw(a, heading, rows, n, sel, menu_shelf_width(a),
 	          a->screen == SCREEN_SYSTEMS ? MENU_ACCENT : a->tint);
 	g_menu_root = false;
@@ -10413,7 +10445,8 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 			sys_ui dev = { .no_wifi = !plat_has_wifi(),
 			               .shader = look_console_of(a->sys.systems[a->sys_cursor].tag)
 			                         == LOOK_NONE ? NULL : "",
-			               .overscan = os_label(a->sys.systems[a->sys_cursor].tag) };
+			               .overscan = os_label(a->sys.systems[a->sys_cursor].tag),
+			               .native = !strcmp(a->sys.systems[a->sys_cursor].core, PICO8_CORE) };
 			sm_row ids[SM_ROWS];
 			int n = sys_menu_system_rows(&dev, ids);
 
@@ -10532,6 +10565,7 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 		               .cable_xfer = plat_cable_link(NULL, 0), .ss_have = ss_have_dev(),
 		               .pm_have = ports_pm_ready(P_ROMS),
 		               .night_ok = plat_volume_night_ok(), .appearance = g_appearance_page,
+		               .rom_page = g_rom_page,
 		               .name_speed = CARDS_DRAWN(g_cards) ? PN_SPEEDS[g_pn_speed[g_dir]].name
 		                                                  : NULL,
 		               .list_view = CARD_DIRS[g_dir].both ? NULL : "" };
@@ -10691,7 +10725,9 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 	case PM_STATS:        if (stats_screen(a)) return MENU_DONE; break;
 	case PM_CONTROLS:     controls_screen(a); break;
 	case PM_PORTS:        pm_get(a); break;
+	case PM_ROMMGMT:      rom_page_screen(a); break;
 	case PM_ROMM:         romm_screen(a); break;
+	case PM_SYNC:         sth_screen(a); break;
 	case PM_UPDATE:       update_screen(a); break;
 	case PM_ABOUT:        about_screen(a); break;
 	default: break;
@@ -10737,6 +10773,25 @@ static void appearance_screen(app *a)
 	g_appearance_page = true;
 	menu_run(a, &st, sysmenu_build, sysmenu_key, &c);
 	g_appearance_page = false;
+}
+
+/* MENU > ROM Management: RomM and Syncthing on their own page, as
+ * Appearance's rows are on theirs */
+static void rom_page_screen(app *a)
+{
+	sysmenu_ctx c;
+	menu_style st = {
+		.fixed_w     = menu_std_width(a),
+		.accent      = MENU_ACCENT,
+		.follow_tint = a->screen != SCREEN_SYSTEMS,
+	};
+
+	memset(&c, 0, sizeof c);
+	c.a = a;
+	c.screen = a->screen;
+	g_rom_page = true;
+	menu_run(a, &st, sysmenu_build, sysmenu_key, &c);
+	g_rom_page = false;
 }
 
 static void tortos_menu(app *a)
@@ -14499,7 +14554,9 @@ static void port_launch(app *a, int o, const char *romfile, const char *title)
 	plat_video_quit();
 
 	fprintf(stderr, "port %s: starting\n", romfile);
+	sth_hold(true);
 	rc = plat_run_port(argv, envkv, NULL, &how, port_power_prompt, a);
+	sth_hold(false);
 	fprintf(stderr, "port %s exited %d (%s)\n", romfile, rc,
 	        how == PORT_POWER ? "power held" : how == PORT_QUIT ? "select+start" : "itself");
 	/* and in the port's own log, where whoever reads it about a port that
@@ -14585,6 +14642,94 @@ static void port_launch(app *a, int o, const char *romfile, const char *title)
 			pick_say(a, title, msg, s->accent);
 		}
 	}
+	render(a);
+}
+
+/* ChaOS: PICO-8 (pico8.h), as a port is run - its own process group, the
+ * power prompt over it, Select+Start held to end it - by
+ * ChaOS/pico8/run.sh, with a cart or Splore */
+static void p8_launch(app *a, int o, const char *file, const char *title)
+{
+	const system_cfg *s = &a->sys.systems[o];
+	char runner[CFG_STR * 2], cart[LIB_PATH * 2], ud[LIB_PATH + 32], card[LIB_PATH + 32];
+	char dir[LIB_PATH + 16];
+	char *argv[4];
+	const char *envkv[3];
+	bool music, splore = !strcmp(file, PICO8_SPLORE_FILE);
+	int how = PORT_ENDED, rc;
+	p8_status st;
+	unsigned long t0;
+
+	snprintf(runner, sizeof runner, "%s/pico8/run.sh", P_ROOT);
+	if (access(runner, R_OK) != 0) {
+		pick_say(a, title, "PICO-8 needs ChaOS's full update", s->accent);
+		return;
+	}
+	snprintf(dir, sizeof dir, "%s/%s", P_CARD, PICO8_DIR);
+	if ((st = p8_check(dir)) != P8_READY) {
+		pick_say(a, title, p8_status_say(st), s->accent);
+		return;
+	}
+	if (splore && !net_online()) {
+		pick_say(a, title, "Splore needs Wi-Fi:\nturn it on in the menu", s->accent);
+		return;
+	}
+	snprintf(cart, sizeof cart, "%s/%s/%s", P_ROMS, s->folder, file);
+
+	remember_place(a);
+	snprintf(ud, sizeof ud, "CHAOS_USERDATA=%s", P_USERDATA);
+	snprintf(card, sizeof card, "CHAOS_CARD=%s", P_CARD);
+	envkv[0] = ud;
+	envkv[1] = card;
+	envkv[2] = NULL;
+	argv[0] = (char *)"/bin/sh";
+	argv[1] = runner;
+	argv[2] = splore ? (char *)"-splore" : cart;
+	argv[3] = NULL;
+
+	music = musec_playing();
+	if (music) musec_toggle();
+	plat_resident_end();
+
+	anim_launch(a, 190);
+	free_all_textures(a);
+	texload_fonts(false);
+	ui_quit();
+	plat_input_quit();
+	plat_video_quit();
+
+	fprintf(stderr, "pico8 %s: starting\n", file);
+	t0 = (unsigned long)time(NULL);
+	/* Play time and Last Played, as a game's: a cart's, not Splore's, whose
+	 * carts aren't on the shelf */
+	if (!splore) stats_begin(s->tag, file, plat_now_ms());
+	sth_hold(true);
+	rc = plat_run_port(argv, envkv, NULL, &how, port_power_prompt, a);
+	sth_hold(false);
+	fprintf(stderr, "pico8 %s exited %d (%s)\n", file, rc,
+	        how == PORT_POWER ? "power held" : how == PORT_QUIT ? "select+start" : "itself");
+	if (!splore) {
+		stats_tick(plat_now_ms());
+		stats_end(NULL, plat_now_ms());
+	}
+
+	if (!plat_video_init() || !plat_input_init()) { a->running = false; return; }
+	a->r = plat_renderer();
+	ui_init(a->r, P_FONT);
+	texload_fonts(true);
+	a->menu_w = 0;
+	prime_sys_window(a);
+	prime_window(a, a->sys_cursor);
+	respawn_resident(a);
+	if (music) musec_toggle();
+
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+	if (access(TORTOS_POWEROFF_FLAG, F_OK) == 0) { a->running = false; return; }
+	if (how == PORT_POWER) { power_off(a); return; }
+	/* One that ended at once, before a frame: what its log says */
+	if (how == PORT_ENDED && rc != 0 && (unsigned long)time(NULL) - t0 < 3)
+		pick_say(a, title, "PICO-8 didn't start. Its log is\n.userdata/brick/pico-8/last.log", s->accent);
 	render(a);
 }
 
@@ -16108,6 +16253,316 @@ static void pm_screen(app *a, unsigned accent)
 	if (g_pmc_loaded) { pmcat_free(&g_pmc); g_pmc_loaded = false; }
 }
 
+/* ---- ChaOS: Syncthing (src/syncthing.h) ----------------------------------
+ *
+ * ROM Management > Syncthing: on and off (fetched the first time), the web
+ * page's address and password, this Brick's ID, ChaOS's three folders each
+ * on or off, the paired devices, and any device asking to pair. On means it
+ * runs whenever ChaOS is on the shelf, and is stopped for every game. */
+
+/* --sync: the screen drawn for the website from made-up answers (1 not yet
+ * fetched, 2 on and paired, 3 a device asking) */
+static int g_sth_shot;
+static bool sth_on(void) { return g_sth_shot >= 2 || db_get_int(db_dev(), "sync_on", 0) != 0; }
+static bool sth_have(void) { return g_sth_shot ? g_sth_shot >= 2 : sth_installed(); }
+static bool sth_up(void) { return g_sth_shot ? g_sth_shot >= 2 : sth_running(); }
+static const char *sth_pass(void) { return g_sth_shot ? "k7Tq2mXa9P" : sth_password(); }
+
+/* The ChaOS menu's value for the row */
+static const char *sth_row_value(void)
+{
+	if (!sth_installed()) return "Off";
+	if (!sth_on()) return "Off";
+	return sth_running() ? "On" : "Starting";
+}
+
+/* At the first frame, and when Wi-Fi comes back: on if it's meant to be */
+static void sth_boot(void)
+{
+	if (sth_on() && sth_installed() && plat_has_wifi() && !sth_running()) sth_start();
+}
+
+typedef struct {
+	app     *a;
+	sth_info in;
+	bool     have;           /* `in` came from Syncthing at least once */
+	unsigned last_poll;
+	unsigned since;          /* when it was first seen running, not answering */
+	char     ip[48];
+	char     vals[STH_FOLDERS + 2 * STH_MAX_DEV + 4][48];
+	char     labels[2 * STH_MAX_DEV][STH_NAME_LEN + 24];
+	char     hints[4][160];
+	/* what each row is: 0 switch, 1 web page, 2 this Brick, 10+i folder i,
+	 * 20+i device i, 40+i asking i */
+	int      what[MENU_RUN_ROWS];
+} sth_ctx;
+
+static void sth_refresh_ip(sth_ctx *c)
+{
+	char ip[48] = "";
+
+	if (wifi_status(NULL, 0, ip, sizeof ip) == WIFI_CONNECTED && ip[0])
+		snprintf(c->ip, sizeof c->ip, "%s", ip);
+	else
+		c->ip[0] = '\0';
+}
+
+static int sth_build(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	sth_ctx *c = ctx;
+	int n = 0, i, v = 0, l = 0;
+	bool run = sth_up();
+	unsigned now = plat_now_ms();
+
+	*heading = "Syncthing";
+	/* Its answers, every two seconds while the screen is up */
+	if (run && !g_sth_shot) {
+		if (sth_poll_step(&c->in)) { if (c->in.ok) c->have = true; c->last_poll = now; }
+		else if (now - c->last_poll > 2000 && sth_poll_begin()) { c->last_poll = now; sth_refresh_ip(c); }
+	}
+
+#define ROW(w, r) do { if (n < max) { c->what[n] = (w); rows[n++] = (r); } } while (0)
+	if (!sth_have()) {
+		ROW(0, ((menu_row){ "Get Syncthing", NULL, true }));
+		rows[n - 1].hint = "About 13 MB, from syncthing.net's own release";
+		rows[n - 1].opens = true;
+		ROW(-1, MENU_RULE);
+		ROW(-1, MENU_NOTE("Saves, games and BIOS, kept"));
+		ROW(-1, MENU_NOTE("the same on all your devices"));
+		ROW(-1, MENU_NOTE("Nothing runs while you play"));
+		return n;
+	}
+	ROW(0, ((menu_row){ "Syncthing", sth_on() ? "On" : "Off", true }));
+	rows[n - 1].toggle = true;
+	rows[n - 1].hint = "Runs on the shelf, stopped during games";
+	if (!sth_on()) return n;
+	if (!run) {
+		/* stopped, by itself: its last words, and the switch to try again */
+		{
+			/* one note a line: the box doesn't wrap them */
+			const char *w = sth_problem()[0] ? sth_problem() : "Syncthing isn't running";
+			int k = 0;
+
+			while (*w && k < 3) {
+				size_t len = strcspn(w, "\n");
+
+				snprintf(c->vals[k], sizeof c->vals[k], "%.*s", (int)len, w);
+				ROW(-1, MENU_NOTE(c->vals[k]));
+				k++;
+				w += len + (w[len] == '\n');
+			}
+		}
+		ROW(-1, MENU_NOTE("Turn it off and on to try again"));
+		return n;
+	}
+	if (!c->have) {
+		if (!c->since) c->since = now;
+		if (now - c->since < 60000) {
+			snprintf(c->hints[3], sizeof c->hints[3], "Starting... %us", (now - c->since) / 1000);
+			ROW(-1, MENU_NOTE(c->hints[3]));
+		} else {
+			ROW(-1, MENU_NOTE("Running, but not answering"));
+			ROW(-1, MENU_NOTE("Its log: .userdata/brick/syncthing"));
+		}
+		return n;
+	}
+	snprintf(c->vals[v], sizeof c->vals[v], "%s", c->ip[0] ? c->ip : "no Wi-Fi");
+	if (c->ip[0]) snprintf(c->vals[v], sizeof c->vals[v], "%s:%d", c->ip, STH_GUI_PORT);
+	ROW(1, ((menu_row){ "Web Page", c->vals[v++], true }));
+	rows[n - 1].opens = true;
+	snprintf(c->hints[0], sizeof c->hints[0], "In a browser: user %s, password %s",
+	         STH_GUI_USER, sth_pass());
+	rows[n - 1].hint = c->hints[0];
+	sth_short_id(c->in.my_id, c->vals[v], sizeof c->vals[v]);
+	ROW(2, ((menu_row){ "This Brick", c->vals[v++], true }));
+	rows[n - 1].hint = "A shows its whole ID";
+	rows[n - 1].opens = true;
+
+	/* asking to pair, first: it's waiting on you */
+	for (i = 0; i < c->in.npend; i++) {
+		if (n == 3) ROW(-1, MENU_RULE);
+		snprintf(c->labels[l], sizeof c->labels[l], "%s wants to pair", c->in.pend[i].name);
+		ROW(40 + i, ((menu_row){ c->labels[l++], "A / X", true }));
+		rows[n - 1].hint = "A pairs with it, X ignores it";
+	}
+
+	ROW(-1, MENU_RULE);
+	for (i = 0; i < STH_FOLDERS; i++) {
+		const sth_folder_state *f = &c->in.folder[i];
+
+		if (!f->on) snprintf(c->vals[v], sizeof c->vals[v], "Off");
+		else if (f->paused) snprintf(c->vals[v], sizeof c->vals[v], "Paused");
+		else if (f->errors) snprintf(c->vals[v], sizeof c->vals[v], "%d problem%s", f->errors,
+		                             f->errors == 1 ? "" : "s");
+		else if (!c->in.ndev) snprintf(c->vals[v], sizeof c->vals[v], "On");
+		else if (f->percent < 100) snprintf(c->vals[v], sizeof c->vals[v], "Syncing %d%%", f->percent);
+		else snprintf(c->vals[v], sizeof c->vals[v], "Up to date");
+		ROW(10 + i, ((menu_row){ STH_FOLDER[i].row, c->vals[v++], true }));
+		rows[n - 1].hint = i == 0 ? "Saves and states, to every paired device"
+		                 : i == 1 ? "The Roms folder, to every paired device"
+		                          : "The Bios folder, to every paired device";
+	}
+
+	ROW(-1, MENU_RULE);
+	if (!c->in.ndev)
+		ROW(-1, MENU_NOTE("No devices yet: see the guide to pair one"));
+	for (i = 0; i < c->in.ndev; i++) {
+		snprintf(c->labels[l], sizeof c->labels[l], "%s", c->in.dev[i].name);
+		ROW(20 + i, ((menu_row){ c->labels[l++], c->in.dev[i].connected ? "Connected" : "Not here",
+		                        true }));
+		rows[n - 1].hint = "A forgets this device";
+	}
+#undef ROW
+	return n;
+}
+
+static void sth_get(app *a)
+{
+	char now[96];
+
+	if (!net_online()) {
+		pick_say(a, "Syncthing", "Connect to Wi-Fi to get Syncthing", MENU_ACCENT);
+		return;
+	}
+	if (!confirm_panel(a, "Syncthing", "Download Syncthing " STH_VERSION "?\n(about 13 MB)", "Download"))
+		return;
+	sync_abandon();
+	if (!sth_get_begin()) { pick_say(a, "Syncthing", sth_problem(), MENU_ACCENT); return; }
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+	for (;;) {
+		sth_get_state st = sth_get_step();
+
+		if (st == STH_GET_DONE) break;
+		if (st == STH_GET_FAILED) { pick_say(a, "Syncthing", sth_problem(), MENU_ACCENT); return; }
+		plat_input_poll(&a->in);
+		if (a->in.quit_requested) { sth_get_cancel(); a->running = false; return; }
+		if (a->in.pressed[IN_POWER]) { sth_get_cancel(); power_off(a); return; }
+		if (a->in.pressed[IN_BACK]) { sth_get_cancel(); return; }
+		if (st == STH_GET_DOWNLOAD)
+			snprintf(now, sizeof now, "Downloading Syncthing\n%.1f MB", sth_get_bytes() / 1048576.0);
+		else
+			snprintf(now, sizeof now, "Unpacking Syncthing");
+		pick_frame(a, "Syncthing", NULL, 0, 0, NULL, 0, 0, now, MENU_ACCENT);
+		SDL_Delay(30);
+	}
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+	db_set_int(db_dev(), "sync_on", 1);
+	if (!sth_start()) pick_say(a, "Syncthing", sth_problem(), MENU_ACCENT);
+}
+
+/* The first time it answers: this Brick named, and Saves shared, so a
+ * computer that pairs is offered them with nothing more to do here */
+static void sth_first_answer(sth_ctx *c)
+{
+	if (db_get_int(db_dev(), "sync_setup", 0)) return;
+	if (sth_set_name("ChaOS Brick") && sth_folder_set(0, true))
+		db_set_int(db_dev(), "sync_setup", 1);
+	c->last_poll = 0;
+}
+
+static menu_result sth_key(app *a, void *ctx, in_button key, int sel)
+{
+	sth_ctx *c = ctx;
+	int w = sel >= 0 && sel < MENU_RUN_ROWS ? c->what[sel] : -1;
+	bool flip = key == IN_ACCEPT || key == IN_LEFT || key == IN_RIGHT;
+
+	if (w == 0 && flip) {
+		if (!sth_installed()) { if (key == IN_ACCEPT) sth_get(a); }
+		else if (sth_on()) { db_set_int(db_dev(), "sync_on", 0); sth_stop(); c->have = false; }
+		else {
+			db_set_int(db_dev(), "sync_on", 1);
+			if (!sth_start()) pick_say(a, "Syncthing", sth_problem(), MENU_ACCENT);
+		}
+		c->last_poll = 0;
+		return MENU_STAY;
+	}
+	if (w == 1 && key == IN_ACCEPT) {
+		char msg[160];
+
+		snprintf(msg, sizeof msg, "http://%s:%d\nUser %s, password %s",
+		         c->ip[0] ? c->ip : "(no Wi-Fi)", STH_GUI_PORT, STH_GUI_USER, sth_pass());
+		confirm_panel(a, "Web Page", msg, "OK");
+		return MENU_STAY;
+	}
+	if (w == 2 && key == IN_ACCEPT) {
+		char id[STH_ID_LEN + 2];
+		size_t half = strlen(c->in.my_id) / 2;
+
+		/* two lines of four blocks, split at the dash in the middle */
+		snprintf(id, sizeof id, "%.*s\n%s", (int)half, c->in.my_id, c->in.my_id + half + 1);
+		confirm_panel(a, "This Brick", id, "OK");
+		return MENU_STAY;
+	}
+	if (w >= 10 && w < 10 + STH_FOLDERS && flip) {
+		int i = w - 10;
+		bool on = !c->in.folder[i].on;
+
+		if (on && i == 1 &&
+		    !confirm_panel(a, "Games", "Share the whole Roms folder?\nIt can be many GB", "Share"))
+			return MENU_STAY;
+		if (!sth_folder_set(i, on)) pick_say(a, "Syncthing", "Syncthing didn't answer", MENU_ACCENT);
+		c->in.folder[i].on = on;
+		c->last_poll = 0;
+		return MENU_STAY;
+	}
+	if (w >= 20 && w < 20 + STH_MAX_DEV && key == IN_ACCEPT) {
+		const sth_device *d = &c->in.dev[w - 20];
+		char msg[160];
+
+		snprintf(msg, sizeof msg, "Forget %s?\nIt stops syncing with this Brick", d->name);
+		if (confirm_panel(a, "Syncthing", msg, "Forget")) sth_forget(d->id);
+		c->last_poll = 0;
+		return MENU_STAY;
+	}
+	if (w >= 40 && w < 40 + STH_MAX_DEV && (key == IN_ACCEPT || key == IN_X)) {
+		const sth_device *d = &c->in.pend[w - 40];
+
+		if (key == IN_ACCEPT) {
+			char msg[200], sid[16];
+
+			sth_short_id(d->id, sid, sizeof sid);
+			snprintf(msg, sizeof msg, "Pair with %s (%s)?\nYour shared folders go to it", d->name, sid);
+			if (confirm_panel(a, "Syncthing", msg, "Pair")) sth_accept(d->id, d->name);
+		} else {
+			sth_ignore(d->id);
+		}
+		c->last_poll = 0;
+		return MENU_STAY;
+	}
+	return MENU_STAY;
+}
+
+static void sth_screen(app *a)
+{
+	sth_ctx c;
+	menu_style st = { 0 };
+
+	memset(&c, 0, sizeof c);
+	c.a = a;
+	sth_refresh_ip(&c);
+	st.accent = MENU_ACCENT;
+	st.fixed_w = menu_std_width(a);
+	if (sth_on() && sth_installed() && !sth_running()) sth_start();
+	/* the first answer may take a few seconds: until it's in, the build
+	 * says Starting, and the setup waits for it */
+	if (sth_running() && !db_get_int(db_dev(), "sync_setup", 0)) {
+		unsigned t0 = plat_now_ms();
+		sth_info in;
+
+		while (plat_now_ms() - t0 < 15000 && a->running) {
+			if (sth_poll_begin()) {
+				while (!sth_poll_step(&in)) SDL_Delay(20);
+				if (in.ok) { sth_first_answer(&c); break; }
+			}
+			pick_frame(a, "Syncthing", NULL, 0, 0, NULL, 0, 0, "Starting Syncthing\nThe first time takes a moment", MENU_ACCENT);
+			SDL_Delay(300);
+		}
+	}
+	menu_run(a, &st, sth_build, sth_key, &c);
+}
+
 /* ---- ChaOS: RomM (src/romm.h) ---------------------------------------------
  *
  * The ChaOS menu's RomM: signing in by RomM's pairing, its library by system
@@ -17028,6 +17483,11 @@ static void launch_game(app *a)
 		port_launch(a, o, v->list.items[v->cursor].file, v->list.items[v->cursor].title);
 		return;
 	}
+	/* ChaOS: PICO-8, the player's own */
+	if (!strcmp(s->core, PICO8_CORE)) {
+		p8_launch(a, o, v->list.items[v->cursor].file, v->list.items[v->cursor].title);
+		return;
+	}
 
 	snprintf(core, sizeof core, "%s/cores/%s_libretro.so", P_ROOT, s->core);
 	snprintf(elf, sizeof elf, "%s/diatom", P_ROOT);
@@ -17197,6 +17657,7 @@ static void launch_game(app *a)
 			/* and its cheats, those that are on */
 			cht_for_launch(a, o, v->list.items[v->cursor].file);
 		}
+		sth_hold(true);   /* ChaOS: Syncthing stopped while it plays */
 		if (plat_resident_send(s->tag, core, rom, st, st, pv,
 		                       console, active[0] ? active : NULL)) {
 			int r;
@@ -17266,6 +17727,7 @@ static void launch_game(app *a)
 				if (r == RES_PAUSED) { game_menu(a); continue; }
 				break;
 			}
+			sth_hold(false);
 			resident = (r == RES_EXIT);
 
 			/* The Auto card's picture, written ONLY here - at the same moment
@@ -17384,7 +17846,9 @@ static void launch_game(app *a)
 			}
 		}
 		argv[n] = NULL;
+		sth_hold(true);
 		fprintf(stderr, "diatom exited %d\n", plat_run(argv, NULL, P_ROOT));
+		sth_hold(false);
 
 		if (!plat_video_init() || !plat_input_init()) { a->running = false; return; }
 		a->r = plat_renderer();
@@ -18773,12 +19237,92 @@ static void pm_shelf_entry(game_list *l)
 	l->scanned = true;
 }
 
+/* ChaOS: the PICO-8 shelf (pico8.h). Its folders made, with the read-me
+ * that says what goes in them; a Raspberry Pi download's zip in PICO-8/
+ * taken apart, once, for the two files it needs; and then the shelf only if
+ * PICO-8 is there, Splore first. */
+static void p8_prepare(void)
+{
+	char dir[LIB_PATH + 16], p[LIB_PATH * 2], from[LIB_PATH + 64], zip[LIB_PATH * 2];
+	struct stat st;
+
+	snprintf(dir, sizeof dir, "%s/%s", P_CARD, PICO8_DIR);
+	mkdir(dir, 0755);
+	snprintf(p, sizeof p, "%s/%s", P_ROMS, PICO8_DIR);
+	mkdir(p, 0755);
+	snprintf(p, sizeof p, "%s/README.txt", dir);
+	snprintf(from, sizeof from, "%s/pico8/README.txt", P_ROOT);
+	if (stat(p, &st) != 0) {
+		FILE *in = fopen(from, "rb"), *out = in ? fopen(p, "wb") : NULL;
+		char buf[4096];
+		size_t got;
+
+		while (in && out && (got = fread(buf, 1, sizeof buf, in)) > 0) fwrite(buf, 1, got, out);
+		if (out) fclose(out);
+		if (in) fclose(in);
+	}
+	if (p8_check(dir) == P8_READY || !p8_find_zip(dir, zip, sizeof zip)) return;
+	{
+		char stage[LIB_PATH + 32];
+		pid_t pid;
+		int status = -1;
+
+		snprintf(stage, sizeof stage, "%s/.unpack", dir);
+		snprintf(p, sizeof p, "rm -rf '%s'", stage);
+		if (system(p)) {}
+		mkdir(stage, 0755);
+		fprintf(stderr, "pico8: unpacking %s\n", zip);
+		pid = fork();
+		if (pid == 0) {
+			const char *uz = access("/usr/bin/unzip", X_OK) == 0 ? "/usr/bin/unzip" : "/bin/unzip";
+
+			execl(uz, "unzip", "-oq", zip, "-d", stage, (char *)NULL);
+			_exit(127);
+		}
+		if (pid > 0) waitpid(pid, &status, 0);
+		if (p8_take_from(stage, dir))
+			fprintf(stderr, "pico8: took pico8_64 and pico8.dat from it (%s)\n",
+			        p8_status_say(p8_check(dir)));
+		else
+			fprintf(stderr, "pico8: no pico8_64 and pico8.dat in it (unzip %d)\n", status);
+		snprintf(p, sizeof p, "rm -rf '%s'", stage);
+		if (system(p)) {}
+	}
+}
+
+static void p8_shelf_entry(game_list *l)
+{
+	char dir[LIB_PATH + 16];
+	game_entry *items;
+	p8_status s;
+
+	p8_prepare();
+	snprintf(dir, sizeof dir, "%s/%s", P_CARD, PICO8_DIR);
+	s = p8_check(dir);
+	if (s != P8_READY) {
+		if (s != P8_NONE) fprintf(stderr, "pico8: %s\n", p8_status_say(s));
+		lib_free(l);
+		return;
+	}
+	items = realloc(l->items, (size_t)(l->count + 1) * sizeof *items);
+	if (!items) return;
+	memmove(items + 1, items, (size_t)l->count * sizeof *items);
+	memset(&items[0], 0, sizeof items[0]);
+	snprintf(items[0].name, sizeof items[0].name, "%s", PICO8_SPLORE_NAME);
+	snprintf(items[0].title, sizeof items[0].title, "%s", PICO8_SPLORE_NAME);
+	snprintf(items[0].file, sizeof items[0].file, "%s", PICO8_SPLORE_FILE);
+	l->items = items;
+	l->count++;
+	l->scanned = true;
+}
+
 static void scan_all(app *a)
 {
 	for (int i = 0; i < a->sys.count; i++) {
 		sysview *v = &a->view[i];
 		lib_scan(P_ROMS, a->sys.systems[i].folder, a->sys.systems[i].exts, &v->list);
 		if (!strcmp(a->sys.systems[i].core, PORTS_CORE)) pm_shelf_entry(&v->list);
+		if (!strcmp(a->sys.systems[i].core, PICO8_CORE)) p8_shelf_entry(&v->list);
 		if (v->list.count > 0) {
 			v->tex = calloc((size_t)v->list.count, sizeof *v->tex);
 			v->tw = calloc((size_t)v->list.count, sizeof *v->tw);
@@ -19369,6 +19913,36 @@ static void take_shot(app *a)
 	if (shot_pm) pm_shot(a);
 	if (shot_port_power >= 0) port_power_draw(a, shot_port_power);
 	if (shot_romm) romm_shot(a);
+	if (g_sth_shot) {
+		/* ChaOS: --sync get|on|pair [row], Syncthing's screen from made-up answers */
+		sth_ctx c;
+		menu_row rows[32];
+		const char *heading;
+		int n;
+
+		memset(&c, 0, sizeof c);
+		snprintf(c.ip, sizeof c.ip, "192.168.1.42");
+		c.have = true;
+		c.in.ok = true;
+		snprintf(c.in.my_id, sizeof c.in.my_id, "L6RTDET-Q2WFJ7M-PA4Z3XK-NC8VHUE-RB5TYS6-WGM2DQ4-H7JKZ3P-XEL9FNA");
+		c.in.ndev = 2;
+		snprintf(c.in.dev[0].name, sizeof c.in.dev[0].name, "Desktop PC");
+		c.in.dev[0].connected = true;
+		snprintf(c.in.dev[1].name, sizeof c.in.dev[1].name, "Brick in the car");
+		c.in.folder[0].on = true;
+		c.in.folder[0].percent = 100;
+		c.in.folder[2].on = true;
+		c.in.folder[2].percent = 64;
+		if (g_sth_shot == 3) {
+			c.in.npend = 1;
+			snprintf(c.in.pend[0].name, sizeof c.in.pend[0].name, "Laptop");
+		}
+		n = sth_build(&c, rows, 32, &heading);
+		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
+		SDL_RenderFillRect(a->r, NULL);
+		menu_draw(a, heading, rows, n, shot_menu_sel, menu_std_width(a), MENU_ACCENT);
+	}
 	if (g_about_shot) about_screen(a);
 	if (shot_cheats >= 0) {
 		static cht_ui u;
@@ -19759,6 +20333,18 @@ int main(int argc, char *argv[])
 		 * device or a hand on it. */
 		/* ChaOS: --appearance [row], the Appearance page as --menu draws the
 		 * main menu */
+		else if (!strcmp(argv[i], "--rompage")) {
+			shot_menu = 1;
+			g_rom_page = true;
+			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9')
+				shot_menu_sel = atoi(argv[++i]);
+		}
+		else if (!strcmp(argv[i], "--sync") && i + 1 < argc) {
+			i++;
+			g_sth_shot = !strcmp(argv[i], "get") ? 1 : !strcmp(argv[i], "pair") ? 3 : 2;
+			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9')
+				shot_menu_sel = atoi(argv[++i]);
+		}
 		else if (!strcmp(argv[i], "--appearance")) {
 			shot_menu = 1;
 			g_appearance_page = true;
@@ -20201,6 +20787,7 @@ int main(int argc, char *argv[])
 		plat_clock_zone(tz);
 	}
 	t_mark("databases");
+	sth_init(P_USERDATA, P_CARD);   /* ChaOS: Syncthing's place, started at the first frame */
 
 	snprintf(path, sizeof path, "%s/systems.cfg", P_ROOT);
 	if (!cfg_load_systems(path, &a.sys)) {
@@ -20660,6 +21247,7 @@ int main(int argc, char *argv[])
 				if (!last_render) {
 					t_mark("first frame");
 					plat_resident_line("PREMAP");
+					sth_boot();
 				}
 				last_render = plat_now_ms();
 			} else {
@@ -20669,6 +21257,7 @@ int main(int argc, char *argv[])
 	}
 
 done:
+	sth_stop();   /* ChaOS: its database closed before the card goes */
 	free_all_textures(&a);
 	/* First, and before IMG_Quit: the worker is inside IMG_Load, and the
 	 * views it decodes into are freed just below. The resizer too, for the

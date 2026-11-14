@@ -1,0 +1,42 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# ChaOS: wget for PICO-8's Splore, done by curl.
+#
+# PICO-8 downloads with wget when its config.txt says use_wget 1, which
+# res/pico8/run.sh sets. The Brick's own wget is BusyBox's, which can't do
+# https, and every cart comes over https: it writes nothing and PICO-8 says
+# "could not connect to bbs". curl can, with OpenSSL and the certificates
+# ChaOS keeps on the card. The idea is spruceUI's (Emu/PICO8/bin/wget); this
+# takes the two shapes of call PICO-8 makes, from its own strings:
+#
+#     wget "<url>" -q -O "<file>"
+#     wget "<url>" -q -O "<file>" --post-file=<file>
+#
+# Only PICO-8 finds it: run.sh puts this folder first on its PATH and no one
+# else's.
+
+url= out= post=
+while [ "$#" -gt 0 ]; do
+	case "$1" in
+		-O) out=$2; shift ;;
+		-O*) out=${1#-O} ;;
+		--post-file=*) post=${1#--post-file=} ;;
+		--post-file) post=$2; shift ;;
+		-*) ;;   # -q and the rest: nothing curl needs
+		*) [ -z "$url" ] && url=$1 ;;
+	esac
+	shift
+done
+[ -n "$url" ] || exit 1
+
+# -L for lexaloffle's http to https, -f so an error page is a failure and not
+# a cart, as wget would have it; a minute at most, so a dead network doesn't
+# hang Splore
+set -- -sSLf --connect-timeout 15 --max-time 60
+[ -n "$CHAOS_CACERT" ] && [ -f "$CHAOS_CACERT" ] && set -- "$@" --cacert "$CHAOS_CACERT"
+[ "$out" = "-" ] && out=
+[ -n "$out" ] && set -- "$@" -o "$out"
+[ -n "$post" ] && set -- "$@" --data-binary "@$post"
+echo "wget: $url${post:+ (post)}" >&2
+exec curl "$@" "$url"

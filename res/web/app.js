@@ -96,7 +96,7 @@ function crumbs() {
 		}
 		const b = document.createElement('button');
 		b.textContent = label;
-		b.onclick = () => go(path);
+		b.onclick = () => openFolder(path);
 		nav.append(b);
 		const sep = document.createElement('span');
 		sep.className = 'sep';
@@ -124,6 +124,7 @@ function crumbs() {
  * The path also goes in the fragment, so a reload lands where you were and a
  * link can be sent to another device on the LAN. */
 async function go(path, hist) {
+	dropCovers();
 	const r = await api('GET', '/api/list' + (path ? '?p=' + enc(path) : ''));
 	const data = await r.json();
 	cwd = data.path;
@@ -145,6 +146,16 @@ async function go(path, hist) {
 	const url = '#' + enc(cwd);
 	if (hist === 'replace') history.replaceState({ path: cwd }, '', url);
 	else if (hist !== 'none') history.pushState({ path: cwd }, '', url);
+}
+
+/* A click on a folder or a crumb. A folder the device won't list says why,
+ * as every other action does: left to go(), the refusal went nowhere and the
+ * click did nothing (Reddit, 2026-11-13, a SNES folder past the listing's
+ * limit). An ended session has already raised the PIN gate. */
+function openFolder(path) {
+	go(path).catch((err) => {
+		if (err.message !== 'unauthorized') toast(err.message, true);
+	});
 }
 
 /* Back and forward. Always 'none': the browser has already moved its own
@@ -180,6 +191,41 @@ async function start() {
 	}
 }
 
+/* thumb=1 so the device does not report each one as a download. */
+const thumb = (path) => '/api/file?thumb=1&p=' + enc(path);
+
+/* Covers fetch only while their row is on screen, or nearly (#101). Safari's
+ * loading=lazy starts every cover that comes near and never lets one go, so
+ * a fast scroll through a big folder queued hundreds of full covers on the
+ * device's six connections, and the next folder's listing waited behind them
+ * for 15 s and more (2026-11-13, 3,500 games). A cover that scrolls away
+ * before it arrives is dropped, which cancels it. */
+const coverSeen = new IntersectionObserver((seen) => {
+	for (const s of seen) {
+		const c = s.target;
+		if (s.isIntersecting) c.src = c.dataset.src;
+		else if (c.getAttribute('src') && !c.complete) c.removeAttribute('src');
+	}
+}, { rootMargin: '200px 0px' });
+
+function coverImg(c, path) {
+	c.dataset.src = thumb(path);
+	c.alt = '';
+	const done = () => coverSeen.unobserve(c);   /* arrived, or never will */
+	c.addEventListener('load', done, { once: true });
+	c.addEventListener('error', done, { once: true });
+	coverSeen.observe(c);
+}
+
+/* Before a listing is replaced: its covers still on the way are dropped, so
+ * the next listing does not wait behind them. */
+function dropCovers() {
+	for (const c of document.querySelectorAll('#list img[data-src]')) {
+		coverSeen.unobserve(c);
+		if (c.getAttribute('src') && !c.complete) c.removeAttribute('src');
+	}
+}
+
 function draw() {
 	crumbs();
 	/* The wording differs at the roots, where nothing takes a drop, so it has
@@ -196,7 +242,6 @@ function draw() {
 	 * only, not an artist's folder of them, which has no cover to show. */
 	const gameCovers = entries.some((e) => !e.dir && e.cover);
 	const albumCovers = entries.some((e) => e.dir && (e.cover || e.covers));
-	const thumb = (path) => '/api/file?thumb=1&p=' + enc(path);
 
 	for (const e of entries) {
 		const li = document.createElement('li');
@@ -208,28 +253,19 @@ function draw() {
 			g.className = 'cover grid';
 			for (const p of e.covers.slice(0, 4)) {
 				const c = document.createElement('img');
-				c.src = thumb(p);
-				c.alt = '';
-				c.loading = 'lazy';
+				coverImg(c, p);
 				g.append(c);
 			}
 			li.append(g);
 		} else if (e.dir && e.covers) {
 			const c = document.createElement('img');
 			c.className = 'cover';
-			c.src = thumb(e.covers[0]);
-			c.alt = '';
-			c.loading = 'lazy';
+			coverImg(c, e.covers[0]);
 			li.append(c);
 		} else if (e.dir ? albumCovers && (e.album || e.cover) : gameCovers) {
-			/* thumb=1 so the device does not report each one as a download. */
 			const c = document.createElement(e.cover ? 'img' : 'span');
 			c.className = 'cover' + (e.cover ? '' : ' none');
-			if (e.cover) {
-				c.src = thumb(e.cover);
-				c.alt = '';
-				c.loading = 'lazy';
-			}
+			if (e.cover) coverImg(c, e.cover);
 			li.append(c);
 		} else {
 			const mark = document.createElement('span');
@@ -280,7 +316,7 @@ function draw() {
 			const b = document.createElement('button');
 			b.className = 'name';
 			b.textContent = e.name;
-			b.onclick = () => go(e.path);
+			b.onclick = () => openFolder(e.path);
 			li.append(b);
 		} else {
 			const s = document.createElement('span');

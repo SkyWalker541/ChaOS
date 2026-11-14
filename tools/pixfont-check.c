@@ -12,7 +12,7 @@ int main(void)
 	static const char *names[] = {
 		"NES", "Master System", "Game Boy", "Genesis", "TurboGrafx-16", "Game Gear",
 		"SNES", "Neo Geo Pocket", "Game Boy Color", "Neo Geo Pocket Color",
-		"Game Boy Advance", "Favorites", "Muse",
+		"Game Boy Advance", "Favorites", "Muse", "Ports", "PICO-8",
 	};
 	static pf_pt pts[PF_PTS_MAX];
 	char lines[PF_LINES_MAX][32], msg[96];

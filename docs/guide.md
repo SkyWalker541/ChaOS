@@ -581,6 +581,42 @@ unloaded, and one arriving later is not loaded. Starting the game again with
 the cheats off brings them back. Your own `.cht` files go in
 `Cheats/<console>/`, named as the game is; ChaOS Transfer reaches the folder.
 
+### PICO-8 (ChaOS)
+
+PICO-8 is Lexaloffle's fantasy console, and ChaOS runs the player's own copy:
+nothing of it is in ChaOS. From a Lexaloffle account, download the Raspberry
+Pi version, `pico-8_<version>_raspi.zip`, and put it in the card's `PICO-8`
+folder (ChaOS Transfer has a **PICO-8** place, or use a card reader). At the
+next start, or as soon as ChaOS Transfer's screen is left, ChaOS takes out the
+two files it needs - `pico8_64`, the program for 64-bit ARM, and `pico8.dat`
+- and the zip can go. Copying just those two works too. The folder has a
+`README.txt` saying the same. A `pico8_64` that isn't the 64-bit ARM one (the
+Windows, Mac or Linux download's) is refused, with that said in the log.
+
+With both there, a **PICO-8** shelf appears after the other consoles. Its first
+card is **Splore**, PICO-8's browser of shared carts, which needs Wi-Fi; the
+carts it downloads and your favourites are kept by PICO-8 itself. Your own
+carts, `.p8` and `.p8.png`, go in `Roms/PICO-8` (a plain `.png` there is not a
+cart and is left off), and a `.p8.png` is its own cover. Play time and Recently
+Played count carts as games; Splore isn't one.
+
+It runs as a port does (`res/pico8/run.sh`): the whole device handed over,
+Select + Start held to quit, Power to Resume, Close or Power Off. B and A are
+PICO-8's O and X, Y and X are the same two again and so are L1 and R1; Start
+and MENU open its pause menu. Its settings (`config.txt`), cart saves and
+Splore's files are in `.userdata/brick/pico-8/`, where updates leave them, and
+what it printed last is `.userdata/brick/pico-8/last.log`. Its screenshots
+(F6 in its own terms) go to `Screenshots/PICO-8`.
+
+Splore fetches carts with `wget`, and the Brick's is BusyBox's, which can't
+speak https. `run.sh` puts a `wget` of ChaOS's first on PICO-8's path that
+hands the call to curl with the certificates ChaOS keeps (spruceUI's approach),
+and sets `use_wget 1` in PICO-8's `config.txt` before every start.
+
+The shelf's menu has Games, Core, Sort By and Rescan Folder: the picture,
+buttons, rewind and box art rows are the emulator's, and PICO-8 isn't run by
+it.
+
 ### Ports (ChaOS)
 
 The Ports shelf lists the scripts in `Roms/Ports/` - each port is one, with
@@ -638,3 +674,56 @@ side: a cover you add is drawn as it is and never resized, so a 2000-pixel scan
 is decoded at full size whenever its card comes into view.
 
 Pressing A on a game with an autosave does not start it, it continues it.
+
+## ROM Management (ChaOS)
+
+**MENU > ROM Management** is a page of its own, for the two ways games and
+saves reach the Brick from your other machines. Both need Wi-Fi.
+
+**RomM** is a game library you run on your own computer or NAS
+(https://romm.app): sign in, browse its games by console and download them onto
+their shelves with RomM's covers, sync saves for the games you got from it, and
+fetch BIOS files. It runs only when you choose something.
+
+### Syncthing
+
+Syncthing (https://syncthing.net) keeps folders the same on your devices, over
+your own network, with no server between them. It isn't in the image: **Get
+Syncthing** downloads its own release for 64-bit ARM (about 13 MB) from GitHub,
+checks it against the SHA-256 ChaOS has for that version, and turns it on. It
+lives in `.userdata/brick/syncthing/` with its keys, settings and database, so
+updates leave your pairings and folders as they were.
+
+**Nothing runs while you play.** Starting a game, a port or a PICO-8 cart stops
+Syncthing outright (SIGSTOP: no CPU at all) and it carries on when you're back
+on the shelf, picking up what changed. Syncthing writes into temporary files
+and renames them, so a stop never leaves half a file under a save's name. On
+the shelf it runs at low priority on two cores at most.
+
+The screen:
+
+| Row | |
+|---|---|
+| **Syncthing** | on or off. On, it starts with ChaOS |
+| **Web Page** | the address of Syncthing's own page, on port 8384; A shows it with the user (`chaos`) and the password ChaOS made. Everything the Brick's screen doesn't do is there: ignore patterns, file versioning, folders of your own |
+| **This Brick** | its device ID, short; A shows all of it |
+| *name* **wants to pair** | a device asking: A pairs and shares your folders with it, X ignores it |
+| **Saves**, **Games**, **BIOS** | ChaOS's three folders - `Saves/` (saves and states), `Roms/` and `Bios/` - each on or off, then **Up to date**, **Syncing nn%**, or a count of problems. Saves is on from the start |
+| *each paired device* | Connected or Not here; A forgets it |
+
+A folder that's on is shared with every paired device. Their IDs are fixed
+(`chaos-saves`, `chaos-roms`, `chaos-bios`), so two Bricks share each other's
+with nothing to set up. Turning one off removes it from Syncthing only; the
+files stay.
+
+**Pairing with a computer.** Run Syncthing on the computer, on the same
+network. There, **Add Remote Device** lists the Brick among the nearby devices:
+pick it and save. The Brick shows *"<computer> wants to pair"* - A, then Pair.
+The computer is then offered the Brick's folders and asks where to keep each.
+ChaOS's saves are `Saves/<game>.srm`, one folder for every console, which is
+how RetroArch keeps them when it isn't sorting saves into a folder per core;
+to share them with RetroArch, point the Saves folder there.
+
+Turning on **Games** shares all of `Roms/`, which can be many gigabytes, and
+ChaOS asks first. Games that arrive are on their shelves after **Rescan
+Folder** or the next start. Syncthing's log is `.userdata/brick/syncthing/syncthing.log`.

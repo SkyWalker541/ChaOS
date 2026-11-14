@@ -177,7 +177,9 @@ static bool has_label(const menu_row *rows, int n, const char *label);
  * five look rows and the three shelf switches are on that page, and the menu
  * holds one row for it. */
 #define PAGE_ROWS 8
-#define TOP_ROWS (PM_ROWS - PAGE_ROWS)
+/* ChaOS: and the ROM Management page's two, RomM and Syncthing */
+#define ROM_ROWS 2
+#define TOP_ROWS (PM_ROWS - PAGE_ROWS - ROM_ROWS)
 /* (the page's description line is drawn by menu_draw, not a row) */
 #define PAGE_NOTE 0
 static const menu_row *by_id(const sys_ui *u, const menu_row *rows, int n, pm_row id);
@@ -217,7 +219,16 @@ static void tortos_menu_offline(void)
 	ck(!strcmp(val(by_id(&u, rows, n, PM_COLOR)), "ChaOS Orange") && (*by_id(&u, rows, n, PM_COLOR)).live,
 	   "Menu Color names the accent, and is reachable offline");
 	u.appearance = false;
+	/* ChaOS: ROM Management, the same way: its page, and one row for it */
+	u.rom_page = true;
 	n = sys_menu_build(&u, rows, &b, &heading);
+	ck(n == ROM_ROWS && !strcmp(heading, "ROM Management") && has_label(rows, n, "RomM") &&
+	   has_label(rows, n, "Syncthing") && !strcmp(val(by_id(&u, rows, n, PM_SYNC)), "Off"),
+	   "the ROM Management page holds RomM and Syncthing, under its own heading");
+	u.rom_page = false;
+	n = sys_menu_build(&u, rows, &b, &heading);
+	ck(has_label(rows, n, "ROM Management") && !has_label(rows, n, "RomM") && !has_label(rows, n, "Syncthing"),
+	   "the menu has ROM Management in their place");
 	ck(has_label(rows, n, "Appearance") && !has_label(rows, n, "UI Theme"),
 	   "the menu holds Appearance in their place, not the look rows");
 	ck(!strcmp(val(by_id(&u, rows, n, PM_WIFI)), "off"), "Wi-Fi reads off");
@@ -734,6 +745,14 @@ static void cursor_reaches(void)
 	ck(!holds(got, k, SM_GAMES) && !holds(got, k, SM_CORE),
 	   "the reported facts are not stops");
 
+	/* ChaOS: PICO-8, which runs outside the emulator */
+	u.sys_name = "PICO-8"; u.sys_core = "pico8"; u.native = true;
+	n = sys_menu_build(&u, rows, &b, &heading);
+	k = reachable(rows, n, got, MENU_MAX_ROWS);
+	ck(n == 4 && k == 2 && reaches(rows, got, k, "Sort By") && reaches(rows, got, k, "Rescan Folder"),
+	   "PICO-8: Games, Core, Sort By and Rescan Folder, and nothing about the picture");
+	u.native = false; u.sys_name = "NES"; u.sys_core = "nestopia";
+
 	memset(&u, 0, sizeof u);
 	u.ss_have = true;   /* the full menu; its hiding is checked on its own */
 	u.night = "Off";
@@ -815,7 +834,8 @@ static void radio_less(void)
 	for (i = 0; i < k; i++)
 		if (pm[i] == PM_THEME || pm[i] == PM_DIR || pm[i] == PM_SPEED ||
 		    pm[i] == PM_LISTVIEW || pm[i] == PM_COLOR || pm[i] == PM_SHELF_FAV ||
-		    pm[i] == PM_RECENT || pm[i] == PM_SHELF_MUSE) ok = false;
+		    pm[i] == PM_RECENT || pm[i] == PM_SHELF_MUSE || pm[i] == PM_ROMM ||
+		    pm[i] == PM_SYNC) ok = false;
 	/* The top level, in the enum's order, with the Appearance rows on their page
 	 * and Appearance in their place */
 	ck(k == TOP_ROWS && ok, "every TortOS row, in the enum's order");

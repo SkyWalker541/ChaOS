@@ -115,6 +115,14 @@ install -m 755 "$ROOT/res/ports/bin/pkill" "$ROOT/res/ports/bin/pgrep" "$ROOT/re
 # unsquashfs, for runtimes the kernel can't mount (res/ports/bin/mount,
 # tools/build-unsquashfs.sh)
 install -m 755 "$ROOT/dist/brick/unsquashfs" "$C/TortOS/ports/bin/unsquashfs"
+# ChaOS: PICO-8 (src/pico8.h), the player's own copy: what runs it, the
+# curl-backed wget its Splore downloads with, and the read-me the launcher
+# puts in the card's PICO-8 folder. ChaOS carries none of PICO-8 itself.
+mkdir -p "$C/TortOS/pico8/bin"
+install -m 755 "$ROOT/res/pico8/run.sh" "$C/TortOS/pico8/run.sh"
+install -m 755 "$ROOT/res/pico8/bin/wget" "$C/TortOS/pico8/bin/wget"
+install -m 644 "$ROOT/res/pico8/README.txt" "$C/TortOS/pico8/README.txt"
+[ -x "$W/root/usr/bin/curl" ] || { echo "no curl in the root: PICO-8's Splore needs it" >&2; exit 1; }
 # The shelf: ChaOS's systems.cfg, with the Ports row, and the cards for the
 # shelves that aren't consoles - Favorites, Muse, Recently Played, Ports - in
 # both of TortOS's sets, as ChaOS draws them (tools/cardstyle.py,
@@ -122,7 +130,7 @@ install -m 755 "$ROOT/dist/brick/unsquashfs" "$C/TortOS/ports/bin/unsquashfs"
 [ -d "$C/TortOS/cards/classic" ] && [ -d "$C/TortOS/cards/fancy" ] || { echo "no cards in the image: check ports" >&2; exit 1; }
 install -m 644 "$ROOT/config/systems.cfg" "$C/TortOS/systems.cfg"
 for set in classic fancy; do
-	for card in FAVORITES MUSE PORTS RECENT; do
+	for card in FAVORITES MUSE PORTS RECENT PICO8; do
 		install -m 644 "$ROOT/res/cards/$set/$card.png" "$C/TortOS/cards/$set/$card.png"
 	done
 done

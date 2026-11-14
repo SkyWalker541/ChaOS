@@ -44,8 +44,10 @@ typedef enum {
 	PM_SCRAPE, PM_ACHIEVEMENTS, PM_SS,
 	/* ChaOS: PortMaster's ports, browsed and installed (src/pmcat.h) */
 	PM_PORTS,
-	/* ChaOS: RomM, a self-hosted game library (src/romm.h) */
-	PM_ROMM,
+	/* ChaOS: ROM Management, a page of its own (rom_page) for the ways games
+	 * and saves come and go: RomM, a self-hosted game library (src/romm.h),
+	 * and Syncthing, folders kept the same across devices (src/sync.h) */
+	PM_ROMMGMT, PM_ROMM, PM_SYNC,
 	PM_UPDATE, PM_CONTROLS, PM_ABOUT, PM_ROWS
 } pm_row;
 
@@ -194,10 +196,16 @@ typedef struct {
 	 * the menu holds Appearance in their place; the row list and the key
 	 * mapping read this the same way, so they cannot disagree. */
 	bool        appearance;
+	/* ChaOS: the ROM Management page, as appearance is the Appearance one */
+	bool        rom_page;
+	const char *sync;        /* ChaOS: Syncthing's state, sync_row_value */
 	const char *menu_color;  /* ChaOS: the menus' accent's name, from theme.h */
 	const char *update;      /* ChaOS: Updates' value, upd_row_value */
 	bool        rewind;      /* ChaOS: this console keeps states to rewind to */
 	const char *overscan;    /* ChaOS: Crop Overscan's choice, NULL for no row */
+	/* ChaOS: a shelf whose games run outside the emulator (PICO-8): none
+	 * of its rows about the picture, the buttons, rewind or box art */
+	bool        native;
 	int         auto_off;    /* seconds, 0 for off */
 	const char *clock;       /* the local date and time, "Oct 3, 6:12 AM" */
 	/* Where sound goes: the policy the player set, and where it actually ends

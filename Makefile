@@ -9,7 +9,7 @@
         check check-cheevos check-hare check-httpd check-idle check-rahash \
         check-raset check-xfer check-menus check-artscrape check-artrun check-audioout \
         check-db check-stats check-sort check-bt check-ss check-update check-asan \
-        check-release check-updater check-chaos-names check-itch check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan
+        check-release check-updater check-chaos-names check-itch check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing
 
 all: check
 
@@ -22,7 +22,7 @@ CHECKS = check-cheevos check-hare check-httpd check-idle check-rahash \
          check-db check-stats check-sort check-bt check-ss \
          check-muselib check-musequeue check-museart check-controls check-logpack \
          check-clock check-update check-remap check-shots check-pixfont \
-         check-release check-updater check-chaos-names check-itch check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan
+         check-release check-updater check-chaos-names check-itch check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing
 
 check:
 	@fail=0; for c in $(CHECKS); do \
@@ -303,11 +303,11 @@ build-native/itch-check: tools/itch-check.c src/itch.c src/itch.h src/artscrape.
 check-ports: build-native/ports-check
 	@./build-native/ports-check
 
-build-native/ports-check: tools/ports-check.c src/ports.c src/ports.h src/library.c src/net.c \
+build-native/ports-check: tools/ports-check.c src/ports.c src/ports.h src/library.c src/pico8.c src/net.c \
                           src/urlenc.c FORCE
 	@mkdir -p build-native
 	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g -DTORTOS_VERSION='"check"' \
-	      -DCHAOS_VERSION='"check"' -Isrc -o $@ tools/ports-check.c src/ports.c src/library.c \
+	      -DCHAOS_VERSION='"check"' -Isrc -o $@ tools/ports-check.c src/ports.c src/library.c src/pico8.c \
 	      src/net.c src/urlenc.c
 
 # ChaOS: PortMaster's catalog (src/pmcat.h): a small one of its own, and
@@ -334,6 +334,26 @@ check-overscan:
 	@mkdir -p build-native
 	@$(CC) -std=gnu11 -Wall -Wextra -O1 -Isrc -o build-native/overscan-check tools/overscan-check.c src/overscan.c
 	@./build-native/overscan-check
+
+# ChaOS: PICO-8 (src/pico8.h): the folder's files judged, a download's zip
+# taken apart, and its carts on the shelf
+# ChaOS: Syncthing (src/syncthing.h): its REST answers read and its folders
+# written. STH_LIVE=<x86 syncthing> build-native/syncthing-check also runs two
+# real ones paired and syncing, by hand.
+build-native/syncthing-check: tools/syncthing-check.c src/syncthing.c src/syncthing.h src/rajson.c \
+                              src/net.c src/urlenc.c tools/tortos-update/sha256.c FORCE
+	@mkdir -p build-native
+	@$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g -DTORTOS_VERSION='"check"' \
+	      -DCHAOS_VERSION='"check"' -Isrc -o $@ tools/syncthing-check.c src/syncthing.c src/rajson.c \
+	      src/net.c src/urlenc.c tools/tortos-update/sha256.c
+
+check-syncthing: build-native/syncthing-check
+	@./build-native/syncthing-check
+
+check-pico8:
+	@mkdir -p build-native
+	@$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -Isrc -o build-native/pico8-check tools/pico8-check.c src/pico8.c src/library.c
+	@./build-native/pico8-check
 
 check-cheats: build-native/cheats-check
 	@./build-native/cheats-check
