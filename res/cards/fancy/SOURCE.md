@@ -42,10 +42,10 @@ side 96% of 384 and centred, in the 384 canvas because it is taller than wide.
 
 ## RECENT.png
 
-Not a console: Recently Played's card, a steel watch with ChaOS on its dial,
-made by SkyWalker541 for ChaOS (generated with Gemini) and given to the
-project on 2026-11-14. Its source is `source/recent-watch.jpg`, kept here;
-`tools/genrecentwatch.py` cuts the watch from it (the source paints a
-checkerboard where transparency would be), turns it as the rendered cards
-are, and frames it as above. It replaces the rendered alarm clock
-(`tools/genrecentfancy.py`), which is kept.
+Not a console: Recently Played's card, a steel watch with ChaOS on its dial.
+The dial is SkyWalker541's, made for ChaOS (generated with Gemini) and given
+to the project on 2026-11-14; its source is `source/recent-watch.jpg`, kept
+here. `tools/genrecentwatch.py` lays its dial and inner ring on a modelled
+steel case and crown and renders it (`tools/raymarch.py`), so it turns as the
+other rendered cards do, with the case's side showing, framed as above. It
+replaces the rendered alarm clock (`tools/genrecentfancy.py`), which is kept.
