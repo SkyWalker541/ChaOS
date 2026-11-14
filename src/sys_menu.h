@@ -60,6 +60,8 @@ typedef enum {
 	 * Stretch), its shader, which opens its settings, and its overlay.
 	 * Shader is left out for a console with no shader made for it. */
 	SM_DISPLAY, SM_SHADER, SM_OVERLAY,
+	/* ChaOS: Crop Overscan (overscan.h), only where the emulator can */
+	SM_OVERSCAN,
 	/* ChaOS: what each of the Brick's buttons presses (src/remap.h), and
 	 * whether MENU+L1 can step the game back */
 	SM_BUTTONS, SM_REWIND, SM_BOXART, SM_RESCAN, SM_ROWS
@@ -195,6 +197,7 @@ typedef struct {
 	const char *menu_color;  /* ChaOS: the menus' accent's name, from theme.h */
 	const char *update;      /* ChaOS: Updates' value, upd_row_value */
 	bool        rewind;      /* ChaOS: this console keeps states to rewind to */
+	const char *overscan;    /* ChaOS: Crop Overscan's choice, NULL for no row */
 	int         auto_off;    /* seconds, 0 for off */
 	const char *clock;       /* the local date and time, "Oct 3, 6:12 AM" */
 	/* Where sound goes: the policy the player set, and where it actually ends

@@ -251,6 +251,7 @@ void plat_resident_demo_speed(const plat_shade_speed *s);
  * "key=value" string; a core that does not declare the key ignores it.
  * Applied BEFORE the game loads, because options marked (Restart) are read at
  * retro_load_game and setting one afterwards does nothing until next launch. */
+void        plat_coreopt_reload(void);
 int         plat_coreopt_count(const char *tag);
 const char *plat_coreopt(const char *tag, int i);
 /* The turbo map for this system, or NULL. */

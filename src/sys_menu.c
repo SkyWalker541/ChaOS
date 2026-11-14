@@ -65,6 +65,7 @@ int sys_menu_system_rows(const sys_ui *u, sm_row *out)
 	for (r = 0; r < SM_ROWS; r++) {
 		if (u->no_wifi && r == SM_BOXART) continue;
 		if (!u->shader && r == SM_SHADER) continue;
+		if (!u->overscan && r == SM_OVERSCAN) continue;
 		out[n++] = (sm_row)r;
 	}
 	return n;
@@ -150,6 +151,8 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 		full[SM_SHADER]  = (menu_row){ "Shader",        u->shader,   true, true };
 		full[SM_OVERLAY] = (menu_row){ "Overlay",
 		                              u->overlay ? u->overlay : "None", true };
+		full[SM_OVERSCAN] = (menu_row){ "Crop Overscan",
+		                               u->overscan ? u->overscan : "Off", true };
 		/* Button Mapping is out until there is something behind it. Diatom
 		 * supplies core button labels, so the hook is real - but a dead row
 		 * in a menu of live ones is a promise the launcher is not keeping,
@@ -183,6 +186,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 		full[SM_DISPLAY].hint = "How the picture fills the screen";
 		full[SM_SHADER].hint  = "A screen effect, like a CRT's or a Game Boy's LCD";
 		full[SM_OVERLAY].hint = "A frame drawn around the picture";
+		full[SM_OVERSCAN].hint = "Trim the edges an old TV hid";
 		full[SM_BUTTONS].hint = "What each button does in this console's games";
 		full[SM_REWIND].hint  = "Hold MENU + L1 to rewind. Costs a little speed";
 		full[SM_BOXART].hint  = "Download box art for this console's games";
@@ -190,6 +194,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 		/* ChaOS: what left and right do (menu.h): go round the choices, or
 		 * flip a switch */
 		full[SM_SORT].cycles = full[SM_DISPLAY].cycles = full[SM_OVERLAY].cycles = true;
+		full[SM_OVERSCAN].cycles = true;
 		/* no overlay fits this Display Mode (Stretch, say): nothing to
 		 * choose, and the row says so by being dim */
 		if (u->no_overlays) full[SM_OVERLAY].live = full[SM_OVERLAY].cycles = false;

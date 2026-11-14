@@ -191,6 +191,7 @@ The system menu opens on a shelf of games and applies to that system alone:
 | **Core** | which libretro core runs them |
 | **Sort By** | left/right; `Name`, `Play Time`, `Last Played` or `Recently Added` |
 | **Display Mode** | left/right cycles `Integer`, `Aspect` and `Stretch`; saved the moment it changes |
+| **Crop Overscan** (ChaOS) | NES, TurboGrafx-16 and Master System only - trims the edges an old TV hid; see below |
 | **Box Art** | fetch what this system is missing, and nothing else |
 | **Rescan Folder** | read the card again, for ROMs that arrived since boot |
 
@@ -203,6 +204,25 @@ same answer. Set here it applies from the next launch; the same row in the
 in-game menu changes the running game as you press it, which is the one to use
 when you want to see the difference rather than guess at it. Either way it is
 written the moment it changes - there is no confirm step to hang the save off.
+
+### Crop Overscan (ChaOS)
+
+A television hid the outer edge of the picture behind its bezel, and some
+games left junk there: flickering tiles at the top and bottom of NES games,
+seams down the side where a game scrolls, a blank column at the left of many
+Master System games. **Crop Overscan** trims it, per console, from the
+console's menu (MENU on its shelf) or the in-game menu. In a game it shows the
+moment the game goes on again.
+
+| Console | Choices |
+|---|---|
+| NES | `Off`, `Top & Bottom` (the default, as the NES has always looked here), `All Sides` |
+| TurboGrafx-16 | `Off` (the default), `On` - 8 lines off the top and bottom |
+| Master System | `Off` (the default), `Left`, `Both Sides` - `Both Sides` keeps the picture centered |
+
+The row is only there for those three. Genesis already hides its borders, and
+the handhelds and SNES show only what they should. The choice is kept with the
+console's core options, so it stays through updates.
 
 Sort By is per-system for the same reason. Alphabetical is the only sane way
 to find a title you can name, and no help at all when you are coming back to

@@ -9,7 +9,7 @@
         check check-cheevos check-hare check-httpd check-idle check-rahash \
         check-raset check-xfer check-menus check-artscrape check-artrun check-audioout \
         check-db check-stats check-sort check-bt check-ss check-update check-asan \
-        check-release check-updater check-chaos-names check-itch check-cover check-ports check-pmcat check-libpack check-romm check-cheats
+        check-release check-updater check-chaos-names check-itch check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan
 
 all: check
 
@@ -22,7 +22,7 @@ CHECKS = check-cheevos check-hare check-httpd check-idle check-rahash \
          check-db check-stats check-sort check-bt check-ss \
          check-muselib check-musequeue check-museart check-controls check-logpack \
          check-clock check-update check-remap check-shots check-pixfont \
-         check-release check-updater check-chaos-names check-itch check-cover check-ports check-pmcat check-libpack check-romm check-cheats
+         check-release check-updater check-chaos-names check-itch check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan
 
 check:
 	@fail=0; for c in $(CHECKS); do \
@@ -330,6 +330,11 @@ build-native/libpack-check: tools/libpack-check.c src/libpack.c src/libpack.h sr
 	      src/libpack.c src/rajson.c
 
 # ChaOS: RomM (src/romm.h) against a stand-in server (tools/romm-mock.py)
+check-overscan:
+	@mkdir -p build-native
+	@$(CC) -std=gnu11 -Wall -Wextra -O1 -Isrc -o build-native/overscan-check tools/overscan-check.c src/overscan.c
+	@./build-native/overscan-check
+
 check-cheats: build-native/cheats-check
 	@./build-native/cheats-check
 

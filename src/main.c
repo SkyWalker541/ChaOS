@@ -28,6 +28,9 @@
 #include "artshrink.h"
 #include "artscrape.h"
 #include "cheats.h"
+#include "overscan.h"
+static const char *os_label(const char *tag);
+static void os_cycle(const char *tag, int d, bool live);
 #include "favorites.h"
 #include "hare.h"
 #include "hareart.h"
@@ -5832,6 +5835,7 @@ static int menu_build(app *a, screen_id screen, int sys,
 			static char ovl[256];
 
 			u.rewind  = rewind_load(sc->tag);
+			u.overscan = u.fav || u.muse ? NULL : os_label(sc->tag);
 			u.shader  = look_console_of(sc->tag) == LOOK_NONE ? NULL
 			          : a->view[sys].look.on ? "On" : "Off";
 			u.overlay = u.fav || u.muse ? NULL : overlay_label(a, sys, ovl, sizeof ovl);
@@ -10408,7 +10412,8 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 		else if (!is_muse(&a->sys.systems[a->sys_cursor])) {
 			sys_ui dev = { .no_wifi = !plat_has_wifi(),
 			               .shader = look_console_of(a->sys.systems[a->sys_cursor].tag)
-			                         == LOOK_NONE ? NULL : "" };
+			                         == LOOK_NONE ? NULL : "",
+			               .overscan = os_label(a->sys.systems[a->sys_cursor].tag) };
 			sm_row ids[SM_ROWS];
 			int n = sys_menu_system_rows(&dev, ids);
 
@@ -10444,6 +10449,10 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 		}
 		if (sel == SM_BUTTONS) {
 			if (key == IN_ACCEPT) console_controls_screen(a, a->sys_cursor, NULL, NULL, NULL);
+			return MENU_STAY;
+		}
+		if (sel == SM_OVERSCAN) {
+			if (d || key == IN_ACCEPT) os_cycle(a->sys.systems[a->sys_cursor].tag, d ? d : 1, false);
 			return MENU_STAY;
 		}
 		if (sel == SM_REWIND) {
@@ -11029,6 +11038,42 @@ static int slot_strip(app *a, SDL_Texture *bg, int saving)
 
 /* What the in-game menu needs from the app, handed to gm_rows to become rows.
  * Same split as everywhere else. */
+/* ChaOS: Crop Overscan (overscan.h). The choice is read back from the
+ * console's stored core options, so it can't disagree with what is sent. */
+static const char *os_get_db(const char *key, void *ctx)
+{
+	static char v[64];
+	char k[160];
+
+	snprintf(k, sizeof k, "coreopt.%s.%s", (const char *)ctx, key);
+	return db_get_str(db_lib(), k, v, sizeof v, NULL) ? v : NULL;
+}
+
+static const char *os_label(const char *tag)
+{
+	const os_console *c = os_for(tag);
+	return c ? c->c[os_current(c, os_get_db, (void *)tag)].label : NULL;
+}
+
+/* The next choice either way, stored; and to a paused game now, which takes
+ * it on as it goes on (the core reads its options each frame) */
+static void os_cycle(const char *tag, int d, bool live)
+{
+	const os_console *c = os_for(tag);
+	int i, k;
+
+	if (!c) return;
+	i = (os_current(c, os_get_db, (void *)tag) + d + c->n) % c->n;
+	for (k = 0; k < OS_KEYS && c->c[i].key[k]; k++) {
+		char key[160];
+
+		snprintf(key, sizeof key, "coreopt.%s.%s", tag, c->c[i].key[k]);
+		db_set_str(db_lib(), key, c->c[i].value[k]);
+		if (live) plat_resident_line("SETOPT\tkey=%s\tvalue=%s", c->c[i].key[k], c->c[i].value[k]);
+	}
+	plat_coreopt_reload();
+}
+
 /* ChaOS: the game's cheats on, and whether one has been on this game - which
  * put its achievements away until it starts again. Set at its start and by
  * the Cheats screen. */
@@ -11059,6 +11104,10 @@ static int gm_build(app *a, menu_row *out, gm_bufs *b, int shots, const char *sh
 	u.total  = chv_count();
 	u.cheats_on = g_cht_on;
 	u.cheated   = g_cht_cheated;
+	{
+		sysview *sv = &a->view[a->sys_cursor];
+		u.overscan = os_label(a->sys.systems[shelf_owner(a, a->sys_cursor, sv->cursor)].tag);
+	}
 	return gm_rows(&u, out, b);
 }
 
@@ -13026,6 +13075,7 @@ typedef struct {
 	Uint32       shot_said;    /* when Take Screenshot last said "Saved", or 0 */
 	bool         shot_ok;
 	bool         cht_shown;    /* ChaOS: Cheats offered for this game (cht_offered) */
+	bool         hide[GM_ROWS];/* ChaOS: rows left out: Cheats, Crop Overscan */
 } gm_ctx;
 
 /* The overlay as Diatom draws it: around the game's picture, never over it
@@ -13147,13 +13197,14 @@ static int gm_menu_build(void *ctx, menu_row *rows, int max,
 		int n = gm_build(c->a, rows, &c->bufs, c->shots,
 		                 c->shot_said ? (c->shot_ok ? "Saved" : "Couldn't save") : NULL);
 
-		/* ChaOS: Cheats only for a game that has some to get; gm_key
-		 * counts past the gap */
-		if (!c->cht_shown) {
-			memmove(&rows[GM_CHEATS], &rows[GM_CHEATS + 1], sizeof *rows * (size_t)(n - GM_CHEATS - 1));
-			n--;
-		}
-		return n;
+		/* ChaOS: rows this game hasn't - Cheats for a game with none to
+		 * get, Crop Overscan for a console that can't crop - left out;
+		 * gm_key counts past the gaps */
+		int i, k = 0;
+
+		for (i = 0; i < n; i++)
+			if (i >= GM_ROWS || !c->hide[i]) rows[k++] = rows[i];
+		return k;
 	}
 }
 
@@ -13594,8 +13645,14 @@ static menu_result gm_key(app *a, void *ctx, in_button key, int sel)
 {
 	gm_ctx *c = ctx;
 
-	/* ChaOS: the rows as gm_row counts them, past a Cheats row not shown */
-	if (!c->cht_shown && sel >= GM_CHEATS) sel++;
+	/* ChaOS: the rows as gm_row counts them, past the rows not shown */
+	{
+		int i, k = -1;
+
+		for (i = 0; i < GM_ROWS; i++)
+			if (!c->hide[i] && ++k == sel) break;
+		sel = i < GM_ROWS ? i : sel + (GM_ROWS - k - 1);
+	}
 
 	/* ChaOS. Applied to the paused game at once, not on resume: the point
 	 * of these rows being here is judging them against the game. Left and
@@ -13611,6 +13668,12 @@ static menu_result gm_key(app *a, void *ctx, in_button key, int sel)
 	}
 	if (sel == GM_DISPLAY && (key == IN_LEFT || key == IN_RIGHT || key == IN_ACCEPT)) {
 		gm_cycle_display(c, key == IN_LEFT ? -1 : 1);
+		return MENU_STAY;
+	}
+	if (sel == GM_OVERSCAN && (key == IN_LEFT || key == IN_RIGHT || key == IN_ACCEPT)) {
+		/* ChaOS: stored, and sent to the paused game, which takes it on as
+		 * soon as it runs again */
+		os_cycle(a->sys.systems[gm_owner(a)].tag, key == IN_LEFT ? -1 : 1, true);
 		return MENU_STAY;
 	}
 	if (sel == GM_OVERLAY && (key == IN_LEFT || key == IN_RIGHT || key == IN_ACCEPT)) {
@@ -13995,6 +14058,8 @@ static void game_menu(app *a)
 		sysview *sv = &a->view[a->sys_cursor];
 		c.cht_shown = g_cht_on > 0 ||
 		              cht_offered(&a->sys, gm_owner(a), sv->list.items[sv->cursor].file);
+		c.hide[GM_CHEATS] = !c.cht_shown;
+		c.hide[GM_OVERSCAN] = !os_for(a->sys.systems[gm_owner(a)].tag);
 	}
 	/* The frame as the shader drew it, when it did: what the player was
 	 * looking at. And the overlay over it. */
@@ -19349,6 +19414,11 @@ static void take_shot(app *a)
 
 		memset(&gb, 0, sizeof gb);
 		gn = gm_build(a, rows, &gb, 2, NULL);
+		/* ChaOS: Crop Overscan left out as gm_menu_build leaves it out */
+		if (!os_for(a->sys.systems[gm_owner(a)].tag)) {
+			memmove(&rows[GM_OVERSCAN], &rows[GM_OVERSCAN + 1], sizeof *rows * (size_t)(gn - GM_OVERSCAN - 1));
+			gn--;
+		}
 		menu_draw(a, NULL, rows, gn, shot_gmenu < gn ? shot_gmenu : 0, 0, MENU_ACCENT);
 	}
 	if (shot_clock) {

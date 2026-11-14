@@ -94,6 +94,12 @@ static int coreopt_nth(const char *tag, int want, const char **out)
 	return 0;
 }
 
+/* ChaOS: read them again, after a setting that is one changed (Crop Overscan) */
+void plat_coreopt_reload(void)
+{
+	ncoreopts = -1;
+}
+
 int plat_coreopt_count(const char *tag)
 {
 	int n = 0;

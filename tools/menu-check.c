@@ -493,6 +493,7 @@ static void system_menu(void)
 	u.game_count = 412;
 	u.shader = "On";
 	u.overlay = "Clean Frame";
+	u.overscan = "Top & Bottom";
 	n = sys_menu_build(&u, rows, &b, &heading);
 
 	printf("system menu:\n");
@@ -506,6 +507,8 @@ static void system_menu(void)
 	   "the rows that do something are live");
 	ck(!rows[SM_GAMES].live && !rows[SM_CORE].live, "reported facts are not rows to press");
 	ck(rows[SM_BOXART].live, "Box Art is live on a network");
+	ck(!strcmp(rows[SM_OVERSCAN].label, "Crop Overscan") && !strcmp(val(&rows[SM_OVERSCAN]), "Top & Bottom")
+	   && rows[SM_OVERSCAN].cycles, "Crop Overscan carries its choice, and goes round them");
 
 	/* The same menu with the radio down. Only Box Art changes. */
 	u.wifi = WIFI_OFF;
@@ -717,8 +720,9 @@ static void cursor_reaches(void)
 	ck(reaches(rows, got, k, "Display Mode") && !strcmp(val(&rows[SM_DISPLAY]), "Integer"),
 	   "Display Mode, Integer when nothing says otherwise");
 	ck(!reaches(rows, got, k, "Shader"), "no Shader: nothing is made for the NES yet");
-	ck(n == SM_ROWS - 1 && !strcmp(rows[SM_SHADER].label, "Overlay"),
+	ck(n == SM_ROWS - 2 && !strcmp(rows[SM_SHADER].label, "Overlay"),
 	   "and Overlay moves up into its place");
+	ck(!reaches(rows, got, k, "Crop Overscan"), "no Crop Overscan where nothing can crop");
 	/* Live since sorting stopped being alphabetical-only. It was a
 	 * placeholder for long enough that this check counted three. */
 	ck(reaches(rows, got, k, "Sort By"), "Sort By");
@@ -815,6 +819,7 @@ static void radio_less(void)
 	/* The top level, in the enum's order, with the Appearance rows on their page
 	 * and Appearance in their place */
 	ck(k == TOP_ROWS && ok, "every TortOS row, in the enum's order");
+	u.overscan = "Off";
 	k = sys_menu_system_rows(&u, sm);
 	for (i = 0, ok = true; i < k; i++) if (sm[i] != (sm_row)i) ok = false;
 	ck(k == SM_ROWS && ok, "every system row, in the enum's order");
@@ -874,7 +879,7 @@ static void radio_less(void)
 	u.games = true;
 	u.no_wifi = true;
 	u.sys_name = "NES"; u.sys_core = "nestopia";
-	u.game_count = 3; u.shader = "Off";
+	u.game_count = 3; u.shader = "Off"; u.overscan = "All Sides";
 	n = sys_menu_build(&u, rows, &b, &heading);
 	k = sys_menu_system_rows(&u, sm);
 	printf("system menu, no radio at all:\n");

@@ -101,7 +101,7 @@ int gm_rows(const gm_ui *u, menu_row *out, gm_bufs *b)
 {
 	static const char *label[GM_ROWS] = {
 		"Continue", "Save", "Load", "Take Screenshot", "Screenshots",
-		"Display Mode", "Shader", "Overlay", "Controls", "Cheats", "RetroAchievements", "Reset", "Quit"
+		"Display Mode", "Shader", "Overlay", "Crop Overscan", "Controls", "Cheats", "RetroAchievements", "Reset", "Quit"
 	};
 	int i;
 
@@ -117,6 +117,7 @@ int gm_rows(const gm_ui *u, menu_row *out, gm_bufs *b)
 			"How the picture fills the screen",
 			"A screen effect, like a CRT's or a Game Boy's LCD",
 			"A frame drawn around the picture",
+			"Trim the edges an old TV hid",
 			"What each button does in this console's games",
 			"Codes for this game, turned on and off here",
 			"This game's achievements and how many you have",
@@ -130,6 +131,8 @@ int gm_rows(const gm_ui *u, menu_row *out, gm_bufs *b)
 	/* ChaOS: left and right change these: Display Mode and Overlay go
 	 * round their choices, Shader is a switch */
 	out[GM_DISPLAY].cycles = out[GM_OVERLAY].cycles = true;
+	out[GM_OVERSCAN].value = u->overscan ? u->overscan : "Off";
+	out[GM_OVERSCAN].cycles = true;
 	out[GM_SHADER].toggle = u->shader != NULL;
 	out[GM_SHADER].value = u->shader ? u->shader : "none";
 	out[GM_SHADER].live = u->shader != NULL;
