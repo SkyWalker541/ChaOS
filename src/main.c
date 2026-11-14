@@ -58,6 +58,7 @@ static void os_cycle(const char *tag, int d, bool live);
 #include "ports.h"
 #include "pico8.h"
 #include "syncthing.h"
+#include "gamecore.h"
 #include "pmcat.h"
 #include "libpack.h"
 #include "romm.h"
@@ -786,6 +787,21 @@ static bool overlay_write_dtov(const app *a, int sys, const char *out)
 #define LOOK_CFG_PATH  "/tmp/chaos-shader.cfg"
 #define LOOK_DTOV_PATH "/tmp/chaos-overlay.dtov"
 #define LOOK_SHADED_PATH "/tmp/chaos-shaded.bmp"
+
+/* ChaOS: PT SkyWalker541's Game System when it is the shader a console's
+ * games play with - on, PT's own style rather than lcd3x - else -1
+ * (gamecore.h sets the core to match it) */
+static char g_running_rom[1100];   /* the game playing, for gm_apply_shader */
+
+static int pt_system_of(const app *a, int sys)
+{
+	const look_settings *l = &a->view[sys].look;
+	look_console c = look_console_of(a->sys.systems[sys].tag);
+
+	if (c == LOOK_NONE || look_shader_of(c) != LS_PT || !l->on || (int)(l->v[LP_PT_STYLE] + 0.5f) != 0)
+		return -1;
+	return (int)(l->v[LP_GAME_SYSTEM] + 0.5f);
+}
 
 /* What Diatom is told about a console's look: the shader file, or "" for no
  * shader, and the overlay file, or "" for none. */
@@ -13203,6 +13219,27 @@ static void gm_apply_shader(gm_ctx *c)
 
 	if (lc == LOOK_NONE) return;
 	if (!look_write_cfg(LOOK_CFG_PATH, lc, &a->view[o].look)) return;
+	/* ChaOS: the core's settings to match, at once (gamecore.h): mGBA takes
+	 * its color correction, blending and palette while a game runs. The
+	 * folder's first, then the game's, as at launch; the machine itself
+	 * (mgba_gb_model) is left as the game started. */
+	{
+		char kv[GC_MAX][GC_LEN];
+		int i, n = gc_options(a->sys.systems[o].tag, g_running_rom, pt_system_of(a, o), kv);
+
+		for (i = 0; i < plat_coreopt_count(a->sys.systems[o].tag); i++) {
+			const char *f = plat_coreopt(a->sys.systems[o].tag, i), *eq = strchr(f, '=');
+
+			if (eq && strncmp(f, "mgba_gb_model=", 14))
+				plat_resident_line("SETOPT\tkey=%.*s\tvalue=%s", (int)(eq - f), f, eq + 1);
+		}
+		for (i = 0; i < n; i++) {
+			const char *eq = strchr(kv[i], '=');
+
+			if (eq && strncmp(kv[i], "mgba_gb_model=", 14))
+				plat_resident_line("SETOPT\tkey=%.*s\tvalue=%s", (int)(eq - kv[i]), kv[i], eq + 1);
+		}
+	}
 	plat_resident_line("SETSHADER\tpath=%s\tpreview=%s", LOOK_CFG_PATH, LOOK_SHADED_PATH);
 	if (plat_resident_sync_shaded(2000)) gm_load_bg(c);
 }
@@ -17498,6 +17535,14 @@ static void launch_game(app *a)
 
 	snprintf(rom, sizeof rom, "%s/%s/%s", P_ROMS, s->folder, romfile);
 	snprintf(save, sizeof save, "%s/Saves", P_CARD);
+	/* ChaOS: this game's own core options - its machine from its header,
+	 * and PT SkyWalker541's settings when PT is the shader (gamecore.h) */
+	{
+		char kv[GC_MAX][GC_LEN];
+
+		plat_coreopt_game((const char (*)[64])kv, gc_options(s->tag, rom, pt_system_of(a, o), kv));
+		snprintf(g_running_rom, sizeof g_running_rom, "%s", rom);
+	}
 	snprintf(bios, sizeof bios, "%s/Bios", P_CARD);
 
 	/* A disc that needs firmware, before anything tries to run it.
@@ -17844,10 +17889,10 @@ static void launch_game(app *a)
 				argv[n++] = (char *)"--core-option";
 				argv[n++] = (char *)plat_coreopt(s->tag, ci);
 			}
-			/* ChaOS: this game's own, after the folder's (platform.c) */
-			if (plat_coreopt_extra(s->tag, rom) && n < (int)(sizeof argv / sizeof argv[0]) - 3) {
+			/* ChaOS: this game's own, after the folder's (gamecore.h) */
+			for (ci = 0; ci < plat_coreopt_game_count() && n < (int)(sizeof argv / sizeof argv[0]) - 3; ci++) {
 				argv[n++] = (char *)"--core-option";
-				argv[n++] = (char *)plat_coreopt_extra(s->tag, rom);
+				argv[n++] = (char *)plat_coreopt_game_at(ci);
 			}
 		}
 		argv[n] = NULL;

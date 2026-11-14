@@ -62,10 +62,6 @@ static const db_default library_defaults[] = {
 	 * has two dots. A tagged entry overrides a global of the same name. */
 	{ "coreopt..mgba_sgb_borders",  "OFF" },
 	{ "coreopt.GB.mgba_gb_model",   "Game Boy" },
-	/* ChaOS: and the Game Boy Color folder is a Game Boy Color, whatever its
-	 * files are called (systems.cfg): a .gb color game from GB Studio plays
-	 * in color, and a mono .gb plays as a GBC plays one, with its colors */
-	{ "coreopt.GBC.mgba_gb_model",  "Game Boy Color" },
 	{ "coreopt.GB.mgba_gb_colors",  "DMG Green" },
 	/* mGBA's frameskip, which Diatom drives: it skips only the frames fast
 	 * forward runs without showing, and none at 1x (Diatom's env.c). Fast

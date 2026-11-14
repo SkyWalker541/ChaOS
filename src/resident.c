@@ -317,9 +317,10 @@ bool plat_resident_send(const char *tag, const char *core, const char *rom,
 				dsend("SETOPT\tkey=%.*s\tvalue=%s",
 				      (int)(eq - kv), kv, eq + 1);
 			}
-			/* ChaOS: and this game's own, after the folder's, so it wins */
-			{
-				const char *kv = plat_coreopt_extra(tag, rom), *eq = kv ? strchr(kv, '=') : NULL;
+			/* ChaOS: and this game's own (gamecore.h), after the folder's,
+			 * so they win */
+			for (i = 0; i < plat_coreopt_game_count(); i++) {
+				const char *kv = plat_coreopt_game_at(i), *eq = strchr(kv, '=');
 
 				if (eq) dsend("SETOPT\tkey=%.*s\tvalue=%s", (int)(eq - kv), kv, eq + 1);
 			}

@@ -117,28 +117,21 @@ const char *plat_coreopt(const char *tag, int i)
 	return kv;
 }
 
-/* ChaOS: one more option for this game in particular, after the folder's, or
- * NULL. The Game Boy folder runs everything as a Game Boy (mgba_gb_model),
- * whatever the file is called; but a cartridge that is Game Boy Color ONLY
- * (header byte 0x143 = 0xC0) won't start on one and shows its "for Game Boy
- * Color" screen, so it alone gets the Color. Its shelf's settings, shader and
- * overlay are still the Game Boy folder's. A .zip isn't looked into. */
-const char *plat_coreopt_extra(const char *tag, const char *rom)
-{
-	unsigned char b;
-	FILE *f;
-	const char *dot;
-	bool only = false;
+/* ChaOS: this game's own options (gamecore.h), set by the launcher before
+ * each launch and sent after the folder's, so they win */
+static char g_game_kv[8][64];
+static int  g_game_n;
 
-	if (!tag || strcmp(tag, "GB") || !rom) return NULL;
-	dot = strrchr(rom, '.');
-	if (!dot || !strcasecmp(dot, ".zip")) return NULL;
-	if ((f = fopen(rom, "rb"))) {
-		only = fseek(f, 0x143, SEEK_SET) == 0 && fread(&b, 1, 1, f) == 1 && b == 0xC0;
-		fclose(f);
-	}
-	return only ? "mgba_gb_model=Game Boy Color" : NULL;
+void plat_coreopt_game(const char kv[][64], int n)
+{
+	int i;
+
+	g_game_n = n < 8 ? n : 8;
+	for (i = 0; i < g_game_n; i++) snprintf(g_game_kv[i], sizeof g_game_kv[i], "%s", kv[i]);
 }
+
+int plat_coreopt_game_count(void) { return g_game_n; }
+const char *plat_coreopt_game_at(int i) { return i >= 0 && i < g_game_n ? g_game_kv[i] : ""; }
 
 /* ---- turbo, read once from the library database -------------------------- */
 /* One canonical map per system tag, handed to Diatom after RUN. Diatom makes a

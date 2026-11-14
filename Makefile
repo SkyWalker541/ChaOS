@@ -9,7 +9,7 @@
         check check-cheevos check-hare check-httpd check-idle check-rahash \
         check-raset check-xfer check-menus check-artscrape check-artrun check-audioout \
         check-db check-stats check-sort check-bt check-ss check-update check-asan \
-        check-release check-updater check-chaos-names check-itch check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing
+        check-release check-updater check-chaos-names check-itch check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore
 
 all: check
 
@@ -22,7 +22,7 @@ CHECKS = check-cheevos check-hare check-httpd check-idle check-rahash \
          check-db check-stats check-sort check-bt check-ss \
          check-muselib check-musequeue check-museart check-controls check-logpack \
          check-clock check-update check-remap check-shots check-pixfont \
-         check-release check-updater check-chaos-names check-itch check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing
+         check-release check-updater check-chaos-names check-itch check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore
 
 check:
 	@fail=0; for c in $(CHECKS); do \
@@ -349,6 +349,12 @@ build-native/syncthing-check: tools/syncthing-check.c src/syncthing.c src/syncth
 
 check-syncthing: build-native/syncthing-check
 	@./build-native/syncthing-check
+
+# ChaOS: one game's core options (src/gamecore.h)
+check-gamecore:
+	@mkdir -p build-native
+	@$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -Isrc -o build-native/gamecore-check tools/gamecore-check.c src/gamecore.c -lz
+	@./build-native/gamecore-check
 
 check-pico8:
 	@mkdir -p build-native

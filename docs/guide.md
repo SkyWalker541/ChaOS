@@ -203,14 +203,30 @@ started from.
 
 The two folders take each other's files: `Roms/Game Boy` lists `.gbc` and
 `.cgb` as well as `.gb` and `.dmg`, and `Roms/Game Boy Color` the same the
-other way round. The folder decides, not the file's name. GB Studio and other
-homebrew often ship a color game as `.gb`; put it in Game Boy Color and it
-plays on a Game Boy Color, with that shelf's shader, overlay, buttons and
-settings. In the Game Boy folder everything plays on a Game Boy, in its
-greens, except a cartridge made only for the Color (its header says so), which
-would refuse to start on a Game Boy and gets the Color instead. A plain Game
-Boy game put in Game Boy Color plays as a Game Boy Color plays one, in the
-colors it gives them.
+other way round, so a GB Studio color game shipped as `.gb` shows wherever
+you put it. The folder decides the shelf's shader, overlay, buttons and
+settings. The game itself decides the machine, as a real cartridge does: one
+made for the Color (its header says so) plays on a Game Boy Color in its own
+colors, in either folder, and one that isn't plays on a Game Boy, as it was
+meant to, never colorized. A `.zip` is looked into for this.
+
+### PT SkyWalker541 and the emulator (ChaOS)
+
+PT SkyWalker541 is tuned with the emulator set a certain way, and ChaOS sets
+it whenever PT is the shader a Game Boy, Color or Advance game plays with,
+by the shader's Game System:
+
+| Game System | Color correction | Interframe blending | |
+|---|---|---|---|
+| Game Boy | off | off | grayscale palette, no colorization |
+| Game Boy Color | GBC | off | |
+| GBA SP | GBA | Smart | |
+| GBA | GBA | LCD ghosting | |
+| Manual | left as they are | | |
+
+With PT off, or its lcd3x style, they're back at the emulator's own (off, and
+the shelf's palette). A change in the in-game menu shows at once; nothing
+needs restarting.
 
 Display Mode is per-system, because a Game Boy and a Genesis do not want the
 same answer. Set here it applies from the next launch; the same row in the
