@@ -13836,6 +13836,89 @@ static void cheats_screen(app *a, gm_ctx *g)
 	memset(&a->in, 0, sizeof a->in);
 }
 
+/* ---- ChaOS: the Disc page --------------------------------------------------
+ *
+ * A on the in-game menu's Disc row: the game's discs, the one in marked. A
+ * on another asks how: Swap Disc, for when the game asks for it, or Restart
+ * With This Disc, which swaps and restarts in one go - a game whose second disc is
+ * a story of its own (Resident Evil 2's) starts there. Either goes back to the
+ * game, as closing the lid did. B leaves everything as it was. */
+typedef struct { int pick; int how; char lab[16][16]; } disc_ui;
+
+static int disc_build(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	disc_ui *u = ctx;
+	int i, n = 0;
+
+	*heading = "Disc";
+	for (i = 0; i < g_disc_n && i < 16 && n < max - 1; i++) {
+		snprintf(u->lab[i], sizeof u->lab[i], "Disc %d", i + 1);
+		rows[n] = (menu_row){ u->lab[i], i == g_disc_i ? "In" : NULL, true };
+		rows[n].opens = i != g_disc_i;
+		rows[n].hint = i == g_disc_i ? "The disc the game is reading" : "Put this disc in";
+		n++;
+	}
+	return n;
+}
+
+static int how_build(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	disc_ui *u = ctx;
+	static char h[24];
+
+	(void)max;
+	snprintf(h, sizeof h, "Disc %d", u->pick + 1);
+	*heading = h;
+	rows[0] = (menu_row){ "Swap Disc", NULL, true };
+	rows[0].hint = "When the game asks for it";
+	rows[1] = (menu_row){ "Restart With This Disc", NULL, true };
+	/* Every PlayStation disc boots; what it does then is the game's own -
+	 * a story of its own, its title and Load, or "insert disc 1" - and no
+	 * disc says which, so the hint says what it does, not what follows */
+	rows[1].hint = "Like turning on with it in. Most ask for a save";
+	return 2;
+}
+
+static menu_result how_key(app *a, void *ctx, in_button key, int sel)
+{
+	disc_ui *u = ctx;
+
+	(void)a;
+	if (key != IN_ACCEPT || sel < 0 || sel > 1) return MENU_STAY;
+	u->how = sel + 1;
+	return MENU_DONE;
+}
+
+static menu_result disc_key(app *a, void *ctx, in_button key, int sel)
+{
+	disc_ui *u = ctx;
+	menu_style st = { .fixed_w = menu_std_width(a), .accent = MENU_ACCENT };
+
+	if (key != IN_ACCEPT || sel < 0 || sel >= g_disc_n || sel == g_disc_i) return MENU_STAY;
+	u->pick = sel;
+	u->how = 0;
+	menu_run(a, &st, how_build, how_key, u);
+	return u->how ? MENU_DONE : MENU_STAY;
+}
+
+/* True when a disc went in, and the game should go on */
+static bool disc_screen(app *a, gm_ctx *g)
+{
+	disc_ui u;
+	menu_style st = g->st;
+	int n, i;
+
+	memset(&u, 0, sizeof u);
+	st.root = false;
+	menu_run(a, &st, disc_build, disc_key, &u);
+	if (!u.how) return false;
+	if (!plat_resident_disc(u.pick, &n, &i, 2000) || i != u.pick) return false;
+	g_disc_n = n;
+	g_disc_i = i;
+	if (u.how == 2) plat_resident_line("RESET");
+	return true;
+}
+
 static menu_result gm_key(app *a, void *ctx, in_button key, int sel)
 {
 	gm_ctx *c = ctx;
@@ -13865,14 +13948,13 @@ static menu_result gm_key(app *a, void *ctx, in_button key, int sel)
 		os_cycle(a->sys.systems[gm_owner(a)].tag, key == IN_LEFT ? -1 : 1, true);
 		return MENU_STAY;
 	}
-	if (sel == GM_DISC && g_disc_n > 1 && (key == IN_LEFT || key == IN_RIGHT || key == IN_ACCEPT)) {
-		/* ChaOS: the next disc in, or the one before, round the set. The
-		 * game sees its tray open and close, as when a disc is changed. */
-		int want = (g_disc_i + (key == IN_LEFT ? g_disc_n - 1 : 1)) % g_disc_n, n, i;
-
-		if (plat_resident_disc(want, &n, &i, 2000) && n > 1) {
-			g_disc_n = n;
-			g_disc_i = i;
+	if (sel == GM_DISC && g_disc_n > 1) {
+		/* ChaOS: A opens the Disc page; left and right do nothing here, so a
+		 * disc is never changed by a press meant for the row below */
+		if (key != IN_ACCEPT) return MENU_STAY;
+		if (disc_screen(a, c)) {
+			c->resume = true;
+			return MENU_DONE;
 		}
 		return MENU_STAY;
 	}
@@ -20043,6 +20125,8 @@ static int shot_info;
  * to look at all three without setting the device three times. */
 static int shot_controls = -1;
 static int shot_updates = -1;   /* ChaOS: --updates <upd_state> */
+static int shot_discpage = -1;   /* ChaOS: --discpage ROW [how], the Disc page */
+static bool shot_dischow;
 static int shot_upd_pill = -1;  /* ChaOS: --update-pill <upd_state>, the shelf's notice */
 static const char *shot_remap;  /* ChaOS: --remap <TAG>: its Button Mapping */
 static int shot_cc_page = -1;  /* ChaOS: --cc <page>, with --remap: its Controls */
@@ -20550,6 +20634,18 @@ static void take_shot(app *a)
 			cht_index_free(&x);
 		}
 	}
+	if (shot_discpage >= 0) {
+		static menu_row rows[20];
+		static disc_ui du;
+		const char *h;
+		int gn;
+
+		du.pick = shot_discpage % 10;   /* 10 and up: the second row picked */
+		gn = shot_dischow ? how_build(&du, rows, 20, &h) : disc_build(&du, rows, 20, &h);
+		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
+		SDL_RenderFillRect(a->r, NULL);
+		menu_draw(a, h, rows, gn, shot_dischow ? (shot_discpage >= 10) : shot_discpage % 10, 0, MENU_ACCENT);
+	}
 	if (shot_gmenu >= 0) {
 		static menu_row rows[GM_SHOWN + 4];
 		gm_bufs gb;
@@ -20876,6 +20972,10 @@ int main(int argc, char *argv[])
 		else if (!strcmp(argv[i], "--gmenu") && i + 1 < argc) shot_gmenu = atoi(argv[++i]);
 		/* ChaOS: --gmdisc N, the in-game menu of a game on N discs, the first in */
 		else if (!strcmp(argv[i], "--gmdisc") && i + 1 < argc) { g_disc_n = atoi(argv[++i]); g_disc_i = 0; }
+		else if (!strcmp(argv[i], "--discpage") && i + 1 < argc) {
+			shot_discpage = atoi(argv[++i]);
+			if (i + 1 < argc && !strcmp(argv[i + 1], "how")) { shot_dischow = true; i++; }
+		}
 		else if (!strcmp(argv[i], "--cheats") && i + 2 < argc) {
 			shot_cheats = atoi(argv[++i]);
 			shot_cheats_file = argv[++i];
