@@ -319,3 +319,10 @@ h3 .tag, h4 .tag { vertical-align: 0.3em; }
 .rel p { margin: 0; font-size: 17px; }
 .ver { font-weight: 700; color: var(--orange); font-size: 18px; }
 .rel:nth-of-type(even) .ver { color: var(--cyan); }
+
+/* ChaOS: a folder laid out, as on the card (Changing discs) */
+pre.tree {
+  font: 14px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--text); background: var(--panel); border: 1px solid var(--line);
+  border-radius: 8px; padding: 12px 14px; margin: 0 0 16px; overflow-x: auto; white-space: pre;
+}

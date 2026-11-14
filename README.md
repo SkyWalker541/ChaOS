@@ -30,6 +30,7 @@ ChaOS is custom firmware for the **TrimUI Brick** and **Brick Hammer**. It runs 
 | **[RomM and Syncthing](https://skywalker541.github.io/ChaOS/#sync)** | In ROM Management: games, saves and BIOS from your own RomM server, and saves, games and BIOS kept the same on all your devices |
 | **[A look of its own](https://skywalker541.github.io/ChaOS/#shelves)** | Pixel Names and Pixel Cards themes, Game List View, letter scrubbing, menu colors |
 | **[Rewind, mapping, screenshots](https://skywalker541.github.io/ChaOS/#playing)** | Alongside TortOS's instant start, resume, fast forward, turbo and RetroAchievements |
+| **[PlayStation](https://skywalker541.github.io/ChaOS/#playstation)** | On PCSX-ReARMed, with achievements, and a Disc page for games on more than one disc |
 | **[Transfer and Wire](https://skywalker541.github.io/ChaOS/#transfer)** | Add games and covers from any browser, over Wi-Fi or the USB cable |
 | **[Updates](https://skywalker541.github.io/ChaOS/#updates)** | Over Wi-Fi, keeping your games, saves and settings |
 

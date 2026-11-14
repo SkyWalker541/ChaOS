@@ -291,11 +291,11 @@ screen; this is the same thing by hand, for a card written some other way.
 the button repeatedly for you instead of you mashing it. It applies to a whole
 system rather than to one game.
 
-Nine of the eleven have it: **NES, Master System, TurboGrafx-16, Game Boy, Game
+Nine of the twelve have it: **NES, Master System, TurboGrafx-16, Game Boy, Game
 Boy Color, Game Boy Advance, Game Gear, Neo Geo Pocket and Neo Geo Pocket
 Color**. Those consoles had two face buttons,
-so X and Y are spare and turbo can have them. Genesis and SNES are left out
-because their pads use X and Y for real buttons.
+so X and Y are spare and turbo can have them. Genesis, SNES and PlayStation
+are left out because their pads use X and Y for real buttons.
 
 Diatom does the pulsing, not the emulator core, which is why it works the same
 on all nine rather than only on the one core that happens to implement turbo.
@@ -629,6 +629,54 @@ game, as RetroAchievements requires, and the menu says **Paused**: the set is
 unloaded, and one arriving later is not loaded. Starting the game again with
 the cheats off brings them back. Your own `.cht` files go in
 `Cheats/<console>/`, named as the game is; ChaOS Transfer reaches the folder.
+
+### PlayStation (ChaOS)
+
+PlayStation games run on PCSX-ReARMed, built for the Brick's Cortex-A53
+(`tools/build-pcsx.sh`), with the CRT shaders, overlays, cheats, achievements,
+save states and button mapping every console has. Games go in
+`Roms/PlayStation`: `.chd` (the best choice, about half the size), `.cue` with
+its `.bin` beside it, `.pbp`, `.iso`, `.img` or `.ccd`. A `.bin` never shows on
+the shelf on its own.
+
+- **No BIOS needed.** PCSX-ReARMed has its own; a real one in `Bios/`
+  (`scph5501.bin`, `scph1001.bin`, `scph7001.bin`) runs a few more games, and
+  is used when it's there.
+- **Memory cards** are `Saves/<game>.srm`, as every console's saves are.
+- **Achievements** for `.chd`, `.cue`/`.bin`, `.iso`, `.img`, `.ccd` and
+  `.m3u`: ChaOS reads the disc's boot program the way RetroAchievements
+  hashes it. A `.pbp` plays, but has none.
+- **The buttons** are the pad's: Cross, Circle, Square, Triangle, L1, R1, L2,
+  R2. The Brick has no analog sticks, so the few games that need them (Ape
+  Escape) don't play well.
+- **Settings** made for the Brick: frameskip only while fast-forwarding,
+  drawing on a second core, no second memory card in `Bios/`, and none of the
+  core's own messages over the game.
+
+#### Changing discs
+
+A game on more than one disc is a folder of its discs and an `.m3u`, a text
+file naming them one per line, and is one game on the shelf:
+
+```
+Roms/PlayStation/Final Fantasy VII/
+  Final Fantasy VII.m3u
+  Final Fantasy VII (Disc 1).chd
+  Final Fantasy VII (Disc 2).chd
+  Final Fantasy VII (Disc 3).chd
+```
+
+In the game, **MENU > Disc** says which is loaded ("Disc 1 loaded"). **A**
+lists the discs, the loaded one marked; pick another, then:
+
+| | When | Examples |
+|---|---|---|
+| **Swap Disc** | the game asks for the next disc - the tray opens and closes, and the game carries on | Final Fantasy VII, VIII and IX, Metal Gear Solid, Chrono Cross: each says "Please insert Disc 2" partway through |
+| **Restart With This Disc** | a disc you want to start from - like turning the console on with it in | Resident Evil 2's disc 2, Claire's story, starts on its own. Most other games show their title and ask for a save; a few ask for disc 1, and Swap Disc puts it back |
+
+Either goes back to the game; **B** leaves everything as it was. Nothing on
+a disc says which kind of game it is, so ChaOS doesn't guess: Restart With
+This Disc always does exactly what the console would.
 
 ### PICO-8 (ChaOS)
 

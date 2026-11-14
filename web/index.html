@@ -35,7 +35,7 @@
 <section class="hero">
   <div class="hero-text">
     <img class="lockup" id="lockup" src="img/lockup.png" alt="ChaOS" width="588" height="192" title="Play the boot again">
-    <p class="lede">Custom firmware for the <b>TrimUI Brick</b>. Eleven classic consoles with shader and overlay support, PC games through PortMaster, PICO-8 with your own copy, your games and saves on all your devices with RomM and Syncthing, and your music, all from the handheld.</p>
+    <p class="lede">Custom firmware for the <b>TrimUI Brick</b>. Twelve classic consoles, PlayStation included, with shader and overlay support, PC games through PortMaster, PICO-8 with your own copy, your games and saves on all your devices with RomM and Syncthing, and your music, all from the handheld.</p>
     <div class="cta">
       <a class="btn primary" href="https://github.com/SkyWalker541/ChaOS-Installer/releases/latest">Get ChaOS Installer</a>
       <a class="btn" href="https://github.com/SkyWalker541/ChaOS/releases/latest">Latest release</a>
@@ -175,7 +175,7 @@
   <h2>Features</h2>
   <p class="intro">Everything ChaOS adds to TortOS, grouped the way you'll use it. <span class="tag">ChaOS</span> marks what ChaOS brings; the rest comes from TortOS. The pictures are the Brick's own screens: tap the labels under one to see more.</p>
   <nav class="subnav" aria-label="Feature groups">
-    <a href="#playing">Playing</a><a href="#cheats">Cheats</a><a href="#shaders">Shaders</a><a href="#speed">Speed check</a><a href="#display">Display &amp; overlays</a><a href="#shelves">Shelves &amp; themes</a><a href="#boxart">Box art</a><a href="#transfer">Transfer &amp; Wire</a><a href="#ports">Ports</a><a href="#romm">RomM</a><a href="#muse">Muse &amp; sound</a><a href="#look">Look &amp; settings</a>
+    <a href="#playing">Playing</a><a href="#cheats">Cheats</a><a href="#shaders">Shaders</a><a href="#speed">Speed check</a><a href="#display">Display &amp; overlays</a><a href="#shelves">Shelves &amp; themes</a><a href="#boxart">Box art</a><a href="#transfer">Transfer &amp; Wire</a><a href="#ports">Ports</a><a href="#playstation">PlayStation</a><a href="#romm">RomM</a><a href="#muse">Muse &amp; sound</a><a href="#look">Look &amp; settings</a>
   </nav>
 
   <!-- Playing -->
@@ -509,6 +509,47 @@
     </figure>
   </article>
 
+  <!-- PlayStation -->
+  <article class="feature" id="playstation">
+    <div class="feature-text">
+      <h3>PlayStation <span class="tag">ChaOS</span></h3>
+      <p>PlayStation games run on <a href="https://github.com/libretro/pcsx_rearmed">PCSX-ReARMed</a>, built for the Brick's chip, with the CRT shaders, overlays, cheats, achievements, save states and button mapping every console has.</p>
+      <ul>
+        <li><b>Files</b> go in <code>Roms/PlayStation</code>: <code>.chd</code> (about half the size: the best choice), <code>.cue</code> with its <code>.bin</code>, <code>.pbp</code>, <code>.iso</code> or <code>.img</code>. Only the <code>.cue</code> shows; its <code>.bin</code> stays beside it.</li>
+        <li><b>A game on more than one disc</b> gets a folder of its own, its discs in it and an <code>.m3u</code> naming them, one per line. It's one game on the shelf. More below.</li>
+        <li><b>No BIOS needed.</b> PCSX-ReARMed has its own. A real one in <code>Bios/</code> (<code>scph5501.bin</code>, <code>scph1001.bin</code> or <code>scph7001.bin</code>) runs a few more games.</li>
+        <li><b>Memory cards</b> save to <code>Saves/</code>, as every console's saves do, so they stay through updates.</li>
+        <li><b>Achievements</b> for <code>.chd</code>, <code>.cue</code>/<code>.bin</code>, <code>.iso</code>, <code>.img</code> and multi-disc games. A <code>.pbp</code> plays, but has none.</li>
+        <li>The Brick has no analog sticks, so games that need them, like Ape Escape, don't play well. Almost every other game uses the d-pad.</li>
+      </ul>
+    </div>
+    <figure class="device" data-screens='[["ps-shelf","The shelf"],["ps-games","The games"],["ps-gm","In a game"]]'>
+      <div class="bezel"><img src="img/ps-shelf.webp" alt="" loading="lazy" width="1024" height="768"></div>
+      <figcaption class="chips"></figcaption>
+    </figure>
+  </article>
+  <article class="feature flip" id="discs">
+    <div class="feature-text">
+      <h3>Changing discs <span class="tag">ChaOS</span></h3>
+      <p>Lay a game on more than one disc out like this, and ChaOS treats it as one game:</p>
+      <pre class="tree">Roms/PlayStation/Final Fantasy VII/
+  Final Fantasy VII.m3u
+  Final Fantasy VII (Disc 1).chd
+  Final Fantasy VII (Disc 2).chd
+  Final Fantasy VII (Disc 3).chd</pre>
+      <p>The <code>.m3u</code> is a text file listing the discs, one per line. In a game, <kbd>MENU</kbd> &gt; <b>Disc</b> says which is loaded ("Disc 1 loaded"). <kbd>A</kbd> opens the discs; pick one, then:</p>
+      <ul>
+        <li><b>Swap Disc</b> is the one you'll use: when the game says <i>Please insert Disc 2</i>. It's the disc tray opening and closing, and the game carries on. Final Fantasy VII, Metal Gear Solid and Chrono Cross all ask this way partway through.</li>
+        <li><b>Restart With This Disc</b> is turning the console on with that disc in. Use it when a disc is a game of its own: Resident Evil 2's second disc is Claire's story, and starts there. Most other games show their title screen and ask you to load a save; a few say to insert disc 1, and Swap Disc puts it back.</li>
+      </ul>
+      <p>Either goes straight back to the game. <kbd>B</kbd> backs out without changing anything.</p>
+    </div>
+    <figure class="device" data-screens='[["ps-disc","The discs"],["ps-how","Swap or restart"]]'>
+      <div class="bezel"><img src="img/ps-disc.webp" alt="" loading="lazy" width="1024" height="768"></div>
+      <figcaption class="chips"></figcaption>
+    </figure>
+  </article>
+
   <!-- Muse -->
   <article class="feature" id="muse">
     <div class="feature-text">
@@ -577,12 +618,13 @@
       <tr><td>Game Gear</td><td><code>Roms/Game Gear</code></td><td>.gg .zip</td><td>Genesis Plus GX</td></tr>
       <tr><td>Neo Geo Pocket</td><td><code>Roms/Neo Geo Pocket</code></td><td>.ngp .ngc .ngpc .npc .zip</td><td>Beetle NeoPop</td></tr>
       <tr><td>Neo Geo Pocket Color</td><td><code>Roms/Neo Geo Pocket Color</code></td><td>.ngp .ngc .ngpc .npc .zip</td><td>Beetle NeoPop</td></tr>
+      <tr><td>PlayStation</td><td><code>Roms/PlayStation</code></td><td>.chd .cue .pbp .m3u .iso .img .ccd</td><td>PCSX-ReARMed</td></tr>
       <tr><td>Ports</td><td><code>Roms/Ports</code></td><td>installed from the Brick</td><td>PortMaster</td></tr>
       <tr><td>PICO-8</td><td><code>Roms/PICO-8</code></td><td>.p8 .p8.png</td><td><a href="#pico8">your own PICO-8</a></td></tr>
     </tbody>
   </table>
   </div>
-  <p class="note"><b>BIOS files</b> go loose in <code>Bios/</code>. Only TurboGrafx-CD needs one, <code>syscard3.pce</code>. Game Boy Advance runs without; add <code>gba_bios.bin</code> for its boot animation.</p>
+  <p class="note"><b>BIOS files</b> go loose in <code>Bios/</code>. Only TurboGrafx-CD needs one, <code>syscard3.pce</code>. PlayStation runs without; a real one (<code>scph5501.bin</code> and the like) runs a few more games. Game Boy Advance runs without; add <code>gba_bios.bin</code> for its boot animation.</p>
 </section>
 
 <!-- ============================================================ -->
@@ -606,6 +648,7 @@
   </div>
   <div class="releases">
     <h3>Recent releases</h3>
+    <div class="rel"><span class="ver">2.4.0</span><p><a href="#playstation">PlayStation</a>, with achievements and <a href="#discs">changing discs</a>. A tidier main menu: Wi-Fi &amp; Bluetooth and System Settings pages, and a dot on Updates when one is waiting. Logs are named ChaOS.</p></div>
     <div class="rel"><span class="ver">2.3.2</span><p>Wi-Fi joins routers set to WPA3, networks whose names have an accent, an emoji or a curly apostrophe in them, and networks with a 64-digit hex key.</p></div>
     <div class="rel"><span class="ver">2.3.1</span><p>Recently Played shows each game's box art again, and starts it from its own console's folder, when Favorites is on the shelf too.</p></div>
     <div class="rel"><span class="ver">2.3.0</span><p><a href="#gbsort">Game Boy or Color, sorted</a>: every Game Boy game plays on the machine it was made for, and ChaOS offers to move the ones in the wrong folder, saves and all. PT SkyWalker541 now sets the emulator the way it's tuned for. A rendered watch for Recently Played and a new arcade stick for Ports in Fancy Pants.</p></div>
@@ -695,7 +738,7 @@
     </div>
     <div class="credit">
       <h4>Emulator cores</h4>
-      <p><b>FCEUmm</b>, <b>Snes9x 2010</b>, <b>Genesis Plus GX</b>, <b>Beetle PCE Fast</b>, <b>Beetle NeoPop</b> and <b>mGBA</b>, from <a href="https://www.libretro.com">libretro</a>, each its authors' work. Snes9x 2010 and Genesis Plus GX forbid commercial use, so ChaOS may never be sold.</p>
+      <p><b>FCEUmm</b>, <b>Snes9x 2010</b>, <b>Genesis Plus GX</b>, <b>Beetle PCE Fast</b>, <b>Beetle NeoPop</b>, <b>mGBA</b> and <b>PCSX-ReARMed</b>, from <a href="https://www.libretro.com">libretro</a>, each its authors' work. Snes9x 2010 and Genesis Plus GX forbid commercial use, so ChaOS may never be sold.</p>
     </div>
     <div class="credit">
       <h4>Overlays and art</h4>
