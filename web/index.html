@@ -268,8 +268,20 @@
     <div class="tip"><h4>Curvature costs</h4><p>The CRT starts flat. Curvature works, but takes about twice the CPU, so check the speed after turning it on.</p></div>
     <div class="tip"><h4>PT's grid wants Integer</h4><p>PT's <b>Pixel Effect</b> follows the game's pixels, so it's drawn in Display Mode <b>Integer</b> only. For a grid in Aspect or Stretch, use lcd3x.</p></div>
   </div>
-  <div class="callout"><b>Game Boy or Color, by the cartridge.</b> Each Game Boy game plays on the machine it was made for, whatever its file is called, and ChaOS can sort them into the right folders: see <a href="#gbsort">Game Boy or Color, sorted</a>.</div>
-  <div class="callout"><b>PT sets the emulator for you.</b> With PT on, ChaOS sets mGBA the way the shader is tuned for, by its Game System: color correction and frame blending off and a plain grayscale palette for Game Boy, GBC color correction for Game Boy Color, GBA color correction with Smart blending for GBA SP and LCD ghosting for the original GBA. Turn PT off and they go back. It all changes at once, in the in-game menu too.</div>
+  <div class="callout">
+    <div class="callout-icon" aria-hidden="true">i</div>
+    <div>
+      <h4>PT sets the emulator for you</h4>
+      <p>With PT on, ChaOS sets the emulator the way the shader is tuned, for the Game System it imitates:</p>
+      <ul>
+        <li><b>Game Boy:</b> color correction and frame blending off, and a plain grayscale palette.</li>
+        <li><b>Game Boy Color:</b> GBC color correction.</li>
+        <li><b>GBA SP:</b> GBA color correction with Smart blending.</li>
+        <li><b>Original GBA:</b> GBA color correction with LCD ghosting.</li>
+      </ul>
+      <p>Turn PT off and they go back. Changes show at once, in the in-game menu too. Each Game Boy game also plays on the machine it was made for, whatever its file is called: see <a href="#gbsort">Game Boy or Color, sorted</a>.</p>
+    </div>
+  </div>
 
   <!-- Speed check -->
   <article class="feature" id="speed">
