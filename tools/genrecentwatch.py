@@ -46,13 +46,35 @@ def frame(p):
     return rm.local(p, (0, 0, 0), M)
 
 
-# The picture's polished silver: a bright metal, glossy enough to carry the
-# studio's softbox and dark floor as the picture's case carries its bands, and
-# lifted a little (emit) so its side reads silver, not the floor's grey
-STEEL = (236, 237, 239)
-MATS = [rm.Mat(STEEL, gloss=0.8, metal=True, emit=0.18),                     # 0 case
+# Polished stainless steel: nearly a mirror, so what it shows is what it
+# reflects. The set's studio (dim ceiling, dark floor) makes such a mirror
+# grey, so this card has its own, as watches are photographed: a bright
+# white sweep overhead and behind, the key softbox, and black flags standing
+# beside the watch and a dark line on the horizon, which polished steel
+# gives back as the crisp dark bands that tell it from grey paint.
+STEEL = (238, 240, 243)
+
+
+def watch_studio(d):
+    x, y, z = d[..., 0], d[..., 1], d[..., 2]
+    env = np.where(y > 0, 0.95 + 0.6 * y, 0.55 + 0.35 * (1 + y))
+    # the horizon, a dark line all the way round
+    env = env * (1 - 0.85 * np.exp(-((y + 0.02) / 0.07) ** 2))
+    # black flags: tall, either side, a little behind
+    env = np.where((np.abs(x - 0.62) < 0.13) & (y > -0.35) & (y < 0.75), env * 0.06, env)
+    env = np.where((np.abs(x + 0.78) < 0.10) & (y > -0.25) & (y < 0.6), env * 0.08, env)
+    # the key softbox and a strip light, very bright
+    sb = np.clip((np.sum(d * rm.KEY, -1) - 0.86) / 0.05, 0, 1) * 4.0
+    strip = np.clip((np.sum(d * rm.FILL, -1) - 0.93) / 0.03, 0, 1) * 2.2
+    return (env + sb + strip)[..., None] * np.array([0.99, 1.0, 1.03])
+
+
+rm.studio = watch_studio
+
+
+MATS = [rm.Mat(STEEL, gloss=0.96, metal=True),                               # 0 case
         rm.Mat(lambda p: FACE(frame(p)), gloss=0.55, spec=0.3, emit=0.95),  # 1 face, under glass
-        rm.Mat((240, 241, 243), gloss=0.9, metal=True, emit=0.25)]           # 2 polished rim and crown
+        rm.Mat((242, 243, 245), gloss=0.98, metal=True)]                     # 2 polished rim and crown
 
 
 def scene(p):
