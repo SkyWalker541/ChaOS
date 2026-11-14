@@ -46,8 +46,9 @@ typedef enum {
 	PM_PORTS,
 	/* ChaOS: ROM Management, a page of its own (rom_page) for the ways games
 	 * and saves come and go: RomM, a self-hosted game library (src/romm.h),
-	 * and Syncthing, folders kept the same across devices (src/sync.h) */
-	PM_ROMMGMT, PM_ROMM, PM_SYNC,
+	 * and Syncthing, folders kept the same across devices (src/sync.h), and
+	 * Sort Game Boy Games (src/gbsort.h) */
+	PM_ROMMGMT, PM_ROMM, PM_SYNC, PM_GBSORT,
 	PM_UPDATE, PM_CONTROLS, PM_ABOUT, PM_ROWS
 } pm_row;
 
@@ -105,7 +106,7 @@ typedef enum { SMM_COUNT, SMM_SHOW, SMM_SORT, SMM_LOCK, SMM_ART, SMM_RESCAN } sm
  * two cannot disagree about what row 2 is. */
 int sys_menu_muse_rows(bool books, bool both, bool no_wifi, sm_muse_row *out);
 
-#define MENU_MAX_ROWS 28
+#define MENU_MAX_ROWS 30
 
 /* The array every caller declares must hold every row a build can produce, and
  * on 2026-09-16 it stopped: PM_ROWS went to 13 against a cap of 12 when the

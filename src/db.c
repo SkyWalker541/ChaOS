@@ -302,6 +302,25 @@ bool db_game_get(db *d, const char *folder, const char *file, game_meta *out)
 	return got;
 }
 
+/* ChaOS: a game's row to another folder, when the game itself moves there
+ * (gbsort.h). A row already under the new folder is replaced. */
+bool db_game_move(db *d, const char *folder, const char *file, const char *to)
+{
+	sqlite3_stmt *st = NULL;
+	bool ok;
+
+	if (!d || !folder || !file || !to) return false;
+	if (sqlite3_prepare_v2(d->h, "UPDATE OR REPLACE games SET folder=? WHERE folder=? AND file=?;",
+	                       -1, &st, NULL) != SQLITE_OK)
+		return false;
+	sqlite3_bind_text(st, 1, to,     -1, SQLITE_TRANSIENT);
+	sqlite3_bind_text(st, 2, folder, -1, SQLITE_TRANSIENT);
+	sqlite3_bind_text(st, 3, file,   -1, SQLITE_TRANSIENT);
+	ok = sqlite3_step(st) == SQLITE_DONE;
+	sqlite3_finalize(st);
+	return ok;
+}
+
 bool db_game_set(db *d, const char *folder, const char *file, const game_meta *m)
 {
 	sqlite3_stmt *st = NULL;

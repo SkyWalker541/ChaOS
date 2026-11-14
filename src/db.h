@@ -99,6 +99,7 @@ typedef struct {
  * from it without asking twice. */
 bool db_game_get(db *d, const char *folder, const char *file, game_meta *out);
 bool db_game_set(db *d, const char *folder, const char *file, const game_meta *m);
+bool db_game_move(db *d, const char *folder, const char *file, const char *to);
 
 /* Inspectable without being editable. Nothing on the device can read a
  * database - there is no sqlite3 binary - and losing the ability to SEE what a

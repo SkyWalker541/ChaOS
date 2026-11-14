@@ -9,7 +9,7 @@
         check check-cheevos check-hare check-httpd check-idle check-rahash \
         check-raset check-xfer check-menus check-artscrape check-artrun check-audioout \
         check-db check-stats check-sort check-bt check-ss check-update check-asan \
-        check-release check-updater check-chaos-names check-itch check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore
+        check-release check-updater check-chaos-names check-itch check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore check-gbsort
 
 all: check
 
@@ -22,7 +22,7 @@ CHECKS = check-cheevos check-hare check-httpd check-idle check-rahash \
          check-db check-stats check-sort check-bt check-ss \
          check-muselib check-musequeue check-museart check-controls check-logpack \
          check-clock check-update check-remap check-shots check-pixfont \
-         check-release check-updater check-chaos-names check-itch check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore
+         check-release check-updater check-chaos-names check-itch check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore check-gbsort
 
 check:
 	@fail=0; for c in $(CHECKS); do \
@@ -349,6 +349,12 @@ build-native/syncthing-check: tools/syncthing-check.c src/syncthing.c src/syncth
 
 check-syncthing: build-native/syncthing-check
 	@./build-native/syncthing-check
+
+# ChaOS: Game Boy games into their folders (src/gbsort.h)
+check-gbsort:
+	@mkdir -p build-native
+	@$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -Isrc -o build-native/gbsort-check tools/gbsort-check.c src/gbsort.c src/gamecore.c -lz
+	@./build-native/gbsort-check
 
 # ChaOS: one game's core options (src/gamecore.h)
 check-gamecore:

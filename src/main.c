@@ -59,6 +59,7 @@ static void os_cycle(const char *tag, int d, bool live);
 #include "pico8.h"
 #include "syncthing.h"
 #include "gamecore.h"
+#include "gbsort.h"
 #include "pmcat.h"
 #include "libpack.h"
 #include "romm.h"
@@ -97,6 +98,7 @@ static void os_cycle(const char *tag, int d, bool live);
 #include <strings.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <sys/resource.h>
 #include <sys/statvfs.h>
 #include <time.h>
 #include <unistd.h>
@@ -1001,6 +1003,11 @@ static bool g_rom_page;
 static void rom_page_screen(app *a);
 static void sth_screen(app *a);
 static const char *sth_row_value(void);
+/* ChaOS: Game Boy games into their folders (gbsort.h) */
+static bool g_gbs_due;
+static void gbs_cancel(void);
+static void gbs_screen(app *a);
+static void romm_dir(char *out, size_t n);
 
 static bool g_status_clock = true;
 static bool g_status_clock24;             /* false: 12-hour */
@@ -6021,15 +6028,43 @@ static bool menu_leaving(app *a)
  * Power is handled here rather than left to the caller. A confirm can sit on
  * screen indefinitely, which makes it exactly the kind of place the device gets
  * put down and the power button pressed. */
+/* ChaOS: with the second answer named, where Cancel isn't the word ("Not
+ * Now" for a question the shelf asks by itself) */
+static bool confirm_panel_ex(app *a, const char *heading, const char *msg,
+                             const char *yes_label, const char *no_label);
+
 static bool confirm_panel(app *a, const char *heading, const char *msg,
                           const char *yes_label)
 {
-	menu_row rows[3];
-	int sel = 2;
+	return confirm_panel_ex(a, heading, msg, yes_label, "Cancel");
+}
 
-	rows[0] = (menu_row){ msg, NULL, false };
-	rows[1] = (menu_row){ yes_label, NULL, true };
-	rows[2] = (menu_row){ "Cancel", NULL, true };
+static bool confirm_panel_ex(app *a, const char *heading, const char *msg,
+                             const char *yes_label, const char *no_label)
+{
+	menu_row rows[10];
+	char lines[6][96];
+	int q = 0, sel, yes;
+
+	/* ChaOS: the question a line to a row - a row doesn't wrap, and one long
+	 * line ran out of the box ("\n" between lines, as the callers write it) */
+	{
+		const char *s = msg;
+
+		while (*s && q < 6) {
+			size_t len = strcspn(s, "\n");
+
+			snprintf(lines[q], sizeof lines[q], "%.*s", (int)len, s);
+			rows[q] = (menu_row){ lines[q], NULL, false };
+			q++;
+			s += len + (s[len] == '\n');
+		}
+		if (!q) rows[q++] = (menu_row){ "", NULL, false };
+	}
+	yes = q;
+	rows[q++] = (menu_row){ yes_label, NULL, true };
+	rows[q++] = (menu_row){ no_label, NULL, true };
+	sel = yes + 1;
 
 	for (;;) {
 		plat_input_poll(&a->in);
@@ -6037,17 +6072,18 @@ static bool confirm_panel(app *a, const char *heading, const char *msg,
 		if (a->in.pressed[IN_POWER] || idle_due(a)) { power_off(a); return false; }
 		if (menu_leaving(a)) return false;
 
-		/* Only the two answerable rows are reachable; row 0 is the question. */
+		/* Only the two answerable rows are reachable; the rows above are the
+		 * question. */
 		if (in_repeat(&a->in, IN_UP) || in_repeat(&a->in, IN_DOWN))
-			sel = (sel == 1) ? 2 : 1;
-		if (a->in.pressed[IN_ACCEPT]) return sel == 1;
+			sel = (sel == yes) ? yes + 1 : yes;
+		if (a->in.pressed[IN_ACCEPT]) return sel == yes;
 
 		tick_tint(a);
 		draw_shelf(a);
 		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
 		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
 		SDL_RenderFillRect(a->r, NULL);
-		menu_draw(a, heading, rows, 3, sel, 0, MENU_ACCENT);
+		menu_draw(a, heading, rows, q, sel, 0, MENU_ACCENT);
 		plat_draw_osd(a->r);
 		plat_present();
 		SDL_Delay(8);
@@ -7267,6 +7303,8 @@ static void xfer_screen_over(app *a, bool over_cable)
 		if (changed) {
 			wait_panel(a, name, "Scanning...");
 			rescan_all(a);
+			/* ChaOS: and a look at the Game Boy games it may have brought */
+			g_gbs_due = true;
 		}
 	}
 	plat_input_flush();
@@ -10744,6 +10782,7 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 	case PM_ROMMGMT:      rom_page_screen(a); break;
 	case PM_ROMM:         romm_screen(a); break;
 	case PM_SYNC:         sth_screen(a); break;
+	case PM_GBSORT:       gbs_screen(a); break;
 	case PM_UPDATE:       update_screen(a); break;
 	case PM_ABOUT:        about_screen(a); break;
 	default: break;
@@ -14592,6 +14631,7 @@ static void port_launch(app *a, int o, const char *romfile, const char *title)
 
 	fprintf(stderr, "port %s: starting\n", romfile);
 	sth_hold(true);
+	gbs_cancel();   /* and the Game Boy look, tried again later */
 	rc = plat_run_port(argv, envkv, NULL, &how, port_power_prompt, a);
 	sth_hold(false);
 	fprintf(stderr, "port %s exited %d (%s)\n", romfile, rc,
@@ -14741,6 +14781,7 @@ static void p8_launch(app *a, int o, const char *file, const char *title)
 	 * carts aren't on the shelf */
 	if (!splore) stats_begin(s->tag, file, plat_now_ms());
 	sth_hold(true);
+	gbs_cancel();   /* and the Game Boy look, tried again later */
 	rc = plat_run_port(argv, envkv, NULL, &how, port_power_prompt, a);
 	sth_hold(false);
 	fprintf(stderr, "pico8 %s exited %d (%s)\n", file, rc,
@@ -16600,6 +16641,351 @@ static void sth_screen(app *a)
 	menu_run(a, &st, sth_build, sth_key, &c);
 }
 
+/* ---- ChaOS: Game Boy games into their folders (src/gbsort.h) -------------
+ *
+ * Looked for in the background - once after the update that brings this,
+ * after ChaOS Transfer sends something, and every two days - and asked about
+ * on the shelf when there's something to move. "Not now" is kept, so the same
+ * games aren't asked about again unless the player opens ROM Management >
+ * Sort Game Boy Games, which lists everything and moves what's chosen. The
+ * look reads only what's new (gbsort.cache), and never runs during a game. */
+
+#define GBS_EVERY (2L * 24 * 3600)
+#define GBS_RESULT "/tmp/chaos-gbsort.txt"
+
+static pid_t g_gbs_pid = -1;   /* g_gbs_due, above: a look wanted once the shelf is quiet */
+
+static void gbs_cache_path(char *out, size_t n) { snprintf(out, n, "%s/gbsort.cache", P_USERDATA); }
+static void gbs_declined_path(char *out, size_t n) { snprintf(out, n, "%s/gbsort.declined", P_USERDATA); }
+static const char *gbs_tag(const char *folder) { return !strcmp(folder, GBS_GB) ? "GB" : "GBC"; }
+
+/* Started at a launch: a look that was going is dropped, and tried again */
+static void gbs_cancel(void)
+{
+	if (g_gbs_pid <= 0) return;
+	kill(g_gbs_pid, SIGKILL);
+	waitpid(g_gbs_pid, NULL, 0);
+	g_gbs_pid = -1;
+	g_gbs_due = true;
+}
+
+static void gbs_start(void)
+{
+	pid_t pid;
+
+	if (g_gbs_pid > 0) return;
+	unlink(GBS_RESULT);
+	pid = fork();
+	if (pid == 0) {
+		static gbs_move mv[GBS_MAX];
+		char cache[LIB_PATH + 32], tmp[64];
+		FILE *f;
+		int n, i;
+
+		if (setpriority(PRIO_PROCESS, 0, 19) != 0) {}
+		gbs_cache_path(cache, sizeof cache);
+		n = gbs_scan(P_ROMS, cache, mv, GBS_MAX);
+		snprintf(tmp, sizeof tmp, "%s.new", GBS_RESULT);
+		if ((f = fopen(tmp, "w"))) {
+			for (i = 0; i < n; i++)
+				fprintf(f, "%s\t%s\t%s\t%s\t%d\n", mv[i].from, mv[i].to, mv[i].file, mv[i].name, mv[i].clash);
+			if (fclose(f) == 0) rename(tmp, GBS_RESULT);
+		}
+		_exit(0);
+	}
+	if (pid > 0) { g_gbs_pid = pid; g_gbs_due = false; }
+}
+
+/* A result file back into moves */
+static int gbs_read(const char *path, gbs_move *out, int max)
+{
+	FILE *f = fopen(path, "r");
+	char line[700];
+	int n = 0;
+
+	if (!f) return 0;
+	while (n < max && fgets(line, sizeof line, f)) {
+		char *t[5], *s = line;
+		int k;
+
+		line[strcspn(line, "\r\n")] = '\0';
+		for (k = 0; k < 5; k++) { t[k] = strsep(&s, "\t"); if (!t[k]) break; }
+		if (k < 5) continue;
+		memset(&out[n], 0, sizeof out[n]);
+		out[n].from = !strcmp(t[0], GBS_GB) ? GBS_GB : GBS_GBC;
+		out[n].to = !strcmp(t[1], GBS_GB) ? GBS_GB : GBS_GBC;
+		snprintf(out[n].file, sizeof out[n].file, "%s", t[2]);
+		snprintf(out[n].name, sizeof out[n].name, "%s", t[3]);
+		out[n].clash = atoi(t[4]) != 0;
+		n++;
+	}
+	fclose(f);
+	return n;
+}
+
+static bool gbs_was_declined(const gbs_move *m)
+{
+	char p[LIB_PATH + 32], line[600], want[600];
+	FILE *f;
+	bool hit = false;
+
+	gbs_declined_path(p, sizeof p);
+	if (!(f = fopen(p, "r"))) return false;
+	snprintf(want, sizeof want, "%s\t%s", m->from, m->file);
+	while (!hit && fgets(line, sizeof line, f)) {
+		line[strcspn(line, "\r\n")] = '\0';
+		hit = !strcmp(line, want);
+	}
+	fclose(f);
+	return hit;
+}
+
+static void gbs_decline(const gbs_move *m, int n)
+{
+	char p[LIB_PATH + 32];
+	FILE *f;
+	int i;
+
+	gbs_declined_path(p, sizeof p);
+	if (!(f = fopen(p, "a"))) return;
+	for (i = 0; i < n; i++)
+		if (!m[i].clash && !gbs_was_declined(&m[i])) fprintf(f, "%s\t%s\n", m[i].from, m[i].file);
+	fclose(f);
+}
+
+/* Play time's rows for one game, to its new tag */
+typedef struct { char suffix[600]; char (*keys)[700]; char (*vals)[128]; int n, cap; } gbs_sess;
+
+static bool gbs_sess_row(const char *key, const char *value, void *ctx)
+{
+	gbs_sess *s = ctx;
+	size_t kl = strlen(key), sl = strlen(s->suffix);
+
+	if (kl > sl && !strcmp(key + kl - sl, s->suffix) && kl < 700) {
+		if (s->n == s->cap) {
+			int cap = s->cap ? s->cap * 2 : 16;
+			char (*k)[700] = realloc(s->keys, (size_t)cap * sizeof *k);
+			char (*v)[128];
+
+			if (!k) return false;
+			s->keys = k;
+			if (!(v = realloc(s->vals, (size_t)cap * sizeof *v))) return false;
+			s->vals = v;
+			s->cap = cap;
+		}
+		snprintf(s->keys[s->n], sizeof s->keys[0], "%s", key);
+		snprintf(s->vals[s->n], sizeof s->vals[0], "%s", value);
+		s->n++;
+	}
+	return true;
+}
+
+/* What the databases know of a moved game, moved with it: favorites, play
+ * time (and so Recently Played), its scraped info, and RomM's record */
+static void gbs_records(const gbs_move *m)
+{
+	const char *ft = gbs_tag(m->from), *tt = gbs_tag(m->to);
+	gbs_sess s;
+	int i;
+
+	if (fav_is(ft, m->file)) {
+		fav_toggle(ft, m->file);
+		if (!fav_is(tt, m->file)) fav_toggle(tt, m->file);
+		fav_save();
+	}
+	memset(&s, 0, sizeof s);
+	snprintf(s.suffix, sizeof s.suffix, ".%s\t%s", ft, m->file);
+	db_each_prefix(db_lib(), "sess.", gbs_sess_row, &s);
+	for (i = 0; i < s.n; i++) {
+		char nk[720];
+		size_t base = strlen(s.keys[i]) - strlen(s.suffix);
+
+		snprintf(nk, sizeof nk, "%.*s.%s\t%s", (int)base, s.keys[i], tt, m->file);
+		if (db_set_str(db_lib(), nk, s.vals[i])) db_del(db_lib(), s.keys[i]);
+	}
+	free(s.keys);
+	free(s.vals);
+	db_game_move(db_lib(), m->from, m->file, m->to);
+	{
+		char d[LIB_PATH + 32];
+		int id;
+
+		romm_dir(d, sizeof d);
+		if ((id = romm_map_find(d, m->from, m->file)) > 0) romm_map_add(d, id, m->to, m->file);
+	}
+}
+
+/* The moves, each with its files and records; how many went */
+static int gbs_do(app *a, const gbs_move *m, int n)
+{
+	int i, done = 0;
+
+	for (i = 0; i < n; i++) {
+		char say[96];
+
+		if (m[i].clash) continue;
+		snprintf(say, sizeof say, "Moving %d of %d", done + 1, n);
+		pick_frame(a, "Game Boy Games", NULL, 0, 0, NULL, 0, 0, say, MENU_ACCENT);
+		if (gbs_move_files(P_ROMS, P_SHARED, P_CARD, &m[i])) {
+			gbs_records(&m[i]);
+			done++;
+			fprintf(stderr, "gbsort: %s/%s -> %s\n", m[i].from, m[i].file, m[i].to);
+		}
+	}
+	if (done) rescan_all(a);
+	return done;
+}
+
+static void gbs_question(int k, char *msg, size_t n)
+{
+	snprintf(msg, n, "%d Game Boy game%s %s in the\nwrong folder for %s\ncartridge. Move %s,\nsaves and all?",
+	         k, k == 1 ? "" : "s", k == 1 ? "is" : "are", k == 1 ? "its" : "their",
+	         k == 1 ? "it" : "them");
+}
+
+/* On the shelf, when a look has come back: ask about what's new */
+static void gbs_ask(app *a, gbs_move *m, int n)
+{
+	gbs_move ask[64];
+	int k = 0, i, moved;
+	char msg[200];
+
+	for (i = 0; i < n && k < 64; i++)
+		if (!m[i].clash && !gbs_was_declined(&m[i])) ask[k++] = m[i];
+	if (!k) return;
+	gbs_question(k, msg, sizeof msg);
+	if (!confirm_panel_ex(a, "Game Boy Games", msg, k == 1 ? "Move It" : "Move Them", "Not Now")) {
+		gbs_decline(ask, k);
+		pick_say(a, "Game Boy Games", "Kept where they are.\nSort them any time in\nROM Management",
+		         MENU_ACCENT);
+		return;
+	}
+	moved = gbs_do(a, ask, k);
+	snprintf(msg, sizeof msg, "Moved %d game%s", moved, moved == 1 ? "" : "s");
+	pick_say(a, "Game Boy Games", msg, MENU_ACCENT);
+}
+
+/* From the main loop, on the shelf */
+static void gbs_poll(app *a)
+{
+	static Uint32 since;
+	Uint32 now = plat_now_ms();
+	long last = (long)db_get_int(db_dev(), "gbsort_last", 0);
+	time_t wall = time(NULL);
+
+	if (!since) since = now;
+	if (g_gbs_pid > 0) {
+		int st;
+
+		if (waitpid(g_gbs_pid, &st, WNOHANG) != g_gbs_pid) return;
+		g_gbs_pid = -1;
+		db_set_int(db_dev(), "gbsort_last", (int)wall);
+		{
+			static gbs_move mv[GBS_MAX];
+			int n = gbs_read(GBS_RESULT, mv, GBS_MAX);
+
+			unlink(GBS_RESULT);
+			fprintf(stderr, "gbsort: %d in the other folder\n", n);
+			if (n > 0) gbs_ask(a, mv, n);
+		}
+		return;
+	}
+	/* never in the first twenty seconds: the boot's own work first */
+	if (now - since < 20000) return;
+	/* the first after the update that brings this, and every two days (a
+	 * clock that went back counts as due); or one asked for */
+	if (g_gbs_due || last == 0 || wall - last > GBS_EVERY || wall < last) gbs_start();
+}
+
+/* MENU > ROM Management > Sort Game Boy Games */
+typedef struct {
+	gbs_move *m;
+	int n;
+	char vals[GBS_MAX > 64 ? 64 : GBS_MAX][24];
+	int what[MENU_RUN_ROWS];
+} gbs_ctx;
+
+static int gbs_build(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	gbs_ctx *c = ctx;
+	int n = 0, i, movable = 0;
+
+	*heading = "Sort Game Boy Games";
+	for (i = 0; i < c->n; i++) if (!c->m[i].clash) movable++;
+	if (!c->n) {
+		rows[n++] = MENU_NOTE("Every Game Boy game is in");
+		rows[n++] = MENU_NOTE("the folder for its cartridge");
+		return n;
+	}
+	if (movable && n < max) {
+		snprintf(c->vals[0], sizeof c->vals[0], "%d", movable);
+		c->what[n] = -2;
+		rows[n++] = (menu_row){ "Move All", c->vals[0], true };
+		rows[n - 1].hint = "Each with its saves, states, play time and box art";
+		rows[n - 1].opens = true;
+	}
+	if (n < max) { c->what[n] = -1; rows[n++] = MENU_RULE; }
+	for (i = 0; i < c->n && n < max; i++) {
+		c->what[n] = i;
+		rows[n++] = (menu_row){ c->m[i].name,
+		                        c->m[i].clash ? "Name taken" : !strcmp(c->m[i].to, GBS_GBC) ? "To Color" : "To Game Boy",
+		                        !c->m[i].clash };
+		rows[n - 1].hint = c->m[i].clash ? "The other folder has a game of this name: move one by hand"
+		                 : !strcmp(c->m[i].to, GBS_GBC) ? "Made for the Color: A moves it to Game Boy Color"
+		                                                : "Not a Color cartridge: A moves it to Game Boy";
+	}
+	return n;
+}
+
+static menu_result gbs_key(app *a, void *ctx, in_button key, int sel)
+{
+	gbs_ctx *c = ctx;
+	int w = sel >= 0 && sel < MENU_RUN_ROWS ? c->what[sel] : -1;
+	char msg[96];
+	int moved;
+
+	if (key != IN_ACCEPT) return MENU_STAY;
+	if (w == -2) {
+		moved = gbs_do(a, c->m, c->n);
+	} else if (w >= 0 && !c->m[w].clash) {
+		moved = gbs_do(a, &c->m[w], 1);
+	} else {
+		return MENU_STAY;
+	}
+	snprintf(msg, sizeof msg, "Moved %d game%s", moved, moved == 1 ? "" : "s");
+	pick_say(a, "Game Boy Games", msg, MENU_ACCENT);
+	/* what's left */
+	{
+		char cache[LIB_PATH + 32];
+
+		gbs_cache_path(cache, sizeof cache);
+		c->n = gbs_scan(P_ROMS, cache, c->m, GBS_MAX);
+		if (c->n < 0) c->n = 0;
+	}
+	return MENU_STAY;
+}
+
+static void gbs_screen(app *a)
+{
+	static gbs_move mv[GBS_MAX];
+	gbs_ctx c;
+	menu_style st = { 0 };
+	char cache[LIB_PATH + 32];
+
+	gbs_cancel();
+	g_gbs_due = false;
+	pick_frame(a, "Game Boy Games", NULL, 0, 0, NULL, 0, 0, "Checking Game Boy games...", MENU_ACCENT);
+	memset(&c, 0, sizeof c);
+	gbs_cache_path(cache, sizeof cache);
+	c.m = mv;
+	c.n = gbs_scan(P_ROMS, cache, mv, GBS_MAX);
+	if (c.n < 0) c.n = 0;
+	db_set_int(db_dev(), "gbsort_last", (int)time(NULL));
+	st.accent = MENU_ACCENT;
+	st.fixed_w = menu_std_width(a);
+	menu_run(a, &st, gbs_build, gbs_key, &c);
+}
+
 /* ---- ChaOS: RomM (src/romm.h) ---------------------------------------------
  *
  * The ChaOS menu's RomM: signing in by RomM's pairing, its library by system
@@ -17703,6 +18089,7 @@ static void launch_game(app *a)
 			cht_for_launch(a, o, v->list.items[v->cursor].file);
 		}
 		sth_hold(true);   /* ChaOS: Syncthing stopped while it plays */
+		gbs_cancel();     /* and the Game Boy look, tried again later */
 		if (plat_resident_send(s->tag, core, rom, st, st, pv,
 		                       console, active[0] ? active : NULL)) {
 			int r;
@@ -17897,6 +18284,7 @@ static void launch_game(app *a)
 		}
 		argv[n] = NULL;
 		sth_hold(true);
+		gbs_cancel();   /* and the Game Boy look, tried again later */
 		fprintf(stderr, "diatom exited %d\n", plat_run(argv, NULL, P_ROOT));
 		sth_hold(false);
 
@@ -19515,6 +19903,7 @@ static void rescan_all(app *a)
 static const char *shot_path;
 static int shot_screen = -1;
 static int shot_menu, shot_menu_sel;
+static int shot_gbask, shot_gbsort;   /* ChaOS: --gbask N, --gbsort [row] */
 static int shot_gmenu = -1;           /* ChaOS: --gmenu ROW, the in-game menu */
 static int shot_cheats = -1;          /* ChaOS: --cheats ROW FILE.cht, the Cheats screen */
 static const char *shot_cheats_file;
@@ -19963,6 +20352,43 @@ static void take_shot(app *a)
 	if (shot_pm) pm_shot(a);
 	if (shot_port_power >= 0) port_power_draw(a, shot_port_power);
 	if (shot_romm) romm_shot(a);
+	if (shot_gbask || shot_gbsort) {
+		/* ChaOS: the Game Boy sorting question, and its screen from Roms */
+		menu_row rows[40];
+		const char *heading = "Game Boy Games";
+		int n;
+		static gbs_move mv[GBS_MAX];
+		static char msg[200];
+		gbs_ctx c;
+
+		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
+		SDL_RenderFillRect(a->r, NULL);
+		if (shot_gbask) {
+			static char ln[6][96];
+			const char *s;
+			int q = 0;
+
+			gbs_question(shot_gbask, msg, sizeof msg);
+			for (s = msg; *s && q < 6;) {
+				size_t len = strcspn(s, "\n");
+				snprintf(ln[q], sizeof ln[q], "%.*s", (int)len, s);
+				rows[q] = (menu_row){ ln[q], NULL, false };
+				q++;
+				s += len + (s[len] == '\n');
+			}
+			rows[q++] = (menu_row){ shot_gbask == 1 ? "Move It" : "Move Them", NULL, true };
+			rows[q++] = (menu_row){ "Not Now", NULL, true };
+			menu_draw(a, heading, rows, q, q - 2, 0, MENU_ACCENT);
+		} else {
+			memset(&c, 0, sizeof c);
+			c.m = mv;
+			c.n = gbs_scan(P_ROMS, NULL, mv, GBS_MAX);
+			if (c.n < 0) c.n = 0;
+			n = gbs_build(&c, rows, 40, &heading);
+			menu_draw(a, heading, rows, n, shot_menu_sel, menu_std_width(a), MENU_ACCENT);
+		}
+	}
 	if (g_sth_shot) {
 		/* ChaOS: --sync get|on|pair [row], Syncthing's screen from made-up answers */
 		sth_ctx c;
@@ -20383,6 +20809,12 @@ int main(int argc, char *argv[])
 		 * device or a hand on it. */
 		/* ChaOS: --appearance [row], the Appearance page as --menu draws the
 		 * main menu */
+		else if (!strcmp(argv[i], "--gbask") && i + 1 < argc) shot_gbask = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "--gbsort")) {
+			shot_gbsort = 1;
+			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9')
+				shot_menu_sel = atoi(argv[++i]);
+		}
 		else if (!strcmp(argv[i], "--rompage")) {
 			shot_menu = 1;
 			g_rom_page = true;
@@ -21200,6 +21632,8 @@ int main(int argc, char *argv[])
 
 		/* ChaOS: the boot's update check, and whatever download is running */
 		upd_poll();
+		/* ChaOS: Game Boy games in the other folder, looked for now and then */
+		gbs_poll(&a);
 		/* ChaOS: the cheat lists, kept for the in-game menu */
 		{
 			static Uint32 next;

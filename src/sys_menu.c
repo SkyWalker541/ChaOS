@@ -28,7 +28,7 @@ int sys_menu_tortos_rows(const sys_ui *u, pm_row *out)
 		 * stays, since a cable and the speaker are still two places. */
 		if (u->no_wifi && (r == PM_WIFI || r == PM_SCRAPE ||
 		                   r == PM_ACHIEVEMENTS || r == PM_SS || r == PM_UPDATE ||
-		                   r == PM_PORTS || r == PM_ROMMGMT || r == PM_ROMM || r == PM_SYNC))
+		                   r == PM_PORTS || r == PM_ROMM || r == PM_SYNC))
 			continue;
 		/* Unless the files go over a cable, which needs no radio. */
 		if (u->no_wifi && !u->cable_xfer && r == PM_XFER) continue;
@@ -51,7 +51,7 @@ int sys_menu_tortos_rows(const sys_ui *u, pm_row *out)
 			bool look = r == PM_THEME || r == PM_DIR || r == PM_SPEED ||
 			            r == PM_LISTVIEW || r == PM_COLOR || r == PM_SHELF_FAV ||
 			            r == PM_RECENT || r == PM_SHELF_MUSE;
-			bool roms = r == PM_ROMM || r == PM_SYNC;
+			bool roms = r == PM_ROMM || r == PM_SYNC || r == PM_GBSORT;
 			int page = look ? 1 : roms ? 2 : 0;
 			int want = u->appearance ? 1 : u->rom_page ? 2 : 0;
 
@@ -316,6 +316,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	full[PM_ROMMGMT]      = (menu_row){ "ROM Management", NULL, true };
 	full[PM_ROMM]         = (menu_row){ "RomM", u->romm ? u->romm : "sign in", true };
 	full[PM_SYNC]         = (menu_row){ "Syncthing", u->sync ? u->sync : "Off", true };
+	full[PM_GBSORT]       = (menu_row){ "Sort Game Boy Games", NULL, true };
 	full[PM_UPDATE]       = (menu_row){ "Updates", u->update, true };
 	full[PM_CONTROLS]     = (menu_row){ "Controls",    NULL,   true  };
 	full[PM_ABOUT]        = (menu_row){ "About ChaOS", NULL,   true  };
@@ -344,9 +345,10 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	full[PM_ACHIEVEMENTS].hint = "Sign in to earn achievements as you play";
 	full[PM_SS].hint           = "Sign in for more box art and game info";
 	full[PM_PORTS].hint        = "Add the Ports shelf: PC games rebuilt for handhelds";
-	full[PM_ROMMGMT].hint      = "RomM and Syncthing, for games and saves";
+	full[PM_ROMMGMT].hint      = "RomM, Syncthing, and sorting Game Boy games";
 	full[PM_ROMM].hint         = "Your own RomM server: download games, sync saves, get BIOS";
 	full[PM_SYNC].hint         = "Saves, games and BIOS on all your devices";
+	full[PM_GBSORT].hint       = "Each into Game Boy or Color, by its cartridge";
 	full[PM_UPDATE].hint       = "Check for a newer ChaOS and install it";
 	full[PM_CONTROLS].hint     = "What every button does";
 	full[PM_ABOUT].hint        = "Version, storage and this device";
@@ -356,7 +358,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	full[PM_ACHIEVEMENTS].opens = full[PM_SS].opens = true;
 	full[PM_CONTROLS].opens = full[PM_ABOUT].opens = true;
 	full[PM_UPDATE].opens = full[PM_PORTS].opens = full[PM_ROMM].opens = true;
-	full[PM_ROMMGMT].opens = full[PM_SYNC].opens = true;
+	full[PM_ROMMGMT].opens = full[PM_SYNC].opens = full[PM_GBSORT].opens = true;
 	full[PM_APPEARANCE].opens = true;
 	/* ChaOS: the rows left and right go round (menu.h, cycles) */
 	full[PM_AUDIO].cycles = full[PM_CHANNELS].cycles = full[PM_SLEEP].cycles = true;

@@ -210,6 +210,20 @@ made for the Color (its header says so) plays on a Game Boy Color in its own
 colors, in either folder, and one that isn't plays on a Game Boy, as it was
 meant to, never colorized. A `.zip` is looked into for this.
 
+**Sorting them.** ChaOS also looks, now and then, for games in the other
+folder for their cartridge: once after the update that brings this, after
+ChaOS Transfer sends anything, and every two days, in the background and
+never while a game plays (it remembers what it has read, so a look reads
+only new files). When it finds some, the shelf asks *"N Game Boy games are
+in the wrong folder for their cartridge. Move them, saves and all?"*, with
+**Move Them** and **Not Now**. Not Now is remembered, and those games aren't
+asked about again. **MENU > ROM Management > Sort Game Boy Games** lists every
+one, whether asked about or not: A on a game moves it, **Move All** moves them
+all. A game moves with its box art, save states, cheats, favorite, play time,
+Recently Played place, scraped info and RomM record; its saves are already in
+the one Saves folder. A game whose name the other folder already has is shown
+as **Name taken** and left for you to move by hand.
+
 ### PT SkyWalker541 and the emulator (ChaOS)
 
 PT SkyWalker541 is tuned with the emulator set a certain way, and ChaOS sets

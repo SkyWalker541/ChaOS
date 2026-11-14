@@ -178,7 +178,7 @@ static bool has_label(const menu_row *rows, int n, const char *label);
  * holds one row for it. */
 #define PAGE_ROWS 8
 /* ChaOS: and the ROM Management page's two, RomM and Syncthing */
-#define ROM_ROWS 2
+#define ROM_ROWS 3
 #define TOP_ROWS (PM_ROWS - PAGE_ROWS - ROM_ROWS)
 /* (the page's description line is drawn by menu_draw, not a row) */
 #define PAGE_NOTE 0
@@ -223,8 +223,9 @@ static void tortos_menu_offline(void)
 	u.rom_page = true;
 	n = sys_menu_build(&u, rows, &b, &heading);
 	ck(n == ROM_ROWS && !strcmp(heading, "ROM Management") && has_label(rows, n, "RomM") &&
-	   has_label(rows, n, "Syncthing") && !strcmp(val(by_id(&u, rows, n, PM_SYNC)), "Off"),
-	   "the ROM Management page holds RomM and Syncthing, under its own heading");
+	   has_label(rows, n, "Syncthing") && !strcmp(val(by_id(&u, rows, n, PM_SYNC)), "Off") &&
+	   has_label(rows, n, "Sort Game Boy Games"),
+	   "the ROM Management page holds RomM, Syncthing and Sort Game Boy Games, under its own heading");
 	u.rom_page = false;
 	n = sys_menu_build(&u, rows, &b, &heading);
 	ck(has_label(rows, n, "ROM Management") && !has_label(rows, n, "RomM") && !has_label(rows, n, "Syncthing"),
@@ -835,7 +836,7 @@ static void radio_less(void)
 		if (pm[i] == PM_THEME || pm[i] == PM_DIR || pm[i] == PM_SPEED ||
 		    pm[i] == PM_LISTVIEW || pm[i] == PM_COLOR || pm[i] == PM_SHELF_FAV ||
 		    pm[i] == PM_RECENT || pm[i] == PM_SHELF_MUSE || pm[i] == PM_ROMM ||
-		    pm[i] == PM_SYNC) ok = false;
+		    pm[i] == PM_SYNC || pm[i] == PM_GBSORT) ok = false;
 	/* The top level, in the enum's order, with the Appearance rows on their page
 	 * and Appearance in their place */
 	ck(k == TOP_ROWS && ok, "every TortOS row, in the enum's order");
@@ -862,7 +863,7 @@ static void radio_less(void)
 	n = sys_menu_build(&u, rows, &b, &heading);
 	k = sys_menu_tortos_rows(&u, pm);
 	printf("ChaOS menu, no radio at all:\n");
-	ck(n == k && n == TOP_ROWS - 9, "nine rows fewer (Updates, Get PortMaster and RomM too), and the build agrees with the list");
+	ck(n == k && n == TOP_ROWS - 8, "eight rows fewer (Updates and Get PortMaster too; ROM Management stays, for sorting Game Boy games), and the build agrees with the list");
 	ck(!has_label(rows, n, "Wi-Fi") && !has_label(rows, n, "Bluetooth"),
 	   "no Wi-Fi, no Bluetooth");
 	ck(!has_label(rows, n, XFER_NAME_WIFI) && !has_label(rows, n, XFER_NAME_CABLE) &&
@@ -884,7 +885,7 @@ static void radio_less(void)
 	n = sys_menu_build(&u, rows, &b, &heading);
 	k = sys_menu_tortos_rows(&u, pm);
 	printf("ChaOS menu, no radio, files over the cable:\n");
-	ck(n == k && n == TOP_ROWS - 8, "eight rows fewer: the transfer row stays");
+	ck(n == k && n == TOP_ROWS - 7, "seven rows fewer: the transfer row stays");
 	for (i = 0; i < k && pm[i] != PM_XFER; i++) { }
 	ck(i < k && !strcmp(rows[i].label, XFER_NAME_CABLE),
 	   "as ChaOS Wire, where the list says it is");
