@@ -135,7 +135,7 @@ typedef struct {
 	/* ChaOS: Crop Overscan's choice (overscan.h); the caller leaves the row
 	 * out for a console with none */
 	const char *overscan;
-	/* ChaOS: the disc that is in, "1 of 3", for a game on more than one; the
+	/* ChaOS: the disc that is in, "Disc 1 loaded", for a game on more than one; the
 	 * caller leaves the row out for the rest */
 	const char *disc;
 } gm_ui;

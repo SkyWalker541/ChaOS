@@ -112,7 +112,7 @@ int gm_rows(const gm_ui *u, menu_row *out, gm_bufs *b)
 			"Back to the game",
 			"Save your place in a slot",
 			"Go back to a saved place",
-			"Swap discs, or start from another",
+			"Swap discs, or restart with another",
 			"A picture of the game, kept on the card",
 			"This game's screenshots",
 			"How the picture fills the screen",

@@ -11279,7 +11279,7 @@ static int gm_build(app *a, menu_row *out, gm_bufs *b, int shots, const char *sh
 	}
 	u.disc = NULL;
 	if (g_disc_n > 1) {
-		snprintf(disc, sizeof disc, "%d of %d", g_disc_i + 1, g_disc_n);
+		snprintf(disc, sizeof disc, "Disc %d loaded", g_disc_i + 1);
 		u.disc = disc;
 	}
 	return gm_rows(&u, out, b);
@@ -13853,7 +13853,7 @@ static int disc_build(void *ctx, menu_row *rows, int max, const char **heading)
 	*heading = "Disc";
 	for (i = 0; i < g_disc_n && i < 16 && n < max - 1; i++) {
 		snprintf(u->lab[i], sizeof u->lab[i], "Disc %d", i + 1);
-		rows[n] = (menu_row){ u->lab[i], i == g_disc_i ? "In" : NULL, true };
+		rows[n] = (menu_row){ u->lab[i], i == g_disc_i ? "Loaded" : NULL, true };
 		rows[n].opens = i != g_disc_i;
 		rows[n].hint = i == g_disc_i ? "The disc the game is reading" : "Put this disc in";
 		n++;
