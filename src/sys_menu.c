@@ -243,17 +243,9 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 		         u->wifi == WIFI_CONNECTING ? "connecting" :
 		         u->wifi == WIFI_IDLE       ? "not connected" : "off");
 	full[PM_WIFI]         = (menu_row){ "Wi-Fi",     b->b,      true  };
-	/* ChaOS: the page's row says what both are doing at a glance: the
-	 * network, then the headset, and only the halves the device has */
-	{
-		static char net[600];
-		const char *w = u->no_wifi ? NULL : b->b;
-		const char *h = u->no_bt ? NULL : u->bt_name;
-
-		if (w && h) snprintf(net, sizeof net, "%s \xc2\xb7 %s", w, h);
-		else snprintf(net, sizeof net, "%s", w ? w : h ? h : "");
-		full[PM_NETPAGE] = (menu_row){ "Wi-Fi & Bluetooth", net, true };
-	}
+	/* ChaOS: a page of two things says nothing of either on its row - "off"
+	 * there could be Wi-Fi or Bluetooth; each says its own on the page */
+	full[PM_NETPAGE] = (menu_row){ "Wi-Fi & Bluetooth", NULL, true };
 	full[PM_SYSPAGE] = (menu_row){ "System Settings", NULL, true };
 	full[PM_SHOWCLOCK] = (menu_row){ "Show Clock", u->show_clock ? u->show_clock : "On", true };
 	full[PM_SHOWBATT]  = (menu_row){ "Show Battery", u->show_batt ? u->show_batt : "Icon", true };
