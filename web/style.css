@@ -58,7 +58,7 @@ li::marker { color: var(--orange); }
 
 /* ---- the little boot: the header's mark flies in, pixel by pixel ---- */
 #mark-boot { position: fixed; z-index: 60; pointer-events: none; }
-.brand.booting img { visibility: hidden; }
+.brand.booting > img { visibility: hidden; }
 .brand.booting span { opacity: 0; transition: none; }
 .brand span { transition: opacity 1.6s ease; }
 
@@ -75,6 +75,8 @@ li::marker { color: var(--orange); }
 .brand:hover { text-decoration: none; }
 .brand b { color: var(--orange); }
 .brand img { image-rendering: pixelated; }
+.brand span { display: flex; }
+.brand .word { width: 87px; height: 21px; }
 .links { display: flex; gap: 22px; margin-left: auto; }
 .links a, .gh { color: var(--text); font-size: 16px; }
 .links a:hover, .gh:hover { color: var(--orange); text-decoration: none; }
