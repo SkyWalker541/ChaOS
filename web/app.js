@@ -7,7 +7,7 @@
    * after the page loads. The mark's cells are the boot's left of x 440; each
    * 12 px cell is 4 px of the 64 px mark, drawn at the header img's size. */
   var B = window.CHAOS_BOOT;
-  var SLOW = 1.6, DELAY = 450;
+  var SLOW = 3.2, DELAY = 500;
   var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var brand = document.querySelector(".brand"), mark = brand && brand.querySelector("img");
   var running = false;
@@ -124,16 +124,25 @@
       ["home-pixelcards", "Pixel Cards, ChaOS's other theme"]
     ], at = 0;
     cycle.forEach(function (s) { var p = new Image(); p.src = "img/" + s[0] + ".webp"; });
+    /* A crossfade: the next screen fades in over the one showing, then takes
+     * its place, so the picture never dips to black between screens. */
+    var bez = hero.parentNode, top = hero.cloneNode(false);
+    top.className = "hero-next"; top.alt = ""; top.setAttribute("aria-hidden", "true");
+    bez.appendChild(top);
     setInterval(function () {
       if (document.hidden) return;
       at = (at + 1) % cycle.length;
-      hero.style.opacity = "0"; cap.style.opacity = "0";
-      setTimeout(function () {
-        hero.onload = function () { hero.style.opacity = "1"; cap.style.opacity = "1"; };
-        hero.src = "img/" + cycle[at][0] + ".webp";
-        hero.alt = cycle[at][1] + ", on the Brick";
-        cap.textContent = cycle[at][1];
-      }, 180);
-    }, 3400);
+      var s = cycle[at];
+      cap.style.opacity = "0";
+      top.onload = function () {
+        top.classList.add("in");
+        setTimeout(function () { cap.textContent = s[1]; cap.style.opacity = "1"; }, 450);
+        setTimeout(function () {
+          hero.src = top.src; hero.alt = s[1] + ", on the Brick";
+          hero.onload = function () { top.classList.remove("in"); };
+        }, 1000);
+      };
+      top.src = "img/" + s[0] + ".webp";
+    }, 4800);
   }
 })();

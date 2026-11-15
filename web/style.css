@@ -59,8 +59,8 @@ li::marker { color: var(--orange); }
 /* ---- the little boot: the header's mark flies in, pixel by pixel ---- */
 #mark-boot { position: fixed; z-index: 60; pointer-events: none; }
 .brand.booting img { visibility: hidden; }
-.brand.booting span { opacity: 0; }
-.brand span { transition: opacity 0.5s ease; }
+.brand.booting span { opacity: 0; transition: none; }
+.brand span { transition: opacity 1.6s ease; }
 
 /* ---- header -------------------------------------------------------- */
 .top {
@@ -97,8 +97,15 @@ section { padding: 0 16px; }
 .lockup { width: min(100%, 420px); height: auto; display: block; margin-bottom: 20px; cursor: pointer; }
 .hero-cap {
   margin-top: 14px; text-align: center; color: var(--cream); font-size: 18px; font-weight: 600;
-  min-height: 1.5em; transition: opacity 0.18s ease;
+  min-height: 1.5em; transition: opacity 0.45s ease;
 }
+.hero-device .bezel { position: relative; }
+.hero-device .bezel img { transition: none; }
+.hero-device .bezel .hero-next {
+  position: absolute; left: 14px; top: 14px; width: calc(100% - 28px);
+  opacity: 0; transition: opacity 0s;
+}
+.hero-device .bezel .hero-next.in { opacity: 1; transition: opacity 0.9s ease; }
 .lede { font-size: 21px; color: var(--text); margin: 0 0 28px; }
 .small { color: var(--muted); font-size: 15px; }
 .cta { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
