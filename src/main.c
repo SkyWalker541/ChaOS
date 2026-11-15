@@ -61,6 +61,7 @@ static void os_cycle(const char *tag, int d, bool live);
 #include "syncthing.h"
 #include "gamecore.h"
 #include "gbsort.h"
+#include "discset.h"
 #include "pmcat.h"
 #include "libpack.h"
 #include "romm.h"
@@ -204,6 +205,9 @@ static romm_conn *romm_get(void);   /* the ChaOS menu's RomM */
 static void romm_screen(app *a);
 /* ChaOS: ROM Management > Get Homebrew (itchdl.h) */
 static void hb_screen(app *a);
+/* ChaOS: ROM Management > Multi-Disc Games (discset.h) */
+static void ds_screen(app *a);
+static void ds_ask(app *a);
 static bool hb_has_key(void);
 static bool hb_save_key(const char *key, char *who, size_t wn, char *why, size_t yn);
 
@@ -10839,6 +10843,7 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 	case PM_HOMEBREW:     hb_screen(a); break;
 	case PM_SYNC:         sth_screen(a); break;
 	case PM_GBSORT:       gbs_screen(a); break;
+	case PM_DISCSETS:     ds_screen(a); break;
 	case PM_UPDATE:       update_screen(a); break;
 	case PM_ABOUT:        about_screen(a); break;
 	default: break;
@@ -16831,6 +16836,9 @@ static void sth_screen(app *a)
 #define GBS_EVERY (7L * 24 * 3600)
 #define GBS_RESULT "/tmp/chaos-gbsort.txt"
 
+#define DS_RESULT "/tmp/chaos-discsets.txt"
+static void ds_look(const char *path);
+
 static pid_t g_gbs_pid = -1;   /* g_gbs_due, above: a look wanted once the shelf is quiet */
 
 static void gbs_cache_path(char *out, size_t n) { snprintf(out, n, "%s/gbsort.cache", P_USERDATA); }
@@ -16853,6 +16861,7 @@ static void gbs_start(void)
 
 	if (g_gbs_pid > 0) return;
 	unlink(GBS_RESULT);
+	unlink(DS_RESULT);
 	pid = fork();
 	if (pid == 0) {
 		static gbs_move mv[GBS_MAX];
@@ -16869,6 +16878,8 @@ static void gbs_start(void)
 				fprintf(f, "%s\t%s\t%s\t%s\t%d\n", mv[i].from, mv[i].to, mv[i].file, mv[i].name, mv[i].clash);
 			if (fclose(f) == 0) rename(tmp, GBS_RESULT);
 		}
+		/* ChaOS: and multi-disc games with no playlist (discset.h) */
+		ds_look(DS_RESULT);
 		_exit(0);
 	}
 	if (pid > 0) { g_gbs_pid = pid; g_gbs_due = false; }
@@ -16993,6 +17004,261 @@ static void gbs_records(const gbs_move *m)
 	}
 }
 
+/* ---- ChaOS: multi-disc games made playlists (discset.h) ----------------------
+ *
+ * Looked for with the Game Boy look (after ChaOS Transfer sends anything, once
+ * a week, and the first start after the update that brings this): the sets
+ * found are asked about on the shelf, once each, and MENU > ROM Management >
+ * Multi-Disc Games makes any of them a playlist whenever it's chosen. */
+
+/* The consoles whose shelves take an .m3u */
+static const char *const DS_FOLDERS[] = { "PlayStation", "TurboGrafx-16", NULL };
+
+static void ds_declined_path(char *out, size_t n) { snprintf(out, n, "%s/discsets.declined", P_USERDATA); }
+
+/* In the background look: the sets, a line each, folder and game */
+static void ds_look(const char *path)
+{
+	static ds_set sets[DS_MAX];
+	char tmp[128];
+	FILE *f;
+	int k, i, n;
+
+	snprintf(tmp, sizeof tmp, "%s.new", path);
+	if (!(f = fopen(tmp, "w"))) return;
+	for (k = 0; DS_FOLDERS[k]; k++) {
+		n = ds_scan(P_ROMS, DS_FOLDERS[k], sets, DS_MAX);
+		for (i = 0; i < n; i++) if (!sets[i].clash) fprintf(f, "%s\t%s\n", sets[i].folder, sets[i].base);
+	}
+	if (fclose(f) == 0) rename(tmp, path);
+}
+
+static bool ds_was_declined(const char *folder, const char *base)
+{
+	char p[LIB_PATH + 32], line[600], want[600];
+	FILE *f;
+	bool hit = false;
+
+	ds_declined_path(p, sizeof p);
+	if (!(f = fopen(p, "r"))) return false;
+	snprintf(want, sizeof want, "%s\t%s", folder, base);
+	while (!hit && fgets(line, sizeof line, f)) {
+		line[strcspn(line, "\r\n")] = '\0';
+		hit = !strcmp(line, want);
+	}
+	fclose(f);
+	return hit;
+}
+
+/* The shelf's tag for a console's folder, "" when ChaOS has none */
+static const char *ds_tag(app *a, const char *folder)
+{
+	int i;
+
+	for (i = 0; i < a->sys.count; i++)
+		if (!strcmp(a->sys.systems[i].folder, folder)) return a->sys.systems[i].tag;
+	return "";
+}
+
+/* What the databases know of the game, to the name it plays as now:
+ * favorites, play time (and so Recently Played) and its scraped info */
+static void ds_records(app *a, const ds_set *s)
+{
+	const char *tag = ds_tag(a, s->folder);
+	game_meta gm;
+	int i;
+
+	if (tag[0] && fav_is(tag, s->was)) {
+		fav_toggle(tag, s->was);
+		if (!fav_is(tag, s->now)) fav_toggle(tag, s->now);
+		fav_save();
+	}
+	if (tag[0]) {
+		gbs_sess ss;
+
+		memset(&ss, 0, sizeof ss);
+		snprintf(ss.suffix, sizeof ss.suffix, ".%s\t%s", tag, s->was);
+		db_each_prefix(db_lib(), "sess.", gbs_sess_row, &ss);
+		for (i = 0; i < ss.n; i++) {
+			char nk[1300];
+			size_t base = strlen(ss.keys[i]) - strlen(ss.suffix);
+
+			snprintf(nk, sizeof nk, "%.*s.%s\t%s", (int)base, ss.keys[i], tag, s->now);
+			if (db_set_str(db_lib(), nk, ss.vals[i])) db_del(db_lib(), ss.keys[i]);
+		}
+		free(ss.keys);
+		free(ss.vals);
+	}
+	memset(&gm, 0, sizeof gm);
+	if (db_game_get(db_lib(), s->folder, s->was, &gm)) db_game_set(db_lib(), s->folder, s->now, &gm);
+}
+
+/* The sets of `pick` (folder TAB game lines, or NULL for all), made; how many */
+static int ds_do(app *a, char (*pick)[300], int npick)
+{
+	static ds_set sets[DS_MAX];
+	int k, i, j, done = 0, total = 0;
+
+	for (k = 0; DS_FOLDERS[k]; k++) {
+		int n = ds_scan(P_ROMS, DS_FOLDERS[k], sets, DS_MAX);
+
+		for (i = 0; i < n; i++) {
+			char key[300], say[96];
+			bool want = !pick;
+
+			if (sets[i].clash) continue;
+			snprintf(key, sizeof key, "%s\t%s", sets[i].folder, sets[i].base);
+			for (j = 0; pick && j < npick; j++) if (!strcmp(pick[j], key)) want = true;
+			if (!want) continue;
+			snprintf(say, sizeof say, "Making playlists: %d", ++total);
+			pick_frame(a, "Multi-Disc Games", NULL, 0, 0, NULL, 0, 0, say, MENU_ACCENT);
+			if (ds_apply(P_ROMS, P_SHARED, P_CARD, &sets[i])) {
+				ds_records(a, &sets[i]);
+				done++;
+				fprintf(stderr, "discset: %s/%s: %d discs, a playlist\n", sets[i].folder, sets[i].base, sets[i].n);
+			} else {
+				fprintf(stderr, "discset: %s/%s: couldn't\n", sets[i].folder, sets[i].base);
+			}
+		}
+	}
+	if (done) rescan_all(a);
+	return done;
+}
+
+static void ds_question(int k, char *msg, size_t n)
+{
+	snprintf(msg, n, "%d game%s on more than one disc\n%s no playlist. Make %s,\nso %s one game with\nDisc in %s menu?",
+	         k, k == 1 ? "" : "s", k == 1 ? "has" : "have", k == 1 ? "one" : "them",
+	         k == 1 ? "it's" : "each is", k == 1 ? "its" : "their");
+}
+
+/* On the shelf, when a look has come back: ask about what's new */
+static void ds_ask(app *a)
+{
+	static char pick[DS_MAX][300];
+	char line[400], msg[240];
+	int k = 0, made;
+	FILE *f = fopen(DS_RESULT, "r");
+
+	if (!f) return;
+	while (k < DS_MAX && fgets(line, sizeof line, f)) {
+		char *tab;
+
+		line[strcspn(line, "\r\n")] = '\0';
+		if (!(tab = strchr(line, '\t'))) continue;
+		*tab = '\0';
+		if (ds_was_declined(line, tab + 1)) continue;
+		*tab = '\t';
+		snprintf(pick[k++], sizeof pick[0], "%s", line);
+	}
+	fclose(f);
+	unlink(DS_RESULT);
+	fprintf(stderr, "discset: %d to ask about\n", k);
+	if (!k) return;
+	ds_question(k, msg, sizeof msg);
+	if (!confirm_panel_ex(a, "Multi-Disc Games", msg, k == 1 ? "Make It" : "Make Them", "Not Now")) {
+		char p[LIB_PATH + 32];
+		int i;
+
+		ds_declined_path(p, sizeof p);
+		if ((f = fopen(p, "a"))) { for (i = 0; i < k; i++) fprintf(f, "%s\n", pick[i]); fclose(f); }
+		pick_say(a, "Multi-Disc Games", "Left as they are.\nMake them any time in\nROM Management", MENU_ACCENT);
+		return;
+	}
+	made = ds_do(a, pick, k);
+	snprintf(msg, sizeof msg, "Made %d playlist%s", made, made == 1 ? "" : "s");
+	pick_say(a, "Multi-Disc Games", msg, MENU_ACCENT);
+}
+
+/* MENU > ROM Management > Multi-Disc Games */
+typedef struct {
+	ds_set sets[DS_MAX];
+	int n;
+	char vals[DS_MAX][24];
+	char all[24];
+	int what[MENU_RUN_ROWS];
+} ds_ctx;
+
+static void ds_refresh(ds_ctx *c)
+{
+	int k, got;
+
+	c->n = 0;
+	for (k = 0; DS_FOLDERS[k] && c->n < DS_MAX; k++) {
+		got = ds_scan(P_ROMS, DS_FOLDERS[k], c->sets + c->n, DS_MAX - c->n);
+		if (got > 0) c->n += got;
+	}
+}
+
+static int ds_build(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	ds_ctx *c = ctx;
+	int n = 0, i, ok = 0;
+
+	*heading = "Multi-Disc Games";
+	for (i = 0; i < c->n; i++) if (!c->sets[i].clash) ok++;
+	if (!c->n) {
+		rows[n++] = MENU_NOTE("Every game on more than one");
+		rows[n++] = MENU_NOTE("disc has its playlist");
+		return n;
+	}
+	if (ok && n < max) {
+		snprintf(c->all, sizeof c->all, "%d", ok);
+		c->what[n] = -2;
+		rows[n++] = (menu_row){ "Make All", c->all, true };
+		rows[n - 1].hint = "Each a folder with its discs and a playlist";
+		rows[n - 1].opens = true;
+	}
+	if (n < max) { c->what[n] = -1; rows[n++] = MENU_RULE; }
+	for (i = 0; i < c->n && n < max; i++) {
+		c->what[n] = i;
+		snprintf(c->vals[i], sizeof c->vals[i], "%s", c->sets[i].clash ? "Name taken" : "");
+		if (!c->sets[i].clash) snprintf(c->vals[i], sizeof c->vals[i], "%d discs", c->sets[i].n);
+		rows[n++] = (menu_row){ c->sets[i].base, c->vals[i], !c->sets[i].clash };
+		rows[n - 1].hint = c->sets[i].clash ? "Something of this name is in the way: tidy it by hand"
+		                 : c->sets[i].loose ? "A moves its discs into a folder with a playlist"
+		                                    : "A writes the playlist in its folder";
+	}
+	return n;
+}
+
+static menu_result ds_key(app *a, void *ctx, in_button key, int sel)
+{
+	ds_ctx *c = ctx;
+	int w = sel >= 0 && sel < MENU_RUN_ROWS ? c->what[sel] : -1, made;
+	char msg[96];
+
+	if (key != IN_ACCEPT) return MENU_STAY;
+	if (w == -2) {
+		made = ds_do(a, NULL, 0);
+	} else if (w >= 0 && !c->sets[w].clash) {
+		char one[1][300];
+
+		snprintf(one[0], sizeof one[0], "%s\t%s", c->sets[w].folder, c->sets[w].base);
+		made = ds_do(a, one, 1);
+	} else {
+		return MENU_STAY;
+	}
+	snprintf(msg, sizeof msg, "Made %d playlist%s", made, made == 1 ? "" : "s");
+	pick_say(a, "Multi-Disc Games", msg, MENU_ACCENT);
+	ds_refresh(c);
+	return MENU_STAY;
+}
+
+static void ds_screen(app *a)
+{
+	ds_ctx *c = calloc(1, sizeof *c);
+	menu_style st = { 0 };
+
+	if (!c) return;
+	pick_frame(a, "Multi-Disc Games", NULL, 0, 0, NULL, 0, 0, "Looking for discs...", MENU_ACCENT);
+	ds_refresh(c);
+	st.accent = MENU_ACCENT;
+	st.fixed_w = menu_std_width(a);
+	menu_run(a, &st, ds_build, ds_key, c);
+	free(c);
+}
+
 /* The moves, each with its files and records; how many went */
 static int gbs_do(app *a, const gbs_move *m, int n)
 {
@@ -17065,6 +17331,7 @@ static void gbs_poll(app *a)
 			unlink(GBS_RESULT);
 			fprintf(stderr, "gbsort: %d in the other folder\n", n);
 			if (n > 0) gbs_ask(a, mv, n);
+			ds_ask(a);
 		}
 		return;
 	}
@@ -21025,6 +21292,7 @@ static const char *shot_path;
 static int shot_screen = -1;
 static int shot_menu, shot_menu_sel;
 static int shot_gbask, shot_gbsort;   /* ChaOS: --gbask N, --gbsort [row] */
+static int shot_dsask, shot_ds = -1;  /* ChaOS: --dsask N, --ds [row] */
 static int shot_gmenu = -1;           /* ChaOS: --gmenu ROW, the in-game menu */
 static int shot_cheats = -1;          /* ChaOS: --cheats ROW FILE.cht, the Cheats screen */
 static const char *shot_cheats_file;
@@ -21540,6 +21808,37 @@ static void take_shot(app *a)
 	if (shot_port_power >= 0) port_power_draw(a, shot_port_power);
 	if (shot_romm) romm_shot(a);
 	if (shot_hb) hb_shot(a);
+	if (shot_dsask || shot_ds >= 0) {
+		menu_row rows[40];
+		int q = 0;
+
+		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
+		SDL_RenderFillRect(a->r, NULL);
+		if (shot_dsask) {
+			static char msg[240], ln[6][96];
+			const char *s;
+
+			ds_question(shot_dsask, msg, sizeof msg);
+			for (s = msg; *s && q < 6;) {
+				size_t len = strcspn(s, "\n");
+				snprintf(ln[q], sizeof ln[q], "%.*s", (int)len, s);
+				rows[q] = (menu_row){ ln[q], NULL, false };
+				q++;
+				s += len + (s[len] == '\n');
+			}
+			rows[q++] = (menu_row){ shot_dsask == 1 ? "Make It" : "Make Them", NULL, true };
+			rows[q++] = (menu_row){ "Not Now", NULL, true };
+			menu_draw(a, "Multi-Disc Games", rows, q, q - 2, 0, MENU_ACCENT);
+		} else {
+			static ds_ctx c;
+			const char *heading;
+
+			ds_refresh(&c);
+			q = ds_build(&c, rows, 40, &heading);
+			menu_draw(a, heading, rows, q, shot_ds, menu_std_width(a), MENU_ACCENT);
+		}
+	}
 	if (shot_gbask || shot_gbsort) {
 		/* ChaOS: the Game Boy sorting question, and its screen from Roms */
 		menu_row rows[40];
@@ -22029,6 +22328,11 @@ int main(int argc, char *argv[])
 		/* ChaOS: --appearance [row], the Appearance page as --menu draws the
 		 * main menu */
 		else if (!strcmp(argv[i], "--gbask") && i + 1 < argc) shot_gbask = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "--dsask") && i + 1 < argc) shot_dsask = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "--ds")) {
+			shot_ds = 0;
+			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9') shot_ds = atoi(argv[++i]);
+		}
 		else if (!strcmp(argv[i], "--gbsort")) {
 			shot_gbsort = 1;
 			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9')

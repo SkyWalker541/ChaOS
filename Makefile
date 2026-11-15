@@ -9,7 +9,7 @@
         check check-cheevos check-hare check-httpd check-idle check-rahash \
         check-raset check-xfer check-menus check-artscrape check-artrun check-audioout \
         check-db check-stats check-sort check-bt check-ss check-update check-asan \
-        check-release check-updater check-chaos-names check-itch check-itchdl check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore check-gbsort
+        check-release check-updater check-chaos-names check-itch check-itchdl check-discset check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore check-gbsort
 
 all: check
 
@@ -22,7 +22,7 @@ CHECKS = check-cheevos check-hare check-httpd check-idle check-rahash \
          check-db check-stats check-sort check-bt check-ss \
          check-muselib check-musequeue check-museart check-controls check-logpack \
          check-clock check-update check-remap check-shots check-pixfont \
-         check-release check-updater check-chaos-names check-itch check-itchdl check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore check-gbsort
+         check-release check-updater check-chaos-names check-itch check-itchdl check-discset check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore check-gbsort
 
 check:
 	@fail=0; for c in $(CHECKS); do \
@@ -285,6 +285,15 @@ check-chaos-names: FORCE
 	      src/muselib.c src/release.c src/rajson.c src/net.c src/atomic.c
 	@./$(CHAOS_NAMES)/release-check
 	@./$(CHAOS_NAMES)/hare-check
+
+# ChaOS: multi-disc games found and made playlists, on a card made in /tmp;
+# see src/discset.h.
+check-discset: build-native/discset-check
+	@./build-native/discset-check
+
+build-native/discset-check: tools/discset-check.c src/discset.c src/discset.h FORCE
+	@mkdir -p build-native
+	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g -Isrc -o $@ tools/discset-check.c src/discset.c
 
 # ChaOS: itch.io's download pages read and a game's file chosen, from pages in
 # itch.io's format (tools/fixtures/itch); no network - see src/itchdl.h.

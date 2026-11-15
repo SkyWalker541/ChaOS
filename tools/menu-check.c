@@ -178,7 +178,7 @@ static bool has_label(const menu_row *rows, int n, const char *label);
  * holds one row for it. */
 #define PAGE_ROWS 8
 /* ChaOS: and the ROM Management page's two, RomM and Syncthing */
-#define ROM_ROWS 4
+#define ROM_ROWS 5
 /* ChaOS: and the Wi-Fi & Bluetooth page's two, and System Settings' eight
  * (Audio Output, Audio Channels, Night Mode, Date & Time, Show Clock, Show
  * Battery, Update Available Dot, Auto Off) */
@@ -863,7 +863,7 @@ static void radio_less(void)
 		if (pm[i] == PM_THEME || pm[i] == PM_DIR || pm[i] == PM_SPEED ||
 		    pm[i] == PM_LISTVIEW || pm[i] == PM_COLOR || pm[i] == PM_SHELF_FAV ||
 		    pm[i] == PM_RECENT || pm[i] == PM_SHELF_MUSE || pm[i] == PM_ROMM || pm[i] == PM_HOMEBREW ||
-		    pm[i] == PM_SYNC || pm[i] == PM_GBSORT || pm[i] == PM_WIFI ||
+		    pm[i] == PM_SYNC || pm[i] == PM_GBSORT || pm[i] == PM_DISCSETS || pm[i] == PM_WIFI ||
 		    pm[i] == PM_BT || pm[i] == PM_AUDIO || pm[i] == PM_CHANNELS ||
 		    pm[i] == PM_NIGHT || pm[i] == PM_CLOCK || pm[i] == PM_SHOWCLOCK ||
 		    pm[i] == PM_SHOWBATT || pm[i] == PM_UPDDOT || pm[i] == PM_SLEEP) ok = false;
