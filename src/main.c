@@ -18220,6 +18220,51 @@ static bool hb_move(const char *from, const char *to)
 	return true;
 }
 
+/* The other folder a Game Boy game might be in (Sort Game Boy Games) */
+static const char *hb_pair(const char *folder)
+{
+	if (!strcmp(folder, GBS_GB)) return GBS_GBC;
+	if (!strcmp(folder, GBS_GBC)) return GBS_GB;
+	return NULL;
+}
+
+/* The same game already on the card, by its bytes: a file of the same size
+ * in its folder (or the other Game Boy one) whose MD5 is the same. Only
+ * files of the same size are read, so a look at a big shelf is quick. */
+static bool hb_same_on_card(const char *file, const char *folder, char *found, size_t n)
+{
+	struct stat me;
+	char mine[33] = "";
+	const char *dirs[2] = { folder, hb_pair(folder) };
+	int k;
+
+	if (stat(file, &me) != 0) return false;
+	for (k = 0; k < 2 && dirs[k]; k++) {
+		char dir[LIB_PATH * 2];
+		DIR *d;
+		struct dirent *e;
+
+		snprintf(dir, sizeof dir, "%s/%s", P_ROMS, dirs[k]);
+		if (!(d = opendir(dir))) continue;
+		while ((e = readdir(d))) {
+			char full[LIB_PATH * 3], theirs[33];
+			struct stat st;
+
+			if (e->d_name[0] == '.') continue;
+			snprintf(full, sizeof full, "%s/%s", dir, e->d_name);
+			if (stat(full, &st) != 0 || !S_ISREG(st.st_mode) || st.st_size != me.st_size) continue;
+			if (!mine[0] && !ra_md5_file(file, mine)) { closedir(d); return false; }
+			if (ra_md5_file(full, theirs) && !strcmp(mine, theirs)) {
+				snprintf(found, n, "%s/%s", dirs[k], e->d_name);
+				closedir(d);
+				return true;
+			}
+		}
+		closedir(d);
+	}
+	return false;
+}
+
 /* One of several files, asked */
 typedef struct {
 	const itchdl_upload *u;
@@ -18417,6 +18462,19 @@ static bool hb_download(app *a, int sys, const itch_game *g, const char *cover)
 			fprintf(stderr, "itch: %s: no telling what the file is; named .%s\n", g->title, ext);
 		}
 	}
+	/* the same game on the card already, under any name: kept as it is */
+	{
+		char same[LIB_PATH * 2], say[LIB_PATH * 2 + 40];
+
+		if (hb_same_on_card(tmp, folder, same, sizeof same)) {
+			unlink(tmp);
+			hb_have_add(g->link, same);
+			fprintf(stderr, "itch: %s is on the card already, as %s\n", g->title, same);
+			snprintf(say, sizeof say, "It's on this Brick already:\n%s", same);
+			pick_say(a, g->title, say, MENU_ACCENT);
+			return true;
+		}
+	}
 	hb_file_name(g->title, name, sizeof name);
 	snprintf(rel, sizeof rel, "%s/%s.%s", folder, name, ext);
 	snprintf(dest, sizeof dest, "%s/%s", P_ROMS, rel);
@@ -18547,6 +18605,60 @@ static void hb_pic_free(hb_pic *pp)
 	if (pp->tex) SDL_DestroyTexture(pp->tex);
 	memset(pp, 0, sizeof *pp);
 	pp->want = pp->shown = -1;
+}
+
+static int hb_strcmp(const void *x, const void *y)
+{
+	return strcmp(*(char *const *)x, *(char *const *)y);
+}
+
+/* Games on the shelf already by name: a file whose name, put the way itch.io
+ * titles are compared (itch.h), is the title's exactly. Not a guess at a
+ * near one: a download still says when the bytes are the same. */
+static void hb_mark_by_name(const char *folder, hb_list *l)
+{
+	const char *dirs[2] = { folder, hb_pair(folder) };
+	char **keys = NULL;
+	int n = 0, cap = 0, i, k;
+
+	for (k = 0; k < 2 && dirs[k]; k++) {
+		char dir[LIB_PATH * 2];
+		DIR *d;
+		struct dirent *e;
+
+		snprintf(dir, sizeof dir, "%s/%s", P_ROMS, dirs[k]);
+		if (!(d = opendir(dir))) continue;
+		while ((e = readdir(d))) {
+			char stem[LIB_NAME], key[256], *dot;
+
+			if (e->d_name[0] == '.') continue;
+			snprintf(stem, sizeof stem, "%s", e->d_name);
+			if ((dot = strrchr(stem, '.'))) *dot = '\0';
+			itch_title_key(stem, key, sizeof key);
+			if (!key[0]) continue;
+			if (n == cap) {
+				char **nk = realloc(keys, (size_t)(cap = cap ? cap * 2 : 128) * sizeof *nk);
+
+				if (!nk) break;
+				keys = nk;
+			}
+			if (!(keys[n] = strdup(key))) break;
+			n++;
+		}
+		closedir(d);
+	}
+	if (n) {
+		qsort(keys, (size_t)n, sizeof *keys, hb_strcmp);
+		for (i = 0; i < l->nall; i++) {
+			char key[256], *kp = key;
+
+			if (l->have[i][0]) continue;
+			itch_title_key(l->all[i].title, key, sizeof key);
+			if (key[0] && bsearch(&kp, keys, (size_t)n, sizeof *keys, hb_strcmp)) l->have[i][0] = 1;
+		}
+	}
+	for (i = 0; i < n; i++) free(keys[i]);
+	free(keys);
 }
 
 static void hb_filter(hb_list *l)
@@ -18683,6 +18795,7 @@ static void hb_games_screen(app *a, int sys)
 	l.have = calloc((size_t)(l.nall ? l.nall : 1), 1);
 	if (!l.idx || !l.have) { free(l.idx); free(l.have); free(l.all); return; }
 	for (i = 0; i < l.nall; i++) l.have[i][0] = hb_have(l.all[i].link, NULL, 0);
+	hb_mark_by_name(s->folder, &l);
 	hb_filter(&l);
 	memset(&pp, 0, sizeof pp);
 	pp.want = pp.shown = -1;
@@ -21317,6 +21430,7 @@ static void hb_shot(app *a)
 		l.idx = calloc((size_t)l.nall + 1, sizeof *l.idx);
 		l.have = calloc((size_t)l.nall + 1, 1);
 		for (i = 0; i < l.nall; i++) l.have[i][0] = hb_have(l.all[i].link, NULL, 0);
+		hb_mark_by_name(s->folder, &l);
 		l.free_only = shot_hb_free;
 		hb_filter(&l);
 		sel = shot_hb_b < l.n ? shot_hb_b : 0;
