@@ -21,23 +21,25 @@
     var k = u * 4 / B.cell;               /* boot px -> css px */
     var pad = 140;                        /* room for the pixels to fly in from */
     var cv = document.createElement("canvas");
-    var W = r.width + pad * 2, H = r.height + pad * 2;
-    var dpr = Math.min(window.devicePixelRatio || 1, 3);
+    /* Everything is placed on whole device pixels, the way the browser draws
+     * the img that takes over at the end, so the last frame and the img are
+     * the same pixels and nothing shifts when they swap. */
+    var dpr = window.devicePixelRatio || 1;
+    var x0 = Math.round(r.left * dpr) / dpr - pad, y0 = Math.round(r.top * dpr) / dpr - pad;
+    var W = Math.round(r.width) + pad * 2, H = Math.round(r.height) + pad * 2;
     cv.id = "mark-boot";
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
     cv.style.width = W + "px"; cv.style.height = H + "px";
-    cv.style.left = (r.left - pad) + "px"; cv.style.top = (r.top - pad) + "px";
+    cv.style.left = x0 + "px"; cv.style.top = y0 + "px";
     document.body.appendChild(cv);
     var ctx = cv.getContext("2d");
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.imageSmoothingEnabled = false;
     brand.classList.add("booting");
     running = true;
     var end = (B.delayMax + B.flight) * 1000 * SLOW, start = null, sz = 4 * u;
     function frame(now) {
       if (start === null) start = now;
       var t = Math.min(now - start, end) / 1000 / SLOW, i, c, q, off;
-      ctx.clearRect(0, 0, W, H);
+      ctx.clearRect(0, 0, cv.width, cv.height);
       for (i = 0; i < cells.length; i++) {
         c = cells[i];
         q = (t - c[6] * B.delayMax) / B.flight;
@@ -46,13 +48,14 @@
         off = c[5] * k * 1.4 * Math.pow(1 - q, 3);
         ctx.globalAlpha = Math.min(1, q / 0.35);
         ctx.fillStyle = B.colors[c[2]];
-        ctx.fillRect(pad + 4 * u + (c[0] - 230) * k + c[3] * off,
-                     pad + (c[1] - 288) * k + c[4] * off, sz, sz);
+        ctx.fillRect(Math.round((pad + 4 * u + (c[0] - 230) * k + c[3] * off) * dpr),
+                     Math.round((pad + (c[1] - 288) * k + c[4] * off) * dpr),
+                     Math.round(sz * dpr), Math.round(sz * dpr));
       }
       ctx.globalAlpha = 1;
       if (now - start < end) { requestAnimationFrame(frame); return; }
       brand.classList.remove("booting");
-      setTimeout(function () { cv.remove(); running = false; }, 30);
+      requestAnimationFrame(function () { requestAnimationFrame(function () { cv.remove(); running = false; }); });
     }
     requestAnimationFrame(frame);
   }
