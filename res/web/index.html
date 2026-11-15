@@ -89,6 +89,19 @@
     <span>Network, headset and account names are masked.</span>
   </p>
 
+  <!-- ChaOS: the player's itch.io API key, for ROM Management > Get Homebrew:
+       pasted here rather than typed on the Brick. Write-only: the page is told
+       whether one is kept, never the key. Hidden where the device says no. -->
+  <p id="itch" class="logs itch" hidden>
+    <span class="itchrow">
+      <input id="itchkey" type="password" autocomplete="off" spellcheck="false"
+             placeholder="Your itch.io API key" aria-label="itch.io API key">
+      <button id="itchsave" class="ghost" type="button">Save Key</button>
+      <button id="itchdrop" class="ghost" type="button" hidden>Remove</button>
+    </span>
+    <span id="itchmsg" role="status">For Get Homebrew: games you bought on itch.io. Make a key at itch.io, Settings, API keys.</span>
+  </p>
+
   <!-- The version the device runs, when nothing newer is out. -->
   <p id="verline" class="logs verline" hidden></p>
 

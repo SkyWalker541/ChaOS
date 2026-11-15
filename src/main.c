@@ -55,6 +55,7 @@ static void os_cycle(const char *tag, int d, bool live);
 #include "remap.h"
 #include "shots.h"
 #include "itch.h"
+#include "itchdl.h"
 #include "ports.h"
 #include "pico8.h"
 #include "syncthing.h"
@@ -201,6 +202,10 @@ static bool pm_is_entry(const char *file)
 static void pm_get(app *a);   /* the ChaOS menu's Get PortMaster */
 static romm_conn *romm_get(void);   /* the ChaOS menu's RomM */
 static void romm_screen(app *a);
+/* ChaOS: ROM Management > Get Homebrew (itchdl.h) */
+static void hb_screen(app *a);
+static bool hb_has_key(void);
+static bool hb_save_key(const char *key, char *who, size_t wn, char *why, size_t yn);
 
 static void refresh_virtual_shelves(app *a);
 static void build_muse_shelf(app *a);
@@ -7061,6 +7066,7 @@ static void xfer_screen_over(app *a, bool over_cable)
 	hare_set_page(cable ? "wire.html" : NULL);
 	hare_set_after_write(xfer_after_write);
 	hare_set_cover(cover_from_web);
+	hare_set_itch_key(hb_has_key, hb_save_key);
 	g_wu = WU_NONE;
 	if (cable) {
 		char dir[CFG_STR * 3];
@@ -8069,15 +8075,20 @@ static void itch_index_path(const char *folder, char *out, size_t n)
  * itch.io, and one look a day keeps the list fresh for the price of a page. */
 #define ITCH_FRESH_S (24 * 60 * 60)
 
-static bool itch_cover_screen(app *a, const char *folder, const char *stem,
-                              const char *title, unsigned accent)
+/* A console's list of itch.io games, read or brought up to date first when
+ * it has to be (none yet, not whole, or a day old) behind a panel: from
+ * malloc, or NULL having said why. A list on the card that can't be brought
+ * up to date is still used. */
+static itch_game *itch_list_get(app *a, const char *folder, const char *title, unsigned accent,
+                                int *count_out)
 {
 	char path[LIB_PATH * 3], now[96];
 	itch_game *games;
-	int count = 0, best[PICK_MAX], k, i;
+	int count = 0;
 	time_t when = 0;
-	bool whole = false, picked = false;
+	bool whole = false;
 
+	*count_out = 0;
 	itch_index_path(folder, path, sizeof path);
 	games = itch_index_load(path, &count, &when, &whole);
 	/* Read the list first when there is none, it isn't whole, or it is a
@@ -8085,7 +8096,7 @@ static bool itch_cover_screen(app *a, const char *folder, const char *stem,
 	 * still used */
 	if (!games || !whole || time(NULL) - when > ITCH_FRESH_S) {
 		if (!net_online()) {
-			if (!games) { pick_say(a, title, "Needs Wi-Fi", accent); return false; }
+			if (!games) { pick_say(a, title, "Needs Wi-Fi", accent); return NULL; }
 		} else {
 			bool going = true;
 
@@ -8097,8 +8108,8 @@ static bool itch_cover_screen(app *a, const char *folder, const char *stem,
 				int st = itch_fetch_step(), g, pg;
 
 				plat_input_poll(&a->in);
-				if (a->in.quit_requested) { itch_fetch_cancel(); a->running = false; return false; }
-				if (a->in.pressed[IN_POWER] || idle_due(a)) { itch_fetch_cancel(); power_off(a); return false; }
+				if (a->in.quit_requested) { itch_fetch_cancel(); a->running = false; return NULL; }
+				if (a->in.pressed[IN_POWER] || idle_due(a)) { itch_fetch_cancel(); power_off(a); return NULL; }
 				if (menu_leaving(a)) { itch_fetch_cancel(); break; }
 				if (st <= 0) {
 					if (st < 0) fprintf(stderr, "itch: %s\n", itch_fetch_problem());
@@ -8115,10 +8126,22 @@ static bool itch_cover_screen(app *a, const char *folder, const char *stem,
 			if (!games) {
 				const char *why = itch_fetch_problem();
 				pick_say(a, title, why && why[0] ? why : "Couldn't read itch.io", accent);
-				return false;
+				return NULL;
 			}
 		}
 	}
+	*count_out = count;
+	return games;
+}
+
+static bool itch_cover_screen(app *a, const char *folder, const char *stem,
+                              const char *title, unsigned accent)
+{
+	itch_game *games;
+	int count = 0, best[PICK_MAX], k, i;
+	bool picked = false;
+
+	if (!(games = itch_list_get(a, folder, title, accent, &count))) return false;
 	k = itch_match(stem, games, count, best, PICK_MAX);
 	/* The title shown, when it isn't the file's name, is tried too */
 	if (!k && title && strcmp(title, stem)) k = itch_match(title, games, count, best, PICK_MAX);
@@ -10813,6 +10836,7 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 	case PM_PORTS:        pm_get(a); break;
 	case PM_ROMMGMT:      rom_page_screen(a); break;
 	case PM_ROMM:         romm_screen(a); break;
+	case PM_HOMEBREW:     hb_screen(a); break;
 	case PM_SYNC:         sth_screen(a); break;
 	case PM_GBSORT:       gbs_screen(a); break;
 	case PM_UPDATE:       update_screen(a); break;
@@ -18028,6 +18052,815 @@ static void romm_screen(app *a)
 	menu_run(a, &st, romm_home_build, romm_home_key, &c);
 }
 
+/* ---- ChaOS: ROM Management > Get Homebrew -----------------------------------
+ *
+ * Games from itch.io, onto their shelves with their covers: a console's list
+ * (itch.h's, the one box art reads), and a game from it downloaded the way
+ * itch.io's Download button does, or through the player's own API key for
+ * the ones they bought (itchdl.h). */
+
+static void hb_dir(char *out, size_t n)
+{
+	snprintf(out, n, "%s/itch", P_USERDATA);
+}
+
+static bool hb_key(char *key, size_t n)
+{
+	char d[LIB_PATH];
+
+	hb_dir(d, sizeof d);
+	return itchdl_key_load(d, key, n);
+}
+
+static bool hb_has_key(void)
+{
+	char k[200];
+
+	return hb_key(k, sizeof k);
+}
+
+/* Kept when itch.io takes it, or when itch.io can't be asked (ChaOS Wire has
+ * no internet: it is checked at the first download instead) */
+static bool hb_save_key(const char *key, char *who, size_t wn, char *why, size_t yn)
+{
+	char d[LIB_PATH];
+	int r;
+
+	hb_dir(d, sizeof d);
+	if (who && wn) who[0] = '\0';
+	if (!key || !key[0]) {
+		if (itchdl_key_save(d, "")) return true;
+		snprintf(why, yn, "Couldn't remove it");
+		return false;
+	}
+	r = itchdl_key_check(key, who, wn);
+	if (r == 0) { snprintf(why, yn, "itch.io didn't take that key"); return false; }
+	if (!itchdl_key_save(d, key)) { snprintf(why, yn, "Couldn't save it to the card"); return false; }
+	fprintf(stderr, "itch: key kept (%s)\n", r > 0 ? "checked" : "not checked: no answer");
+	return true;
+}
+
+/* The games downloaded, a line each: the game's page, then where it went */
+static void hb_have_path(char *out, size_t n)
+{
+	snprintf(out, n, "%s/itch/downloaded.list", P_USERDATA);
+}
+
+static void hb_have_add(const char *link, const char *rel)
+{
+	char p[LIB_PATH + 32];
+	FILE *f;
+
+	hb_have_path(p, sizeof p);
+	if ((f = fopen(p, "a"))) { fprintf(f, "%s\t%s\n", link, rel); fclose(f); }
+}
+
+/* Where a game went, when it is still there */
+static bool hb_have(const char *link, char *rel, size_t n)
+{
+	char p[LIB_PATH + 32], line[LIB_PATH * 2], found[LIB_PATH] = "";
+	FILE *f;
+	size_t l = strlen(link);
+
+	hb_have_path(p, sizeof p);
+	if (!(f = fopen(p, "r"))) return false;
+	while (fgets(line, sizeof line, f))
+		if (!strncmp(line, link, l) && line[l] == '\t') {
+			line[strcspn(line, "\r\n")] = '\0';
+			snprintf(found, sizeof found, "%s", line + l + 1);   /* the last one wins */
+		}
+	fclose(f);
+	if (!found[0]) return false;
+	{
+		char full[LIB_PATH * 2];
+
+		snprintf(full, sizeof full, "%s/%s", P_ROMS, found);
+		if (access(full, F_OK) != 0) return false;
+	}
+	if (rel) snprintf(rel, n, "%s", found);
+	return true;
+}
+
+/* A title as a file's name: what a card's file system and the shelf take */
+static void hb_file_name(const char *title, char *out, size_t n)
+{
+	size_t o = 0;
+	const char *p;
+	bool sp = false;
+
+	for (p = title; *p && o + 1 < n && o < 120; p++) {
+		char c = *p;
+
+		if (strchr("/\\:*?\"<>|", c) || (unsigned char)c < ' ') c = ' ';
+		if (c == ' ') { if (o && !sp) { out[o++] = ' '; } sp = true; continue; }
+		sp = false;
+		out[o++] = c;
+	}
+	while (o && (out[o - 1] == ' ' || out[o - 1] == '.')) o--;
+	out[o] = '\0';
+	if (!out[0]) snprintf(out, n, "itch.io game");
+}
+
+static int hb_sys_by_folder(app *a, const char *folder)
+{
+	int i;
+
+	for (i = 0; i < a->sys.count; i++)
+		if (!strcmp(a->sys.systems[i].folder, folder)) return i;
+	return -1;
+}
+
+/* The ROM in an unpacked zip: the file with the console's best extension,
+ * or else one whose bytes say it is a game; "" when there is none */
+static void hb_walk(const char *dir, int depth, const char *exts, char *best, size_t bn, int *rank,
+                    char *sniffed, size_t sn)
+{
+	DIR *d = opendir(dir);
+	struct dirent *e;
+
+	if (!d) return;
+	while ((e = readdir(d))) {
+		char full[LIB_PATH * 3];
+		struct stat st;
+
+		if (e->d_name[0] == '.' || !strncmp(e->d_name, "__MACOSX", 8)) continue;
+		snprintf(full, sizeof full, "%s/%s", dir, e->d_name);
+		if (stat(full, &st) != 0) continue;
+		if (S_ISDIR(st.st_mode)) {
+			if (depth < 3) hb_walk(full, depth + 1, exts, best, bn, rank, sniffed, sn);
+			continue;
+		}
+		if (!S_ISREG(st.st_mode)) continue;
+		{
+			if (itchdl_ext_in(e->d_name, exts, false)) {
+				/* earlier in the console's list is better */
+				const char *dot = strrchr(e->d_name, '.');
+				const char *p = strcasestr(exts, dot + 1);
+				int r = p ? (int)(p - exts) : 999;
+
+				if (r < *rank) { *rank = r; snprintf(best, bn, "%s", full); }
+			} else if (!sniffed[0] && st.st_size >= 0x150) {
+				char fo[64], ex[8];
+
+				if (itchdl_sniff(full, fo, sizeof fo, ex, sizeof ex) && strcmp(ex, "zip"))
+					snprintf(sniffed, sn, "%s", full);
+			}
+		}
+	}
+	closedir(d);
+}
+
+/* Copy then remove: the card's folders and /tmp are different file systems */
+static bool hb_move(const char *from, const char *to)
+{
+	if (rename(from, to) == 0) return true;
+	copy_file(from, to);
+	if (access(to, F_OK) != 0) return false;
+	unlink(from);
+	return true;
+}
+
+/* One of several files, asked */
+typedef struct {
+	const itchdl_upload *u;
+	const int *order;
+	int k, chosen;
+} hb_choose_ctx;
+
+static int hb_choose_build(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	hb_choose_ctx *c = ctx;
+	int i, n = 0;
+
+	*heading = "Which File?";
+	for (i = 0; i < c->k && n < max; i++)
+		rows[n++] = (menu_row){ c->u[c->order[i]].name, NULL, true, false };
+	return n;
+}
+
+static menu_result hb_choose_key(app *a, void *ctx, in_button key, int sel)
+{
+	hb_choose_ctx *c = ctx;
+
+	(void)a;
+	if (key != IN_ACCEPT || sel < 0 || sel >= c->k) return MENU_STAY;
+	c->chosen = c->order[sel];
+	return MENU_DONE;
+}
+
+/* A game onto its shelf. True when it is there. */
+static bool hb_download(app *a, int sys, const itch_game *g, const char *cover)
+{
+	const system_cfg *s = &a->sys.systems[sys];
+	char key[200], why[200], url[1400], tmp[LIB_PATH * 2], name[160], rel[LIB_PATH * 2];
+	char dest[LIB_PATH * 3], folder[CFG_STR], ext[16] = "", fo[64] = "", ex[16] = "";
+	itchdl_upload up[ITCHDL_UPLOADS];
+	int order[ITCHDL_UPLOADS], n, k, pick;
+	bool paid = false, several = false, ok = false;
+	itchdl d;
+	pid_t pid;
+	int rc;
+
+	if (!net_online()) { pick_say(a, g->title, "Connect to Wi-Fi first", MENU_ACCENT); return false; }
+	sync_abandon();
+	memset(&d, 0, sizeof d);
+	snprintf(d.link, sizeof d.link, "%s", g->link);
+	d.api_key = hb_key(key, sizeof key) ? key : NULL;
+	pick_frame(a, g->title, NULL, 0, 0, NULL, 0, 0, "Asking itch.io", MENU_ACCENT);
+	n = itchdl_uploads(&d, up, ITCHDL_UPLOADS, &paid, why, sizeof why);
+	if (n < 0) {
+		itchdl_done(&d);
+		if (paid && !d.api_key)
+			pick_say(a, g->title, "A paid game. To download the ones\nyou've bought, add your itch.io key:\nGet Homebrew > itch.io Key", MENU_ACCENT);
+		else if (paid)
+			pick_say(a, g->title, "Not one you own.\nBuy it on itch.io first", MENU_ACCENT);
+		else
+			pick_say(a, g->title, why[0] ? why : "Couldn't get it", MENU_ACCENT);
+		return false;
+	}
+	k = n ? itchdl_rank(up, n, s->exts, order, &several) : 0;
+	if (k == 0) {
+		itchdl_done(&d);
+		pick_say(a, g->title, n ? "Nothing in it for this console" : "Nothing to download:\nit's played in a browser",
+		         MENU_ACCENT);
+		return false;
+	}
+	pick = order[0];
+	if (several) {
+		hb_choose_ctx c = { up, order, k, -1 };
+		menu_style st = { 0 };
+
+		st.accent = MENU_ACCENT;
+		st.fixed_w = menu_std_width(a);
+		menu_run(a, &st, hb_choose_build, hb_choose_key, &c);
+		if (c.chosen < 0 || g_menu_closing) { itchdl_done(&d); return false; }
+		pick = c.chosen;
+	}
+	pick_frame(a, g->title, NULL, 0, 0, NULL, 0, 0, "Asking itch.io", MENU_ACCENT);
+	if (!itchdl_file_url(&d, &up[pick], url, sizeof url, why, sizeof why)) {
+		itchdl_done(&d);
+		pick_say(a, g->title, why[0] ? why : "Couldn't get it", MENU_ACCENT);
+		return false;
+	}
+	itchdl_done(&d);
+	/* the file's own name, from the address, when the page showed a label */
+	{
+		char last[256];
+		const char *q = strchr(url, '?'), *e = q ? q : url + strlen(url), *b = e;
+
+		while (b > url && b[-1] != '/') b--;
+		if ((size_t)(e - b) < sizeof last) {
+			const char *dot;
+
+			memcpy(last, b, (size_t)(e - b));
+			last[e - b] = '\0';
+			if ((dot = strrchr(last, '.')) && strlen(dot + 1) < sizeof ext && strlen(dot + 1) >= 2)
+				snprintf(ext, sizeof ext, "%s", dot + 1);
+		}
+		if (!ext[0]) {
+			const char *dot = strrchr(up[pick].name, '.');
+
+			if (dot && strlen(dot + 1) < sizeof ext) snprintf(ext, sizeof ext, "%s", dot + 1);
+		}
+	}
+	/* down, beside where it goes, under a name the shelf won't list */
+	snprintf(tmp, sizeof tmp, "%s/%s/.itch-%ld.part", P_ROMS, s->folder, (long)getpid());
+	{
+		char dir[LIB_PATH * 2];
+
+		snprintf(dir, sizeof dir, "%s/%s", P_ROMS, s->folder);
+		mkdir(dir, 0755);
+	}
+	unlink(tmp);
+	pid = net_get_spawn(url, tmp, 3600);
+	memset(url, 0, sizeof url);            /* it carries a token */
+	if (pid <= 0) { pick_say(a, g->title, "Couldn't start the download", MENU_ACCENT); return false; }
+	rc = pm_wait(a, pid, g->title, "Downloading", tmp, up[pick].size, MENU_ACCENT, true);
+	net_spawn_done(pid);
+	if (rc != 0) {
+		unlink(tmp);
+		if (rc > 0) pick_say(a, g->title, "Couldn't download it", MENU_ACCENT);
+		return false;
+	}
+	/* what it is: a zip is opened and its game taken out */
+	if (itchdl_sniff(tmp, fo, sizeof fo, ex, sizeof ex) && !strcmp(ex, "zip")) {
+		char unz[LIB_PATH * 2], best[LIB_PATH * 3] = "", sniffed[LIB_PATH * 3] = "", zip[LIB_PATH * 2];
+		int rank = 1 << 20;
+
+		snprintf(zip, sizeof zip, "%s.zip", tmp);
+		rename(tmp, zip);
+		snprintf(unz, sizeof unz, "/tmp/chaos-itch-unzip");
+		{
+			const char *rm[] = { "/bin/rm", "-rf", unz, NULL };
+
+			pm_run(a, g->title, "Unpacking", MENU_ACCENT, rm, NULL);
+		}
+		mkdir(unz, 0755);
+		{
+			const char *argv[] = { pm_unzip_bin(), "-oq", zip, "-d", unz, NULL };
+
+			rc = pm_run(a, g->title, "Unpacking", MENU_ACCENT, argv, NULL);
+		}
+		unlink(zip);
+		if (rc == 0) hb_walk(unz, 0, s->exts, best, sizeof best, &rank, sniffed, sizeof sniffed);
+		if (!best[0]) snprintf(best, sizeof best, "%s", sniffed);
+		if (best[0]) {
+			const char *dot = strrchr(best, '.');
+
+			ext[0] = '\0';
+			if (dot && !strchr(dot, '/') && strlen(dot + 1) < sizeof ext) snprintf(ext, sizeof ext, "%s", dot + 1);
+			fo[0] = ex[0] = '\0';
+			ok = hb_move(best, tmp);
+		}
+		{
+			const char *rm[] = { "/bin/rm", "-rf", unz, NULL };
+
+			pm_run(a, g->title, "Unpacking", MENU_ACCENT, rm, NULL);
+		}
+		if (!ok) {
+			unlink(tmp);
+			pick_say(a, g->title, rc != 0 ? "Couldn't unpack it" : "No game for this console in it", MENU_ACCENT);
+			return false;
+		}
+		itchdl_sniff(tmp, fo, sizeof fo, ex, sizeof ex);
+	}
+	/* where it goes: the console its bytes say, when ChaOS has that shelf
+	 * (a Color game from the Game Boy list goes to Game Boy Color, as Sort
+	 * Game Boy Games would put it); else the console it was chosen from */
+	snprintf(folder, sizeof folder, "%s", s->folder);
+	if (fo[0] && strcmp(fo, s->folder)) {
+		int o = hb_sys_by_folder(a, fo);
+
+		if (o >= 0) snprintf(folder, sizeof folder, "%s", fo);
+	}
+	if (ex[0]) {
+		/* a name's extension the shelf takes is kept ("gb" for a Color game
+		 * that plays on both); else the one its bytes say */
+		int o = hb_sys_by_folder(a, folder);
+
+		{
+			char probe[32];
+
+			snprintf(probe, sizeof probe, "x.%s", ext);
+			if (!ext[0] || o < 0 || !itchdl_ext_in(probe, a->sys.systems[o].exts, false))
+				snprintf(ext, sizeof ext, "%s", ex);
+		}
+	} else {
+		char probe[32];
+		const char *e1 = s->exts;
+		size_t l = strcspn(e1, ",");
+
+		snprintf(probe, sizeof probe, "x.%s", ext);
+		if (!ext[0] || !itchdl_ext_in(probe, s->exts, false)) {
+			/* nothing says what it is: the console's own first kind */
+			if (l < sizeof ext) { memcpy(ext, e1, l); ext[l] = '\0'; }
+			fprintf(stderr, "itch: %s: no telling what the file is; named .%s\n", g->title, ext);
+		}
+	}
+	hb_file_name(g->title, name, sizeof name);
+	snprintf(rel, sizeof rel, "%s/%s.%s", folder, name, ext);
+	snprintf(dest, sizeof dest, "%s/%s", P_ROMS, rel);
+	if (access(dest, F_OK) == 0 &&
+	    !confirm_panel(a, g->title, "It's on this Brick already.\nReplace it?", "Replace")) {
+		unlink(tmp);
+		return false;
+	}
+	{
+		char dir[LIB_PATH * 2];
+
+		snprintf(dir, sizeof dir, "%s/%s", P_ROMS, folder);
+		mkdir(dir, 0755);
+	}
+	if (!hb_move(tmp, dest)) {
+		unlink(tmp);
+		pick_say(a, g->title, "Couldn't save it to the card", MENU_ACCENT);
+		return false;
+	}
+	/* its cover, as the shelf's box art */
+	if (cover && cover[0] && access(cover, R_OK) == 0) {
+		char media[LIB_PATH * 2];
+
+		snprintf(media, sizeof media, "%s/%s/.media", P_ROMS, folder);
+		mkdir(media, 0755);
+		cover_save(a, cover, folder, name);
+	}
+	hb_have_add(g->link, rel);
+	sync();
+	fprintf(stderr, "itch: %s downloaded into %s\n", g->title, folder);
+	rescan_all(a);
+	{
+		char say[200];
+
+		snprintf(say, sizeof say, "On the %s shelf", folder);
+		pick_say(a, g->title, say, MENU_ACCENT);
+	}
+	return true;
+}
+
+/* ---- a console's games ---- */
+
+typedef struct {
+	itch_game *all;
+	int nall;
+	int *idx;          /* what's shown: all, or the free ones */
+	int n;
+	bool free_only;
+	char (*have)[1];
+} hb_list;
+
+/* The cover under the cursor, fetched into .userdata */
+typedef struct {
+	int want, shown, fetching;
+	pid_t pid;
+	unsigned since;
+	SDL_Texture *tex;
+	int tw, th;
+	bool failed;
+} hb_pic;
+
+static void hb_cover_path(const char *image, char *out, size_t n)
+{
+	unsigned long h = 5381;
+	const char *p;
+
+	for (p = image; *p; p++) h = h * 33 + (unsigned char)*p;
+	snprintf(out, n, "%s/itch/covers/%08lx.img", P_USERDATA, h & 0xFFFFFFFFul);
+}
+
+static void hb_pic_step(app *a, hb_pic *pp, const itch_game *all)
+{
+	char path[LIB_PATH];
+
+	if (pp->pid > 0) {
+		int st;
+		pid_t r = waitpid(pp->pid, &st, WNOHANG);
+
+		if (r == pp->pid || r < 0) {
+			char part[LIB_PATH + 8];
+
+			net_spawn_done(pp->pid);
+			hb_cover_path(all[pp->fetching].image, path, sizeof path);
+			snprintf(part, sizeof part, "%s.part", path);
+			if (r == pp->pid && WIFEXITED(st) && WEXITSTATUS(st) == 0) rename(part, path);
+			else { unlink(part); if (pp->fetching == pp->want) pp->failed = true; }
+			pp->pid = 0;
+		}
+	}
+	if (pp->want < 0 || pp->shown == pp->want) return;
+	hb_cover_path(all[pp->want].image, path, sizeof path);
+	if (access(path, R_OK) == 0) {
+		SDL_Surface *s = IMG_Load(path);
+
+		if (pp->tex) SDL_DestroyTexture(pp->tex);
+		pp->tex = NULL;
+		if (s) {
+			pp->tex = SDL_CreateTextureFromSurface(a->r, s);
+			pp->tw = s->w; pp->th = s->h;
+			SDL_FreeSurface(s);
+			if (pp->tex) SDL_SetTextureScaleMode(pp->tex, SDL_ScaleModeLinear);
+		} else {
+			pp->failed = true;
+		}
+		pp->shown = pp->want;
+		return;
+	}
+	if (pp->pid <= 0 && !pp->failed && plat_now_ms() - pp->since > 180 && net_online()) {
+		char dir[LIB_PATH], part[LIB_PATH + 8];
+		net_req r;
+
+		snprintf(dir, sizeof dir, "%s/itch/covers", P_USERDATA);
+		mkdir(dir, 0755);
+		snprintf(part, sizeof part, "%s.part", path);
+		memset(&r, 0, sizeof r);
+		r.url = all[pp->want].image;
+		r.accept = "image/*";
+		r.timeout_s = 20;
+		pp->pid = net_request_spawn(&r, part);
+		pp->fetching = pp->want;
+		if (pp->pid <= 0) { pp->pid = 0; pp->failed = true; }
+	}
+}
+
+static void hb_pic_free(hb_pic *pp)
+{
+	if (pp->pid > 0) { kill(pp->pid, SIGTERM); waitpid(pp->pid, NULL, 0); net_spawn_done(pp->pid); }
+	if (pp->tex) SDL_DestroyTexture(pp->tex);
+	memset(pp, 0, sizeof *pp);
+	pp->want = pp->shown = -1;
+}
+
+static void hb_filter(hb_list *l)
+{
+	int i;
+
+	l->n = 0;
+	for (i = 0; i < l->nall; i++)
+		if (!l->free_only || itch_free(&l->all[i])) l->idx[l->n++] = i;
+}
+
+static int hb_title_cmp(const void *x, const void *y)
+{
+	return strcasecmp(((const itch_game *)x)->title, ((const itch_game *)y)->title);
+}
+
+static void hb_list_draw(app *a, const char *heading, const hb_list *l, int sel, int first, int vis,
+                         hb_pic *pp)
+{
+	SDL_Rect panel = PM_PANEL;
+	TTF_Font *fm = ui_font(UI_F_MENU), *fs = ui_font(UI_F_META);
+	int rh = menu_row_h(), lm = ui_font_line(UI_F_MENU), ls = ui_font_line(UI_F_META);
+	int lx = panel.x + 20, lw = 452, y0 = panel.y + 100, i;
+	SDL_Rect box = { lx + lw + 24, y0, panel.x + panel.w - 36 - (lx + lw + 24), 0 };
+	char meta[48], fit[256], line[200];
+
+	snprintf(meta, sizeof meta, "%d game%s%s", l->n, l->n == 1 ? "" : "s", l->free_only ? " \xC2\xB7 free" : "");
+	pm_frame_begin(a, MENU_ACCENT, heading, meta);
+	if (l->n == 0) {
+		ui_text(a->r, fm, "No games here", panel.x + panel.w / 2, panel.y + panel.h / 2 - lm / 2, 0,
+		        UI_TEXT_DIM);
+		pm_footer(a, l->free_only ? "Y: all games   B: back" : "B: back");
+		pm_frame_end(a);
+		return;
+	}
+	for (i = first; i < l->n && i < first + vis; i++) {
+		const itch_game *g = &l->all[l->idx[i]];
+		int y = y0 + (i - first) * rh, cy = y + rh / 2, tw = 0;
+
+		if (i == sel)
+			ui_round_rect(a->r, &(SDL_Rect){ lx, y, lw, rh }, rh / 4, (SDL_Color){ 255, 255, 255, 34 });
+		if (l->have[l->idx[i]][0])
+			tw = pm_tag(a, "On Brick", lx + lw - 12, cy, (SDL_Color){ 0, 30, 12, 255 }, PM_GREEN) + 8;
+		else if (!itch_free(g))
+			tw = pm_tag(a, g->price, lx + lw - 12, cy, (SDL_Color){ 40, 24, 0, 255 }, PM_AMBER) + 8;
+		ui_fit_text(fm, g->title, fit, sizeof fit, lw - 28 - tw);
+		ui_text(a->r, fm, fit, lx + 16, cy - lm / 2 - TTF_FontDescent(fm) / 2, -1, UI_TEXT);
+	}
+	if (l->n > vis) {
+		int track = vis * rh, th = track * vis / l->n, ty = y0 + (track - th) * first / (l->n - vis);
+
+		SDL_SetRenderDrawColor(a->r, 0x3D, 0xD6, 0xFF, 160);
+		SDL_RenderFillRect(a->r, &(SDL_Rect){ lx - 10, ty, 3, th > 12 ? th : 12 });
+	}
+	{
+		const itch_game *g = &l->all[l->idx[sel]];
+		int y;
+
+		box.h = panel.y + panel.h - 24 - ls - 20 - (lm + ls + 30) - y0;
+		if (box.h > box.w) box.h = box.w;
+		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+		ui_round_rect(a->r, &box, 10, (SDL_Color){ 0, 0, 0, 90 });
+		if (pp->tex && pp->shown == pp->want && pp->tw > 0 && pp->th > 0) {
+			float k = (float)box.w / pp->tw < (float)box.h / pp->th ? (float)box.w / pp->tw
+			                                                       : (float)box.h / pp->th;
+			SDL_Rect d = { 0, 0, (int)(pp->tw * k), (int)(pp->th * k) };
+
+			d.x = box.x + (box.w - d.w) / 2;
+			d.y = box.y + (box.h - d.h) / 2;
+			SDL_RenderCopy(a->r, pp->tex, NULL, &d);
+		} else {
+			ui_text(a->r, fs, pp->failed ? "No cover" : "Loading...", box.x + box.w / 2,
+			        box.y + box.h / 2 - ls / 2, 0, UI_TEXT_DIM);
+		}
+		y = box.y + box.h + 18;
+		ui_fit_text(fm, g->title, fit, sizeof fit, box.w);
+		ui_text(a->r, fm, fit, box.x, y, -1, UI_TEXT);
+		y += lm + 4;
+		{
+			const char *by = strstr(g->link, "://"), *dot;
+			char author[64] = "";
+
+			if (by && (dot = strchr(by + 3, '.')) && (size_t)(dot - by - 3) < sizeof author) {
+				memcpy(author, by + 3, (size_t)(dot - by - 3));
+				author[dot - by - 3] = '\0';
+			}
+			snprintf(line, sizeof line, "%s%s%s%s", itch_free(g) ? "Free" : g->price,
+			         author[0] ? "  \xC2\xB7  by " : "", author,
+			         l->have[l->idx[sel]][0] ? "  \xC2\xB7  on this Brick" : "");
+		}
+		ui_fit_text(fs, line, fit, sizeof fit, box.w);
+		ui_text(a->r, fs, fit, box.x, y, -1, UI_TEXT_DIM);
+	}
+	pm_footer(a, l->free_only ? "A: download   Y: all games   L2 R2: letter   B: back"
+	                          : "A: download   Y: free only   L2 R2: letter   B: back");
+	draw_letter_popup(a);
+	pm_frame_end(a);
+}
+
+static int hb_letter_jump(const hb_list *l, int cur, int dir)
+{
+	char c0;
+	int i;
+
+	if (l->n <= 1) return cur;
+	c0 = shelf_initial(l->all[l->idx[cur]].title);
+	if (dir > 0) {
+		for (i = cur + 1; i < l->n; i++) if (shelf_initial(l->all[l->idx[i]].title) != c0) return i;
+		return 0;
+	}
+	i = cur;
+	while (i > 0 && shelf_initial(l->all[l->idx[i - 1]].title) == c0) i--;
+	if (i != cur) return i;
+	i = cur == 0 ? l->n - 1 : cur - 1;
+	c0 = shelf_initial(l->all[l->idx[i]].title);
+	while (i > 0 && shelf_initial(l->all[l->idx[i - 1]].title) == c0) i--;
+	return i;
+}
+
+static void hb_games_screen(app *a, int sys)
+{
+	const system_cfg *s = &a->sys.systems[sys];
+	SDL_Rect panel = PM_PANEL;
+	hb_list l;
+	hb_pic pp;
+	int sel = 0, first = 0, i;
+	int vis = (panel.h - 100 - 24 - ui_font_line(UI_F_META) - 16) / menu_row_h();
+	Uint32 held = 0;
+
+	memset(&l, 0, sizeof l);
+	if (!(l.all = itch_list_get(a, s->folder, s->name, MENU_ACCENT, &l.nall))) return;
+	qsort(l.all, (size_t)l.nall, sizeof *l.all, hb_title_cmp);
+	l.idx = calloc((size_t)(l.nall ? l.nall : 1), sizeof *l.idx);
+	l.have = calloc((size_t)(l.nall ? l.nall : 1), 1);
+	if (!l.idx || !l.have) { free(l.idx); free(l.have); free(l.all); return; }
+	for (i = 0; i < l.nall; i++) l.have[i][0] = hb_have(l.all[i].link, NULL, 0);
+	hb_filter(&l);
+	memset(&pp, 0, sizeof pp);
+	pp.want = pp.shown = -1;
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+	while (a->running) {
+		if (l.n > 0 && pp.want != l.idx[sel]) { pp.want = l.idx[sel]; pp.since = plat_now_ms(); pp.failed = false; }
+		hb_pic_step(a, &pp, l.all);
+		plat_input_poll(&a->in);
+		if (a->in.quit_requested) { a->running = false; break; }
+		if (a->in.pressed[IN_POWER] || idle_due(a)) { power_off(a); break; }
+		if (menu_leaving(a)) break;
+		if (in_repeat(&a->in, IN_VOLUP)) plat_volume_nudge(+1);
+		if (in_repeat(&a->in, IN_VOLDN)) plat_volume_nudge(-1);
+		if (a->in.pressed[IN_Y]) {
+			int was = l.n ? l.idx[sel] : 0;
+
+			l.free_only = !l.free_only;
+			hb_filter(&l);
+			for (sel = 0; sel < l.n - 1 && l.idx[sel] < was; sel++) ;
+			first = 0;
+		}
+		if (l.n > 0) {
+			if (in_repeat(&a->in, IN_DOWN)) sel = sel + 1 < l.n ? sel + 1 : 0;
+			if (in_repeat(&a->in, IN_UP)) sel = sel > 0 ? sel - 1 : l.n - 1;
+			if (in_repeat(&a->in, IN_RIGHT) || in_repeat(&a->in, IN_R1)) sel = sel + vis < l.n ? sel + vis : l.n - 1;
+			if (in_repeat(&a->in, IN_LEFT) || in_repeat(&a->in, IN_L1)) sel = sel - vis > 0 ? sel - vis : 0;
+			if (in_repeat(&a->in, IN_R2)) { sel = hb_letter_jump(&l, sel, +1); letter_show(shelf_initial(l.all[l.idx[sel]].title)); }
+			if (in_repeat(&a->in, IN_L2)) { sel = hb_letter_jump(&l, sel, -1); letter_show(shelf_initial(l.all[l.idx[sel]].title)); }
+			if (a->in.down[IN_UP] || a->in.down[IN_DOWN]) {
+				if (!held) held = plat_now_ms();
+				if (plat_now_ms() - held >= 2000) letter_show(shelf_initial(l.all[l.idx[sel]].title));
+			} else {
+				held = 0;
+			}
+			if (a->in.pressed[IN_ACCEPT]) {
+				const itch_game *g = &l.all[l.idx[sel]];
+				char cover[LIB_PATH];
+				bool go = true;
+
+				if (l.have[l.idx[sel]][0])
+					go = confirm_panel(a, "Download", "It's on this Brick already.\nDownload it again?",
+					                   "Download");
+				if (go) {
+					hb_cover_path(g->image, cover, sizeof cover);
+					if (hb_download(a, sys, g, cover)) l.have[l.idx[sel]][0] = 1;
+				}
+				plat_input_flush();
+				memset(&a->in, 0, sizeof a->in);
+				continue;
+			}
+		}
+		if (sel < first) first = sel;
+		if (sel >= first + vis) first = sel - vis + 1;
+		hb_list_draw(a, s->name, &l, sel, first, vis, &pp);
+		SDL_Delay(8);
+	}
+	hb_pic_free(&pp);
+	free(l.have);
+	free(l.idx);
+	free(l.all);
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+}
+
+/* ---- the page: consoles, and the key ---- */
+
+typedef struct {
+	int sys[32];
+	char counts[32][16];
+	int n;
+	char keyval[24];
+	app *a;
+} hb_ctx;
+
+static void hb_refresh(app *a, hb_ctx *c)
+{
+	int i;
+
+	c->n = 0;
+	for (i = 0; i < a->sys.count && c->n < 32; i++) {
+		char path[LIB_PATH * 3];
+		itch_game *g;
+		int cnt = 0;
+
+		if (!itch_slugs(a->sys.systems[i].folder)) continue;
+		c->sys[c->n] = i;
+		itch_index_path(a->sys.systems[i].folder, path, sizeof path);
+		g = itch_index_load(path, &cnt, NULL, NULL);
+		free(g);
+		if (g) snprintf(c->counts[c->n], 16, "%d", cnt);
+		else c->counts[c->n][0] = '\0';
+		c->n++;
+	}
+	snprintf(c->keyval, sizeof c->keyval, "%s", hb_has_key() ? "Kept" : "None");
+}
+
+static int hb_build(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	hb_ctx *c = ctx;
+	int i, n = 0;
+
+	*heading = "Get Homebrew";
+	for (i = 0; i < c->n && n < max - 2; i++) {
+		rows[n] = (menu_row){ c->a->sys.systems[c->sys[i]].name, c->counts[i][0] ? c->counts[i] : NULL,
+		                      true, true };
+		rows[n].hint = "Its games on itch.io";
+		n++;
+	}
+	rows[n] = (menu_row){ "itch.io Key", c->keyval, true, true };
+	rows[n].hint = "For games you bought. Or paste it in ChaOS Transfer";
+	n++;
+	return n;
+}
+
+static menu_result hb_key_row(app *a, hb_ctx *c)
+{
+	char key[200] = "", why[160], who[96];
+	kb_result kr;
+
+	if (hb_has_key()) {
+		if (confirm_panel(a, "itch.io Key", "Remove the key kept\non this Brick?", "Remove")) {
+			hb_save_key("", who, sizeof who, why, sizeof why);
+			hb_refresh(a, c);
+		}
+		return MENU_STAY;
+	}
+	pick_say(a, "itch.io Key", "On itch.io: Settings, API keys,\nGenerate new API key. Type it here,\nor paste it in ChaOS Transfer",
+	         MENU_ACCENT);
+	kr = kb_prompt(a->r, &a->in, "itch.io API Key", key, (int)sizeof key, MENU_ACCENT,
+	               wifi_backdrop, idle_due_ctx, a);
+	if (kr == KB_POWER) { power_off(a); return MENU_DONE; }
+	if (kr != KB_ACCEPT || !key[0]) return MENU_STAY;
+	pick_frame(a, "itch.io Key", NULL, 0, 0, NULL, 0, 0, "Checking it with itch.io", MENU_ACCENT);
+	if (!hb_save_key(key, who, sizeof who, why, sizeof why)) {
+		pick_say(a, "itch.io Key", why, MENU_ACCENT);
+	} else {
+		char say[160];
+
+		snprintf(say, sizeof say, who[0] ? "Kept: %s's games" : "Kept", who);
+		pick_say(a, "itch.io Key", say, MENU_ACCENT);
+	}
+	memset(key, 0, sizeof key);
+	hb_refresh(a, c);
+	return MENU_STAY;
+}
+
+static menu_result hb_menu_key(app *a, void *ctx, in_button key, int sel)
+{
+	hb_ctx *c = ctx;
+
+	if (key != IN_ACCEPT || sel < 0) return MENU_STAY;
+	if (sel == c->n) return hb_key_row(a, c);
+	if (sel > c->n) return MENU_STAY;
+	if (!net_online()) {
+		char path[LIB_PATH * 3];
+
+		itch_index_path(a->sys.systems[c->sys[sel]].folder, path, sizeof path);
+		if (access(path, R_OK) != 0) { pick_say(a, "Get Homebrew", "Connect to Wi-Fi first", MENU_ACCENT); return MENU_STAY; }
+	}
+	hb_games_screen(a, c->sys[sel]);
+	hb_refresh(a, c);
+	return g_menu_closing ? MENU_DONE : MENU_STAY;
+}
+
+static void hb_screen(app *a)
+{
+	hb_ctx c;
+	menu_style st = { 0 };
+
+	memset(&c, 0, sizeof c);
+	c.a = a;
+	hb_refresh(a, &c);
+	st.accent = MENU_ACCENT;
+	st.fixed_w = menu_std_width(a);
+	menu_run(a, &st, hb_build, hb_menu_key, &c);
+}
+
 static void launch_game(app *a)
 {
 	sysview *v = &a->view[a->sys_cursor];
@@ -20090,6 +20923,11 @@ static int shot_port_power = -1;   /* ChaOS: --port-power ROW, power during a po
 /* ChaOS: --romm home ROW | games PLATFORM ROW, against .userdata/romm's server */
 static const char *shot_romm;
 static int shot_romm_a, shot_romm_b;
+/* ChaOS: Get Homebrew's page (--hb home N) and a console's list (--hb games
+ * SYS SEL [free]), from the itch.io lists in the userdata */
+static const char *shot_hb;
+static int shot_hb_a, shot_hb_b;
+static bool shot_hb_free;
 static const char *shot_pm;
 static const char *shot_pm_arg;
 static int shot_pm_n;
@@ -20448,6 +21286,64 @@ static void romm_shot(app *a)
 	}
 }
 
+static void hb_shot(app *a)
+{
+	g_pm_shot = true;
+	if (!strcmp(shot_hb, "home")) {
+		hb_ctx c;
+		menu_row rows[40];
+		const char *heading;
+		int n;
+
+		memset(&c, 0, sizeof c);
+		c.a = a;
+		hb_refresh(a, &c);
+		n = hb_build(&c, rows, 40, &heading);
+		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
+		SDL_RenderFillRect(a->r, NULL);
+		menu_draw(a, heading, rows, n, shot_hb_a, menu_std_width(a), MENU_ACCENT);
+	} else if (!strcmp(shot_hb, "games") && shot_hb_a < a->sys.count) {
+		const system_cfg *s = &a->sys.systems[shot_hb_a];
+		char path[LIB_PATH * 3];
+		hb_list l;
+		hb_pic pp;
+		int i, vis = (PM_PANEL.h - 100 - 24 - ui_font_line(UI_F_META) - 16) / menu_row_h(), sel, first;
+
+		memset(&l, 0, sizeof l);
+		itch_index_path(s->folder, path, sizeof path);
+		if (!(l.all = itch_index_load(path, &l.nall, NULL, NULL))) { fprintf(stderr, "--hb games: no list at %s\n", path); return; }
+		qsort(l.all, (size_t)l.nall, sizeof *l.all, hb_title_cmp);
+		l.idx = calloc((size_t)l.nall + 1, sizeof *l.idx);
+		l.have = calloc((size_t)l.nall + 1, 1);
+		for (i = 0; i < l.nall; i++) l.have[i][0] = hb_have(l.all[i].link, NULL, 0);
+		l.free_only = shot_hb_free;
+		hb_filter(&l);
+		sel = shot_hb_b < l.n ? shot_hb_b : 0;
+		first = sel >= vis ? sel - vis + 1 : 0;
+		memset(&pp, 0, sizeof pp);
+		pp.want = pp.shown = -1;
+		if (l.n) {
+			char cover[LIB_PATH];
+			SDL_Surface *sf;
+
+			pp.want = l.idx[sel];
+			hb_cover_path(l.all[pp.want].image, cover, sizeof cover);
+			if ((sf = IMG_Load(cover))) {
+				pp.tex = SDL_CreateTextureFromSurface(a->r, sf);
+				pp.tw = sf->w; pp.th = sf->h;
+				SDL_FreeSurface(sf);
+				pp.shown = pp.want;
+			} else {
+				pp.failed = true;
+			}
+		}
+		hb_list_draw(a, s->name, &l, sel, first, vis, &pp);
+		if (pp.tex) SDL_DestroyTexture(pp.tex);
+		free(l.idx); free(l.have); free(l.all);
+	}
+}
+
 /* One frame of PortMaster's browser for --pm */
 static void pm_shot(app *a)
 {
@@ -20529,6 +21425,7 @@ static void take_shot(app *a)
 	if (shot_pm) pm_shot(a);
 	if (shot_port_power >= 0) port_power_draw(a, shot_port_power);
 	if (shot_romm) romm_shot(a);
+	if (shot_hb) hb_shot(a);
 	if (shot_gbask || shot_gbsort) {
 		/* ChaOS: the Game Boy sorting question, and its screen from Roms */
 		menu_row rows[40];
@@ -20991,6 +21888,12 @@ int main(int argc, char *argv[])
 			shot_romm = argv[++i];
 			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9') shot_romm_a = atoi(argv[++i]);
 			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9') shot_romm_b = atoi(argv[++i]);
+		}
+		else if (!strcmp(argv[i], "--hb") && i + 1 < argc) {
+			shot_hb = argv[++i];
+			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9') shot_hb_a = atoi(argv[++i]);
+			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9') shot_hb_b = atoi(argv[++i]);
+			if (i + 1 < argc && !strcmp(argv[i + 1], "free")) { shot_hb_free = true; i++; }
 		}
 		else if (!strcmp(argv[i], "--pm") && i + 1 < argc) {
 			shot_pm = argv[++i];

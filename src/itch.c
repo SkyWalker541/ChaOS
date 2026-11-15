@@ -156,8 +156,10 @@ int itch_feed_parse(const char *xml, size_t len, itch_game *out, int max)
 		if ((element(a, b, "plainTitle", g.title, sizeof g.title) ||
 		     element(a, b, "title", g.title, sizeof g.title)) && g.title[0] &&
 		    element(a, b, "link", g.link, sizeof g.link) && itch_page(g.link) &&
-		    element(a, b, "imageurl", g.image, sizeof g.image) && itch_image(g.image))
+		    element(a, b, "imageurl", g.image, sizeof g.image) && itch_image(g.image)) {
+			if (!element(a, b, "price", g.price, sizeof g.price)) g.price[0] = '\0';
 			out[n++] = g;
+		}
 		p = b + 7;
 	}
 	return n;
@@ -322,7 +324,19 @@ int itch_match(const char *rom_name, const itch_game *games, int n, int *best, i
 
 /* ---- the list on the card ------------------------------------------------- */
 
-#define INDEX_MAGIC "#chaos-itch 1"
+/* 2 added the price. A list from 1 still reads, for box art, but isn't
+ * whole, so the next look reads the list again, prices and all. */
+#define INDEX_MAGIC "#chaos-itch 2"
+#define INDEX_MAGIC1 "#chaos-itch 1"
+
+bool itch_free(const itch_game *g)
+{
+	const char *p;
+
+	if (!g->price[0]) return true;
+	for (p = g->price; *p; p++) if (*p >= '1' && *p <= '9') return false;
+	return true;
+}
 
 bool itch_index_save(const char *path, const itch_game *games, int n, time_t when,
                      bool whole)
@@ -335,7 +349,7 @@ bool itch_index_save(const char *path, const itch_game *games, int n, time_t whe
 	if (!(f = fopen(tmp, "w"))) return false;
 	fprintf(f, "%s %lld %s\n", INDEX_MAGIC, (long long)when, whole ? "whole" : "part");
 	for (i = 0; i < n; i++)
-		fprintf(f, "%s\t%s\t%s\n", games[i].title, games[i].link, games[i].image);
+		fprintf(f, "%s\t%s\t%s\t%s\n", games[i].title, games[i].link, games[i].image, games[i].price);
 	if (fflush(f) != 0 || fsync(fileno(f)) != 0) { fclose(f); unlink(tmp); return false; }
 	fclose(f);
 	return rename(tmp, path) == 0;
@@ -343,28 +357,35 @@ bool itch_index_save(const char *path, const itch_game *games, int n, time_t whe
 
 itch_game *itch_index_load(const char *path, int *count, time_t *when, bool *whole)
 {
-	char line[640], state[16] = "";
+	char line[700], state[16] = "";
 	long long t = 0;
 	itch_game *g = NULL;
 	int n = 0, cap = 0;
+	bool v1 = false;
 	FILE *f;
 
 	*count = 0;
 	if (when) *when = 0;
 	if (whole) *whole = false;
 	if (!(f = fopen(path, "r"))) return NULL;
-	if (!fgets(line, sizeof line, f) || strncmp(line, INDEX_MAGIC " ", sizeof INDEX_MAGIC) ||
+	if (!fgets(line, sizeof line, f)) line[0] = '\0';
+	if (!strncmp(line, INDEX_MAGIC1 " ", sizeof INDEX_MAGIC1)) {
+		v1 = true;
+		memcpy(line, INDEX_MAGIC, sizeof INDEX_MAGIC - 1);
+	}
+	if (strncmp(line, INDEX_MAGIC " ", sizeof INDEX_MAGIC) ||
 	    sscanf(line + sizeof INDEX_MAGIC, "%lld %15s", &t, state) != 2) {
 		fclose(f);
 		return NULL;
 	}
 	while (fgets(line, sizeof line, f)) {
-		char *t1 = strchr(line, '\t'), *t2 = t1 ? strchr(t1 + 1, '\t') : NULL, *nl;
+		char *t1 = strchr(line, '\t'), *t2 = t1 ? strchr(t1 + 1, '\t') : NULL, *t3, *nl;
 		itch_game *ng;
 
 		if (!t2) continue;
 		*t1 = *t2 = '\0';
 		if ((nl = strchr(t2 + 1, '\n'))) *nl = '\0';
+		if ((t3 = strchr(t2 + 1, '\t'))) *t3++ = '\0';
 		if (!itch_page(t1 + 1) || !itch_image(t2 + 1)) continue;
 		if (n == cap) {
 			cap = cap ? cap * 2 : 256;
@@ -374,12 +395,13 @@ itch_game *itch_index_load(const char *path, int *count, time_t *when, bool *who
 		snprintf(g[n].title, sizeof g[n].title, "%s", line);
 		snprintf(g[n].link, sizeof g[n].link, "%s", t1 + 1);
 		snprintf(g[n].image, sizeof g[n].image, "%s", t2 + 1);
+		snprintf(g[n].price, sizeof g[n].price, "%s", t3 ? t3 : "");
 		n++;
 	}
 	fclose(f);
 	*count = n;
 	if (when) *when = (time_t)t;
-	if (whole) *whole = !strcmp(state, "whole");
+	if (whole) *whole = !v1 && !strcmp(state, "whole");
 	return g;
 }
 

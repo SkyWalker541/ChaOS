@@ -31,6 +31,44 @@ async function api(method, path, body) {
 
 const enc = encodeURIComponent;
 
+/* ---- ChaOS: the itch.io key ---------------------------------------------- */
+
+/* Whether the device keeps one, asked once per visit to the first page; a
+ * device that doesn't know the route (404) shows nothing */
+let itchKnown = null;
+async function drawItch() {
+	if (cwd !== '') { $('itch').hidden = true; return; }
+	if (itchKnown === null) {
+		try {
+			const r = await fetch('/api/itchkey', { credentials: 'same-origin' });
+			if (!r.ok) { $('itch').hidden = true; return; }
+			itchKnown = !!(await r.json()).set;
+		} catch (e) { $('itch').hidden = true; return; }
+	}
+	if (cwd !== '') return;
+	$('itch').hidden = false;
+	$('itchdrop').hidden = !itchKnown;
+	$('itchkey').placeholder = itchKnown ? 'A key is kept: paste a new one' : 'Your itch.io API key';
+}
+
+async function saveItch(key) {
+	const msg = $('itchmsg');
+	msg.textContent = key ? 'Checking it with itch.io…' : 'Removing it…';
+	try {
+		const r = await api('POST', '/api/itchkey', key);
+		const j = await r.json();
+		itchKnown = !!j.set;
+		$('itchkey').value = '';
+		msg.textContent = !key ? 'Removed.' : j.who ? 'Kept: ' + j.who + '\u2019s games.' : 'Kept.';
+	} catch (e) {
+		if (e.message !== 'unauthorized') msg.textContent = e.message;
+	}
+	drawItch();
+}
+$('itchsave').onclick = () => { const k = $('itchkey').value.trim(); if (k) saveItch(k); };
+$('itchkey').onkeydown = (e) => { if (e.key === 'Enter') $('itchsave').click(); };
+$('itchdrop').onclick = () => saveItch('');
+
 /* ---- the gate ---------------------------------------------------------- */
 
 function showGate(msg) {
@@ -269,6 +307,7 @@ function draw() {
 	ul.textContent = '';
 	$('empty').hidden = entries.length > 0;
 	$('logs').hidden = cwd !== '';
+	drawItch();
 	drawArt();
 	drawUpdate();
 	/* A listing with any covers gives each row of that kind a cover's slot:

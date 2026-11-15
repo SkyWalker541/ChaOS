@@ -237,7 +237,7 @@ header {
 header { flex-wrap: wrap; }
 .crumbs.long { order: 5; flex: 1 1 100%; }
 .crumbs button {
-	background: none; border: none; padding: 2px 4px;
+	background: none; border: none; padding: 2px 4px; white-space: nowrap;
 	color: var(--accent); font: inherit; font-size: 16px;
 }
 .crumbs .here { color: var(--text); padding: 2px 4px; }
@@ -382,6 +382,12 @@ header { flex-wrap: wrap; }
 .art { margin-top: 24px; }
 .art + .logs { margin-top: 16px; }
 .logs { flex-direction: column; align-items: flex-start; gap: 8px; }
+/* ChaOS: the itch.io key, a field and its buttons on one line */
+.itch { margin-top: 16px; }
+.itchrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.itchrow input { font: inherit; font-size: 15px; padding: 6px 10px; border-radius: 8px;
+                 border: 1px solid var(--line, #333); background: transparent; color: var(--text);
+                 width: min(320px, 70vw); }
 
 /* ---- dropping files ---------------------------------------------------- */
 

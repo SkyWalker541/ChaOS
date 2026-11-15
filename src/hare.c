@@ -410,6 +410,21 @@ void hare_set_cover(bool (*fn)(const char *rom, const char *url, const char *fil
 
 void hare_set_page(const char *page) { g_page = page ? page : "index.html"; }
 
+static bool (*g_itch_has)(void);
+
+static void reply_text_json(httpd_req *r, const char *json)
+{
+	httpd_reply(r, 200, "application/json", json, strlen(json), NULL);
+}
+static bool (*g_itch_save)(const char *key, char *who, size_t wn, char *why, size_t yn);
+
+void hare_set_itch_key(bool (*has)(void),
+                       bool (*save)(const char *key, char *who, size_t wn, char *why, size_t yn))
+{
+	g_itch_has = has;
+	g_itch_save = save;
+}
+
 void hare_set_update(const char *dir, const char *version, const char *device,
                      void (*received)(const update_release *offer))
 {
@@ -1649,6 +1664,47 @@ static void on_request(httpd_req *r, bool done, void *ctx)
 		else        httpd_reply(r, 200, "application/json", j.p, j.used, NULL);
 		free(j.p);
 		return;
+	}
+
+	/* ChaOS: the itch.io key (hare_set_itch_key). The body is the key, and
+	 * nothing about it is logged. */
+	if (!strcmp(path, "/api/itchkey") && g_itch_save) {
+		if (!strcmp(m, "GET")) {
+			if (!done) httpd_want_body(r, HTTPD_BODY_NONE, NULL);
+			reply_text_json(r, g_itch_has && g_itch_has() ? "{\"set\":true}" : "{\"set\":false}");
+			return;
+		}
+		if (!strcmp(m, "POST")) {
+			char key[200], who[96] = "", why[160] = "", out[300];
+			const char *body;
+			size_t n, i, k = 0;
+
+			if (!done) {
+				if (httpd_content_len(r) > 190) { httpd_reply_status(r, 400, "that is not an itch.io key"); return; }
+				httpd_want_body(r, HTTPD_BODY_MEM, NULL);
+				return;
+			}
+			body = httpd_body(r, &n);
+			for (i = 0; body && i < n && k + 1 < sizeof key; i++)
+				if ((unsigned char)body[i] > ' ' && body[i] != '"' && body[i] != '\\') key[k++] = body[i];
+			key[k] = '\0';
+			if (!g_itch_save(key, who, sizeof who, why, sizeof why)) {
+				httpd_reply_status(r, 400, why[0] ? why : "that key wasn't kept");
+				return;
+			}
+			note(k ? "itch.io key kept" : "itch.io key removed");
+			snprintf(out, sizeof out, "{\"set\":%s,\"who\":\"", k ? "true" : "false");
+			for (i = 0; who[i] && strlen(out) + 3 < sizeof out; i++)
+				if (who[i] != '"' && who[i] != '\\' && (unsigned char)who[i] >= ' ') {
+					size_t l = strlen(out);
+
+					out[l] = who[i];
+					out[l + 1] = '\0';
+				}
+			strncat(out, "\"}", sizeof out - strlen(out) - 1);
+			reply_text_json(r, out);
+			return;
+		}
 	}
 
 	if (!strcmp(path, "/api/mkdir") && !strcmp(m, "POST")) {

@@ -178,7 +178,7 @@ static bool has_label(const menu_row *rows, int n, const char *label);
  * holds one row for it. */
 #define PAGE_ROWS 8
 /* ChaOS: and the ROM Management page's two, RomM and Syncthing */
-#define ROM_ROWS 3
+#define ROM_ROWS 4
 /* ChaOS: and the Wi-Fi & Bluetooth page's two, and System Settings' eight
  * (Audio Output, Audio Channels, Night Mode, Date & Time, Show Clock, Show
  * Battery, Update Available Dot, Auto Off) */
@@ -229,8 +229,8 @@ static void tortos_menu_offline(void)
 	n = sys_menu_build(&u, rows, &b, &heading);
 	ck(n == ROM_ROWS && !strcmp(heading, "ROM Management") && has_label(rows, n, "RomM") &&
 	   has_label(rows, n, "Syncthing") && !strcmp(val(by_id(&u, rows, n, PM_SYNC)), "Off") &&
-	   has_label(rows, n, "Sort Game Boy Games"),
-	   "the ROM Management page holds RomM, Syncthing and Sort Game Boy Games, under its own heading");
+	   has_label(rows, n, "Sort Game Boy Games") && has_label(rows, n, "Get Homebrew"),
+	   "the ROM Management page holds RomM, Get Homebrew, Syncthing and Sort Game Boy Games, under its own heading");
 	u.rom_page = false;
 	n = sys_menu_build(&u, rows, &b, &heading);
 	ck(has_label(rows, n, "ROM Management") && !has_label(rows, n, "RomM") && !has_label(rows, n, "Syncthing"),
@@ -862,7 +862,7 @@ static void radio_less(void)
 	for (i = 0; i < k; i++)
 		if (pm[i] == PM_THEME || pm[i] == PM_DIR || pm[i] == PM_SPEED ||
 		    pm[i] == PM_LISTVIEW || pm[i] == PM_COLOR || pm[i] == PM_SHELF_FAV ||
-		    pm[i] == PM_RECENT || pm[i] == PM_SHELF_MUSE || pm[i] == PM_ROMM ||
+		    pm[i] == PM_RECENT || pm[i] == PM_SHELF_MUSE || pm[i] == PM_ROMM || pm[i] == PM_HOMEBREW ||
 		    pm[i] == PM_SYNC || pm[i] == PM_GBSORT || pm[i] == PM_WIFI ||
 		    pm[i] == PM_BT || pm[i] == PM_AUDIO || pm[i] == PM_CHANNELS ||
 		    pm[i] == PM_NIGHT || pm[i] == PM_CLOCK || pm[i] == PM_SHOWCLOCK ||

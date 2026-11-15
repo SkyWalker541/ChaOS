@@ -108,6 +108,12 @@ typedef struct {
 	const char *form_name;     /* a multipart field ... */
 	const char *form_file;     /* ... and the file it carries */
 	int timeout_s;
+	/* ChaOS: for a web page's own flow (itch.io's downloads, itchdl.c) */
+	const char *cookies;       /* a cookie jar: read, and written back */
+	const net_field *fields;   /* urlencoded into a form body (a POST) */
+	int nfields;
+	const char *accept;        /* the Accept header; NULL is JSON's */
+	bool no_follow;            /* a redirect is answered, not followed */
 } net_req;
 /* Blocking: the reply into `out` (NUL-terminated, up to outn - 1 bytes),
  * its length or -1; the HTTP status in *http (0 when nothing answered), a
@@ -116,6 +122,11 @@ long  net_request(const net_req *r, char *out, size_t outn, int *http);
 /* Started and left, the reply to `path`; reaped as net_get_spawn's are:
  * waitpid for curl's exit (0 for a 2xx), then net_spawn_done. */
 pid_t net_request_spawn(const net_req *r, const char *path);
+/* ChaOS: where a request is sent on to, not following it: the Location of a
+ * 3xx into `loc` ("" for none), the status, or -1. For an API that answers a
+ * download with a redirect to a CDN, so the account's key in the header goes
+ * to the API alone and never on to the CDN. */
+int   net_request_redirect(const net_req *r, char *loc, size_t n);
 
 /* What the server answered with, once net_async_poll has returned non-zero:
  * an HTTP status, or 0 when the request never reached a server at all.

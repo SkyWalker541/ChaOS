@@ -99,6 +99,14 @@ void hare_set_albums(char *(*wanted)(size_t *len, char *why, size_t wn),
  * files go over the USB cable. NULL is index.html. */
 void hare_set_page(const char *page);
 
+/* ChaOS: the player's itch.io API key, typed on the page rather than on the
+ * Brick (ROM Management > Get Homebrew): GET /api/itchkey says whether one is
+ * kept, POST /api/itchkey with the key as the body keeps it (an empty body
+ * removes it). `save` keeps it and says whose it is in `who` ("" when it
+ * couldn't be checked), false with why. Never sent back. NULL answers 404. */
+void hare_set_itch_key(bool (*has)(void),
+                       bool (*save)(const char *key, char *who, size_t wn, char *why, size_t yn));
+
 /* Called with a file's absolute path once an upload of it is in place, so the
  * launcher can shrink a cover. Unset, nothing is told. */
 void hare_set_after_write(void (*fn)(const char *abs));

@@ -33,7 +33,11 @@ typedef struct {
 	char title[128];   /* the developer's title, entities decoded */
 	char link[192];    /* https://<author>.itch.io/<game> */
 	char image[256];   /* its cover, https://img.itch.zone/... */
+	char price[16];    /* as the feed says it, "$0.00"; "" when not known */
 } itch_game;
+
+/* Free: a price of nothing, or none known (then the download will say) */
+bool itch_free(const itch_game *g);
 
 /* The tag feeds a console's games are under, by ChaOS's folder name, ending
  * with NULL; NULL for a console itch.io has no such tag for. More specific

@@ -284,8 +284,19 @@ static bool write_req_config(const char *path, const net_req *r, const char *bod
 	/* No `fail`: an API's 4xx carries what went wrong in its body (RomM's
 	 * pairing says "authorization_pending" that way), and the status comes
 	 * back on stdout as for every other request here */
-	fprintf(f, "silent\nlocation\n");
-	fprintf(f, "write-out = "); cfg_quote(f, "%{http_code}"); fputc('\n', f);
+	fprintf(f, r->no_follow ? "silent\n" : "silent\nlocation\n");
+	fprintf(f, "write-out = "); cfg_quote(f, r->no_follow ? "%{http_code} %{redirect_url}" : "%{http_code}");
+	fputc('\n', f);
+	if (r->cookies) {
+		fprintf(f, "cookie = "); cfg_quote(f, r->cookies); fputc('\n', f);
+		fprintf(f, "cookie-jar = "); cfg_quote(f, r->cookies); fputc('\n', f);
+	}
+	for (int i = 0; r->fields && i < r->nfields; i++) {
+		char kv[1400];
+
+		snprintf(kv, sizeof kv, "%s=%s", r->fields[i].k, r->fields[i].v ? r->fields[i].v : "");
+		fprintf(f, "data-urlencode = "); cfg_quote(f, kv); fputc('\n', f);
+	}
 	if (body_path) { fprintf(f, "output = "); cfg_quote(f, body_path); fputc('\n', f); }
 	fprintf(f, "max-time = %d\n", r->timeout_s > 0 ? r->timeout_s : 30);
 	if (g_ca[0]) { fprintf(f, "cacert = "); cfg_quote(f, g_ca); fputc('\n', f); }
@@ -297,7 +308,12 @@ static bool write_req_config(const char *path, const net_req *r, const char *bod
 		snprintf(h, sizeof h, "Authorization: Bearer %s", r->bearer);
 		fprintf(f, "header = "); cfg_quote(f, h); fputc('\n', f);
 	}
-	fprintf(f, "header = "); cfg_quote(f, "Accept: application/json"); fputc('\n', f);
+	{
+		char h[200];
+
+		snprintf(h, sizeof h, "Accept: %s", r->accept ? r->accept : "application/json");
+		fprintf(f, "header = "); cfg_quote(f, h); fputc('\n', f);
+	}
 	if (json_path) {
 		char d[300];
 
@@ -370,6 +386,44 @@ long net_request(const net_req *r, char *out, size_t outn, int *http)
 	unlink(st);
 	unlink(body);
 	return len;
+}
+
+int net_request_redirect(const net_req *r, char *loc, size_t n)
+{
+	char cfg[128], st[160], line[1400];
+	int sfd, status = -1;
+	ssize_t got;
+	net_req g;
+
+	if (loc && n) loc[0] = '\0';
+	if (!r || !r->url) return -1;
+	g = *r;
+	g.no_follow = true;
+	g.json = NULL;
+	tmp_config(cfg, sizeof cfg);
+	snprintf(st, sizeof st, "%s.http", cfg);
+	if (!write_req_config(cfg, &g, "/dev/null", NULL)) return -1;
+	sfd = open(st, O_RDWR | O_CREAT | O_TRUNC, 0600);
+	if (sfd < 0) { unlink(cfg); return -1; }
+	run_curl(cfg, sfd);
+	unlink(cfg);
+	lseek(sfd, 0, SEEK_SET);
+	got = read(sfd, line, sizeof line - 1);
+	close(sfd);
+	unlink(st);
+	if (got > 0) {
+		char *sp;
+
+		line[got] = '\0';
+		status = atoi(line);
+		if ((sp = strchr(line, ' ')) && loc && n) {
+			char *e = sp + 1 + strcspn(sp + 1, "\r\n");
+
+			*e = '\0';
+			snprintf(loc, n, "%s", sp + 1);
+		}
+	}
+	return status > 0 ? status : -1;
 }
 
 static unsigned g_spawn_n;
