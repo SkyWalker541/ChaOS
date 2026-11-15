@@ -56,17 +56,11 @@ ul, ol { padding-left: 1.2em; margin: 0 0 1em; }
 li { margin: 0.35em 0; }
 li::marker { color: var(--orange); }
 
-/* ---- boot intro ---------------------------------------------------- */
-#boot {
-  position: fixed; inset: 0; z-index: 100;
-  background: var(--ground);
-  display: grid; place-items: center;
-  transition: opacity 0.7s ease, visibility 0.7s;
-  cursor: pointer;
-}
-#boot canvas { width: min(100vw, calc(100vh * 4 / 3)); height: auto; aspect-ratio: 4 / 3; display: block; }
-#boot.done { opacity: 0; visibility: hidden; pointer-events: none; }
-.booted #boot { display: none; }
+/* ---- the little boot: the header's mark flies in, pixel by pixel ---- */
+#mark-boot { position: fixed; z-index: 60; pointer-events: none; }
+.brand.booting img { visibility: hidden; }
+.brand.booting span { opacity: 0; }
+.brand span { transition: opacity 0.5s ease; }
 
 /* ---- header -------------------------------------------------------- */
 .top {
@@ -101,6 +95,10 @@ section { padding: 0 16px; }
   background: radial-gradient(ellipse 70% 60% at 75% 45%, rgba(255, 122, 47, 0.12), transparent 70%);
 }
 .lockup { width: min(100%, 420px); height: auto; display: block; margin-bottom: 20px; cursor: pointer; }
+.hero-cap {
+  margin-top: 14px; text-align: center; color: var(--cream); font-size: 18px; font-weight: 600;
+  min-height: 1.5em; transition: opacity 0.18s ease;
+}
 .lede { font-size: 21px; color: var(--text); margin: 0 0 28px; }
 .small { color: var(--muted); font-size: 15px; }
 .cta { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }

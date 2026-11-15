@@ -8,11 +8,8 @@
 <meta name="theme-color" content="#17151c">
 <link rel="icon" type="image/png" href="img/mark-64.png">
 <link rel="stylesheet" href="style.css">
-<script>try{if(sessionStorage.getItem('chaos-booted'))document.documentElement.classList.add('booted')}catch(e){}</script>
 </head>
 <body>
-
-<div id="boot" aria-hidden="true"><canvas id="boot-canvas"></canvas></div>
 
 <header class="top">
   <a class="brand" href="#top"><img src="img/mark-64.png" alt="" width="28" height="28"><span>Cha<b>OS</b></span></a>
@@ -34,7 +31,7 @@
 
 <section class="hero">
   <div class="hero-text">
-    <img class="lockup" id="lockup" src="img/lockup.png" alt="ChaOS" width="588" height="192" title="Play the boot again">
+    <img class="lockup" id="lockup" src="img/lockup.png" alt="ChaOS" width="588" height="192">
     <p class="lede">Custom firmware for the <b>TrimUI Brick</b>. Twelve classic consoles, PlayStation included, with shader and overlay support, PC games through PortMaster, PICO-8 with your own copy, your games and saves on all your devices with RomM and Syncthing, and your music, all from the handheld.</p>
     <div class="cta">
       <a class="btn primary" href="https://github.com/SkyWalker541/ChaOS-Installer/releases/latest">Get ChaOS Installer</a>
@@ -42,8 +39,9 @@
     </div>
     <p class="small">Built on <a href="https://github.com/ericreinsmidt/TortOS">TortOS</a> by Eric Reinsmidt. For the Brick and Brick Hammer only. Still in testing: keep a copy of your saves.</p>
   </div>
-  <figure class="device hero-device" data-cycle>
+  <figure class="device hero-device">
     <div class="bezel"><img src="img/home-pixelnames.webp" alt="The ChaOS shelf in the Pixel Names theme" width="1024" height="768"></div>
+    <figcaption class="hero-cap" aria-live="off">Pixel Names, ChaOS's own theme</figcaption>
   </figure>
 </section>
 
@@ -583,7 +581,7 @@
         <li><b>Appearance</b> <span class="tag">ChaOS</span> on one page: UI Theme, UI Direction, Transition Speed, Game List View, Menu Color, and <b>Show Favorites</b>, <b>Show Recently Played</b> and <b>Show Muse</b>.</li>
         <li><b>Every menu says what its rows do</b> <span class="tag">ChaOS</span>, in a line at the bottom.</li>
         <li><b>The clock and battery</b> <span class="tag">ChaOS</span> in every menu's heading. <b>MENU &gt; System Settings</b> has Date &amp; Time (the zone, 12- or 24-hour), <b>Show Clock</b>, and <b>Show Battery</b> as an icon, a percent or both. Wi-Fi keeps the clock right.</li>
-        <li><b>Boot and power-off</b> <span class="tag">ChaOS</span>: the logo's pixels fly in, and fly out again, like the top of this page.</li>
+        <li><b>Boot and power-off</b> <span class="tag">ChaOS</span>: the logo's pixels fly in, and fly out again, like the little logo at the top of this page.</li>
         <li><b>Auto Off</b> after a while without a button (not while music plays or it's charging).</li>
         <li><b>About ChaOS</b>: version, the TortOS it's built on, free space on the card, address, battery, time awake.</li>
       </ul>
@@ -731,6 +729,10 @@
     <div class="credit">
       <h4>ChaOS</h4>
       <p>by <b>SkyWalker541</b>: the shaders' ports and PT SkyWalker541, the pixel themes, logo and animations, PortMaster, RomM, Syncthing and PICO-8 support, and the rest marked <span class="tag">ChaOS</span> above.</p>
+    </div>
+    <div class="credit">
+      <h4>Made with AI-assisted programming</h4>
+      <p>ChaOS's changes to TortOS, and this website, were written by SkyWalker541 working with <b>Claude</b>, Anthropic's AI. SkyWalker541 decides what ChaOS does, tests every release on a Brick, and approves each change before it ships.</p>
     </div>
     <div class="credit">
       <h4>Shaders</h4>

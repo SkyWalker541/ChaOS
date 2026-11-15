@@ -9,6 +9,11 @@ parts carry themselves.*
 
 ## Where this OS comes from
 
+ChaOS is made with AI-assisted programming: ChaOS's changes to TortOS, and
+its website, are written by **SkyWalker541** working with **Claude**,
+Anthropic's AI. SkyWalker541 decides what ChaOS does, tests every release on a
+Brick, and approves each change before it ships.
+
 **TortOS** by **Eric Reinsmidt** - https://github.com/ericreinsmidt/TortOS
 
 This OS is a fork of TortOS: the launcher, menus, Muse, Over The Hare, box art,

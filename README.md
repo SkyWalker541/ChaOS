@@ -34,7 +34,7 @@ ChaOS is custom firmware for the **TrimUI Brick** and **Brick Hammer**. It runs 
 | **[Transfer and Wire](https://skywalker541.github.io/ChaOS/#transfer)** | Add games and covers from any browser, over Wi-Fi or the USB cable |
 | **[Updates](https://skywalker541.github.io/ChaOS/#updates)** | Over Wi-Fi, keeping your games, saves and settings |
 
-The **[website](https://skywalker541.github.io/ChaOS/)** has the full tour: the Brick's own screens, a setup walkthrough, every button shortcut, and an FAQ.
+The **[ChaOS website](https://skywalker541.github.io/ChaOS/)** has the full tour: the Brick's own screens, a setup walkthrough, every button shortcut, and an FAQ.
 
 ## Getting started
 
@@ -61,6 +61,8 @@ Prefer to do it by hand? Write `ChaOS-v<version>-brick.img.xz` from [Releases](h
 ## Credits and license
 
 ChaOS is a fork of **[TortOS](https://github.com/ericreinsmidt/TortOS) by Eric Reinsmidt**, on his [plastron](https://github.com/ericreinsmidt/plastron), with ChaOS's changes by SkyWalker541. Games run in [ChaOS-diatom](https://github.com/SkyWalker541/ChaOS-diatom), a fork of his [Diatom](https://github.com/ericreinsmidt/diatom). Ports come from [PortMaster](https://portmaster.games). Shaders, cores, overlays, art and libraries are by many others, all named in [CREDITS.md](CREDITS.md) and on the [website](https://skywalker541.github.io/ChaOS/#credits).
+
+ChaOS is made with AI-assisted programming: ChaOS's changes to TortOS, and its website, are written by SkyWalker541 working with Claude, Anthropic's AI. SkyWalker541 decides what ChaOS does, tests every release on a Brick, and approves each change before it ships.
 
 ChaOS is free software under the **GNU General Public License, version 3 or later** ([LICENSE](LICENSE)), as TortOS is. TortOS is Copyright (c) 2026 Eric Reinsmidt; ChaOS's changes are Copyright (c) 2026 SkyWalker541. ChaOS-diatom is under the Mozilla Public License 2.0, and everything else keeps its own licence ([THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md)). Two of the emulator cores, Snes9x 2010 and Genesis Plus GX, forbid commercial use, so ChaOS images may not be sold. Every release includes the source of everything in its image.
 

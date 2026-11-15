@@ -1,71 +1,67 @@
-/* ChaOS's site: the boot, the button tabs, and the device screens. */
+/* ChaOS's site: the little boot, the button tabs, and the device screens. */
 (function () {
   "use strict";
 
-  /* ---- the boot: tools/genchaosmotion.py's boot_frame, on a canvas ---- */
-  var boot = document.getElementById("boot");
-  var canvas = document.getElementById("boot-canvas");
+  /* ---- the little boot: the Brick's boot (tools/genchaosmotion.py's
+   * boot_frame), only its mark, played small on the header's logo a moment
+   * after the page loads. The mark's cells are the boot's left of x 440; each
+   * 12 px cell is 4 px of the 64 px mark, drawn at the header img's size. */
   var B = window.CHAOS_BOOT;
-  var SLOW = 1.5;            /* the Brick's 0.6 s, a little slower to read on a page */
-  var HOLD = 650;            /* ms the whole logo holds before the page */
+  var SLOW = 1.6, DELAY = 450;
+  var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var brand = document.querySelector(".brand"), mark = brand && brand.querySelector("img");
+  var running = false;
 
-  function remember() { try { sessionStorage.setItem("chaos-booted", "1"); } catch (e) {} }
-
-  function draw(ctx, t) {
-    var g = B.ground, cell = B.cell, cs = B.cells, i, c, k, off, a;
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, B.w, B.h);
-    for (i = 0; i < cs.length; i++) {
-      c = cs[i];
-      k = (t - c[6] * B.delayMax) / B.flight;
-      if (k <= 0) continue;
-      if (k > 1) k = 1;
-      off = c[5] * Math.pow(1 - k, 3);
-      a = Math.min(1, k / 0.35);
-      ctx.globalAlpha = a;
-      ctx.fillStyle = B.colors[c[2]];
-      ctx.fillRect(Math.round(c[0] + c[3] * off), Math.round(c[1] + c[4] * off), cell, cell);
-    }
-    ctx.globalAlpha = 1;
-  }
-
-  function finish() {
-    if (!boot || boot.classList.contains("done")) return;
-    boot.classList.add("done");
-    boot.classList.remove("playing");
-    remember();
-  }
-
-  function play() {
-    if (!boot || !canvas || !B) { finish(); return; }
-    var ctx = canvas.getContext("2d");
-    var dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = B.w * dpr; canvas.height = B.h * dpr;
+  function little() {
+    if (running || reduced || !B || !mark) return;
+    var r = mark.getBoundingClientRect();
+    if (!r.width) return;
+    var cells = B.cells.filter(function (c) { return c[0] < 440; });
+    var u = r.width / 64;                 /* css px per mark px */
+    var k = u * 4 / B.cell;               /* boot px -> css px */
+    var pad = 140;                        /* room for the pixels to fly in from */
+    var cv = document.createElement("canvas");
+    var W = r.width + pad * 2, H = r.height + pad * 2;
+    var dpr = Math.min(window.devicePixelRatio || 1, 3);
+    cv.id = "mark-boot";
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    cv.style.width = W + "px"; cv.style.height = H + "px";
+    cv.style.left = (r.left - pad) + "px"; cv.style.top = (r.top - pad) + "px";
+    document.body.appendChild(cv);
+    var ctx = cv.getContext("2d");
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = false;
-    document.documentElement.classList.remove("booted");
-    boot.classList.remove("done");
-    boot.classList.add("playing");
-    var end = (B.delayMax + B.flight) * 1000 * SLOW, start = null;
+    brand.classList.add("booting");
+    running = true;
+    var end = (B.delayMax + B.flight) * 1000 * SLOW, start = null, sz = 4 * u;
     function frame(now) {
-      if (boot.classList.contains("done")) return;
       if (start === null) start = now;
-      var ms = now - start;
-      draw(ctx, Math.min(ms, end) / 1000 / SLOW);
-      if (ms < end + HOLD) requestAnimationFrame(frame); else finish();
+      var t = Math.min(now - start, end) / 1000 / SLOW, i, c, q, off;
+      ctx.clearRect(0, 0, W, H);
+      for (i = 0; i < cells.length; i++) {
+        c = cells[i];
+        q = (t - c[6] * B.delayMax) / B.flight;
+        if (q <= 0) continue;
+        if (q > 1) q = 1;
+        off = c[5] * k * 1.4 * Math.pow(1 - q, 3);
+        ctx.globalAlpha = Math.min(1, q / 0.35);
+        ctx.fillStyle = B.colors[c[2]];
+        ctx.fillRect(pad + 4 * u + (c[0] - 230) * k + c[3] * off,
+                     pad + (c[1] - 288) * k + c[4] * off, sz, sz);
+      }
+      ctx.globalAlpha = 1;
+      if (now - start < end) { requestAnimationFrame(frame); return; }
+      brand.classList.remove("booting");
+      setTimeout(function () { cv.remove(); running = false; }, 30);
     }
     requestAnimationFrame(frame);
   }
-
-  var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var seen = document.documentElement.classList.contains("booted");
-  if (boot) {
-    boot.addEventListener("click", finish);
-    window.addEventListener("keydown", function (e) { if (boot.classList.contains("playing")) { finish(); e.preventDefault(); } });
-    if (reduced || seen) { boot.classList.add("done"); remember(); } else play();
+  if (window.scrollY < 40) {
+    if (brand && !reduced && B) brand.classList.add("booting");
+    window.addEventListener("load", function () { setTimeout(little, DELAY); });
   }
   var lockup = document.getElementById("lockup");
-  if (lockup) lockup.addEventListener("click", function () { if (!reduced) play(); });
+  if (lockup) lockup.addEventListener("click", function () { window.scrollTo({ top: 0 }); little(); });
 
   /* ---- button tabs ---------------------------------------------------- */
   var tabs = document.querySelectorAll('.tabs [role="tab"]');
@@ -112,16 +108,32 @@
     list.forEach(function (s) { var p = new Image(); p.src = "img/" + s[0] + ".webp"; });
   });
 
-  /* ---- the hero's screen, cycling through the themes ------------------- */
-  var hero = document.querySelector(".hero-device img");
-  if (hero && !reduced) {
-    var cycle = ["home-pixelnames", "home-pixelcards", "home-fancy", "home-plainjane", "chaos-shader", "pm-list"], at = 0;
-    cycle.forEach(function (s) { var p = new Image(); p.src = "img/" + s + ".webp"; });
+  /* ---- the hero: what ChaOS adds, one screen and one line at a time ---- */
+  var hero = document.querySelector(".hero-device img"), cap = document.querySelector(".hero-cap");
+  if (hero && cap && !reduced) {
+    var cycle = [
+      ["home-pixelnames", "Pixel Names, ChaOS's own theme"],
+      ["ps-shelf", "PlayStation, discs and all"],
+      ["chaos-shader", "CRT, LCD and PT shaders you can tune"],
+      ["pm-list", "PC games through PortMaster"],
+      ["pico8-shelf", "PICO-8, with your own copy"],
+      ["cheats", "Cheats, chosen from a list"],
+      ["romm", "Your RomM library, on the Brick"],
+      ["sync", "Saves in step with Syncthing"],
+      ["shader-gb-speed", "A speed check for every look"],
+      ["home-pixelcards", "Pixel Cards, ChaOS's other theme"]
+    ], at = 0;
+    cycle.forEach(function (s) { var p = new Image(); p.src = "img/" + s[0] + ".webp"; });
     setInterval(function () {
       if (document.hidden) return;
       at = (at + 1) % cycle.length;
-      hero.style.opacity = "0";
-      setTimeout(function () { hero.src = "img/" + cycle[at] + ".webp"; hero.onload = function () { hero.style.opacity = "1"; }; }, 180);
-    }, 3200);
+      hero.style.opacity = "0"; cap.style.opacity = "0";
+      setTimeout(function () {
+        hero.onload = function () { hero.style.opacity = "1"; cap.style.opacity = "1"; };
+        hero.src = "img/" + cycle[at][0] + ".webp";
+        hero.alt = cycle[at][1] + ", on the Brick";
+        cap.textContent = cycle[at][1];
+      }, 180);
+    }, 3400);
   }
 })();
