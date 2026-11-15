@@ -173,7 +173,7 @@
   <h2>Features</h2>
   <p class="intro">Everything ChaOS adds to TortOS, grouped the way you'll use it. <span class="tag">ChaOS</span> marks what ChaOS brings; the rest comes from TortOS. The pictures are the Brick's own screens: tap the labels under one to see more.</p>
   <nav class="subnav" aria-label="Feature groups">
-    <a href="#playing">Playing</a><a href="#cheats">Cheats</a><a href="#shaders">Shaders</a><a href="#speed">Speed check</a><a href="#display">Display &amp; overlays</a><a href="#shelves">Shelves &amp; themes</a><a href="#boxart">Box art</a><a href="#transfer">Transfer &amp; Wire</a><a href="#ports">Ports</a><a href="#playstation">PlayStation</a><a href="#romm">RomM</a><a href="#muse">Muse &amp; sound</a><a href="#look">Look &amp; settings</a>
+    <a href="#playing">Playing</a><a href="#cheats">Cheats</a><a href="#shaders">Shaders</a><a href="#speed">Speed check</a><a href="#display">Display &amp; overlays</a><a href="#shelves">Shelves &amp; themes</a><a href="#boxart">Box art</a><a href="#transfer">Transfer &amp; Wire</a><a href="#ports">Ports</a><a href="#playstation">PlayStation</a><a href="#romm">RomM</a><a href="#homebrew">Homebrew</a><a href="#muse">Muse &amp; sound</a><a href="#look">Look &amp; settings</a>
   </nav>
 
   <!-- Playing -->
@@ -466,8 +466,27 @@
     </figure>
   </article>
 
+  <!-- Get Homebrew -->
+  <article class="feature" id="homebrew">
+    <div class="feature-text">
+      <h3>Get Homebrew <span class="tag">ChaOS</span></h3>
+      <p>New games are still being made for these consoles, and most are on <a href="https://itch.io">itch.io</a>. <b>MENU &gt; ROM Management &gt; Get Homebrew</b> brings them to the Brick over Wi-Fi, for NES, Master System, Game Boy, Genesis, TurboGrafx-16, Game Gear, SNES, Game Boy Color and Game Boy Advance.</p>
+      <ul>
+        <li><b>A console's games</b>, A to Z, with the cover of the one you're on. <kbd>Y</kbd> shows free games only; <kbd>L2</kbd>/<kbd>R2</kbd> jump by letter. Paid games show their price, and games you have already say <b>On Brick</b>.</li>
+        <li><kbd>A</kbd> <b>downloads it</b> onto its shelf, with its cover as box art. ChaOS picks the file for the Brick (not the web version or another handheld's), unpacks a zip, and puts a Game Boy Color game on the Color shelf. When a game has two files that could both be it, it asks which.</li>
+        <li><b>No doubles.</b> A download that's the same game as one on your card, under any name, isn't kept twice: ChaOS compares the files and says where you have it.</li>
+        <li><b>Games you bought</b> download with your own itch.io API key (itch.io, Settings, API keys). Type it in <b>itch.io Key</b> at the bottom of the console list, or paste it on ChaOS Transfer's first page. It stays on the card and is never shown again.</li>
+      </ul>
+      <p class="note">Free games download the way itch.io's own Download button works, so a change to itch.io's site can stop them until ChaOS catches up. Following <a href="https://github.com/carroarmato0/NextUI-Itchio-Pak">NextUI-Itchio-Pak</a> by Christophe Vanlancker.</p>
+    </div>
+    <figure class="device" data-screens='[["homebrew","Games"],["homebrew-home","Consoles"],["rom-management","ROM Management"]]'>
+      <div class="bezel"><img src="img/homebrew.webp" alt="" loading="lazy" width="1024" height="768"></div>
+      <figcaption class="chips"></figcaption>
+    </figure>
+  </article>
+
   <!-- Syncthing -->
-  <article class="feature" id="sync">
+  <article class="feature flip" id="sync">
     <div class="feature-text">
       <h3>Syncthing <span class="tag">ChaOS</span></h3>
       <p><a href="https://syncthing.net">Syncthing</a> keeps folders the same on your devices, over your own network, with no server in between: the Brick's saves with RetroArch on your computer, its games with another Brick. <b>MENU &gt; ROM Management &gt; Syncthing</b>.</p>
@@ -491,7 +510,7 @@
   </article>
 
   <!-- Game Boy sorting -->
-  <article class="feature flip" id="gbsort">
+  <article class="feature" id="gbsort">
     <div class="feature-text">
       <h3>Game Boy or Color, sorted <span class="tag">ChaOS</span></h3>
       <p>Lots of new Game Boy games come from indie developers, on <a href="https://itch.io/games/tag-game-boy-color">itch.io</a> and elsewhere, many made with <b>GB Studio</b>. Plenty of them are Game Boy Color games named <code>.gb</code>, so they end up in the Game Boy folder, where they either don't show up or start in black and white, or tell you they need a Game Boy Color. Some black-and-white games come named <code>.gbc</code> the other way round.</p>
@@ -509,7 +528,7 @@
   </article>
 
   <!-- PlayStation -->
-  <article class="feature" id="playstation">
+  <article class="feature flip" id="playstation">
     <div class="feature-text">
       <h3>PlayStation <span class="tag">ChaOS</span></h3>
       <p>PlayStation games run on <a href="https://github.com/libretro/pcsx_rearmed">PCSX-ReARMed</a>, built for the Brick's chip, with the CRT shaders, overlays, cheats, achievements, save states and button mapping every console has.</p>
@@ -527,7 +546,7 @@
       <figcaption class="chips"></figcaption>
     </figure>
   </article>
-  <article class="feature flip" id="discs">
+  <article class="feature" id="discs">
     <div class="feature-text">
       <h3>Changing discs <span class="tag">ChaOS</span></h3>
       <p>Lay a game on more than one disc out like this, and ChaOS treats it as one game:</p>
@@ -545,6 +564,25 @@
     </div>
     <figure class="device" data-screens='[["ps-disc","The discs"],["ps-how","Swap or restart"]]'>
       <div class="bezel"><img src="img/ps-disc.webp" alt="" loading="lazy" width="1024" height="768"></div>
+      <figcaption class="chips"></figcaption>
+    </figure>
+  </article>
+
+  <!-- Multi-Disc Games -->
+  <article class="feature flip" id="multidisc">
+    <div class="feature-text">
+      <h3>Multi-disc games, combined <span class="tag">ChaOS</span></h3>
+      <p>Copied a game's discs in loose, like <code>Final Fantasy VII (Disc 1).chd</code>, <code>(Disc 2)</code> and <code>(Disc 3)</code>? ChaOS lays them out as above for you, so they're one game with <b>Disc</b> in its menu.</p>
+      <ul>
+        <li><b>It notices.</b> After ChaOS Transfer sends anything, and once a week, ChaOS looks for games split across separate discs on the PlayStation and TurboGrafx-16 shelves, and asks: <b>Combine</b> or <b>Not Now</b>. Not Now is remembered.</li>
+        <li><b>What it does:</b> the discs go into a folder named for the game, a <code>.cue</code> with its <code>.bin</code> tracks, and the folder gets its <code>.m3u</code>. A game's folder that has its discs but no <code>.m3u</code> just gets one.</li>
+        <li><b>Everything goes with the game:</b> its save, the first disc's save states, box art, favorite, play time and game info.</li>
+        <li>It knows <i>Disc 2</i>, <i>Disk 2 of 3</i>, <i>CD2</i> and <i>Disc B</i>. One disc on its own, or two copies of the same disc, are left as they are.</li>
+        <li><b>MENU &gt; ROM Management &gt; Multi-Disc Games</b> lists them whenever you like. <kbd>A</kbd> combines one, <b>Combine All</b> the lot.</li>
+      </ul>
+    </div>
+    <figure class="device" data-screens='[["multidisc-ask","The question"],["multidisc","Multi-Disc Games"]]'>
+      <div class="bezel"><img src="img/multidisc-ask.webp" alt="" loading="lazy" width="1024" height="768"></div>
       <figcaption class="chips"></figcaption>
     </figure>
   </article>
@@ -647,6 +685,7 @@
   </div>
   <div class="releases">
     <h3>Recent releases</h3>
+    <div class="rel"><span class="ver">2.5.0</span><p><a href="#homebrew">Get Homebrew</a>: new games from itch.io for nine consoles, free ones and ones you bought, onto their shelves with their covers. <a href="#multidisc">Multi-disc games</a> copied in loose are found and combined into one game.</p></div>
     <div class="rel"><span class="ver">2.4.1</span><p>ChaOS Transfer's folder path no longer crowds the buttons when you're deep in folders: it has a line of its own, a <b>Back</b> button, and a long path folds its middle into <b>…</b>.</p></div>
     <div class="rel"><span class="ver">2.4.0</span><p><a href="#playstation">PlayStation</a>, with achievements and <a href="#discs">changing discs</a>. A tidier main menu: Wi-Fi &amp; Bluetooth and System Settings pages, and a dot on Updates when one is waiting. Logs are named ChaOS.</p></div>
     <div class="rel"><span class="ver">2.3.2</span><p>Wi-Fi joins routers set to WPA3, networks whose names have an accent, an emoji or a curly apostrophe in them, and networks with a 64-digit hex key.</p></div>

@@ -28,6 +28,8 @@ ChaOS is custom firmware for the **TrimUI Brick** and **Brick Hammer**. It runs 
 | **[PICO-8](https://skywalker541.github.io/ChaOS/#pico8)** | Your own copy of PICO-8, with Splore for the carts people share |
 | **[Game Boy or Color, sorted](https://skywalker541.github.io/ChaOS/#gbsort)** | Indie games named `.gb` that are really Game Boy Color play in color, and ChaOS offers to move them to the right folder with their saves, play time and covers |
 | **[RomM and Syncthing](https://skywalker541.github.io/ChaOS/#sync)** | In ROM Management: games, saves and BIOS from your own RomM server, and saves, games and BIOS kept the same on all your devices |
+| **[Get Homebrew](https://skywalker541.github.io/ChaOS/#homebrew)** | New games from itch.io for nine consoles, free ones and ones you bought, onto their shelves with their covers |
+| **[Multi-disc games, combined](https://skywalker541.github.io/ChaOS/#multidisc)** | Discs copied in loose are found and made one game, with Disc in its menu |
 | **[A look of its own](https://skywalker541.github.io/ChaOS/#shelves)** | Pixel Names and Pixel Cards themes, Game List View, letter scrubbing, menu colors |
 | **[Rewind, mapping, screenshots](https://skywalker541.github.io/ChaOS/#playing)** | Alongside TortOS's instant start, resume, fast forward, turbo and RetroAchievements |
 | **[PlayStation](https://skywalker541.github.io/ChaOS/#playstation)** | On PCSX-ReARMed, with achievements, and a Disc page for games on more than one disc |

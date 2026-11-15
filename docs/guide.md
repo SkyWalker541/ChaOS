@@ -774,13 +774,73 @@ Pressing A on a game with an autosave does not start it, it continues it.
 
 ## ROM Management (ChaOS)
 
-**MENU > ROM Management** is a page of its own, for the two ways games and
-saves reach the Brick from your other machines. Both need Wi-Fi.
+**MENU > ROM Management** is a page of its own, for the ways games and saves
+reach the Brick and for tidying them: RomM, Get Homebrew, Syncthing, Sort Game
+Boy Games and Multi-Disc Games. RomM, Get Homebrew and Syncthing need Wi-Fi.
 
 **RomM** is a game library you run on your own computer or NAS
 (https://romm.app): sign in, browse its games by console and download them onto
 their shelves with RomM's covers, sync saves for the games you got from it, and
 fetch BIOS files. It runs only when you choose something.
+
+### Get Homebrew
+
+New games for old consoles, mostly from itch.io. **Get Homebrew** lists the
+consoles itch.io has a tag for (NES, Master System, Game Boy, Genesis,
+TurboGrafx-16, Game Gear, SNES, Game Boy Color, Game Boy Advance), each with
+how many games ChaOS knows of. The first look at a console reads its whole
+list from itch.io (a minute or two for Game Boy, which has about 2,000), then
+only what's new, once a day. It is the same list **Search itch.io** box art uses.
+
+| In a console's list | |
+|---|---|
+| A | download the game |
+| Y | free games only / all games |
+| L2, R2 | the previous or next letter |
+| B | back |
+
+- A game's cover shows beside the list. A paid game shows its price; a game
+  you have already shows **On Brick**: one Get Homebrew downloaded, or a file
+  of the game's exact name on that shelf (or the other Game Boy shelf).
+- A download picks the game's file for the Brick: a file with that console's
+  extension first, then a zip, then a file named only by its label (itch.io
+  often shows "My Game (GB Rom)", not a file name), which ChaOS identifies by
+  its first bytes. A file for the web, another handheld, a manual, a map or a
+  soundtrack comes last or not at all. When two files look equally right, it
+  asks which.
+- A zip is unpacked and its game taken out. The game is named for its title
+  on itch.io, goes onto the shelf its bytes say (a Game Boy Color game found
+  under Game Boy goes to Game Boy Color), and gets its itch.io cover as box art.
+- The same game on the card already, under any name (the same size and MD5),
+  isn't kept twice: ChaOS says where you have it.
+- **itch.io Key**: for games you bought. Make a key on itch.io (Settings, API
+  keys), then type it here or paste it on ChaOS Transfer's first page. It's
+  checked with itch.io, kept in ChaOS's userdata (only ChaOS can read it) and
+  never shown or logged. With a key, free games come through itch.io's API too.
+- Without a key, free games download the way itch.io's Download button works.
+  It's itch.io's web page, not an API, so a change there can stop it until
+  ChaOS is updated.
+
+### Multi-Disc Games
+
+A game on more than one disc is one game on the shelf when it's a folder with
+an `.m3u` (see Changing discs). Discs copied in loose aren't, so ChaOS looks
+for them on the PlayStation and TurboGrafx-16 shelves: after ChaOS Transfer
+sends anything, once a week, and the first time after the update that brings
+this. If it finds any, it asks **Combine** or **Not Now** (remembered).
+
+- Loose discs of one game (`Final Fantasy VII (USA) (Disc 1).chd`, `(Disc 2)`,
+  `(Disc 3)`) go into a folder named for it (`Final Fantasy VII (USA)`), each
+  `.cue` with the `.bin` files it names, and the folder gets
+  `Final Fantasy VII (USA).m3u` listing them in disc order.
+- A game's folder with its discs but no `.m3u` gets one, named for the folder.
+- The save is copied to the name the game plays as now, and the first disc's
+  save states, box art, favorite, play time and game info go with it.
+- A disc is told by its name: *Disc 2*, *Disk 2 of 3*, *CD2*, *Disc B*. One disc
+  alone, or two copies of the same disc (a USA and a Europe disc 1), are left
+  alone, and so is a game whose folder name is already taken.
+- **MENU > ROM Management > Multi-Disc Games** lists them any time: A combines
+  one, **Combine All** the lot.
 
 ### Syncthing
 

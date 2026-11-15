@@ -15886,11 +15886,13 @@ static void pm_frame_begin(app *a, unsigned accent, const char *heading, const c
 	ui_glow(a->r, &panel, accent, 60, 1.5f);
 	ui_panel(a->r, &panel, MENU_RADIUS, accent);
 	ui_fit_text(fh, heading, fit, sizeof fit, panel.w - 360);
+	/* centred on the letters, not the line: the descent down (the panel's
+	 * border takes the band's top), so the heading sits in its middle */
 	ui_text(a->r, fh, fit, panel.x + panel.w / 2,
-	        panel.y + (band - ui_font_line(UI_F_LABEL)) / 2, 0, UI_TEXT);
+	        panel.y + (band - ui_font_line(UI_F_LABEL)) / 2 - TTF_FontDescent(fh), 0, UI_TEXT);
 	if (meta && meta[0])
 		ui_text(a->r, fs, meta, panel.x + panel.w - 36,
-		        panel.y + (band - ui_font_line(UI_F_META)) / 2, 1, UI_TEXT_DIM);
+		        panel.y + (band - ui_font_line(UI_F_META)) / 2 - TTF_FontDescent(fs), 1, UI_TEXT_DIM);
 	SDL_SetRenderDrawColor(a->r, (Uint8)(accent >> 16), (Uint8)(accent >> 8), (Uint8)accent, 70);
 	SDL_RenderFillRect(a->r, &(SDL_Rect){ panel.x + 32, panel.y + band, panel.w - 64, 2 });
 }
