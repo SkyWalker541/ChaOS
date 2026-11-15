@@ -232,6 +232,10 @@ header {
 }
 
 .crumbs { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px; align-items: baseline; }
+/* ChaOS: a path past a folder or two takes a line of its own, under the logo
+ * and the buttons, rather than a squeezed column beside them (app.js, crumbs) */
+header { flex-wrap: wrap; }
+.crumbs.long { order: 5; flex: 1 1 100%; }
 .crumbs button {
 	background: none; border: none; padding: 2px 4px;
 	color: var(--accent); font: inherit; font-size: 16px;

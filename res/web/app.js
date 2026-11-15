@@ -82,10 +82,18 @@ function human(n) {
 	return (i === 0 ? Math.round(n) : n.toFixed(1)) + ' ' + u[i];
 }
 
+/* ChaOS: a deep folder's path is shortened to its root, "…" and its last
+ * two folders; "…" shows the rest, until the next folder is opened. And a
+ * path that long gets a line of its own under the logo and the buttons, so it
+ * is never squeezed into a column beside them, a word a line, with the drop
+ * hint sitting over it. */
+let crumbsFull = false;
 function crumbs() {
 	const nav = $('crumbs');
 	nav.textContent = '';
 	const parts = cwd ? cwd.split('/') : [];
+	const fold = !crumbsFull && parts.length > 4;
+	nav.classList.toggle('long', parts.length > 2);
 	const mk = (label, path, last) => {
 		if (last) {
 			const s = document.createElement('span');
@@ -105,6 +113,21 @@ function crumbs() {
 	};
 	mk('Device', '', parts.length === 0);
 	parts.forEach((p, i) => {
+		if (fold && i > 0 && i < parts.length - 2) {
+			if (i === 1) {
+				const more = document.createElement('button');
+				more.textContent = '\u2026';
+				more.title = parts.slice(1, -2).join(' / ');
+				more.setAttribute('aria-label', 'Show the whole path');
+				more.onclick = () => { crumbsFull = true; crumbs(); };
+				nav.append(more);
+				const sep = document.createElement('span');
+				sep.className = 'sep';
+				sep.textContent = '/';
+				nav.append(sep);
+			}
+			return;
+		}
 		/* The first segment is a root's URL name - "roms" - and the device
 		 * calls it "ROMs" everywhere else. Show what it is called. */
 		const root = i === 0 && roots.find((r) => r.path === p);
@@ -125,6 +148,7 @@ function crumbs() {
  * link can be sent to another device on the LAN. */
 async function go(path, hist) {
 	dropCovers();
+	crumbsFull = false;
 	const r = await api('GET', '/api/list' + (path ? '?p=' + enc(path) : ''));
 	const data = await r.json();
 	cwd = data.path;
