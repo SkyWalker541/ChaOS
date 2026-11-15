@@ -17110,7 +17110,7 @@ static int ds_do(app *a, char (*pick)[300], int npick)
 			snprintf(key, sizeof key, "%s\t%s", sets[i].folder, sets[i].base);
 			for (j = 0; pick && j < npick; j++) if (!strcmp(pick[j], key)) want = true;
 			if (!want) continue;
-			snprintf(say, sizeof say, "Making playlists: %d", ++total);
+			snprintf(say, sizeof say, "Combining: %d", ++total);
 			pick_frame(a, "Multi-Disc Games", NULL, 0, 0, NULL, 0, 0, say, MENU_ACCENT);
 			if (ds_apply(P_ROMS, P_SHARED, P_CARD, &sets[i])) {
 				ds_records(a, &sets[i]);
@@ -17127,9 +17127,8 @@ static int ds_do(app *a, char (*pick)[300], int npick)
 
 static void ds_question(int k, char *msg, size_t n)
 {
-	snprintf(msg, n, "%d game%s on more than one disc\n%s no playlist. Make %s,\nso %s one game with\nDisc in %s menu?",
-	         k, k == 1 ? "" : "s", k == 1 ? "has" : "have", k == 1 ? "one" : "them",
-	         k == 1 ? "it's" : "each is", k == 1 ? "its" : "their");
+	if (k == 1) snprintf(msg, n, "Found a game split\nacross separate discs.\nCombine it into one game?");
+	else snprintf(msg, n, "Found %d games split\nacross separate discs.\nCombine each into one game?", k);
 }
 
 /* On the shelf, when a look has come back: ask about what's new */
@@ -17156,17 +17155,17 @@ static void ds_ask(app *a)
 	fprintf(stderr, "discset: %d to ask about\n", k);
 	if (!k) return;
 	ds_question(k, msg, sizeof msg);
-	if (!confirm_panel_ex(a, "Multi-Disc Games", msg, k == 1 ? "Make It" : "Make Them", "Not Now")) {
+	if (!confirm_panel_ex(a, "Multi-Disc Games", msg, "Combine", "Not Now")) {
 		char p[LIB_PATH + 32];
 		int i;
 
 		ds_declined_path(p, sizeof p);
 		if ((f = fopen(p, "a"))) { for (i = 0; i < k; i++) fprintf(f, "%s\n", pick[i]); fclose(f); }
-		pick_say(a, "Multi-Disc Games", "Left as they are.\nMake them any time in\nROM Management", MENU_ACCENT);
+		pick_say(a, "Multi-Disc Games", "Left as they are.\nCombine them any time in\nROM Management", MENU_ACCENT);
 		return;
 	}
 	made = ds_do(a, pick, k);
-	snprintf(msg, sizeof msg, "Made %d playlist%s", made, made == 1 ? "" : "s");
+	snprintf(msg, sizeof msg, "Combined %d game%s", made, made == 1 ? "" : "s");
 	pick_say(a, "Multi-Disc Games", msg, MENU_ACCENT);
 }
 
@@ -17198,15 +17197,15 @@ static int ds_build(void *ctx, menu_row *rows, int max, const char **heading)
 	*heading = "Multi-Disc Games";
 	for (i = 0; i < c->n; i++) if (!c->sets[i].clash) ok++;
 	if (!c->n) {
-		rows[n++] = MENU_NOTE("Every game on more than one");
-		rows[n++] = MENU_NOTE("disc has its playlist");
+		rows[n++] = MENU_NOTE("No games are split");
+		rows[n++] = MENU_NOTE("across separate discs");
 		return n;
 	}
 	if (ok && n < max) {
 		snprintf(c->all, sizeof c->all, "%d", ok);
 		c->what[n] = -2;
-		rows[n++] = (menu_row){ "Make All", c->all, true };
-		rows[n - 1].hint = "Each a folder with its discs and a playlist";
+		rows[n++] = (menu_row){ "Combine All", c->all, true };
+		rows[n - 1].hint = "Each becomes one game";
 		rows[n - 1].opens = true;
 	}
 	if (n < max) { c->what[n] = -1; rows[n++] = MENU_RULE; }
@@ -17215,9 +17214,8 @@ static int ds_build(void *ctx, menu_row *rows, int max, const char **heading)
 		snprintf(c->vals[i], sizeof c->vals[i], "%s", c->sets[i].clash ? "Name taken" : "");
 		if (!c->sets[i].clash) snprintf(c->vals[i], sizeof c->vals[i], "%d discs", c->sets[i].n);
 		rows[n++] = (menu_row){ c->sets[i].base, c->vals[i], !c->sets[i].clash };
-		rows[n - 1].hint = c->sets[i].clash ? "Something of this name is in the way: tidy it by hand"
-		                 : c->sets[i].loose ? "A moves its discs into a folder with a playlist"
-		                                    : "A writes the playlist in its folder";
+		rows[n - 1].hint = c->sets[i].clash ? "A file of this name is in the way"
+		                                    : "A: combine into one game";
 	}
 	return n;
 }
@@ -17239,7 +17237,7 @@ static menu_result ds_key(app *a, void *ctx, in_button key, int sel)
 	} else {
 		return MENU_STAY;
 	}
-	snprintf(msg, sizeof msg, "Made %d playlist%s", made, made == 1 ? "" : "s");
+	snprintf(msg, sizeof msg, "Combined %d game%s", made, made == 1 ? "" : "s");
 	pick_say(a, "Multi-Disc Games", msg, MENU_ACCENT);
 	ds_refresh(c);
 	return MENU_STAY;
@@ -21827,7 +21825,7 @@ static void take_shot(app *a)
 				q++;
 				s += len + (s[len] == '\n');
 			}
-			rows[q++] = (menu_row){ shot_dsask == 1 ? "Make It" : "Make Them", NULL, true };
+			rows[q++] = (menu_row){ "Combine", NULL, true };
 			rows[q++] = (menu_row){ "Not Now", NULL, true };
 			menu_draw(a, "Multi-Disc Games", rows, q, q - 2, 0, MENU_ACCENT);
 		} else {

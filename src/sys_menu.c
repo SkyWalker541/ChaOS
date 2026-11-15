@@ -385,7 +385,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	full[PM_HOMEBREW].hint     = "Games from itch.io: free, and ones you bought";
 	full[PM_SYNC].hint         = "Saves, games and BIOS on all your devices";
 	full[PM_GBSORT].hint       = "Each into Game Boy or Color, by its cartridge";
-	full[PM_DISCSETS].hint     = "A playlist for each game on several discs";
+	full[PM_DISCSETS].hint     = "Combine games split across discs";
 	full[PM_UPDATE].hint       = "Check for a newer ChaOS and install it";
 	full[PM_CONTROLS].hint     = "What every button does";
 	full[PM_ABOUT].hint        = "Version, storage and this device";
