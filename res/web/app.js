@@ -111,7 +111,17 @@ function crumbs() {
 		sep.textContent = '/';
 		nav.append(sep);
 	};
-	mk('Device', '', parts.length === 0);
+	/* ChaOS: Back, one folder up at a time, ahead of the path; and Device
+	 * wears a house, so the way home is plain however deep you are. */
+	if (parts.length) {
+		const up = document.createElement('button');
+		up.className = 'up';
+		up.textContent = '\u2039 Back';
+		up.title = 'Up one folder';
+		up.onclick = () => openFolder(parts.slice(0, -1).join('/'));
+		nav.append(up);
+	}
+	mk('\u2302 Device', '', parts.length === 0);
 	parts.forEach((p, i) => {
 		if (fold && i > 0 && i < parts.length - 2) {
 			if (i === 1) {
