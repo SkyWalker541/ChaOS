@@ -118,10 +118,17 @@ jobs:
           # What's new first: the same notes the Brick's Updates screen shows
           # (ChaOS-notes.txt), less their "ChaOS N.N.N" line
           { echo "## What's new"; echo; tail -n +2 out/ChaOS-notes.txt | sed '/./,$!d'; echo; echo "---"; echo; } > new.md
+          # How to get it: ChaOS Installer takes the latest release only, so a
+          # test build says the two ways it can be had
+          if [ -n "${{ steps.v.outputs.test }}" ]; then
+            HOW="**Get it** on a Brick with ChaOS 2.6.0 or later: MENU > About ChaOS > Update Channels > Pre-Release, then MENU > Updates. Or write \`ChaOS-v$V-brick.img.xz\` to a card with balenaEtcher or Raspberry Pi Imager (that erases it). ChaOS Installer installs public releases only."
+          else
+            HOW="**Install or update** with [ChaOS Installer](https://github.com/SkyWalker541/ChaOS-Installer/releases/latest), or write \`ChaOS-v$V-brick.img.xz\` to a card yourself (that erases it)."
+          fi
           cat > notes.md <<EOF
           ChaOS $V for the TrimUI Brick and Brick Hammer.
 
-          **Install or update** with [ChaOS Installer](https://github.com/SkyWalker541/ChaOS-Installer/releases/latest), or write \`ChaOS-v$V-brick.img.xz\` to a card yourself (that erases it).
+          $HOW
 
           ChaOS is built on [TortOS $B](https://github.com/ericreinsmidt/TortOS/releases/tag/v$B) by Eric Reinsmidt. \`ChaOS-v$V-brick-sources.tar\` is the source of everything in the image; what came from where is in [CREDITS.md](https://github.com/SkyWalker541/ChaOS/blob/main/CREDITS.md).
           EOF
