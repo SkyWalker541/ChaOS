@@ -46,6 +46,7 @@ int sys_menu_tortos_rows(const sys_ui *u, pm_row *out)
 		if (!u->name_speed && r == PM_SPEED) continue;
 		if (!u->list_view && r == PM_LISTVIEW) continue;
 		if (!u->night_ok && r == PM_NIGHT) continue;
+		if (!u->sticks && r == PM_STICKS) continue;
 		/* ChaOS: the Wi-Fi & Bluetooth page only where there is a radio */
 		if (r == PM_NETPAGE && u->no_wifi && u->no_bt) continue;
 		/* The look rows live on the Appearance page, and ChaOS's RomM and
@@ -62,7 +63,7 @@ int sys_menu_tortos_rows(const sys_ui *u, pm_row *out)
 			bool sys  = r == PM_AUDIO || r == PM_CHANNELS || r == PM_NIGHT ||
 			            r == PM_CLOCK || r == PM_SHOWCLOCK || r == PM_SHOWBATT || r == PM_BATTWARN ||
 			            r == PM_UPDDOT ||
-			            r == PM_SLEEP;
+			            r == PM_SLEEP || r == PM_STICKS;
 			int page = look ? 1 : roms ? 2 : net ? 3 : sys ? 4 : 0;
 			int want = u->appearance ? 1 : u->rom_page ? 2 : u->net_page ? 3
 			         : u->sys_page ? 4 : 0;
@@ -82,7 +83,8 @@ int sys_menu_system_rows(const sys_ui *u, sm_row *out)
 		if (u->no_wifi && r == SM_BOXART) continue;
 		if (!u->shader && r == SM_SHADER) continue;
 		if (!u->overscan && r == SM_OVERSCAN) continue;
-		if (u->native && (r == SM_DISPLAY || r == SM_OVERLAY || r == SM_BUTTONS ||
+		/* ChaOS: Overlay stays: one is drawn over PICO-8 too (res/pico8) */
+		if (u->native && (r == SM_DISPLAY || r == SM_BUTTONS ||
 		                  r == SM_REWIND || r == SM_BOXART))
 			continue;
 		out[n++] = (sm_row)r;
@@ -298,6 +300,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	 * is chosen here on both. */
 	full[PM_CLOCK]        = (menu_row){ "Date & Time", u->clock,  true  };
 	full[PM_SLEEP]        = (menu_row){ "Auto Off",  b->c,      true  };
+	full[PM_STICKS]       = (menu_row){ "Calibrate Sticks", NULL, true, true };
 	/* Both change how the shelf looks and nothing about what is on it. They
 	 * are what is left of that group: Text Size stood here until the band it
 	 * offered turned out to be too narrow to matter - src/ui.c. */
@@ -371,6 +374,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	full[PM_BATTWARN].hint     = "When the low battery dot shows, and in games";
 	full[PM_UPDDOT].hint       = "A dot on Updates when a new ChaOS is out";
 	full[PM_SLEEP].hint        = "Power off after this long with no buttons pressed";
+	full[PM_STICKS].hint       = "Their middles, their ends, which way is up";
 	full[PM_APPEARANCE].hint   = "Theme, layout, menu color and which shelves show";
 	full[PM_THEME].hint        = "The look of the cards on the shelf";
 	full[PM_DIR].hint          = "Which way the shelves move";
