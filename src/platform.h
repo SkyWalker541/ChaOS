@@ -233,6 +233,9 @@ bool plat_resident_sync_cheats(const char *path, int timeout_ms);
  * 0), -1 only asks. count 0 for a game on one disc, or a Diatom without discs.
  * False when Diatom did not answer. */
 bool plat_resident_disc(int set, int *count, int *index, int timeout_ms);
+/* ChaOS: the Brick Pro's Left Stick as D-Pad for the next game: 1, 0, or -1
+ * for a device without sticks */
+void plat_resident_set_stick(int on);
 void plat_resident_set_zone(const char *tz);
 /* The paused frame as the shader draws it, the size of the game's rect, or
  * NULL when the game is not shaded. Written by Diatom on the way into its
@@ -409,6 +412,17 @@ bool plat_brightness_on_volume(void);
  * flashing the level there outside a game (the Pixel 2's four side lights,
  * which plastron's gauge drives). What MENU > Controls says. */
 bool plat_battery_lights(void);
+
+/* ChaOS: the Brick Pro's sticks. Raw (0 to 4095) as ABS_X, ABS_Y, ABS_RX,
+ * ABS_RY; false on a device without. A direction's calibration, lx, ly, rx,
+ * ry: which raw axis it reads, and its raw value at the negative end (left
+ * or up), at rest, and at the positive end - sticks.cfg's lines, which
+ * Diatom reads too. plat_stick_axis gives a direction, -1 to 1. */
+typedef struct { int idx, neg, mid, pos; } plat_stick_cal;
+bool  plat_sticks(int raw[4]);
+bool  plat_sticks_cal(plat_stick_cal out[4]);
+void  plat_sticks_reload(void);
+float plat_stick_axis(const plat_stick_cal *c, const int raw[4]);
 
 /* Date & Time (src/clock.h). Set the clock to `t`, and the hardware clock with
  * it, which keeps the time while the device is off: the Pixel 2 has nothing

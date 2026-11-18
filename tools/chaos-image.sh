@@ -162,6 +162,9 @@ mkdir -p "$C/TortOS/pico8/bin"
 install -m 755 "$ROOT/res/pico8/run.sh" "$C/TortOS/pico8/run.sh"
 install -m 755 "$ROOT/res/pico8/bin/wget" "$C/TortOS/pico8/bin/wget"
 install -m 644 "$ROOT/res/pico8/README.txt" "$C/TortOS/pico8/README.txt"
+# and the overlay over it, when its console has one (res/pico8/overlay.c)
+mkdir -p "$C/TortOS/pico8/lib"
+install -m 755 "$ROOT/dist/brick/pico8-overlay.so" "$C/TortOS/pico8/lib/overlay.so"
 [ -x "$W/root/usr/bin/curl" ] || { echo "no curl in the root: PICO-8's Splore needs it" >&2; exit 1; }
 # The shelf: ChaOS's systems.cfg, with the Ports row, and the cards for the
 # shelves that aren't consoles - Favorites, Muse, Recently Played, Ports - in
