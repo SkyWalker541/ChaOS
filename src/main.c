@@ -7023,6 +7023,158 @@ static void wire_up_received(const update_release *offer)
 	g_wu = WU_CHECK;
 }
 
+/* ChaOS: updating from ChaOS Transfer over Wi-Fi. The device has the network
+ * there, so the page drives the device's own updater (src/update.h, the
+ * channel Update Channels chose) rather than sending an image: it asks how
+ * things stand, starts the check or the download, and Install and Restart
+ * asks on the device, as the cable's update does, so nothing restarts the
+ * device without someone holding it saying so. */
+static bool upd_battery_ok(char *why, size_t n);   /* below, with Updates */
+typedef enum { SU_NONE, SU_ASK, SU_NOTNOW, SU_REFUSED, SU_UPDATING } self_up_phase;
+static self_up_phase g_su;
+static char          g_su_why[96];
+static bool          g_su_online;
+
+/* A growing JSON reply; buf NULL once out of memory. */
+typedef struct { char *buf; size_t len, cap; bool bad; } jsonw;
+
+static void jw_put(jsonw *j, const char *s, size_t n)
+{
+	if (j->bad) return;
+	if (j->len + n + 1 > j->cap) {
+		size_t cap = j->cap ? j->cap : 512;
+		char *nb;
+
+		while (j->len + n + 1 > cap) cap *= 2;
+		if (!(nb = realloc(j->buf, cap))) { free(j->buf); j->buf = NULL; j->bad = true; return; }
+		j->buf = nb;
+		j->cap = cap;
+	}
+	memcpy(j->buf + j->len, s, n);
+	j->len += n;
+	j->buf[j->len] = '\0';
+}
+static void jw_raw(jsonw *j, const char *s) { jw_put(j, s, strlen(s)); }
+static void jw_fmt(jsonw *j, const char *fmt, ...)
+{
+	char tmp[256];
+	va_list ap;
+	int n;
+
+	va_start(ap, fmt);
+	n = vsnprintf(tmp, sizeof tmp, fmt, ap);
+	va_end(ap);
+	if (n > 0) jw_put(j, tmp, (size_t)n < sizeof tmp ? (size_t)n : sizeof tmp - 1);
+}
+static void su_json_str(jsonw *j, const char *s)
+{
+	jw_put(j, "\"", 1);
+	for (; s && *s; s++) {
+		char e[8];
+		unsigned char c = (unsigned char)*s;
+
+		if (c == '"' || c == '\\') { e[0] = '\\'; e[1] = (char)c; jw_put(j, e, 2); }
+		else if (c == '\n') jw_put(j, "\\n", 2);
+		else if (c < 0x20) { snprintf(e, sizeof e, "\\u%04x", c); jw_put(j, e, 6); }
+		else jw_put(j, (const char *)&c, 1);
+	}
+	jw_put(j, "\"", 1);
+}
+
+static const char *su_state_name(upd_state s)
+{
+	switch (s) {
+	case UPD_CHECKING:    return "checking";
+	case UPD_CURRENT:     return "current";
+	case UPD_AVAILABLE:   return "available";
+	case UPD_INSTALLER:   return "installer";
+	case UPD_DOWNLOADING: return "downloading";
+	case UPD_UNPACKING:   return "unpacking";
+	case UPD_READY:       return "ready";
+	case UPD_FAILED:      return "failed";
+	default:              return "idle";
+	}
+}
+
+static char *self_up_status(size_t *len, char *why, size_t wn)
+{
+	const ota_info *o = upd_latest();
+	const upd_state s = upd_get();
+	char batt[32] = "";
+	jsonw j = { 0 };
+
+	(void)why; (void)wn;
+	upd_battery_ok(batt, sizeof batt);
+	jw_raw(&j, "{\"version\":");      su_json_str(&j, CHAOS_VERSION);
+	jw_raw(&j, ",\"channel\":");      su_json_str(&j, g_test_updates ? "pre" : "public");
+	jw_raw(&j, g_su_online ? ",\"online\":true" : ",\"online\":false");
+	jw_raw(&j, ",\"state\":");        su_json_str(&j, su_state_name(s));
+	jw_raw(&j, ",\"latest\":");       su_json_str(&j, o ? o->version : "");
+	jw_raw(&j, o && o->can_small ? ",\"canSmall\":true" : ",\"canSmall\":false");
+	jw_raw(&j, o && o->small ? ",\"small\":true" : ",\"small\":false");
+	jw_raw(&j, o && o->root[0] ? ",\"canFull\":true" : ",\"canFull\":false");
+	jw_fmt(&j, ",\"size\":%lld,\"full\":%lld,\"percent\":%d",
+	       upd_size_of(true), upd_size_of(false), upd_percent());
+	jw_raw(&j, upd_receiving() ? ",\"receiving\":true" : ",\"receiving\":false");
+	jw_raw(&j, ",\"error\":");        su_json_str(&j, upd_error());
+	jw_raw(&j, ",\"battery\":");      su_json_str(&j, batt);
+	jw_raw(&j, ",\"ask\":");
+	su_json_str(&j, g_su == SU_ASK ? "asking" : g_su == SU_NOTNOW ? "notnow" :
+	                g_su == SU_REFUSED ? "refused" : g_su == SU_UPDATING ? "updating" : "");
+	jw_raw(&j, ",\"askWhy\":");       su_json_str(&j, g_su_why);
+	jw_raw(&j, ",\"notes\":");
+	su_json_str(&j, s != UPD_CURRENT && s != UPD_CHECKING && upd_notes() ? upd_notes() : "");
+	jw_raw(&j, "}");
+	if (!j.buf) { snprintf(why, wn, "out of memory"); return NULL; }
+	*len = j.len;
+	return j.buf;
+}
+
+static bool self_up_act(const char *what, char *why, size_t wn)
+{
+	const ota_info *o = upd_latest();
+	const upd_state s = upd_get();
+	const bool net = !strcmp(what, "check") || !strcmp(what, "update") || !strcmp(what, "full");
+
+	why[0] = '\0';
+	if (g_su == SU_ASK || g_su == SU_UPDATING) { snprintf(why, wn, "the device is asking already"); return false; }
+	if (net && !g_su_online) { snprintf(why, wn, "the device isn't online"); return false; }
+	g_su = SU_NONE;
+	g_su_why[0] = '\0';
+	if (!strcmp(what, "check")) {
+		if (s == UPD_DOWNLOADING || s == UPD_UNPACKING) { snprintf(why, wn, "an update is on its way"); return false; }
+		if (upd_check()) return true;
+	} else if (!strcmp(what, "update") || !strcmp(what, "full")) {
+		const bool small = !strcmp(what, "update");
+
+		if (!o || (small && (s != UPD_AVAILABLE || !o->can_small)) ||
+		    (!small && (!o->root[0] || (s != UPD_AVAILABLE && s != UPD_CURRENT && s != UPD_FAILED)))) {
+			snprintf(why, wn, "there's no update to download");
+			return false;
+		}
+		if (upd_download(small)) return true;
+	} else if (!strcmp(what, "cancel")) {
+		if (s != UPD_DOWNLOADING) { snprintf(why, wn, "nothing is downloading"); return false; }
+		upd_cancel();
+		return true;
+	} else if (!strcmp(what, "remove")) {
+		if (s != UPD_READY) { snprintf(why, wn, "nothing is downloaded"); return false; }
+		if (upd_remove()) return true;
+	} else if (!strcmp(what, "install")) {
+		char batt[32];
+
+		if (s != UPD_READY) { snprintf(why, wn, "nothing is downloaded"); return false; }
+		if (!upd_battery_ok(batt, sizeof batt)) { snprintf(why, wn, "Plug in or %s", batt); return false; }
+		g_su = SU_ASK;
+		return true;
+	} else {
+		snprintf(why, wn, "check, update, full, cancel, remove or install");
+		return false;
+	}
+	snprintf(why, wn, "%s", upd_error()[0] ? upd_error() : "it couldn't be done");
+	return false;
+}
+
 
 static void xfer_screen_over(app *a, bool over_cable)
 {
@@ -7080,9 +7232,14 @@ static void xfer_screen_over(app *a, bool over_cable)
 
 		up_path(dir, sizeof dir, "");
 		hare_set_update(dir, CHAOS_VERSION, plat_device_name(), wire_up_received);
+		hare_set_self_update(NULL, NULL);
 	} else {
 		hare_set_update(NULL, NULL, NULL, NULL);
+		hare_set_self_update(self_up_status, self_up_act);
 	}
+	g_su = SU_NONE;
+	g_su_why[0] = '\0';
+	g_su_online = !cable && net_online();
 	if (!hare_start(P_ROMS, P_CARD, P_SHARED, P_WEB)) {
 		menu_row row = { "Could not start", NULL, false };
 
@@ -7164,6 +7321,27 @@ static void xfer_screen_over(app *a, bool over_cable)
 		/* The Now row goes back to the server's word once it has a new one. */
 		if (wu_now[0] && strcmp(wu_last, st.last)) wu_now[0] = '\0';
 
+		/* A new ask from the page starts on Not now, as every confirm does. */
+		{
+			static self_up_phase su_seen;
+
+			if (g_su == SU_ASK && su_seen != SU_ASK) wu_sel = 6;
+			su_seen = g_su;
+		}
+		/* Over Wi-Fi, the device's own update moves along here as it does on
+		 * the shelf, for the page to follow, and says so on the Now row. */
+		if (!cable) {
+			upd_state us;
+
+			upd_tick(g_su_online);
+			us = upd_get();
+			if (us == UPD_DOWNLOADING || us == UPD_UNPACKING) {
+				snprintf(wu_now, sizeof wu_now, "%s update %d%%",
+				         us == UPD_DOWNLOADING ? "downloading" : "unpacking", upd_percent());
+				snprintf(wu_last, sizeof wu_last, "%s", st.last);
+			}
+		}
+
 		/* Every album's embedded cover copied out to .media, where the page
 		 * can show it and Album Art can judge it: an album the shelf never
 		 * drew had none there, so the page showed nothing and asked
@@ -7189,6 +7367,7 @@ static void xfer_screen_over(app *a, bool over_cable)
 		 * says whether anyone is on the other end. */
 		if (!addr[0] || now - next_check > 2000u) {
 			next_check = now;
+			if (!cable) g_su_online = net_online();
 			if (cable ? plat_cable_link(ip, sizeof ip)
 			          : wifi_status(ssid, sizeof ssid, ip, sizeof ip) == WIFI_CONNECTED
 			            && ip[0]) {
@@ -7238,7 +7417,9 @@ static void xfer_screen_over(app *a, bool over_cable)
 		 * which is the same claim a button press makes and no weaker for
 		 * arriving over a network. Neither suspends Auto Off - close the tab
 		 * and the countdown resumes. */
-		if (busy || st.clients > 0 || g_wu != WU_NONE) a->idle.since_ms = now;
+		if (busy || st.clients > 0 || g_wu != WU_NONE || g_su == SU_ASK ||
+		    upd_get() == UPD_DOWNLOADING || upd_get() == UPD_UNPACKING)
+			a->idle.since_ms = now;
 
 		if (a->in.pressed[IN_POWER] || idle_due(a)) {
 			if (wu_fd >= 0) close(wu_fd);
@@ -7279,6 +7460,42 @@ static void xfer_screen_over(app *a, bool over_cable)
 				snprintf(wu_now, sizeof wu_now, "update kept for later");
 				snprintf(wu_last, sizeof wu_last, "%s", st.last);
 			}
+		} else if (g_su == SU_ASK) {
+			/* Install and Restart, asked from the page: as MENU > Updates
+			 * does it, once someone at the device says so. */
+			bool leave = menu_leaving(a);
+
+			if (in_repeat(&a->in, IN_UP) || in_repeat(&a->in, IN_DOWN))
+				wu_sel = wu_sel == 5 ? 6 : 5;
+			if (a->in.pressed[IN_ACCEPT] && wu_sel == 5) {
+				const ota_info *o = upd_latest();
+				unsigned t0;
+
+				if (o->small) wait_panel(a, "Updates", "Installing...");
+				if (!upd_arm()) {
+					g_su = SU_REFUSED;
+					snprintf(g_su_why, sizeof g_su_why, "%s",
+					         upd_error()[0] ? upd_error() : "it couldn't be installed");
+					snprintf(wu_now, sizeof wu_now, "update didn't start");
+					snprintf(wu_last, sizeof wu_last, "%s", st.last);
+				} else {
+					FILE *f;
+
+					/* "updating" for the page, a moment to hear it, then the
+					 * restart as Install and Restart makes it. */
+					g_su = SU_UPDATING;
+					for (t0 = plat_now_ms(); plat_now_ms() - t0 < 600; SDL_Delay(4))
+						hare_poll();
+					hare_stop();
+					if ((f = fopen(CHAOS_REBOOT_FLAG, "w"))) fclose(f);
+					power_off(a);
+					return;
+				}
+			} else if (leave || a->in.pressed[IN_ACCEPT]) {
+				g_su = SU_NOTNOW;
+				snprintf(wu_now, sizeof wu_now, "update kept for later");
+				snprintf(wu_last, sizeof wu_last, "%s", st.last);
+			}
 		} else if (menu_leaving(a)) {
 			done = true;
 		}
@@ -7310,6 +7527,21 @@ static void xfer_screen_over(app *a, bool over_cable)
 			};
 
 			snprintf(ask, sizeof ask, "Update to %s?", g_wu_offer.version);
+			menu_draw(a, ask, confirm, 7, wu_sel, menu_std_width(a), MENU_ACCENT);
+		} else if (g_su == SU_ASK) {
+			const ota_info *o = upd_latest();
+			char ask[48];
+			menu_row confirm[] = {
+				MENU_NOTE("Asked from ChaOS Transfer."),
+				MENU_NOTE("The device restarts"),
+				MENU_NOTE("to update."),
+				MENU_NOTE("Games and saves stay."),
+				MENU_HR,
+				{ "Install and Restart", NULL, true },
+				{ "Not now", NULL, true },
+			};
+
+			snprintf(ask, sizeof ask, o->small ? "Update to %s?" : "Full Install of %s?", o->version);
 			menu_draw(a, ask, confirm, 7, wu_sel, menu_std_width(a), MENU_ACCENT);
 		} else {
 			menu_draw(a, head, rows, 3, -1, menu_std_width(a), MENU_ACCENT);
@@ -13936,7 +14168,20 @@ static void cheats_screen(app *a, gm_ctx *g)
  * With This Disc, which swaps and restarts in one go - a game whose second disc is
  * a story of its own (Resident Evil 2's) starts there. Either goes back to the
  * game, as closing the lid did. B leaves everything as it was. */
-typedef struct { int pick; int how; char lab[16][16]; } disc_ui;
+typedef struct {
+	int pick, how;
+	char lab[16][16];
+	void *game;          /* the in-game menu's gm_ctx, for the backdrop */
+	menu_style st;       /* its style, with disc_backdrop */
+} disc_ui;
+
+/* The paused game behind the Disc pages. The in-game menu's backdrop takes
+ * its own context: handed the Disc page's, it drew from the wrong struct and
+ * the launcher went down the moment the page opened (2.6.0). */
+static void disc_backdrop(app *a, void *ctx)
+{
+	gm_backdrop(a, ((disc_ui *)ctx)->game);
+}
 
 static int disc_build(void *ctx, menu_row *rows, int max, const char **heading)
 {
@@ -13985,12 +14230,11 @@ static menu_result how_key(app *a, void *ctx, in_button key, int sel)
 static menu_result disc_key(app *a, void *ctx, in_button key, int sel)
 {
 	disc_ui *u = ctx;
-	menu_style st = { .fixed_w = menu_std_width(a), .accent = MENU_ACCENT };
 
 	if (key != IN_ACCEPT || sel < 0 || sel >= g_disc_n || sel == g_disc_i) return MENU_STAY;
 	u->pick = sel;
 	u->how = 0;
-	menu_run(a, &st, how_build, how_key, u);
+	menu_run(a, &u->st, how_build, how_key, u);
 	return u->how ? MENU_DONE : MENU_STAY;
 }
 
@@ -13998,12 +14242,14 @@ static menu_result disc_key(app *a, void *ctx, in_button key, int sel)
 static bool disc_screen(app *a, gm_ctx *g)
 {
 	disc_ui u;
-	menu_style st = g->st;
 	int n, i;
 
 	memset(&u, 0, sizeof u);
-	st.root = false;
-	menu_run(a, &st, disc_build, disc_key, &u);
+	u.game = g;
+	u.st = g->st;
+	u.st.root = false;
+	u.st.backdrop = disc_backdrop;
+	menu_run(a, &u.st, disc_build, disc_key, &u);
 	if (!u.how) return false;
 	if (!plat_resident_disc(u.pick, &n, &i, 2000) || i != u.pick) return false;
 	g_disc_n = n;
@@ -24361,7 +24607,11 @@ int main(int argc, char *argv[])
 		g_status_clock24 = db_get_int(db_dev(), "status.clock24", 0) != 0;
 		g_status_batt    = db_get_int(db_dev(), "status.battery", STATUS_BATT_ICON);
 		g_update_dot     = db_get_int(db_dev(), "update.dot", 1) != 0;
-		g_test_updates   = db_get_int(db_dev(), "update.testing", 0) != 0;
+		/* A test build put on a card as it is (its image, or ChaOS
+		 * Installer's Pre-Release) starts on Pre-Release: whoever chose it
+		 * wants the next one. Once chosen, the choice stands. */
+		g_test_updates   = db_get_int(db_dev(), "update.testing",
+		                              strstr(CHAOS_VERSION, "-test") ? 1 : 0) != 0;
 		upd_set_testing(g_test_updates);
 		if (g_status_batt < 0 || g_status_batt >= STATUS_BATT_COUNT) g_status_batt = STATUS_BATT_ICON;
 	}

@@ -127,7 +127,7 @@ than any one console:
 | | |
 |---|---|
 | **Play Time** | per game or per system, by day, week, month, year or all time |
-| **ChaOS Transfer** | the file server; needs Wi-Fi and says so when there is none. While a computer is on the USB cable it is **ChaOS Wire** instead, always at `10.55.0.2` on the Brick and `10.42.0.1` on the Pixel 2 |
+| **ChaOS Transfer** | the file server; needs Wi-Fi and says so when there is none. While a computer is on the USB cable it is **ChaOS Wire** instead, always at `10.55.0.2` on the Brick and `10.42.0.1` on the Pixel 2. Everything on the card stays yours to change, but before you delete or rename something ChaOS relies on (a console's folder, PortMaster, or Save States' `library.db`, which holds play time and your games' details) it says what it's for and asks first. Over Wi-Fi its first page also says when a ChaOS update is out, on your Update Channel, and can download and install it: **Install and Restart** asks on the device before it restarts. |
 | **Wi-Fi & Bluetooth** | a page with both, each showing its own state there |
 | **Wi-Fi** (Wi-Fi & Bluetooth) | the network's name when connected, or why it is not. WPA2 and WPA3 networks both join, whatever is in the name |
 | **Bluetooth** (Wi-Fi & Bluetooth) | the connected headset, or `not connected` - pair, connect and forget |

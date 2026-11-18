@@ -64,6 +64,8 @@ static char  *(*g_albums_pick)(int id, const char *json, size_t n,
 enum { TAG_SENDING = 1, TAG_RECEIVING = 2, TAG_UPDATE = 3 };
 
 static bool room_for(const char *path, long want);   /* below */
+static void reply_json(httpd_req *r, char *json, size_t len, const char *why,
+                       const char *fallback);   /* below */
 
 /* Updating over Down To The Wire: hare_set_update. */
 static char   g_up_dir[XFER_PATH_MAX];
@@ -433,6 +435,41 @@ void hare_set_update(const char *dir, const char *version, const char *device,
 	snprintf(g_up_device, sizeof g_up_device, "%s", device ? device : "");
 	g_up_received = dir ? received : NULL;
 	hare_update_state("idle", NULL);
+}
+
+/* ChaOS: updating over Wi-Fi, the device's own updater: hare_set_self_update. */
+static char *(*g_self_status)(size_t *len, char *why, size_t wn);
+static bool  (*g_self_act)(const char *what, char *why, size_t wn);
+
+void hare_set_self_update(char *(*status)(size_t *len, char *why, size_t wn),
+                          bool (*act)(const char *what, char *why, size_t wn))
+{
+	g_self_status = status;
+	g_self_act = act;
+}
+
+static void route_self(httpd_req *r, bool done)
+{
+	const char *m = httpd_method(r);
+	char why[128] = "", what[16];
+
+	if (!done) { httpd_want_body(r, HTTPD_BODY_NONE, NULL); return; }
+	if (!g_self_status || !g_self_act) { httpd_reply_status(r, 404, "no updates here"); return; }
+	if (!strcmp(m, "GET")) {
+		size_t len = 0;
+		char *json = g_self_status(&len, why, sizeof why);
+
+		reply_json(r, json, len, why, "couldn't ask the updater");
+		return;
+	}
+	if (strcmp(m, "POST")) { httpd_reply_status(r, 405, "GET or POST"); return; }
+	httpd_query(r, "do", what, sizeof what);
+	if (!g_self_act(what, why, sizeof why)) {
+		httpd_reply_status(r, 409, why[0] ? why : "not now");
+		return;
+	}
+	note("update: %s", what);
+	httpd_reply(r, 200, "text/plain", "ok", 2, NULL);
 }
 
 /* Kept to what can go between JSON's quotes as it is: the reasons are this
@@ -967,6 +1004,13 @@ static void route_list(httpd_req *r)
 					artist_covers(&j, abs, req, e->d_name);
 				}
 			}
+			/* ChaOS: why ChaOS relies on it, for the page to say before a
+			 * delete or a rename */
+			{
+				const char *why = xfer_chaos_note(child, S_ISDIR(st.st_mode));
+
+				if (why) { JLIT(&j, ",\"chaos\":"); jstr(&j, why); }
+			}
 		}
 		jfmt(&j, ",\"dir\":%s,\"size\":%lld}",
 		     S_ISDIR(st.st_mode) ? "true" : "false", (long long)st.st_size);
@@ -1110,6 +1154,10 @@ static void on_request(httpd_req *r, bool done, void *ctx)
 
 	if (!strcmp(path, "/api/update")) {
 		route_update(r, done);
+		return;
+	}
+	if (!strcmp(path, "/api/self")) {
+		route_self(r, done);
 		return;
 	}
 

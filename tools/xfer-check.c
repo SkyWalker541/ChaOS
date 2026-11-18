@@ -98,6 +98,26 @@ int main(void)
 	      "pico8 root wrong: %s", xfer_root_at(9) ? xfer_root_at(9)->path : "(none)");
 	CHECK(xfer_root_at(10) == NULL, "an eleventh root appeared");
 
+	/* ChaOS: what ChaOS keeps, which the page neither lists nor changes */
+	/* ChaOS: what ChaOS relies on, which the page warns about */
+	CHECK(xfer_chaos_note("states/library.db", false) && xfer_chaos_note("states/library.db-journal", false),
+	      "Save States' own database");
+	CHECK(!xfer_chaos_note("states/Game Boy/Tetris.1.state", false) &&
+	      !xfer_chaos_note("states/Game Boy/library.db", false), "a save state is the player's");
+	CHECK(xfer_chaos_note("roms/Ports/PortMaster", true) &&
+	      !xfer_chaos_note("roms/Ports/PortMaster/control.txt", false) &&
+	      !xfer_chaos_note("roms/Ports/Celeste.sh", false), "PortMaster itself, not what's in it");
+	CHECK(xfer_chaos_note("roms/Game Boy", true) && xfer_chaos_note("overlays/NES", true) &&
+	      !xfer_chaos_note("roms/Game Boy", false), "a console's folder");
+	CHECK(!xfer_chaos_note("roms/NES/.media", true) && !xfer_chaos_note("roms/NES/Contra (USA).nes", false) &&
+	      !xfer_chaos_note("music/Artist", true) && !xfer_chaos_note("roms", true) &&
+	      !xfer_chaos_note(NULL, false), "box art, games, music and the roots say nothing");
+	CHECK(xfer_named_by_chaos("roms/Game Boy") && xfer_named_by_chaos("overlays/NES") &&
+	      xfer_named_by_chaos("states/PlayStation"), "a console's folder is named by ChaOS");
+	CHECK(!xfer_named_by_chaos("roms/Game Boy/Tetris.gb") && !xfer_named_by_chaos("music/Artist") &&
+	      !xfer_named_by_chaos("roms/") && !xfer_named_by_chaos("roms"),
+	      "but not what is in it, nor anything in Music");
+
 	printf("  ordinary paths land where they should:\n");
 	allow("roms", "/mnt/SDCARD/Roms");
 	allow("roms/NES", "/mnt/SDCARD/Roms/NES");

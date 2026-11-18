@@ -52,8 +52,10 @@ LIBRETRO = {
     "NES": ["Nintendo - Nintendo Entertainment System",
             "Nintendo - Family Computer Disk System"],
     "SNES": ["Nintendo - Super Nintendo Entertainment System"],
-    "Game Boy": ["Nintendo - Game Boy"],
-    "Game Boy Color": ["Nintendo - Game Boy Color"],
+    # Each Game Boy's the other's second: a game for both is filed under one
+    # (Pokemon Yellow is the Game Boy's), as in src/artscrape.c.
+    "Game Boy": ["Nintendo - Game Boy", "Nintendo - Game Boy Color"],
+    "Game Boy Color": ["Nintendo - Game Boy Color", "Nintendo - Game Boy"],
     "Game Boy Advance": ["Nintendo - Game Boy Advance"],
     "Genesis": ["Sega - Mega Drive - Genesis",
                 "Sega - Mega-CD - Sega CD"],

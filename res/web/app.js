@@ -512,7 +512,14 @@ function mkbtn(label, fn) {
 
 /* ---- the operations ---------------------------------------------------- */
 
+/* ChaOS: something ChaOS relies on (the device says why, as e.chaos) is the
+ * player's to change all the same; this only makes sure they meant it. */
+function chaosOk(e, doing) {
+	return !e.chaos || confirm('ChaOS uses ' + e.name + '. ' + e.chaos + '\n\n' + doing + ' it anyway?');
+}
+
 async function rename(e) {
+	if (!chaosOk(e, 'Rename')) return;
 	const to = prompt('Rename to', e.name);
 	if (!to || to === e.name) return;
 	try {
@@ -528,6 +535,7 @@ async function rename(e) {
  * a console's folder cannot (see xfer_delete_rule). The server enforces both;
  * this is only so the question asked is the right one. */
 async function del(e) {
+	if (!chaosOk(e, 'Delete')) return;
 	if (e.dir) {
 		let c;
 		try {
@@ -1292,6 +1300,7 @@ async function drawUpdate() {
 	if (updBusy) { $('upd').hidden = false; return; }
 	try {
 		const r = await fetch('/api/update', { credentials: 'same-origin' });
+		if (r.status === 404) { selfDraw(); return; }
 		if (!r.ok) { $('upd').hidden = true; $('verline').hidden = true; return; }
 		updDev = await r.json();
 	} catch (e) { return; }
@@ -1445,6 +1454,144 @@ async function updWatch() {
 		await new Promise((res) => setTimeout(res, 500));
 	}
 }
+
+/* ---- ChaOS: updating over Wi-Fi --------------------------------------------
+ *
+ * ChaOS Transfer over Wi-Fi: the device has the network, so it downloads its
+ * own update, as MENU > Updates does and on the channel Update Channels chose
+ * (/api/self). This page only asks how it stands and says what to do: check,
+ * Update or Full Install, Cancel, Remove, and Install and Restart, which the
+ * device asks about on its own screen before it restarts. */
+let selfDev = null;        /* the device's answer */
+let selfChecked = false;   /* a check asked for once a visit, if none was made */
+let selfTimer = 0;
+let selfOpenNotes = false;
+
+/* Not now: the notice for a version, put away in this browser until a newer
+ * one is out; the line under it brings it back. Nothing is downloaded or
+ * installed unless asked. */
+function selfSkipped() { try { return localStorage.getItem('chaos.updSkip') || ''; } catch (e) { return ''; } }
+function selfSkip(v) { try { if (v) localStorage.setItem('chaos.updSkip', v); else localStorage.removeItem('chaos.updSkip'); } catch (e) { /* this visit only */ } selfSkipMem = v; }
+let selfSkipMem = null;
+const selfIsSkipped = (d) => (selfSkipMem !== null ? selfSkipMem : selfSkipped()) === d.latest;
+
+const selfBusy = (d) => ['checking', 'downloading', 'unpacking'].includes(d.state) ||
+	['asking', 'updating'].includes(d.ask);
+
+async function selfDraw() {
+	clearTimeout(selfTimer);
+	if (cwd !== '') { $('upd').hidden = true; $('verline').hidden = true; return; }
+	let d;
+	try {
+		const r = await fetch('/api/self', { credentials: 'same-origin' });
+		if (!r.ok) { $('upd').hidden = true; $('verline').hidden = true; return; }
+		d = await r.json();
+	} catch (e) {
+		if (selfDev && selfDev.ask === 'updating') selfShow({ ...selfDev });
+		return;
+	}
+	selfDev = d;
+	if (d.state === 'idle' && d.online && !selfChecked) {
+		selfChecked = true;
+		selfAct('check');
+		return;
+	}
+	selfShow(d);
+	if (selfBusy(d)) selfTimer = setTimeout(selfDraw, 1000);
+}
+
+async function selfAct(what) {
+	try {
+		await api('POST', '/api/self?do=' + what);
+	} catch (err) { toast(err.message, true); }
+	selfDraw();
+}
+
+function selfShow(d) {
+	const box = $('upd'), line = $('verline');
+	const v = esc(d.latest), chan = d.channel === 'pre' ? ' (Pre-Release)' : '';
+	const mbs = (n) => n > 0 ? ' (' + (n / 1e6).toFixed(n < 1e7 ? 1 : 0) + ' MB)' : '';
+	const btn = (act, label, go) => '<button' + (go ? ' class="go"' : '') + ' data-self="' + act + '">' + label + '</button>';
+	const notes = d.notes
+		? '<details class="notes"' + (selfOpenNotes ? ' open' : '') + '><summary>What\'s new</summary><pre>' + esc(d.notes) + '</pre></details>' : '';
+	const bar = (what) => '<div class="line"><span>' + what + '</span><span>' + d.percent + '%</span></div>' +
+		'<div class="bar"><span style="width:' + d.percent + '%"></span></div>';
+	let html = '', bad = false;
+	const quiet = ['available', 'installer', 'ready'].includes(d.state) && !d.ask && selfIsSkipped(d);
+
+	if (quiet) {
+		box.hidden = true;
+		line.innerHTML = 'ChaOS ' + esc(d.version) + ' &middot; <a href="#" data-self="again">ChaOS ' + v + chan +
+			(d.state === 'ready' ? ' is downloaded' : ' is available') + '</a>';
+		line.hidden = false;
+		return;
+	}
+	if (d.ask === 'updating') {
+		html = '<h2>Updating</h2><p>The device is installing ChaOS ' + v + ' and restarts when it\'s done. Don\'t turn it off.</p>';
+	} else if (d.ask === 'asking') {
+		html = '<h2>Confirm on the device</h2><p>The device is asking: Install and Restart?</p>';
+	} else switch (d.state) {
+	case 'available':
+		html = '<h2>ChaOS ' + v + chan + ' is available</h2><p>This device has ' + esc(d.version) +
+			'. Your games, saves and settings stay as they are.</p>' + notes + '<div class="acts">' +
+			btn('later', 'Not now') + (d.canFull ? btn('full', 'Full Install' + mbs(d.full), !d.canSmall) : '') +
+			(d.canSmall ? btn('update', 'Update' + mbs(d.size), true) : '') + '</div>';
+		break;
+	case 'installer':
+		html = '<h2>ChaOS ' + v + chan + ' is available</h2><p>This one updates the whole system, so it starts on the device: ' +
+			'<b>MENU &gt; Updates</b>. Your games, saves and settings stay as they are.</p>' + notes + '<div class="acts">' + btn('later', 'Not now') + '</div>';
+		break;
+	case 'downloading':
+		html = '<h2>Updating to ChaOS ' + v + '</h2>' + bar(d.receiving ? 'Downloading' : 'Connecting') +
+			'<p class="hint">It carries on if you close this page.</p><div class="acts">' + btn('cancel', 'Cancel') + '</div>';
+		break;
+	case 'unpacking':
+		html = '<h2>Updating to ChaOS ' + v + '</h2>' + bar('Checking and unpacking') + '<p class="hint">Keep the device on.</p>';
+		break;
+	case 'ready':
+		html = '<h2>ChaOS ' + v + ' is downloaded</h2><p>' +
+			(d.ask === 'notnow' ? 'Not now was chosen on the device. ' : '') +
+			(d.ask === 'refused' ? esc(d.askWhy) + '. ' : '') +
+			(d.battery ? 'Plug in or ' + esc(d.battery) + ' first. ' : 'Install and Restart asks on the device first. ') +
+			'Your games, saves and settings stay as they are.</p>' + notes + '<div class="acts">' + btn('later', 'Not now') + btn('remove', 'Remove Download') +
+			(d.battery ? '' : btn('install', 'Install and Restart', true)) + '</div>';
+		bad = d.ask === 'refused';
+		break;
+	case 'failed':
+		html = '<h2>The update didn\'t work</h2><p>' + esc(d.error || 'Something went wrong') + '. Nothing was changed.</p>' +
+			'<div class="acts">' + btn('check', 'Try again') + '</div>';
+		bad = true;
+		break;
+	}
+	if (html) {
+		box.className = 'tidy upd' + (bad ? ' bad' : '');
+		box.innerHTML = html;
+		box.hidden = false;
+		line.hidden = true;
+		const det = box.querySelector('details.notes');
+		if (det) det.addEventListener('toggle', () => { selfOpenNotes = det.open; });
+		return;
+	}
+	box.hidden = true;
+	line.textContent = d.state === 'checking' ? 'ChaOS ' + d.version + ', checking for updates...' :
+		d.state === 'current' ? 'ChaOS ' + d.version + chan + ', up to date' : 'ChaOS ' + d.version;
+	line.hidden = false;
+}
+
+$('upd').addEventListener('click', (e) => {
+	const act = e.target.dataset && e.target.dataset.self;
+	if (!act) return;
+	if (act === 'later') { selfSkip(selfDev.latest); selfShow(selfDev); return; }
+	if (act === 'cancel' && !confirm('Stop the download?')) return;
+	if (act === 'remove' && !confirm('Remove the download?')) return;
+	selfAct(act);
+});
+$('verline').addEventListener('click', (e) => {
+	if (!(e.target.dataset && e.target.dataset.self === 'again')) return;
+	e.preventDefault();
+	selfSkip('');
+	if (selfDev) selfShow(selfDev);
+});
 
 function toast(msg, bad) {
 	const t = $('toast');

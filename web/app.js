@@ -149,3 +149,57 @@
     }, 4800);
   }
 })();
+
+/* How many Bricks took the newest release, and the newest test build: the
+ * downloads GitHub counts of each one's card image and its two updates (one
+ * per Brick, whichever it took). ChaOS sends nothing about anyone, so this is
+ * downloads, not people. Asked once an hour per visitor at most: GitHub lets
+ * a browser ask 60 times an hour. */
+(function counts() {
+  var el = document.getElementById("counts");
+  if (!el || !window.fetch) return;
+  var KEY = "chaos-counts", HOUR = 3600 * 1000;
+  function sum(r) {
+    var v = r.tag_name.replace(/^v/, ""), n = 0;
+    (r.assets || []).forEach(function (a) {
+      if (a.name === "ChaOS-v" + v + "-brick.img.xz" || a.name === "ChaOS-v" + v + "-brick-app.tar.xz" ||
+          a.name === "ChaOS-v" + v + "-brick-root.squashfs.xz") n += a.download_count || 0;
+    });
+    return { v: v, n: n };
+  }
+  function newer(a, b) {   /* "2.7.0-test1" after "2.6.0", before "2.7.0" */
+    function parts(v) { var t = v.split("-test"); return t[0].split(".").map(Number).concat([t[1] ? +t[1] : 1e9]); }
+    var x = parts(a), y = parts(b);
+    for (var i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
+    return false;
+  }
+  function show(c) {
+    if (!c || !c.rel) return;
+    var t = "ChaOS " + c.rel.v + ": " + c.rel.n.toLocaleString() + " downloads";
+    if (c.pre) t += " \u00b7 Pre-Release " + c.pre.v + ": " + c.pre.n.toLocaleString();
+    el.textContent = t;
+    el.hidden = false;
+  }
+  try {
+    var kept = JSON.parse(localStorage.getItem(KEY) || "null");
+    if (kept && Date.now() - kept.at < HOUR) { show(kept); return; }
+  } catch (e) {}
+  fetch("https://api.github.com/repos/SkyWalker541/ChaOS/releases?per_page=20")
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (all) {
+      if (!all) return;
+      var rel = null, pre = null;
+      all.forEach(function (r) {
+        if (r.draft || !/^v/.test(r.tag_name)) return;
+        var s = sum(r);
+        if (r.prerelease) { if (!pre || newer(s.v, pre.v)) pre = s; }
+        else if (!rel || newer(s.v, rel.v)) rel = s;
+      });
+      /* a test build older than the release has been released */
+      if (pre && rel && !newer(pre.v, rel.v)) pre = null;
+      var c = { at: Date.now(), rel: rel, pre: pre };
+      try { localStorage.setItem(KEY, JSON.stringify(c)); } catch (e) {}
+      show(c);
+    })
+    .catch(function () {});
+})();

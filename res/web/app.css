@@ -366,8 +366,16 @@ header { flex-wrap: wrap; }
 .upd.bad h2 { color: var(--bad); }
 .upd .acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
 .upd .acts a { text-decoration: none; }
+/* ChaOS: the device's own update, over Wi-Fi */
+.upd .hint { margin: 8px 0 0; color: var(--dim); font-size: 14px; }
+.upd .notes { margin-top: 10px; font-size: 15px; color: var(--soft); }
+.upd .notes summary { cursor: pointer; }
+.upd .notes pre { white-space: pre-wrap; font: inherit; margin: 8px 0 0; max-height: 40vh; overflow: auto; }
+.upd .acts { flex-wrap: wrap; }
 .upd .go { border-color: var(--accent); color: var(--accent); }
 .verline { font-size: 15px; }
+.logs.verline { display: block; }
+.verline a { color: var(--accent); }
 
 .empty { color: var(--dim); text-align: center; padding: 48px 16px;
          margin: 0 auto; max-width: var(--wrap); }

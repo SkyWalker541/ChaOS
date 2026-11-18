@@ -121,7 +121,7 @@ jobs:
           # How to get it: ChaOS Installer takes the latest release only, so a
           # test build says the two ways it can be had
           if [ -n "${{ steps.v.outputs.test }}" ]; then
-            HOW="**Get it** on a Brick with ChaOS 2.6.0 or later: MENU > About ChaOS > Update Channels > Pre-Release, then MENU > Updates. Or write \`ChaOS-v$V-brick.img.xz\` to a card with balenaEtcher or Raspberry Pi Imager (that erases it). ChaOS Installer installs public releases only."
+            HOW="**Get it** on a Brick with ChaOS 2.6.0 or later: MENU > About ChaOS > Update Channels > Pre-Release, then MENU > Updates. Or install it with [ChaOS Installer](https://github.com/SkyWalker541/ChaOS-Installer/releases/latest) 1.1.0 or later, Pre-Release chosen, or write \`ChaOS-v$V-brick.img.xz\` to a card with balenaEtcher or Raspberry Pi Imager (that erases it)."
           else
             HOW="**Install or update** with [ChaOS Installer](https://github.com/SkyWalker541/ChaOS-Installer/releases/latest), or write \`ChaOS-v$V-brick.img.xz\` to a card yourself (that erases it)."
           fi

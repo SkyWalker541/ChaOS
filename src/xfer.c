@@ -2,6 +2,7 @@
 /* See xfer.h for why every path the browser sends comes through here. */
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 
 #include "xfer.h"
 
@@ -191,6 +192,35 @@ bool xfer_name_ok(const char *name)
 		if (strchr("\\:*?\"<>|", *name)) return false;
 	}
 	return true;
+}
+
+bool xfer_named_by_chaos(const char *path)
+{
+	static const char *const ROOTS[] = { "roms/", "states/", "overlays/", "screenshots/", "cheats/", NULL };
+	int i;
+
+	if (!path) return false;
+	for (i = 0; ROOTS[i]; i++) {
+		size_t l = strlen(ROOTS[i]);
+
+		if (!strncmp(path, ROOTS[i], l) && path[l] && !strchr(path + l, '/')) return true;
+	}
+	return false;
+}
+
+const char *xfer_chaos_note(const char *path, bool dir)
+{
+	if (!path) return NULL;
+	if (!strncmp(path, "states/library.db", 17) && !strchr(path + 7, '/'))
+		return "ChaOS keeps play time, Last Played and every game's details in this file. "
+		       "Without it they start over.";
+	if (dir && !strcmp(path, "roms/Ports/PortMaster"))
+		return "PortMaster runs your ports. Without it they won't start until you get it "
+		       "again from the ChaOS menu.";
+	if (dir && xfer_named_by_chaos(path))
+		return "ChaOS finds this console's games by this folder's name. Renamed or deleted, "
+		       "they won't show until it's back.";
+	return NULL;
 }
 
 bool xfer_resolve(const char *url_path, char *out, size_t outn)

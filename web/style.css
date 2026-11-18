@@ -82,6 +82,7 @@ li::marker { color: var(--orange); }
 .links a:hover, .gh:hover { color: var(--orange); text-decoration: none; }
 .gh { border: 1px solid var(--line); padding: 6px 14px 4px; border-radius: 999px; }
 @media (max-width: 860px) { .links { display: none; } .gh { margin-left: auto; } }
+.gh + .gh { margin-left: -14px; }
 
 /* ---- layout -------------------------------------------------------- */
 section { padding: 0 16px; }

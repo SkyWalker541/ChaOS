@@ -78,8 +78,12 @@ static const struct { const char *folder, *remote, *remote2; } MAP[] = {
 	{ "NES",              "Nintendo - Nintendo Entertainment System",
 	                      "Nintendo - Family Computer Disk System" },
 	{ "SNES",             "Nintendo - Super Nintendo Entertainment System", NULL },
-	{ "Game Boy",         "Nintendo - Game Boy", NULL },
-	{ "Game Boy Color",   "Nintendo - Game Boy Color", NULL },
+	/* Each Game Boy's the other's second: a game for both is filed under
+	 * one. Pokemon Yellow is the Game Boy's at libretro, and once ChaOS
+	 * moved it to Game Boy Color (it plays in colour there) no cover was
+	 * found for it - seen 2026-11-18. */
+	{ "Game Boy",         "Nintendo - Game Boy", "Nintendo - Game Boy Color" },
+	{ "Game Boy Color",   "Nintendo - Game Boy Color", "Nintendo - Game Boy" },
 	{ "Game Boy Advance", "Nintendo - Game Boy Advance", NULL },
 	{ "Genesis",          "Sega - Mega Drive - Genesis",
 	                      "Sega - Mega-CD - Sega CD" },
@@ -569,6 +573,35 @@ static bool ext_allowed(const char *name, const char *exts)
 	return false;
 }
 
+/* A game in a folder of its own - a multi-disc game's discs and .m3u, a CD
+ * game's .cue and tracks - is one game on the shelf, named for the folder
+ * (library.c): the file it launches, in the shelf's order (an .m3u first),
+ * into `out`. False when the folder holds no disc of this console's. */
+static bool folder_disc(const char *path, const char *exts, char *out, size_t n)
+{
+	static const char *const RANK[] = { "m3u", "chd", "cue", "ccd", "toc", "iso", "img", "pbp", "bin", NULL };
+	DIR *d = opendir(path);
+	struct dirent *e;
+	int best = 99;
+
+	out[0] = '\0';
+	if (!d) return false;
+	while ((e = readdir(d))) {
+		const char *dot = strrchr(e->d_name, '.');
+		int r;
+
+		if (e->d_name[0] == '.' || !dot || !ext_allowed(e->d_name, exts)) continue;
+		for (r = 0; RANK[r] && strcasecmp(dot + 1, RANK[r]); r++) ;
+		if (!RANK[r]) continue;
+		if (r < best || (r == best && strcmp(e->d_name, out) < 0)) {
+			if (snprintf(out, n, "%s", e->d_name) >= (int)n) { out[0] = '\0'; continue; }
+			best = r;
+		}
+	}
+	closedir(d);
+	return out[0] != '\0';
+}
+
 /* The ROM stems in one folder. `.media/` and any dotfile are not games, and
  * neither is a stray text file - which is what the extension list in
  * systems.cfg is for. Without it this reports missing art for things that
@@ -589,7 +622,20 @@ static void read_roms(const char *dir, const char *exts)
 		 * file - so truncation is skipped rather than survived. */
 		if (snprintf(full, sizeof full, "%s/%s", dir, e->d_name)
 		    >= (int)sizeof full) continue;
-		if (stat(full, &st) != 0 || !S_ISREG(st.st_mode)) continue;
+		if (stat(full, &st) != 0) continue;
+		if (S_ISDIR(st.st_mode)) {
+			/* A game of its own folder, by the folder's name: Box Art for
+			 * every game missed these, and a multi-disc game is always one
+			 * (2.6.0). "/" marks it for the ScreenScraper pass. */
+			char inside[NAME_MAX_];
+
+			if (!folder_disc(full, exts, inside, sizeof inside)) continue;
+			if (snprintf(g_roms[g_nroms], NAME_MAX_, "%s", e->d_name) >= NAME_MAX_) continue;
+			snprintf(g_rext[g_nroms], sizeof g_rext[0], "/");
+			g_nroms++;
+			continue;
+		}
+		if (!S_ISREG(st.st_mode)) continue;
 		if (!ext_allowed(e->d_name, exts)) continue;
 		if (snprintf(g_roms[g_nroms], NAME_MAX_, "%s", e->d_name)
 		    >= NAME_MAX_) continue;
@@ -1381,9 +1427,18 @@ int art_step(void)
 		snprintf(g_st.now, sizeof g_st.now, "%s", g_roms[g_ri]);
 		mkdir(media, 0777);
 		{
-			char file[NAME_MAX_ + 16];
+			char file[NAME_MAX_ * 2 + 16];
 
-			snprintf(file, sizeof file, "%s%s", g_roms[g_ri], g_rext[g_ri]);
+			if (!strcmp(g_rext[g_ri], "/")) {
+				/* a folder's game: the file it launches, as the shelf has it */
+				char full[ARTPATH_MAX], inside[NAME_MAX_];
+
+				snprintf(full, sizeof full, "%s/%s", dir, g_roms[g_ri]);
+				if (!folder_disc(full, g_sys[g_si].exts, inside, sizeof inside)) inside[0] = '\0';
+				snprintf(file, sizeof file, "%s/%s", g_roms[g_ri], inside);
+			} else {
+				snprintf(file, sizeof file, "%s%s", g_roms[g_ri], g_rext[g_ri]);
+			}
 			if (!ss_run_begin(g_sys[g_si].folder, file, g_roms[g_ri], dir,
 			                  g_sys[g_si].exts)) {
 				/* No account, or a system they have no id for. Either way

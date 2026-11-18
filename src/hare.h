@@ -144,6 +144,19 @@ void hare_set_cover(bool (*fn)(const char *rom, const char *url, const char *fil
 void hare_set_update(const char *dir, const char *version, const char *device,
                      void (*received)(const update_release *offer));
 
+/* ChaOS: updating over Wi-Fi (ChaOS Transfer), where the device has the
+ * network and downloads its own update, as MENU > Updates does, on the
+ * channel About ChaOS > Update Channels chose.
+ *
+ *   GET  /api/self             status's JSON: the updater's state
+ *   POST /api/self?do=WHAT     act: "check", "update" (the small one), "full",
+ *        "cancel", "remove", or "install", which asks on the device first
+ *
+ * status returns malloc'd JSON (NULL with why); act false with why. NULL (the
+ * default, and over the cable, where hare_set_update does it) answers 404. */
+void hare_set_self_update(char *(*status)(size_t *len, char *why, size_t wn),
+                          bool (*act)(const char *what, char *why, size_t wn));
+
 /* How it is going, for the page: "idle", "receiving", "checking", "asking",
  * "notnow", "refused" with why, or "updating". */
 void hare_update_state(const char *state, const char *why);

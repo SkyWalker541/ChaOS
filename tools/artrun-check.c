@@ -155,6 +155,7 @@ static int  g_ss_busy;        /* how many more lookups answer 429 */
 static int  g_ss_left = -1;   /* what the account says is left today */
 static int  g_ss_asked;       /* lookups started */
 static char g_ss_stem[256];
+static char g_ss_file[2048];  /* the files lookups were for, a line each */
 static char g_ss_dest[512];
 static bool g_ss_toomany;
 
@@ -163,7 +164,12 @@ bool ss_signed_in(void) { return g_ss_on; }
 bool ss_run_begin(const char *folder, const char *file, const char *stem,
                   const char *rom_dir, const char *exts)
 {
-	(void)folder; (void)file; (void)exts;
+	(void)folder; (void)exts;
+	{
+		size_t l = strlen(g_ss_file);
+
+		snprintf(g_ss_file + l, sizeof g_ss_file - l, "%s\n", file);
+	}
 	if (!g_ss_on) return false;
 	snprintf(g_ss_stem, sizeof g_ss_stem, "%s", stem);
 	snprintf(g_ss_dest, sizeof g_ss_dest, "%s/.media/%s.png", rom_dir, stem);
@@ -302,6 +308,8 @@ static bool part_left(void)
 
 /* A whole run, to the end. Bounded, so a step machine that never finishes is a
  * failing check rather than a hung one. */
+static const char *g_exts = "gb,zip";
+
 static int run(const char *only, art_progress *out)
 {
 	systems_cfg sys;
@@ -310,7 +318,7 @@ static int run(const char *only, art_progress *out)
 	memset(&sys, 0, sizeof sys);
 	sys.count = 1;
 	snprintf(sys.systems[0].folder, sizeof sys.systems[0].folder, "Game Boy");
-	snprintf(sys.systems[0].exts, sizeof sys.systems[0].exts, "gb,zip");
+	snprintf(sys.systems[0].exts, sizeof sys.systems[0].exts, "%s", g_exts);
 
 	g_urls[0] = '\0';
 	g_nreq = 0;
@@ -374,6 +382,51 @@ int main(void)
 	CHECK(strstr(g_urls, "Hit%20Game") != NULL,
 	      "a link's text passed for a cover and was skipped:\n%s", g_urls);
 	CHECK(!strcmp(cover(), "NEW"), "the cover reads \"%s\", wanted NEW", cover());
+
+	/* A game in a folder of its own - a multi-disc game, always - is one
+	 * game on the shelf, named for the folder. Box Art for every game
+	 * passed them by; the one game's Box Art found them (2.6.0). */
+	printf("  a game in its own folder is asked for, by the folder's name:\n");
+	{
+		char p[512];
+		bool was = g_ss_on;
+
+		snprintf(p, sizeof p, "%s/Disc Game", g_shelf);
+		mkdir(p, 0755);
+		snprintf(p, sizeof p, "%s/Disc Game/Disc Game (Disc 1).cue", g_shelf); write_file(p, "cue");
+		snprintf(p, sizeof p, "%s/Disc Game/Disc Game.m3u", g_shelf);         write_file(p, "m3u");
+		snprintf(p, sizeof p, "%s/Notes", g_shelf);
+		mkdir(p, 0755);
+		snprintf(p, sizeof p, "%s/Notes/readme.txt", g_shelf);                 write_file(p, "txt");
+		g_exts = "gb,zip,m3u,cue";
+		g_serve_image = "Disc%20Game";
+		g_ss_on = true;
+		g_ss_has = NULL;
+		g_ss_file[0] = '\0';
+		CHECK(run(NULL, &st) == 0, "the run did not finish");
+		CHECK(strstr(g_urls, "Disc%20Game.png") != NULL,
+		      "the folder's game was never asked for:\n%s", g_urls);
+		CHECK(!strcmp(cover_of("Disc Game"), "NEW"), "its cover reads \"%s\"", cover_of("Disc Game"));
+		CHECK(!strstr(g_urls, "Notes"), "a folder with no disc in it was asked for:\n%s", g_urls);
+		g_ss_on = was;
+		g_exts = "gb,zip";
+	}
+
+	printf("  and ScreenScraper is given the file it launches, the .m3u:\n");
+	{
+		char p[512];
+
+		snprintf(p, sizeof p, "%s/Disc Game.png", g_media);
+		unlink(p);
+		g_ss_on = true;
+		g_exts = "gb,zip,m3u,cue";
+		g_ss_file[0] = '\0';
+		CHECK(run(NULL, &st) == 0, "the run did not finish");
+		CHECK(strstr(g_ss_file, "Disc Game/Disc Game.m3u\n") != NULL,
+		      "ScreenScraper was asked about:\n%s", g_ss_file);
+		g_ss_on = false;
+		g_exts = "gb,zip";
+	}
 
 	printf("  a name too long to hold is refused, not widened to the shelf:\n");
 	memset(big, 'x', sizeof big - 1);

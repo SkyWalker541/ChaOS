@@ -56,6 +56,18 @@ const xfer_root *xfer_root_at(int i);
  * and that is the caller's question, not this one's. */
 bool xfer_resolve(const char *url_path, char *out, size_t outn);
 
+/* ChaOS: why ChaOS relies on what is at `path` (a decoded root path; dir
+ * when it is a folder), or NULL. Nothing is held back from the page: it shows
+ * this before a delete or a rename, and the player decides. Save States'
+ * library.db, PortMaster, and a console's own folder. */
+const char *xfer_chaos_note(const char *path, bool dir);
+
+/* ChaOS: a console's own folder, which ChaOS named and finds by name - one
+ * level into ROMs, Save States, Overlays, Screenshots or Cheats. Its games
+ * are the player's, but a rename would lose the shelf, so it is refused.
+ * `path` decoded, as xfer_chaos_note's. */
+bool xfer_named_by_chaos(const char *path);
+
 /* WHAT A DELETE MAY TAKE, for a folder `abs` that resolved into a root.
  *
  * A file is always the file alone. A folder is one of three, decided here and
