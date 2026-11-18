@@ -1,0 +1,242 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: SkyWalker541 <178531074+SkyWalker541@users.noreply.github.com>
+Date: Tue, 17 Nov 2026 15:10:24 -0800
+Subject: [PATCH] ChaOS: the Brick Pro told from the Brick at boot, in the SPL
+
+Its sticks' ADCs answer on TWI3 (PE3/PE4, addresses 0x29 and 0x28); the Brick has nothing there. Probed by bit-banging the pins before DRAM is set up, about 0.3 ms, and left as found. The Pro gets its own DRAM timings (tpr11-13, from TrimUI's firmware 1.1.1), with the other set tried if training fails, and the SPL leaves a word at 0x47f00000 for boot.scr: PRO! for the Pro, BRIC for the Brick.
+---
+ arch/arm/mach-sunxi/dram_sun50i_a133.c |  44 ++++++++--
+ board/sunxi/Makefile                   |   1 +
+ board/sunxi/brickpro.c                 | 112 +++++++++++++++++++++++++
+ include/brickpro.h                     |  15 ++++
+ 4 files changed, 166 insertions(+), 6 deletions(-)
+ create mode 100644 board/sunxi/brickpro.c
+ create mode 100644 include/brickpro.h
+
+diff --git a/arch/arm/mach-sunxi/dram_sun50i_a133.c b/arch/arm/mach-sunxi/dram_sun50i_a133.c
+index 261a342b..9413066f 100644
+--- a/arch/arm/mach-sunxi/dram_sun50i_a133.c
++++ b/arch/arm/mach-sunxi/dram_sun50i_a133.c
+@@ -22,6 +22,7 @@
+ #include <asm/arch/dram.h>
+ #include <asm/arch/prcm.h>
+ #include <asm/io.h>
++#include <brickpro.h>
+ #include <init.h>
+ #include <linux/bitops.h>
+ #include <linux/delay.h>
+@@ -1172,7 +1173,7 @@ static unsigned long calculate_dram_size(const struct dram_config *config)
+ 	       width * (1ULL << config->ranks);
+ }
+ 
+-static const struct dram_para para = {
++static struct dram_para para = {
+ 	.clk = CONFIG_DRAM_CLK,
+ #ifdef CONFIG_SUNXI_DRAM_DDR3
+ 	.type = SUNXI_DRAM_TYPE_DDR3,
+@@ -1203,6 +1204,22 @@ static const struct dram_para para = {
+ 	.tpr14 = CONFIG_DRAM_SUNXI_TPR14,
+ };
+ 
++/* ChaOS: the Brick's three timings, or the Brick Pro's */
++static void dram_use_pro(bool pro)
++{
++	para.tpr11 = pro ? 0x18150d11 : CONFIG_DRAM_SUNXI_TPR11;
++	para.tpr12 = pro ? 0x14141514 : CONFIG_DRAM_SUNXI_TPR12;
++	para.tpr13 = pro ? 0x01081d20 : CONFIG_DRAM_SUNXI_TPR13;
++	debug("DRAM: %s timings\n", pro ? "Brick Pro" : "Brick");
++}
++
++static bool dram_try(struct dram_config *config)
++{
++	auto_detect_ranks(&para, config);
++	mctl_auto_detect_dram_size(&para, config);
++	return mctl_core_init(&para, config);
++}
++
+ unsigned long sunxi_dram_init(void)
+ {
+ 	struct dram_config config;
+@@ -1211,11 +1228,26 @@ unsigned long sunxi_dram_init(void)
+ 	setbits_le32(0x03000160, BIT(8));
+ 	clrbits_le32(0x03000168, 0x3f);
+ 
+-	auto_detect_ranks(&para, &config);
+-	mctl_auto_detect_dram_size(&para, &config);
+-
+-	if (!mctl_core_init(&para, &config))
+-		return 0;
++	/*
++	 * ChaOS: the TrimUI Brick Pro's DRAM is the Brick's but for three
++	 * timings, as TrimUI's own firmware for it sets them (sys_config.fex,
++	 * firmware 1.1.1). Told apart by its sticks (board/sunxi/brickpro.c).
++	 * Should a set not come up, the other is tried before giving up.
++	 */
++	if (board_is_brick_pro())
++		dram_use_pro(true);
++	if (!dram_try(&config)) {
++		dram_use_pro(!board_is_brick_pro());
++		if (!dram_try(&config))
++			return 0;
++	}
++	/*
++	 * And for boot.scr, which device tree: a word in DRAM, which U-Boot
++	 * proper (TortOS's, unchanged) leaves alone between the kernel's
++	 * compressed copy (0x44000000, 32 MB) and its own (0x4a000000).
++	 * "PRO!" for the Pro, "BRIC" for the Brick, read with setexpr.l.
++	 */
++	writel(board_is_brick_pro() ? CHAOS_MARK_PRO : CHAOS_MARK_BRICK, CHAOS_MARK_ADDR);
+ 
+ 	debug("cols = 2^%d, rows = 2^%d, banks = %d, bank groups = %d, ranks = %d, width = %d\n",
+ 	      config.cols, config.rows, 1U << config.banks,
+diff --git a/board/sunxi/Makefile b/board/sunxi/Makefile
+index ee824931..beaddfe0 100644
+--- a/board/sunxi/Makefile
++++ b/board/sunxi/Makefile
+@@ -12,3 +12,4 @@ obj-$(CONFIG_MACH_SUN4I)	+= dram_sun4i_auto.o
+ obj-$(CONFIG_MACH_SUN5I)	+= dram_sun5i_auto.o
+ obj-$(CONFIG_MACH_SUN7I)	+= dram_sun5i_auto.o
+ obj-$(CONFIG_$(PHASE_)CHIP_DIP_SCAN)	+= chip.o
++obj-$(CONFIG_MACH_SUN50I_A133)	+= brickpro.o
+diff --git a/board/sunxi/brickpro.c b/board/sunxi/brickpro.c
+new file mode 100644
+index 00000000..93341984
+--- /dev/null
++++ b/board/sunxi/brickpro.c
+@@ -0,0 +1,112 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * ChaOS: the TrimUI Brick Pro told from the Brick, at boot.
++ *
++ * The two are one board but for the Pro's sticks: each is a small ADC on the
++ * A133's TWI3 (PE3 clock, PE4 data), the left at 0x29 and the right at 0x28,
++ * as TrimUI's own input daemon reads them (trimui_inputd, firmware 1.1.1).
++ * The Brick has nothing on those pins. So: is anything at 0x28 or 0x29?
++ *
++ * Asked by bit-banging PE3 and PE4 as an open-drain bus, never driven high:
++ * a pin is either pulled low or let go to its pull-up. A start, the address
++ * byte, the ninth clock's acknowledge, a stop: about 0.3 ms for both
++ * addresses, so the boot is no slower. The pins are left as they were found
++ * (disabled, no pull), where Linux's device tree takes them over.
++ *
++ * Used by the SPL alone, before memory is set up, for the Pro's DRAM timings
++ * (dram_sun50i_a133.c), which then leaves a word in DRAM saying which device
++ * this is, for boot.scr's device tree: U-Boot proper is TortOS's, unchanged.
++ */
++#include <asm/io.h>
++#include <linux/delay.h>
++#include <brickpro.h>
++
++#define PIO_E		(0x0300B000UL + 4 * 0x24)
++#define PIO_CFG(p)	((void __iomem *)(PIO_E + ((p) / 8) * 4))
++#define PIO_DAT		((void __iomem *)(PIO_E + 0x10))
++#define PIO_PULL(p)	((void __iomem *)(PIO_E + 0x1c + ((p) / 16) * 4))
++#define SCL		3
++#define SDA		4
++
++static void pin_cfg(int p, u32 f)
++{
++	clrsetbits_le32(PIO_CFG(p), 0xf << ((p % 8) * 4), f << ((p % 8) * 4));
++}
++
++static void pin_pull(int p, u32 pull)
++{
++	clrsetbits_le32(PIO_PULL(p), 3 << ((p % 16) * 2), pull << ((p % 16) * 2));
++}
++
++/* Low: an output holding 0. Let go: an input, the pull-up raises it. */
++static void low(int p)  { pin_cfg(p, 1); }
++static void free_(int p) { pin_cfg(p, 0); }
++static int  level(int p) { return (readl(PIO_DAT) >> p) & 1; }
++
++static void half(void) { udelay(5); }   /* 100 kHz */
++
++/* SCL let go, and held for a slow device's clock stretching (1 ms at most) */
++static void scl_up(void)
++{
++	int i;
++
++	free_(SCL);
++	for (i = 0; i < 1000 && !level(SCL); i++)
++		udelay(1);
++}
++
++static bool ack_from(u8 addr)
++{
++	u8 byte = addr << 1;	/* a write: nothing is asked of it */
++	bool ack;
++	int i;
++
++	/* start: SDA falls while SCL is high */
++	free_(SDA); scl_up(); half();
++	low(SDA); half();
++	low(SCL); half();
++	for (i = 7; i >= 0; i--) {
++		if (byte & (1 << i))
++			free_(SDA);
++		else
++			low(SDA);
++		half();
++		scl_up(); half();
++		low(SCL);
++	}
++	/* the ninth clock: the device pulls SDA low to acknowledge */
++	free_(SDA); half();
++	scl_up(); half();
++	ack = !level(SDA);
++	low(SCL); half();
++	/* stop: SDA rises while SCL is high */
++	low(SDA); half();
++	scl_up(); half();
++	free_(SDA); half();
++	return ack;
++}
++
++bool board_is_brick_pro(void)
++{
++	static int known = -1;
++	bool pro;
++
++	if (known >= 0)
++		return known;
++	/* the data register's bits for PE3 and PE4 at 0, so "low" drives 0 */
++	clrbits_le32(PIO_DAT, (1 << SCL) | (1 << SDA));
++	pin_pull(SCL, 1);
++	pin_pull(SDA, 1);
++	free_(SCL);
++	free_(SDA);
++	udelay(20);
++	/* a bus held low is not a free bus: nothing here to ask */
++	pro = level(SCL) && level(SDA) && (ack_from(0x29) || ack_from(0x28));
++	/* as found: disabled (7), no pull */
++	pin_cfg(SCL, 7);
++	pin_cfg(SDA, 7);
++	pin_pull(SCL, 0);
++	pin_pull(SDA, 0);
++	known = pro;
++	return pro;
++}
+diff --git a/include/brickpro.h b/include/brickpro.h
+new file mode 100644
+index 00000000..f94cabcc
+--- /dev/null
++++ b/include/brickpro.h
+@@ -0,0 +1,15 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/* ChaOS: the TrimUI Brick Pro told from the Brick (board/sunxi/brickpro.c) */
++#ifndef __BRICKPRO_H
++#define __BRICKPRO_H
++
++#include <linux/types.h>
++
++bool board_is_brick_pro(void);
++
++/* What the SPL leaves for boot.scr (dram_sun50i_a133.c) */
++#define CHAOS_MARK_ADDR		0x47f00000UL
++#define CHAOS_MARK_PRO		0x50524f21	/* "PRO!" */
++#define CHAOS_MARK_BRICK	0x43495242	/* "BRIC" */
++
++#endif
+-- 
+2.43.0
+

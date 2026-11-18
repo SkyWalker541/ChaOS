@@ -42,7 +42,10 @@ typedef enum {
 	 * status line's clock and battery, Auto Off */
 	PM_NETPAGE, PM_WIFI, PM_BT,
 	PM_SYSPAGE, PM_AUDIO, PM_CHANNELS, PM_NIGHT, PM_CLOCK, PM_SHOWCLOCK, PM_SHOWBATT, PM_UPDDOT,
-	PM_SLEEP, PM_APPEARANCE, PM_THEME, PM_DIR, PM_SPEED, PM_LISTVIEW, PM_COLOR,
+	PM_SLEEP,
+	/* ChaOS: on the Brick Pro only, its sticks taught to ChaOS */
+	PM_STICKS,
+	PM_APPEARANCE, PM_THEME, PM_DIR, PM_SPEED, PM_LISTVIEW, PM_COLOR,
 	/* ChaOS: which of the shelves that aren't consoles are on the systems row */
 	PM_SHELF_FAV, PM_RECENT, PM_SHELF_MUSE,
 	PM_SCRAPE, PM_ACHIEVEMENTS, PM_SS,
@@ -162,6 +165,7 @@ typedef struct {
 	 * is. False means present, so a caller or a check that says nothing about
 	 * it gets the Brick. */
 	bool        no_wifi;
+	bool        sticks;      /* ChaOS: the device has sticks (the Brick Pro) */
 	bool        no_bt;
 	/* Files move over the USB cable rather than Wi-Fi (plat_cable_link), so
 	 * the transfer row stays without a radio, under its cable name. */
@@ -217,7 +221,8 @@ typedef struct {
 	bool        rewind;      /* ChaOS: this console keeps states to rewind to */
 	const char *overscan;    /* ChaOS: Crop Overscan's choice, NULL for no row */
 	/* ChaOS: a shelf whose games run outside the emulator (PICO-8): none
-	 * of its rows about the picture, the buttons, rewind or box art */
+	 * of its rows about the picture (but Overlay), the buttons, rewind or
+	 * box art */
 	bool        native;
 	int         auto_off;    /* seconds, 0 for off */
 	const char *clock;       /* the local date and time, "Oct 3, 6:12 AM" */

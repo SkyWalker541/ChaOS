@@ -184,7 +184,8 @@ static bool has_label(const menu_row *rows, int n, const char *label);
  * Battery, Update Available Dot, Auto Off) */
 #define NET_ROWS 2
 #define SYS_ROWS 8
-#define TOP_ROWS (PM_ROWS - PAGE_ROWS - ROM_ROWS - NET_ROWS - SYS_ROWS)
+/* less Calibrate Sticks, on System Settings for a Brick Pro alone */
+#define TOP_ROWS (PM_ROWS - PAGE_ROWS - ROM_ROWS - NET_ROWS - SYS_ROWS - 1)
 /* (the page's description line is drawn by menu_draw, not a row) */
 #define PAGE_NOTE 0
 static const menu_row *by_id(const sys_ui *u, const menu_row *rows, int n, pm_row id);
@@ -455,6 +456,19 @@ static void tortos_menu_online(void)
 	/* Controls needs nothing of the device - no network, no account, no
 	 * card - so it is live in every state this menu can be in, and it sits
 	 * with About at the end where the rows you only read live. */
+	printf("Calibrate Sticks:\n");
+	{
+		sys_ui p = u;
+
+		p.sys_page = true;
+		n = sys_menu_build(&p, rows, &b, &heading);
+		ck(n == SYS_ROWS && !has_label(rows, n, "Calibrate Sticks"), "not on a Brick");
+		p.sticks = true;
+		n = sys_menu_build(&p, rows, &b, &heading);
+		ck(n == SYS_ROWS + 1 && has_label(rows, n, "Calibrate Sticks") &&
+		   (*by_id(&p, rows, n, PM_STICKS)).opens, "on a Brick Pro, on System Settings, opening its page");
+		n = sys_menu_build(&u, rows, &b, &heading);
+	}
 	printf("the Controls row:\n");
 	ck(!strcmp((*by_id(&u, rows, n, PM_CONTROLS)).label, "Controls"), "it is there");
 	ck((*by_id(&u, rows, n, PM_CONTROLS)).live, "and live with the radio down and nobody signed in");
@@ -759,8 +773,9 @@ static void cursor_reaches(void)
 	u.sys_name = "PICO-8"; u.sys_core = "pico8"; u.native = true;
 	n = sys_menu_build(&u, rows, &b, &heading);
 	k = reachable(rows, n, got, MENU_MAX_ROWS);
-	ck(n == 4 && k == 2 && reaches(rows, got, k, "Sort By") && reaches(rows, got, k, "Rescan Folder"),
-	   "PICO-8: Games, Core, Sort By and Rescan Folder, and nothing about the picture");
+	ck(n == 5 && k == 3 && reaches(rows, got, k, "Sort By") && reaches(rows, got, k, "Rescan Folder") &&
+	   reaches(rows, got, k, "Overlay") && !reaches(rows, got, k, "Display Mode"),
+	   "PICO-8: Games, Core, Sort By, Overlay and Rescan Folder, and nothing else about the picture");
 	u.native = false; u.sys_name = "NES"; u.sys_core = "nestopia";
 
 	memset(&u, 0, sizeof u);
