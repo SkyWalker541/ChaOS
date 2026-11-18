@@ -1,0 +1,67 @@
+/*
+ * ChaOS: the TrimUI Brick Pro (Allwinner A133P), as the Brick's device tree
+ * and what differs, every value from TrimUI's own firmware for it
+ * (trimui_tg4040, 1.1.1, 2026-07-17: its sunxi.fex, decompiled):
+ *
+ *   - its panel's timings: the same 1024x768 panel (otm1289a), at a 57 MHz
+ *     pixel clock where the Brick's is 51, and wider porches. With the
+ *     Brick's, TrimUI's firmware note says, the picture sits off-centre.
+ *   - its backlight's enable on PH11, where the Brick's is on PH18.
+ *   - TWI3 on PE3 (clock) and PE4 (data), on: its two sticks are ADCs there,
+ *     the left at 0x29 and the right at 0x28 (TrimUI's trimui_inputd), read
+ *     from user space through /dev/i2c-3. The Brick's tree points TWI3's pins
+ *     at PH12 and PH13, its buttons, and has no TWI3.
+ *
+ * U-Boot picks this one when it finds the sticks (board/brick/u-boot,
+ * ChaOS's patch 0011, and boot.cmd). The model names it, for whatever in
+ * Linux wants to know (/proc/device-tree/model).
+ */
+/include/ "sun50iw10p1-trimui-brick.dts"
+
+/ {
+	model = "TrimUI Brick Pro";
+	compatible = "trimui,brick-pro\0allwinner,a133\0arm,sun50iw10p1";
+};
+
+/* the I2C driver numbers its bus by this: /dev/i2c-3 */
+&{/aliases} {
+	twi3 = "/soc@03000000/twi@0x05002c00";
+};
+
+&lcd0 {
+	lcd_dclk_freq = <0x39>;
+	lcd_hbp = <0x28>;
+	lcd_ht = <0x4a0>;
+	lcd_hspw = <0x0a>;
+	lcd_vbp = <0x0b>;
+	lcd_vt = <0x320>;
+	lcd_bl_en = <&pio 0x07 0x0b 0x01 0x01 0x00 0x03 0x01>;
+};
+
+&twi3_pins_a {
+	allwinner,pins = "PE3\0PE4";
+	allwinner,muxsel = <0x02>;
+};
+
+&twi3_pins_b {
+	allwinner,pins = "PE3\0PE4";
+};
+
+&{/soc@03000000} {
+	twi3: twi@0x05002c00 {
+		#address-cells = <0x01>;
+		#size-cells = <0x00>;
+		compatible = "allwinner,sun50i-twi";
+		device_type = "twi3";
+		reg = <0x00 0x5002c00 0x00 0x400>;
+		interrupts = <0x00 0x0a 0x04>;
+		clocks = <&clk_twi3>;
+		clock-frequency = <0x30d40>;
+		pinctrl-names = "default\0sleep";
+		pinctrl-0 = <&twi3_pins_a>;
+		pinctrl-1 = <&twi3_pins_b>;
+		status = "okay";
+		twi-supply = <&reg_aldo2>;
+		twi_vol = <0x325aa0>;
+	};
+};

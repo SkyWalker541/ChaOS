@@ -1,0 +1,184 @@
+From: SkyWalker541 <178531074+SkyWalker541@users.noreply.github.com>
+Subject: [PATCH] ChaOS: brick-pad reads the Brick Pro's L3, R3 and sticks
+
+---
+--- a/drivers/input/joystick/brick-pad.c	2026-11-17 15:12:35.956081870 -0800
++++ b/drivers/input/joystick/brick-pad.c	2026-11-17 15:12:35.957535175 -0800
+@@ -15,9 +15,22 @@
+  *
+  * The buttons pull the pins low; the pull-ups are set here, as no pinctrl
+  * state covers these pins yet.
++ *
++ * ChaOS: the TrimUI Brick Pro is the Brick with two sticks, told by its
++ * device tree (trimui,brick-pro: board/brick/dts, chosen by ChaOS's U-Boot).
++ * There the pad has two more keys, the sticks pressed in (L3 on PE7, R3 on
++ * PE8, BTN_TRIGGER_HAPPY1 and 2), and four axes: each stick is an ADC on
++ * TWI3, the left at 0x29 and the right at 0x28, and reading 4 bytes from its
++ * register 0xB0 gives X then Y, 12 bits each, big-endian - as TrimUI's own
++ * input daemon reads them (trimui_inputd, firmware 1.1.1). Reported raw,
++ * 0 to 4095, as ABS_X and ABS_Y (left) and ABS_RX and ABS_RY (right), at the
++ * same 10 ms: what the centre is and which way is up is the launcher's to
++ * learn, as TrimUI keeps a calibration per device.
+  */
+ #include <linux/gpio.h>
++#include <linux/i2c.h>
+ #include <linux/input.h>
++#include <linux/of.h>
+ #include <linux/io.h>
+ #include <linux/module.h>
+ #include <linux/workqueue.h>
+@@ -31,6 +44,7 @@
+ /* sunxi GPIO numbers: bank * 32 + pin, PB = 1, PD = 3, PH = 7 */
+ #define PB(n) (1 * 32 + (n))
+ #define PD(n) (3 * 32 + (n))
++#define PE(n) (4 * 32 + (n))
+ #define PH(n) (7 * 32 + (n))
+ 
+ struct brick_button {
+@@ -59,17 +73,76 @@
+ 	{ PD(16), BTN_DPAD_RIGHT, "Right" },
+ 	{ PD(20), KEY_VOLUMEDOWN, "Volume down" },
+ 	{ PD(21), KEY_VOLUMEUP,   "Volume up" },
++	/* the Brick Pro's: the sticks pressed in */
++	{ PE(7),  BTN_TRIGGER_HAPPY1, "L3" },
++	{ PE(8),  BTN_TRIGGER_HAPPY2, "R3" },
+ };
+ 
+ static struct input_dev *pad;
++
++/* The Brick has the first 19; the Brick Pro all of them */
++#define BRICK_BUTTONS	19
++static int nbuttons = BRICK_BUTTONS;
++
++/* The Brick Pro's sticks */
++#define STICK_BUS	3
++#define STICK_REG	0xb0
++#define STICK_MAX	4095
++static struct i2c_client *stick[2];   /* left, right */
++static const unsigned short stick_addr[2] = { 0x29, 0x28 };
++static const unsigned int stick_axes[2][2] = { { ABS_X, ABS_Y }, { ABS_RX, ABS_RY } };
++
++static void brick_pad_sticks(void)
++{
++	u8 b[4];
++	int s;
++
++	for (s = 0; s < 2; s++) {
++		if (!stick[s] || i2c_smbus_read_i2c_block_data(stick[s], STICK_REG, 4, b) != 4)
++			continue;
++		input_report_abs(pad, stick_axes[s][0], min((b[0] << 8 | b[1]) & 0xffff, STICK_MAX));
++		input_report_abs(pad, stick_axes[s][1], min((b[2] << 8 | b[3]) & 0xffff, STICK_MAX));
++	}
++}
++
++static void brick_pad_sticks_open(void)
++{
++	struct i2c_adapter *bus = i2c_get_adapter(STICK_BUS);
++	int s;
++
++	if (!bus) {
++		pr_err("brick-pad: no I2C bus %d for the sticks\n", STICK_BUS);
++		return;
++	}
++	for (s = 0; s < 2; s++) {
++		stick[s] = i2c_new_dummy(bus, stick_addr[s]);
++		if (!stick[s])
++			pr_err("brick-pad: stick at 0x%02x: no client\n", stick_addr[s]);
++	}
++	i2c_put_adapter(bus);
++}
++
++static void brick_pad_sticks_close(void)
++{
++	int s;
++
++	for (s = 0; s < 2; s++)
++		if (stick[s]) {
++			i2c_unregister_device(stick[s]);
++			stick[s] = NULL;
++		}
++}
++
+ static struct delayed_work poll_work;
+ 
+ static void brick_pad_poll(struct work_struct *work)
+ {
+ 	int i;
+ 
+-	for (i = 0; i < ARRAY_SIZE(buttons); i++)
++	for (i = 0; i < nbuttons; i++)
+ 		input_report_key(pad, buttons[i].code, !gpio_get_value(buttons[i].gpio));
++	if (stick[0] || stick[1])
++		brick_pad_sticks();
+ 	input_sync(pad);
+ 
+ 	schedule_delayed_work(&poll_work, msecs_to_jiffies(POLL_MS));
+@@ -83,7 +156,7 @@
+ 
+ 	if (!pio)
+ 		return;
+-	for (i = 0; i < ARRAY_SIZE(buttons); i++) {
++	for (i = 0; i < nbuttons; i++) {
+ 		int bank = buttons[i].gpio / 32, pin = buttons[i].gpio % 32;
+ 		void __iomem *reg = pio + bank * PIO_BANK_SIZE + PIO_PULL0 + (pin / 16) * 4;
+ 		int shift = (pin % 16) * 2;
+@@ -102,8 +175,11 @@
+ static int __init brick_pad_init(void)
+ {
+ 	int i, err;
++	bool pro = of_machine_is_compatible("trimui,brick-pro");
+ 
+-	for (i = 0; i < ARRAY_SIZE(buttons); i++) {
++	if (pro)
++		nbuttons = ARRAY_SIZE(buttons);
++	for (i = 0; i < nbuttons; i++) {
+ 		err = gpio_request_one(buttons[i].gpio, GPIOF_IN, buttons[i].name);
+ 		if (err) {
+ 			pr_err("brick-pad: pin %d (%s): %d\n", buttons[i].gpio, buttons[i].name, err);
+@@ -115,19 +191,29 @@
+ 
+ 	pad = input_allocate_device();
+ 	if (!pad) {
+-		brick_pad_free_gpios(ARRAY_SIZE(buttons));
++		brick_pad_free_gpios(nbuttons);
+ 		return -ENOMEM;
+ 	}
+ 	pad->name = "Brick Gamepad";
+ 	pad->phys = "brick-pad/input0";
+ 	pad->id.bustype = BUS_HOST;
+-	for (i = 0; i < ARRAY_SIZE(buttons); i++)
++	for (i = 0; i < nbuttons; i++)
+ 		input_set_capability(pad, EV_KEY, buttons[i].code);
++	if (pro) {
++		int s;
++
++		brick_pad_sticks_open();
++		for (s = 0; s < 2; s++) {
++			input_set_abs_params(pad, stick_axes[s][0], 0, STICK_MAX, 16, 0);
++			input_set_abs_params(pad, stick_axes[s][1], 0, STICK_MAX, 16, 0);
++		}
++	}
+ 
+ 	err = input_register_device(pad);
+ 	if (err) {
++		brick_pad_sticks_close();
+ 		input_free_device(pad);
+-		brick_pad_free_gpios(ARRAY_SIZE(buttons));
++		brick_pad_free_gpios(nbuttons);
+ 		return err;
+ 	}
+ 
+@@ -140,10 +226,11 @@
+ {
+ 	cancel_delayed_work_sync(&poll_work);
+ 	input_unregister_device(pad);
+-	brick_pad_free_gpios(ARRAY_SIZE(buttons));
++	brick_pad_sticks_close();
++	brick_pad_free_gpios(nbuttons);
+ }
+ 
+ module_init(brick_pad_init);
+ module_exit(brick_pad_exit);
+-MODULE_DESCRIPTION("TrimUI Brick buttons");
++MODULE_DESCRIPTION("TrimUI Brick and Brick Pro buttons and sticks");
+ MODULE_LICENSE("GPL");

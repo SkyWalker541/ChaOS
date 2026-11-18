@@ -499,7 +499,9 @@ static void overlay_dirs_ensure(const app *a)
 	       strcmp(was, CHAOS_VERSION) != 0;
 	if (seed) overlays_retire();
 	for (i = 0; i < a->sys.count; i++) {
-		if (!a->sys.systems[i].folder[0] || !strcmp(a->sys.systems[i].core, PICO8_CORE)) continue;
+		/* ChaOS: PICO-8's too, for overlays of the player's own
+		 * (res/pico8/overlay.c) */
+		if (!a->sys.systems[i].folder[0]) continue;
 		overlay_dir(a, i, d, sizeof d);
 		mkdir(d, 0755);
 		if (seed) overlay_seed(a, i, d);
@@ -567,6 +569,9 @@ static const struct { const char *tag; int w, h; double aspect; } OVL_SCREENS[] 
 	{ "GG",   160, 144, 10.0 / 9.0 },
 	{ "NGP",  160, 152, 160.0 / 152.0 },
 	{ "NGPC", 160, 152, 160.0 / 152.0 },
+	/* ChaOS: PICO-8, which draws itself, always at a whole multiple
+	 * (768x768 on the Brick) whatever the Display Mode (res/pico8) */
+	{ "PICO8", 128, 128, 1.0 },
 };
 
 /* Where the game is drawn at `mode`, as ChaOS-diatom works it out
@@ -581,7 +586,7 @@ static bool overlay_game_rect(const app *a, int sys, int mode, SDL_Rect *r)
 		double asp = OVL_SCREENS[i].aspect;
 
 		if (strcmp(OVL_SCREENS[i].tag, a->sys.systems[sys].tag)) continue;
-		if (!strcmp(DMODES[mode].name, "integer")) {
+		if (!strcmp(DMODES[mode].name, "integer") || !strcmp(a->sys.systems[sys].tag, "PICO8")) {
 			f = W / w < H / h ? W / w : H / h;
 			if (f < 1) f = 1;
 			r->w = w * f; r->h = h * f;
@@ -5982,6 +5987,11 @@ static int menu_build(app *a, screen_id screen, int sys,
 		u.rom_page  = g_rom_page;
 		u.net_page  = g_net_page;
 		u.sys_page  = g_sys_page;
+		{
+			int raw[4];
+
+			u.sticks = plat_sticks(raw);
+		}
 		u.show_clock = g_status_clock ? "On" : "Off";
 		u.show_batt  = STATUS_BATT_NAMES[g_status_batt];
 		u.update_dot = g_update_dot ? "On" : "Off";
@@ -9140,6 +9150,22 @@ static bool rewind_load(const char *tag)
 	return db_get_int(db_dev(), k, 0) == 1;
 }
 
+/* ChaOS: Left Stick as D-Pad, by console: on, but for the PlayStation, whose
+ * games made for sticks have them as a DualShock's (Diatom) */
+static bool stick_dpad_load(const char *tag)
+{
+	char k[CFG_STR + 16];
+	snprintf(k, sizeof k, "stickdpad.%s", tag);
+	return db_get_int(db_dev(), k, strcmp(tag, "PS") ? 1 : 0) == 1;
+}
+
+static void stick_dpad_save(const char *tag, bool on)
+{
+	char k[CFG_STR + 16];
+	snprintf(k, sizeof k, "stickdpad.%s", tag);
+	db_set_int(db_dev(), k, on ? 1 : 0);
+}
+
 static void rewind_save(const char *tag, bool on)
 {
 	char k[CFG_STR + 16];
@@ -10571,6 +10597,8 @@ static void about_screen(app *a)
 	}
 }
 
+static void sticks_screen(app *a);   /* ChaOS: Calibrate Sticks, below */
+
 /* Which page the shelf's controls are described on. See controls.h: the page
  * follows UI Direction, because which axis moves is what that setting does. */
 static ctl_dir controls_dir(void)
@@ -11079,6 +11107,7 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 		               .pm_have = ports_pm_ready(P_ROMS),
 		               .night_ok = plat_volume_night_ok(), .appearance = g_appearance_page,
 		               .rom_page = g_rom_page, .net_page = g_net_page, .sys_page = g_sys_page,
+		               .sticks = plat_sticks((int[4]){ 0 }),
 		               .name_speed = CARDS_DRAWN(g_cards) ? PN_SPEEDS[g_pn_speed[g_dir]].name
 		                                                  : NULL,
 		               .list_view = CARD_DIRS[g_dir].both ? NULL : "" };
@@ -11257,6 +11286,7 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 	case PM_SYSPAGE:      sys_page_screen(a); break;
 	case PM_STATS:        if (stats_screen(a)) return MENU_DONE; break;
 	case PM_CONTROLS:     controls_screen(a); break;
+	case PM_STICKS:       sticks_screen(a); break;
 	case PM_PORTS:        pm_get(a); break;
 	case PM_ROMMGMT:      rom_page_screen(a); break;
 	case PM_ROMM:         romm_screen(a); break;
@@ -11725,6 +11755,11 @@ static int gm_build(app *a, menu_row *out, gm_bufs *b, int shots, const char *sh
 	{
 		sysview *sv = &a->view[a->sys_cursor];
 		u.overscan = os_label(a->sys.systems[shelf_owner(a, a->sys_cursor, sv->cursor)].tag);
+	}
+	{
+		sysview *sv = &a->view[a->sys_cursor];
+
+		u.stick = stick_dpad_load(a->sys.systems[shelf_owner(a, a->sys_cursor, sv->cursor)].tag) ? "On" : "Off";
 	}
 	u.disc = NULL;
 	if (g_disc_n > 1) {
@@ -14433,6 +14468,15 @@ static menu_result gm_key(app *a, void *ctx, in_button key, int sel)
 		}
 		return MENU_STAY;
 	}
+	if (sel == GM_STICK && (key == IN_LEFT || key == IN_RIGHT || key == IN_ACCEPT)) {
+		/* ChaOS: kept for the console, and to the paused game at once */
+		const char *tag = a->sys.systems[gm_owner(a)].tag;
+		bool on = !stick_dpad_load(tag);
+
+		stick_dpad_save(tag, on);
+		plat_resident_line("SETSTICKDPAD\ton=%d", on ? 1 : 0);
+		return MENU_STAY;
+	}
 	if (sel == GM_OVERLAY && (key == IN_LEFT || key == IN_RIGHT || key == IN_ACCEPT)) {
 		overlay_cycle(a, gm_owner(a), key == IN_LEFT ? -1 : 1);
 		gm_apply_overlay(c);
@@ -14842,6 +14886,11 @@ static void game_menu(app *a)
 			g_disc_i = known_i;
 		}
 		c.hide[GM_DISC] = g_disc_n < 2;
+		{
+			int raw[4];
+
+			c.hide[GM_STICK] = !plat_sticks(raw);
+		}
 	}
 	/* The frame as the shader drew it, when it did: what the player was
 	 * looking at. And the overlay over it. */
@@ -15373,6 +15422,8 @@ static void port_launch(app *a, int o, const char *romfile, const char *title)
 	render(a);
 }
 
+#define P8_OVERLAY_BMP "/tmp/chaos-p8-overlay.bmp"
+
 /* ChaOS: PICO-8 (pico8.h), as a port is run - its own process group, the
  * power prompt over it, Select+Start held to end it - by
  * ChaOS/pico8/run.sh, with a cart or Splore */
@@ -15382,7 +15433,7 @@ static void p8_launch(app *a, int o, const char *file, const char *title)
 	char runner[CFG_STR * 2], cart[LIB_PATH * 2], ud[LIB_PATH + 32], card[LIB_PATH + 32];
 	char dir[LIB_PATH + 16];
 	char *argv[4];
-	const char *envkv[3];
+	const char *envkv[4];
 	bool music, splore = !strcmp(file, PICO8_SPLORE_FILE);
 	int how = PORT_ENDED, rc;
 	p8_status st;
@@ -15410,6 +15461,31 @@ static void p8_launch(app *a, int o, const char *file, const char *title)
 	envkv[0] = ud;
 	envkv[1] = card;
 	envkv[2] = NULL;
+	envkv[3] = NULL;
+	/* ChaOS: its overlay, made the screen's size, as a BMP the SDL PICO-8
+	 * has can read for itself (res/pico8/overlay.c) */
+	unlink(P8_OVERLAY_BMP);
+	{
+		char ol[256];
+
+		if (overlay_label(a, o, ol, sizeof ol)) {
+			char path[LIB_PATH * 3];
+			SDL_Surface *img, *full;
+
+			overlay_dir(a, o, path, sizeof path);
+			snprintf(path + strlen(path), sizeof path - strlen(path), "/%s", a->view[o].overlay);
+			if ((img = IMG_Load(path))) {
+				full = SDL_CreateRGBSurfaceWithFormat(0, TORTOS_SCREEN_W, TORTOS_SCREEN_H, 32, SDL_PIXELFORMAT_ARGB8888);
+				if (full) {
+					SDL_SetSurfaceBlendMode(img, SDL_BLENDMODE_NONE);
+					SDL_BlitScaled(img, NULL, full, NULL);
+					if (SDL_SaveBMP(full, P8_OVERLAY_BMP) == 0) envkv[2] = "CHAOS_P8_OVERLAY=" P8_OVERLAY_BMP;
+					SDL_FreeSurface(full);
+				}
+				SDL_FreeSurface(img);
+			}
+		}
+	}
 	argv[0] = (char *)"/bin/sh";
 	argv[1] = runner;
 	argv[2] = splore ? (char *)"-splore" : cart;
@@ -16381,6 +16457,220 @@ static void pm_frame_end(app *a)
 	plat_draw_osd(a->r);
 	plat_present();
 }
+
+/* ---- ChaOS: Calibrate Sticks (the Brick Pro) --------------------------------
+ *
+ * A stick's ADC reads 0 to 4095, but where it rests, how far each way goes and
+ * even which way is up are the device's own, so ChaOS asks. Let go and press
+ * A: the middles. Then each stick pushed up and pushed right, held a moment
+ * (a thumb on a stick has none spare for A): which raw axis is which, and
+ * which way. Then both sticks round their edges, and A: the ends. Kept in
+ * sticks.cfg, which the menus and Diatom's games both read (plat_sticks).
+ * B goes back a step, and out from the first. */
+enum { STK_REST, STK_LUP, STK_LRIGHT, STK_RUP, STK_RRIGHT, STK_EDGES, STK_DONE };
+
+static const char *const STK_SAY[] = {
+	"Let go of both sticks,\nthen press A",
+	"Push the left stick up,\nall the way, and hold it",
+	"Push the left stick right,\nall the way, and hold it",
+	"Push the right stick up,\nall the way, and hold it",
+	"Push the right stick right,\nall the way, and hold it",
+	"Turn both sticks round their edges\na few times, then press A",
+	"Done: both sticks are calibrated",
+};
+
+static int g_sticks_shot = -1;   /* --sticks STEP: one frame of a step */
+static bool shot_gmstick;         /* --gmstick: the in-game menu with the Brick Pro's row */
+
+static void stk_draw(app *a, int step, const plat_stick_cal *cal, const int raw[4], float hold)
+{
+	SDL_Rect panel = PM_PANEL;
+	TTF_Font *fm = ui_font(UI_F_MENU), *fs = ui_font(UI_F_META);
+	int lm = ui_font_line(UI_F_MENU), ls = ui_font_line(UI_F_META);
+	int r = 120, cy = panel.y + 120 + r, s;
+	char lines[2][CHV_WRAP_COLS], meta[24];
+	const char *say = STK_SAY[step];
+	int k, nl;
+
+	snprintf(meta, sizeof meta, "%d of 6", step < STK_DONE ? step + 1 : 6);
+	pm_frame_begin(a, MENU_ACCENT, "Calibrate Sticks", meta);
+	for (s = 0; s < 2; s++) {
+		int cx = panel.x + panel.w / 2 + (s ? 170 : -170);
+		float x = plat_stick_axis(&cal[s * 2], raw), y = plat_stick_axis(&cal[s * 2 + 1], raw);
+		bool lit = (s == 0 && (step == STK_LUP || step == STK_LRIGHT)) ||
+		           (s == 1 && (step == STK_RUP || step == STK_RRIGHT)) || step == STK_EDGES || step == STK_REST;
+		SDL_Rect ring = { cx - r, cy - r, 2 * r, 2 * r };
+		int dx = cx + (int)(x * (r - 18)), dy = cy + (int)(y * (r - 18));
+
+		ui_round_rect(a->r, &ring, r, (SDL_Color){ 255, 255, 255, (Uint8)(lit ? 30 : 12) });
+		SDL_SetRenderDrawColor(a->r, 255, 255, 255, 50);
+		SDL_RenderDrawLine(a->r, cx - r + 10, cy, cx + r - 10, cy);
+		SDL_RenderDrawLine(a->r, cx, cy - r + 10, cx, cy + r - 10);
+		ui_round_rect(a->r, &(SDL_Rect){ dx - 14, dy - 14, 28, 28 }, 14,
+		              lit ? (SDL_Color){ 0x3D, 0xD6, 0xFF, 255 } : (SDL_Color){ 160, 160, 170, 255 });
+		ui_text(a->r, fs, s ? "Right" : "Left", cx, cy + r + 12, 0, UI_TEXT_DIM);
+	}
+	nl = wrap_text(fm, say, panel.w - 120, lines, 2);
+	{
+		/* the "\n" in a step's words is where it breaks, when it fits */
+		char one[2][CHV_WRAP_COLS];
+		const char *nlp = strchr(say, '\n');
+
+		if (nlp) {
+			snprintf(one[0], sizeof one[0], "%.*s", (int)(nlp - say), say);
+			snprintf(one[1], sizeof one[1], "%s", nlp + 1);
+			memcpy(lines, one, sizeof one);
+			nl = 2;
+		}
+	}
+	for (k = 0; k < nl; k++)
+		ui_text(a->r, fm, lines[k], panel.x + panel.w / 2, cy + r + 24 + ls + 16 + k * (lm + 4), 0,
+		        step == STK_DONE ? (SDL_Color){ 120, 220, 150, 255 } : UI_TEXT);
+	if (hold > 0) {
+		int bw = 240, by = cy + r + 24 + ls + 16 + nl * (lm + 4) + 12;
+
+		SDL_SetRenderDrawColor(a->r, 255, 255, 255, 30);
+		SDL_RenderFillRect(a->r, &(SDL_Rect){ panel.x + (panel.w - bw) / 2, by, bw, 8 });
+		SDL_SetRenderDrawColor(a->r, 0x3D, 0xD6, 0xFF, 255);
+		SDL_RenderFillRect(a->r, &(SDL_Rect){ panel.x + (panel.w - bw) / 2, by, (int)(bw * hold), 8 });
+	}
+	pm_footer(a, step == STK_DONE ? "A B: done" : step == STK_REST || step == STK_EDGES ? "A: next   B: back"
+	                                                                                    : "B: back");
+	pm_frame_end(a);
+}
+
+/* The calibration as sticks.cfg has it */
+static bool stk_save(const plat_stick_cal *c)
+{
+	static const char *const name[4] = { "lx", "ly", "rx", "ry" };
+	char p[LIB_PATH + 32], tmp[LIB_PATH + 40];
+	FILE *f;
+	int i;
+
+	snprintf(p, sizeof p, "%s/sticks.cfg", P_USERDATA);
+	snprintf(tmp, sizeof tmp, "%s.part", p);
+	if (!(f = fopen(tmp, "w"))) return false;
+	fprintf(f, "# ChaOS: the Brick Pro's sticks (MENU > System Settings > Calibrate Sticks).\n"
+	           "# A direction: its raw axis; raw at the left or up end, at rest, at the right or down end\n");
+	for (i = 0; i < 4; i++) fprintf(f, "%s %d %d %d %d\n", name[i], c[i].idx, c[i].neg, c[i].mid, c[i].pos);
+	if (fclose(f) != 0) { unlink(tmp); return false; }
+	if (rename(tmp, p) != 0) return false;
+	sync();
+	return true;
+}
+
+static void sticks_screen(app *a)
+{
+	plat_stick_cal cal[4], live[4];
+	int raw[4], mid[4] = { 0 }, lo[4], hi[4], push[4] = { 0 }, step = STK_REST, i;
+	unsigned held_since = 0;
+
+	if (g_sticks_shot >= 0) {
+		/* a screenshot: the left stick pushed up, the right at rest */
+		for (i = 0; i < 4; i++) cal[i] = (plat_stick_cal){ i, 350, 2048, 3750 };
+		raw[0] = 2048; raw[1] = g_sticks_shot == STK_LUP ? 700 : 2048; raw[2] = 2300; raw[3] = 2048;
+	} else if (!plat_sticks(raw) || !plat_sticks_cal(cal)) {
+		return;
+	}
+	memcpy(live, cal, sizeof cal);
+	if (g_sticks_shot >= 0) {
+		step = g_sticks_shot;
+		stk_draw(a, step, live, raw, step == STK_LUP ? 0.6f : 0);
+		return;
+	}
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+	while (a->running) {
+		float hold = 0;
+
+		plat_input_poll(&a->in);
+		plat_sticks(raw);
+		if (a->in.quit_requested) { a->running = false; break; }
+		if (a->in.pressed[IN_POWER] || idle_due(a)) { power_off(a); break; }
+		if (a->in.pressed[IN_MENU]) { g_menu_closing = true; break; }
+		if (a->in.pressed[IN_BACK]) {
+			if (step == STK_REST || step == STK_DONE) break;
+			step = step == STK_EDGES ? STK_RRIGHT : step - 1;
+			held_since = 0;
+		}
+		if (step == STK_REST && a->in.pressed[IN_ACCEPT]) {
+			for (i = 0; i < 4; i++) { mid[i] = lo[i] = hi[i] = raw[i]; live[i].mid = raw[i]; live[i].idx = i; }
+			step = STK_LUP;
+		} else if (step >= STK_LUP && step <= STK_RRIGHT) {
+			/* the raw axis of this stick moved furthest, held there half a second */
+			int base = step <= STK_LRIGHT ? 0 : 2, best = base, d0, d1;
+
+			d0 = abs(raw[base] - mid[base]);
+			d1 = abs(raw[base + 1] - mid[base + 1]);
+			if (d1 > d0) best = base + 1;
+			if ((d1 > d0 ? d1 : d0) > 900) {
+				if (!held_since) held_since = plat_now_ms();
+				hold = (float)(plat_now_ms() - held_since) / 600.0f;
+				if (hold >= 1) {
+					int dir = step == STK_LUP ? 1 : step == STK_LRIGHT ? 0 : step == STK_RUP ? 3 : 2;
+
+					push[dir] = raw[best];
+					live[dir].idx = best;
+					live[dir].mid = mid[best];
+					/* for now, the ends as far as it was pushed; Edges finds them */
+					if (dir == 1 || dir == 3) { live[dir].neg = raw[best]; live[dir].pos = 2 * mid[best] - raw[best]; }
+					else { live[dir].pos = raw[best]; live[dir].neg = 2 * mid[best] - raw[best]; }
+					step++;
+					held_since = 0;
+					hold = 0;
+					if (step == STK_EDGES) for (i = 0; i < 4; i++) lo[i] = hi[i] = raw[i];
+				}
+			} else {
+				held_since = 0;
+			}
+		} else if (step == STK_EDGES) {
+			for (i = 0; i < 4; i++) {
+				if (raw[i] < lo[i]) lo[i] = raw[i];
+				if (raw[i] > hi[i]) hi[i] = raw[i];
+			}
+			if (a->in.pressed[IN_ACCEPT]) {
+				bool ok = true;
+
+				for (i = 0; i < 4; i++) {
+					int r0 = live[i].idx, m = mid[r0];
+					/* the end on the side it was pushed, and the other */
+					bool push_low = push[i] < m;
+					int toward = push_low ? lo[r0] : hi[r0], away = push_low ? hi[r0] : lo[r0];
+
+					if (abs(toward - m) < 600 || abs(away - m) < 600) ok = false;
+					if (i == 1 || i == 3) { live[i].neg = toward; live[i].pos = away; }
+					else { live[i].pos = toward; live[i].neg = away; }
+					live[i].mid = m;
+				}
+				if (live[0].idx == live[1].idx || live[2].idx == live[3].idx) ok = false;
+				if (!ok) {
+					pick_say(a, "Calibrate Sticks", "That didn't reach the edges.\nLet's try again.", MENU_ACCENT);
+					memcpy(live, cal, sizeof cal);
+					step = STK_REST;
+				} else if (stk_save(live)) {
+					plat_sticks_reload();
+					plat_sticks_cal(cal);
+					memcpy(live, cal, sizeof cal);
+					step = STK_DONE;
+				} else {
+					pick_say(a, "Calibrate Sticks", "Couldn't save it to the card", MENU_ACCENT);
+				}
+				plat_input_flush();
+				memset(&a->in, 0, sizeof a->in);
+				continue;
+			}
+		} else if (step == STK_DONE && a->in.pressed[IN_ACCEPT]) {
+			break;
+		}
+		if (in_repeat(&a->in, IN_VOLUP)) plat_volume_nudge(+1);
+		if (in_repeat(&a->in, IN_VOLDN)) plat_volume_nudge(-1);
+		stk_draw(a, step, live, raw, hold > 1 ? 1 : hold);
+		SDL_Delay(8);
+	}
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+}
+
 
 /* A small tag: what a port is, beside its name */
 static int pm_tag(app *a, const char *s, int right, int cy, SDL_Color fg, SDL_Color bg)
@@ -21266,6 +21556,8 @@ static void launch_game(app *a)
 			plat_resident_set_play(remap_spec(otag, v->list.items[v->cursor].file,
 			                                  spec, sizeof spec),
 			                       rewind_load(otag));
+			/* the Brick Pro's left stick, as the console has it */
+			plat_resident_set_stick(plat_sticks((int[4]){ 0 }) ? stick_dpad_load(otag) : -1);
 			/* and its cheats, those that are on */
 			cht_for_launch(a, o, v->list.items[v->cursor].file);
 		}
@@ -23761,6 +24053,7 @@ static void take_shot(app *a)
 		SDL_RenderFillRect(a->r, NULL);
 		menu_draw(a, heading, rows, n, g_bw_shot - 1, 0, MENU_ACCENT);
 	}
+	if (g_sticks_shot >= 0) sticks_screen(a);
 	if (g_chan_shot) {
 		menu_row rows[8];
 		const char *heading;
@@ -23838,6 +24131,12 @@ static void take_shot(app *a)
 		if (!os_for(a->sys.systems[gm_owner(a)].tag)) {
 			/* one up, when Disc went */
 			int at = GM_OVERSCAN - (g_disc_n < 2);
+			memmove(&rows[at], &rows[at + 1], sizeof *rows * (size_t)(gn - at - 1));
+			gn--;
+		}
+		if (!shot_gmstick) {
+			/* the Brick Pro's alone (--gmstick) */
+			int at = GM_STICK - (g_disc_n < 2) - !os_for(a->sys.systems[gm_owner(a)].tag);
 			memmove(&rows[at], &rows[at + 1], sizeof *rows * (size_t)(gn - at - 1));
 			gn--;
 		}
@@ -24146,6 +24445,7 @@ int main(int argc, char *argv[])
 		/* --menu [row] draws the TortOS menu over whichever screen --screen
 		 * asked for, so the panel can be looked at without a device. */
 		else if (!strcmp(argv[i], "--gmenu") && i + 1 < argc) shot_gmenu = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "--gmstick")) shot_gmstick = true;
 		/* ChaOS: --gmdisc N, the in-game menu of a game on N discs, the first in */
 		else if (!strcmp(argv[i], "--gmdisc") && i + 1 < argc) { g_disc_n = atoi(argv[++i]); g_disc_i = 0; }
 		else if (!strcmp(argv[i], "--discpage") && i + 1 < argc) {
@@ -24163,6 +24463,7 @@ int main(int argc, char *argv[])
 		}
 		else if (!strcmp(argv[i], "--port-power") && i + 1 < argc) shot_port_power = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--about")) g_about_shot = true;
+		else if (!strcmp(argv[i], "--sticks") && i + 1 < argc) g_sticks_shot = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--chan") && i + 1 < argc) g_chan_shot = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--battwarn") && i + 1 < argc) g_bw_shot = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--romm") && i + 1 < argc) {

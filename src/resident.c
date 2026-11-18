@@ -21,7 +21,8 @@
 static char g_play_map[512];
 static bool g_play_rewind;
 static char g_play_mode[16];     /* Display Mode, Diatom's name: "integer" */
-static char g_play_tz[64];       /* the player's zone, an id such as "America/New_York" */
+static char g_play_tz[64];
+static int  g_play_stick = -1;    /* ChaOS: Left Stick as D-Pad for the next game, -1 none */       /* the player's zone, an id such as "America/New_York" */
 static char g_play_cheats[1024]; /* the cheats on, as a file for Diatom, or "" */
 
 /* One connection, held across games. Diatom is fine with that - it is the
@@ -392,6 +393,9 @@ bool plat_resident_send(const char *tag, const char *core, const char *rom,
 			dsend("SETREWIND\ton=%d", g_play_rewind ? 1 : 0);
 			/* ChaOS: the game's cheats, when any are on */
 			if (g_play_cheats[0]) dsend("SETCHEATS\tpath=%s", g_play_cheats);
+			/* ChaOS: the Brick Pro's Left Stick as D-Pad */
+			if (g_play_stick >= 0) dsend("SETSTICKDPAD\ton=%d", g_play_stick);
+			g_play_stick = -1;
 			g_play_map[0] = '\0';
 			g_play_rewind = false;
 			g_play_cheats[0] = '\0';
@@ -494,6 +498,8 @@ const char *plat_resident_last_glass(void) { return d_glass; }
 static void d_note_level(const char *l);
 static void d_note_audio(const char *l);
 static void d_note_display(const char *l);
+
+void plat_resident_set_stick(int on) { g_play_stick = on; }
 
 void plat_resident_set_play(const char *map, bool rewind)
 {
