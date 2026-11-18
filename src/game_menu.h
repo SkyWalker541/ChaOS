@@ -103,7 +103,11 @@ int gi_rows(menu_row *out, const game_info *gi, bool net);
 
 typedef enum {
 	GM_CONTINUE, GM_SAVE, GM_LOAD, GM_DISC, GM_SHOT, GM_SHOTS, GM_DISPLAY, GM_SHADER, GM_OVERLAY, GM_OVERSCAN,
-	GM_BUTTONS, GM_CHEATS,
+	GM_BUTTONS,
+	/* ChaOS: on a device with sticks (the Brick Pro), the left one as the
+	 * d-pad too, for the console */
+	GM_STICK,
+	GM_CHEATS,
 	GM_CHEEVOS, GM_RESET,
 	GM_QUIT,
 	GM_ROWS
@@ -138,6 +142,7 @@ typedef struct {
 	/* ChaOS: the disc that is in, "Disc 1 loaded", for a game on more than one; the
 	 * caller leaves the row out for the rest */
 	const char *disc;
+	const char *stick;    /* ChaOS: Left Stick as D-Pad, "On" or "Off" */
 } gm_ui;
 
 /* Where the Cheevos row's text lives; the caller owns it, because a row holds

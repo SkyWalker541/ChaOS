@@ -60,6 +60,13 @@ export SDL_GAMECONTROLLERCONFIG="19001eec427269636b2047616d657000,Brick Gamepad,
 # The SDL ports use: the Brick's own, finding the pad with no udev
 export LD_LIBRARY_PATH="/usr/lib/chaos-ports${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
+# ChaOS: the console's overlay, when one is chosen: the launcher leaves it as
+# a BMP the screen's size, drawn over each frame by lib/overlay.so
+if [ -n "$CHAOS_P8_OVERLAY" ] && [ -f "$CHAOS_P8_OVERLAY" ] && [ -f "$HERE/lib/overlay.so" ]; then
+	export LD_PRELOAD="$HERE/lib/overlay.so${LD_PRELOAD:+:$LD_PRELOAD}"
+	echo "overlay: $CHAOS_P8_OVERLAY"
+fi
+
 trap 'echo "run.sh: stopped by ChaOS"; exit 143' TERM HUP INT
 
 cd "$ENGINE" || exit 1
