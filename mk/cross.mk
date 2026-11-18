@@ -94,6 +94,14 @@ $(BUILD)/tortos-update: $(UPDATE_SRC) $(wildcard tools/tortos-update/*.h) $(XZ_S
 	$(CC) -O2 -mcpu=cortex-a53 -Wall -Wextra -std=gnu11 -D_GNU_SOURCE -static \
 	      -D$(UPDATE_DEVICE) -DXZ_USE_CRC64 -I$(XZ_DIR) -o $@ $(UPDATE_SRC) $(XZ_SRC)
 
+# ChaOS: the overlay over the player's own PICO-8, loaded into it with
+# LD_PRELOAD by res/pico8/run.sh (see res/pico8/overlay.c). Uses the SDL
+# PICO-8 has loaded, so it links to none; kept as dist/brick/pico8-overlay.so.
+$(BUILD)/pico8-overlay.so: res/pico8/overlay.c
+	mkdir -p $(BUILD)
+	$(CC) -shared -fPIC -O2 -Wall -Wextra -I$(SYSROOT)/include/SDL2 -I$(SYSROOT)/include -D_REENTRANT \
+	      -o $@ $< -ldl
+
 # Registers a do-nothing media player with BlueZ so a headset's absolute
 # volume is not dropped, and hands a headset's keys to Muse; see the file.
 # Linked against SYSROOT's libdbus, whose arch header lives under lib.

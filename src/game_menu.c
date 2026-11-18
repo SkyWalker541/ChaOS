@@ -101,7 +101,8 @@ int gm_rows(const gm_ui *u, menu_row *out, gm_bufs *b)
 {
 	static const char *label[GM_ROWS] = {
 		"Continue", "Save", "Load", "Disc", "Take Screenshot", "Screenshots",
-		"Display Mode", "Shader", "Overlay", "Crop Overscan", "Controls", "Cheats", "RetroAchievements", "Reset", "Quit"
+		"Display Mode", "Shader", "Overlay", "Crop Overscan", "Controls", "Left Stick as D-Pad", "Cheats",
+		"RetroAchievements", "Reset", "Quit"
 	};
 	int i;
 
@@ -120,6 +121,7 @@ int gm_rows(const gm_ui *u, menu_row *out, gm_bufs *b)
 			"A frame drawn around the picture",
 			"Trim the edges an old TV hid",
 			"What each button does in this console's games",
+			"Move with the stick too, in this console's games",
 			"Codes for this game, turned on and off here",
 			"This game's achievements and how many you have",
 			"Start the game over, as if switched off and on",
@@ -147,6 +149,8 @@ int gm_rows(const gm_ui *u, menu_row *out, gm_bufs *b)
 	out[GM_SHADER].opens = u->shader != NULL;
 	out[GM_CHEEVOS].opens = true;
 	out[GM_BUTTONS].opens = true;   /* ChaOS: Button Mapping, for this game */
+	out[GM_STICK].value = u->stick ? u->stick : "Off";
+	out[GM_STICK].toggle = true;
 	/* ChaOS: Cheats, how many are on */
 	out[GM_CHEATS].opens = true;
 	if (u->cheats_on > 0) snprintf(b->cheats, sizeof b->cheats, "%d On", u->cheats_on);
