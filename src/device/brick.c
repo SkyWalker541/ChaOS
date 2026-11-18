@@ -223,6 +223,9 @@ static void input_scan(void)
 }
 #endif
 
+static bool g_sticks;          /* ChaOS: the Brick Pro's, below */
+static void sticks_load(void);
+
 bool plat_input_init(void)
 {
 	char marker[512];
@@ -233,6 +236,14 @@ bool plat_input_init(void)
 	if (fd_pad < 0)   fprintf(stderr, "input: no gamepad found\n");
 	if (fd_keys < 0)  fprintf(stderr, "input: no volume keys found\n");
 	if (fd_power < 0) fprintf(stderr, "input: no power key found\n");
+	if (fd_pad >= 0 && !g_sticks) {
+		unsigned long abs[NLONGS(ABS_MAX)];
+
+		memset(abs, 0, sizeof abs);
+		ioctl(fd_pad, EVIOCGBIT(EV_ABS, sizeof abs), abs);
+		g_sticks = BIT_IS_SET(abs, ABS_X) && BIT_IS_SET(abs, ABS_RY);
+		if (g_sticks) { fprintf(stderr, "input: two sticks (Brick Pro)\n"); sticks_load(); }
+	}
 #endif
 	return true;
 }
@@ -269,13 +280,113 @@ void plat_input_settle(in_state *st)
 /* The descriptors stay open: they are display-independent. */
 void plat_input_quit(void) { }
 
+/* ---- ChaOS: the Brick Pro's sticks ------------------------------------------
+ *
+ * brick-pad reports them raw (0 to 4095 each way) on the Brick Pro. In the
+ * menus the left stick moves as the d-pad does, pushed past half its way and
+ * let go below a third, so a stick resting near the line doesn't flicker.
+ * Calibrate Sticks (main.c) learns the device's own ends, middles and which
+ * way is which into sticks.cfg; Diatom reads the same file for the games.
+ * Without it each axis is its own, at rest where it was when ChaOS started. */
+#ifdef __linux__
+static const int stick_abs[4] = { ABS_X, ABS_Y, ABS_RX, ABS_RY };
+#endif
+static int  g_raw[4];
+static plat_stick_cal g_cal[4];
+static unsigned g_stick_dirs;          /* the d-pad directions the left stick holds */
+
+static void sticks_load(void)
+{
+	static const char *const name[4] = { "lx", "ly", "rx", "ry" };
+	char path[512], line[96];
+	FILE *f;
+	int i;
+
+	for (i = 0; i < 4; i++) {
+#ifdef __linux__
+		struct input_absinfo ai;
+
+		if (fd_pad >= 0 && ioctl(fd_pad, EVIOCGABS(stick_abs[i]), &ai) == 0) g_raw[i] = ai.value;
+#endif
+		g_cal[i].idx = i;
+		g_cal[i].mid = g_raw[i];
+		g_cal[i].neg = g_raw[i] - 1700;
+		g_cal[i].pos = g_raw[i] + 1700;
+	}
+	snprintf(path, sizeof path, "%s/sticks.cfg", P_USERDATA);
+	if (!(f = fopen(path, "r"))) return;
+	while (fgets(line, sizeof line, f)) {
+		char n[8];
+		int idx, neg, mid, pos;
+
+		if (sscanf(line, "%7s %d %d %d %d", n, &idx, &neg, &mid, &pos) != 5) continue;
+		if (idx < 0 || idx > 3 || neg == mid || pos == mid) continue;
+		for (i = 0; i < 4; i++)
+			if (!strcmp(n, name[i])) {
+				g_cal[i].idx = idx; g_cal[i].neg = neg; g_cal[i].mid = mid; g_cal[i].pos = pos;
+			}
+	}
+	fclose(f);
+}
+
+bool plat_sticks(int raw[4])
+{
+	int i;
+
+	for (i = 0; i < 4; i++) raw[i] = g_raw[i];
+	return g_sticks;
+}
+
+void plat_sticks_reload(void) { if (g_sticks) sticks_load(); }
+
+bool plat_sticks_cal(plat_stick_cal out[4])
+{
+	memcpy(out, g_cal, sizeof g_cal);
+	return g_sticks;
+}
+
+/* A direction, -1 to 1 */
+float plat_stick_axis(const plat_stick_cal *c, const int raw[4])
+{
+	float r = (float)raw[c->idx], mid = (float)c->mid, v;
+	bool plus = (r >= mid) == (c->pos >= c->mid);
+	float end = plus ? (float)c->pos : (float)c->neg;
+
+	v = (r - mid) / (end - mid);
+	if (v > 1) v = 1;
+	if (v < 0) v = 0;
+	return plus ? v : -v;
+}
+
+static void sticks_dpad(in_state *st)
+{
+	static const in_button b[4] = { IN_LEFT, IN_RIGHT, IN_UP, IN_DOWN };
+	float x = plat_stick_axis(&g_cal[0], g_raw), y = plat_stick_axis(&g_cal[1], g_raw);
+	float v[4] = { -x, x, -y, y };
+	int i;
+
+	for (i = 0; i < 4; i++) {
+		bool held = g_stick_dirs & (1u << i), want = held ? v[i] > 0.33f : v[i] > 0.5f;
+
+		if (want == held) continue;
+		g_stick_dirs ^= 1u << i;
+		plat_set_btn(st, b[i], want);
+	}
+}
+
 static void poll_fd(int fd, in_state *st)
 {
 #ifdef __linux__
 	struct input_event ev;
 	size_t i;
+	bool moved = false;
 
 	while (fd >= 0 && read(fd, &ev, sizeof ev) == (ssize_t)sizeof ev) {
+		if (ev.type == EV_ABS && fd == fd_pad && g_sticks) {
+			for (i = 0; i < 4; i++)
+				if (stick_abs[i] == ev.code) { g_raw[i] = ev.value; moved = true; }
+			continue;
+		}
 		if (ev.type != EV_KEY || ev.value == 2) continue;
 		if (dbg_input) fprintf(stderr, "[in] fd=%d code=%d val=%d\n", fd, ev.code, ev.value);
 		for (i = 0; i < sizeof keymap / sizeof keymap[0]; i++)
@@ -284,6 +395,7 @@ static void poll_fd(int fd, in_state *st)
 				break;
 			}
 	}
+	if (moved) sticks_dpad(st);
 #else
 	(void)fd; (void)st;
 #endif

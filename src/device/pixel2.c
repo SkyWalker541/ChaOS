@@ -977,6 +977,12 @@ bool plat_brightness_on_volume(void) { return true; }
 /* The side lights, and L2+R2 asking gauge for the level (key_event). */
 bool plat_battery_lights(void) { return true; }
 
+/* ChaOS: no sticks */
+bool  plat_sticks(int raw[4]) { raw[0] = raw[1] = raw[2] = raw[3] = 0; return false; }
+bool  plat_sticks_cal(plat_stick_cal out[4]) { memset(out, 0, sizeof *out * 4); return false; }
+void  plat_sticks_reload(void) { }
+float plat_stick_axis(const plat_stick_cal *c, const int raw[4]) { (void)c; (void)raw; return 0; }
+
 /* ---- battery ---- */
 
 /* A level written to /tmp/tortos_fake_batt stands in for the gauge, off the
