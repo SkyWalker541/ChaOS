@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
@@ -22,9 +23,13 @@
  * pak reads (its internal/itchio/platforms.go), and for the consoles it has
  * none for, the tag itch.io's own browse pages use for that console, counted
  * 2026-11-12: SNES 297 games, Master System 62, Game Gear 10, PC Engine 16.
- * Game Boy Color reads GB Studio's too: a GB Studio game is often a .gbc. */
+ * GB Studio's games are the Game Boy's, as the pak has them: one that is
+ * really a Game Boy Color game is told by its bytes when it is downloaded
+ * (itchdl_sniff) and goes to that shelf. A game in two consoles' lists is
+ * shown once, under the first in the pak's order (Get Homebrew's catalogue:
+ * Game Boy Color before Game Boy, the more specific tag first). */
 static const char *const S_GB[]   = { "made-with-gb-studio", "tag-gbstudio", "tag-gameboy-rom", NULL };
-static const char *const S_GBC[]  = { "tag-gameboy-color", "tag-gbc", "made-with-gb-studio", NULL };
+static const char *const S_GBC[]  = { "tag-gameboy-color", "tag-gbc", NULL };
 static const char *const S_GBA[]  = { "tag-gameboy-advance", NULL };
 static const char *const S_NES[]  = { "tag-nes-rom", NULL };
 static const char *const S_SNES[] = { "tag-snes", NULL };
@@ -32,6 +37,7 @@ static const char *const S_MD[]   = { "tag-sega-mega-drive", "tag-genesis-rom", 
 static const char *const S_SMS[]  = { "tag-master-system", NULL };
 static const char *const S_GG[]   = { "tag-game-gear", NULL };
 static const char *const S_PCE[]  = { "tag-pc-engine", NULL };
+static const char *const S_P8[]   = { "tag-pico-8", NULL };
 
 const char *const *itch_slugs(const char *folder)
 {
@@ -39,7 +45,7 @@ const char *const *itch_slugs(const char *folder)
 		{ "Game Boy", S_GB }, { "Game Boy Color", S_GBC },
 		{ "Game Boy Advance", S_GBA }, { "NES", S_NES }, { "SNES", S_SNES },
 		{ "Genesis", S_MD }, { "Master System", S_SMS }, { "Game Gear", S_GG },
-		{ "TurboGrafx-16", S_PCE },
+		{ "TurboGrafx-16", S_PCE }, { "PICO-8", S_P8 },
 	};
 	size_t i;
 
@@ -139,6 +145,60 @@ static bool itch_image(const char *u)
 	return !strncmp(u, "https://img.itch.zone/", 22) && !strpbrk(u, " \"'<>\\");
 }
 
+void itch_title_tags(const char *raw, char *out, size_t n)
+{
+	const char *p = raw;
+	size_t o = 0;
+
+	if (n) out[0] = '\0';
+	while (p && (p = strchr(p, '['))) {
+		const char *e = strchr(p, ']');
+		size_t l;
+
+		if (!e) break;
+		p++;
+		l = (size_t)(e - p);
+		{
+			bool free_tag = l == 4 && !strncasecmp(p, "Free", 4);
+			bool price = strchr("$0123456789", p[0]) != NULL || (unsigned char)p[0] >= 0x80;
+
+			if (l && !free_tag && !price && o + l + 3 < n)
+				o += (size_t)snprintf(out + o, n - o, "%s%.*s", o ? ", " : "", (int)l, p);
+		}
+		p = e + 1;
+	}
+}
+
+long long itch_date(const char *s)
+{
+	static const char *const MON[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+	                                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+	char mon[8] = "", zone[8] = "";
+	int d, y, h, mi, sec, m, off = 0;
+	long long days;
+	const char *p = s ? strchr(s, ',') : NULL;
+
+	p = p ? p + 1 : s;
+	if (!p || sscanf(p, " %d %3s %d %d:%d:%d %7s", &d, mon, &y, &h, &mi, &sec, zone) < 6) return 0;
+	for (m = 0; m < 12 && strcmp(mon, MON[m]); m++) ;
+	if (m == 12 || y < 1970 || d < 1 || d > 31) return 0;
+	if (zone[0] == '+' || zone[0] == '-') {
+		int z = atoi(zone + 1);
+
+		off = (z / 100 * 60 + z % 100) * 60;
+		if (zone[0] == '-') off = -off;
+	}
+	/* days from civil (Howard Hinnant's), March-based */
+	{
+		int yy = y - (m < 2), mm = m < 2 ? m + 13 : m + 1;
+		int era = yy / 400, yoe = yy - era * 400;
+		int doy = (153 * (mm - 3) + 2) / 5 + d - 1, doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+
+		days = (long long)era * 146097 + doe - 719468;
+	}
+	return days * 86400 + h * 3600 + mi * 60 + sec - off;
+}
+
 int itch_feed_parse(const char *xml, size_t len, itch_game *out, int max)
 {
 	const char *p = xml, *end = xml + len;
@@ -153,11 +213,17 @@ int itch_feed_parse(const char *xml, size_t len, itch_game *out, int max)
 		b = memmem(a, (size_t)(end - a), "</item>", 7);
 		if (!b) break;
 		memset(&g, 0, sizeof g);
+		char raw[256];
+
+		if (element(a, b, "title", raw, sizeof raw)) itch_title_tags(raw, g.tags, sizeof g.tags);
 		if ((element(a, b, "plainTitle", g.title, sizeof g.title) ||
 		     element(a, b, "title", g.title, sizeof g.title)) && g.title[0] &&
 		    element(a, b, "link", g.link, sizeof g.link) && itch_page(g.link) &&
 		    element(a, b, "imageurl", g.image, sizeof g.image) && itch_image(g.image)) {
+			char date[64];
+
 			if (!element(a, b, "price", g.price, sizeof g.price)) g.price[0] = '\0';
+			if (element(a, b, "pubDate", date, sizeof date)) g.pub = itch_date(date);
 			out[n++] = g;
 		}
 		p = b + 7;
@@ -326,8 +392,9 @@ int itch_match(const char *rom_name, const itch_game *games, int n, int *best, i
 
 /* 2 added the price. A list from 1 still reads, for box art, but isn't
  * whole, so the next look reads the list again, prices and all. */
-#define INDEX_MAGIC "#chaos-itch 2"
+#define INDEX_MAGIC "#chaos-itch 3"
 #define INDEX_MAGIC1 "#chaos-itch 1"
+#define INDEX_MAGIC2 "#chaos-itch 2"   /* before 2.6.0: no dates or tags, but whole */
 
 bool itch_free(const itch_game *g)
 {
@@ -349,10 +416,25 @@ bool itch_index_save(const char *path, const itch_game *games, int n, time_t whe
 	if (!(f = fopen(tmp, "w"))) return false;
 	fprintf(f, "%s %lld %s\n", INDEX_MAGIC, (long long)when, whole ? "whole" : "part");
 	for (i = 0; i < n; i++)
-		fprintf(f, "%s\t%s\t%s\t%s\n", games[i].title, games[i].link, games[i].image, games[i].price);
+		fprintf(f, "%s\t%s\t%s\t%s\t%lld\t%s\n", games[i].title, games[i].link, games[i].image, games[i].price,
+		        games[i].pub, games[i].tags);
 	if (fflush(f) != 0 || fsync(fileno(f)) != 0) { fclose(f); unlink(tmp); return false; }
 	fclose(f);
 	return rename(tmp, path) == 0;
+}
+
+int itch_index_version(const char *path)
+{
+	char line[64] = "";
+	FILE *f = fopen(path, "r");
+
+	if (!f) return 0;
+	if (!fgets(line, sizeof line, f)) line[0] = '\0';
+	fclose(f);
+	if (!strncmp(line, INDEX_MAGIC " ", sizeof INDEX_MAGIC)) return 3;
+	if (!strncmp(line, INDEX_MAGIC2 " ", sizeof INDEX_MAGIC2)) return 2;
+	if (!strncmp(line, INDEX_MAGIC1 " ", sizeof INDEX_MAGIC1)) return 1;
+	return 0;
 }
 
 itch_game *itch_index_load(const char *path, int *count, time_t *when, bool *whole)
@@ -372,6 +454,8 @@ itch_game *itch_index_load(const char *path, int *count, time_t *when, bool *who
 	if (!strncmp(line, INDEX_MAGIC1 " ", sizeof INDEX_MAGIC1)) {
 		v1 = true;
 		memcpy(line, INDEX_MAGIC, sizeof INDEX_MAGIC - 1);
+	} else if (!strncmp(line, INDEX_MAGIC2 " ", sizeof INDEX_MAGIC2)) {
+		memcpy(line, INDEX_MAGIC, sizeof INDEX_MAGIC - 1);
 	}
 	if (strncmp(line, INDEX_MAGIC " ", sizeof INDEX_MAGIC) ||
 	    sscanf(line + sizeof INDEX_MAGIC, "%lld %15s", &t, state) != 2) {
@@ -379,13 +463,15 @@ itch_game *itch_index_load(const char *path, int *count, time_t *when, bool *who
 		return NULL;
 	}
 	while (fgets(line, sizeof line, f)) {
-		char *t1 = strchr(line, '\t'), *t2 = t1 ? strchr(t1 + 1, '\t') : NULL, *t3, *nl;
+		char *t1 = strchr(line, '\t'), *t2 = t1 ? strchr(t1 + 1, '\t') : NULL, *t3, *t4 = NULL, *t5 = NULL, *nl;
 		itch_game *ng;
 
 		if (!t2) continue;
 		*t1 = *t2 = '\0';
 		if ((nl = strchr(t2 + 1, '\n'))) *nl = '\0';
 		if ((t3 = strchr(t2 + 1, '\t'))) *t3++ = '\0';
+		if (t3 && (t4 = strchr(t3, '\t'))) *t4++ = '\0';
+		if (t4 && (t5 = strchr(t4, '\t'))) *t5++ = '\0';
 		if (!itch_page(t1 + 1) || !itch_image(t2 + 1)) continue;
 		if (n == cap) {
 			cap = cap ? cap * 2 : 256;
@@ -396,6 +482,8 @@ itch_game *itch_index_load(const char *path, int *count, time_t *when, bool *who
 		snprintf(g[n].link, sizeof g[n].link, "%s", t1 + 1);
 		snprintf(g[n].image, sizeof g[n].image, "%s", t2 + 1);
 		snprintf(g[n].price, sizeof g[n].price, "%s", t3 ? t3 : "");
+		g[n].pub = t4 ? atoll(t4) : 0;
+		snprintf(g[n].tags, sizeof g[n].tags, "%s", t5 ? t5 : "");
 		n++;
 	}
 	fclose(f);
@@ -473,7 +561,19 @@ void itch_fetch_cancel(void)
 	memset(&F, 0, sizeof F);
 }
 
+static bool fetch_begin(const char *folder, const char *index_path, bool whole_again);
+
 bool itch_fetch_begin(const char *folder, const char *index_path)
+{
+	return fetch_begin(folder, index_path, false);
+}
+
+bool itch_fetch_begin_whole(const char *folder, const char *index_path)
+{
+	return fetch_begin(folder, index_path, true);
+}
+
+static bool fetch_begin(const char *folder, const char *index_path, bool whole_again)
 {
 	const char *const *slugs = itch_slugs(folder);
 	time_t when;
@@ -486,7 +586,7 @@ bool itch_fetch_begin(const char *folder, const char *index_path)
 	F.slugs = slugs;
 	snprintf(F.path, sizeof F.path, "%s", index_path);
 	g = itch_index_load(index_path, &n, &when, &whole);
-	if (g && whole) {
+	if (g && whole && !whole_again) {
 		F.games = g;
 		F.n = F.cap = n;
 		F.known = n;

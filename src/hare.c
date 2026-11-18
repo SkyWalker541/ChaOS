@@ -575,7 +575,7 @@ static void route_update(httpd_req *r, bool done)
 		         "\"why\":\"%s\",\"have\":\"%s\",\"feed\":\"%s\",\"files\":\"%s\","
 		         "\"room\":%lld}",
 		         g_up_version, g_up_device, g_up_state, g_up_why, have,
-		         UPDATE_FEED, UPDATE_FILES, update_room());
+		         update_feed(), UPDATE_FILES, update_room());
 		httpd_reply(r, 200, "application/json", json, strlen(json), NULL);
 		return;
 	}

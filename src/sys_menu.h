@@ -111,7 +111,7 @@ typedef enum { SMM_COUNT, SMM_SHOW, SMM_SORT, SMM_LOCK, SMM_ART, SMM_RESCAN } sm
  * two cannot disagree about what row 2 is. */
 int sys_menu_muse_rows(bool books, bool both, bool no_wifi, sm_muse_row *out);
 
-#define MENU_MAX_ROWS 36
+#define MENU_MAX_ROWS 37
 
 /* The array every caller declares must hold every row a build can produce, and
  * on 2026-09-16 it stopped: PM_ROWS went to 13 against a cap of 12 when the

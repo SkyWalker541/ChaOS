@@ -56,6 +56,8 @@ static void os_cycle(const char *tag, int d, bool live);
 #include "shots.h"
 #include "itch.h"
 #include "itchdl.h"
+#include "hbcat.h"
+#include "qrcodegen.h"
 #include "ports.h"
 #include "pico8.h"
 #include "syncthing.h"
@@ -1013,6 +1015,7 @@ static void rom_page_screen(app *a);
 /* ChaOS: the Wi-Fi & Bluetooth page, and the System Settings page */
 static bool g_net_page, g_sys_page;
 static bool g_update_dot = true;   /* ChaOS: Update Available Dot, "update.dot" */
+static bool g_test_updates;        /* ChaOS: the Pre-Release channel, "update.testing" */
 static void net_page_screen(app *a);
 static void sys_page_screen(app *a);
 static void sth_screen(app *a);
@@ -9760,6 +9763,13 @@ static void image_update_screen(app *a)
 	sha256 h;
 
 	upbg_abandon();     /* the shelf's check, if it is asking: this screen asks */
+	/* ChaOS: on the testing channel, the test build the check found, when
+	 * that is what's newer: its own release, a prerelease */
+	{
+		const ota_info *o = upd_latest();
+
+		update_set_test(upd_testing() && o && o->version[0] ? o->version : NULL);
+	}
 	up_known();
 	up_cache_path(cache, sizeof cache);
 	/* ChaOS: asked every time it opens. It opens from Updates, whose own
@@ -9785,7 +9795,7 @@ static void image_update_screen(app *a)
 				phase = UP_IDLE;
 			} else if (!asked) {
 				/* One request at a time: box art may have the slot */
-				if (net_get_async(UPDATE_FEED, UP_FEED_TMP, 20)) asked = true;
+				if (net_get_async(update_feed(), UP_FEED_TMP, 20)) asked = true;
 				else if (!asked_at) asked_at = now;
 				else if (now - asked_at > 10000) { phase = UP_IDLE; failed = true; }
 			} else {
@@ -10060,6 +10070,57 @@ static void update_after_start(app *a)
 }
 
 static bool g_about_shot;   /* --about: one frame, drawn and not shown */
+static int  g_chan_shot;    /* --chan 1|2: Update Channels, on Public Release or Pre-Release */
+
+/* About ChaOS > Update Channels: where updates come from. Public Release is
+ * every official ChaOS; Pre-Release adds the test builds that come before one
+ * (update.h, release.c), and only a device on it is told of them. Choosing
+ * Pre-Release is asked, as a test build can have bugs; either way the next
+ * check is made now, so Updates says what this channel has. */
+typedef struct { int dummy; } chan_ctx;
+
+static int chan_build(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	int n = 0;
+
+	(void)ctx; (void)max;
+	*heading = "Update Channels";
+	rows[n] = (menu_row){ "Public Release", !g_test_updates ? "In Use" : NULL, true };
+	rows[n++].hint = "Official releases";
+	rows[n] = (menu_row){ "Pre-Release", g_test_updates ? "In Use" : NULL, true };
+	rows[n++].hint = "Test builds, before they're released";
+	rows[n++] = MENU_RULE;
+	rows[n++] = MENU_NOTE("Saves and settings stay either way");
+	return n;
+}
+
+static void chan_set(bool test)
+{
+	g_test_updates = test;
+	db_set_int(db_dev(), "update.testing", test ? 1 : 0);
+	upd_set_testing(test);
+	if (net_online()) upd_check();
+}
+
+static menu_result chan_key(app *a, void *ctx, in_button key, int sel)
+{
+	(void)ctx;
+	if (key != IN_ACCEPT) return MENU_STAY;
+	if (sel == 0 && g_test_updates) {
+		chan_set(false);
+	} else if (sel == 1 && !g_test_updates &&
+	           confirm_panel(a, "Pre-Release", "Test builds come before a release\nand can have bugs. Get them?", "Get Them")) {
+		chan_set(true);
+	}
+	return MENU_STAY;
+}
+
+static void chan_screen(app *a)
+{
+	chan_ctx c = { 0 };
+
+	menu_run(a, &(menu_style){ .accent = MENU_ACCENT, .fixed_w = 0 }, chan_build, chan_key, &c);
+}
 
 static void about_screen(app *a)
 {
@@ -10127,12 +10188,15 @@ static void about_screen(app *a)
 		rows[3] = (menu_row){ "Address",   addr,  false };
 		rows[4] = (menu_row){ "Battery",   batt,  false };
 		rows[5] = (menu_row){ "Awake for", up,    false };
+		rows[6] = (menu_row){ "Update Channels",
+		                      g_test_updates ? "Pre-Release" : "Public Release", true, true };
 
 		plat_input_poll(&a->in);
 		if (a->in.quit_requested) { a->running = false; return; }
 		if (a->in.pressed[IN_POWER] || idle_due(a)) { power_off(a); return; }
 		if (menu_leaving(a)) done = true;
 		if (a->in.pressed[IN_SELECT]) muse_open(a, NULL, NULL);
+		if (a->in.pressed[IN_ACCEPT]) chan_screen(a);
 
 		if (in_repeat(&a->in, IN_VOLUP))    plat_volume_nudge(+1);
 		if (in_repeat(&a->in, IN_VOLDN))    plat_volume_nudge(-1);
@@ -10144,7 +10208,7 @@ static void about_screen(app *a)
 		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
 		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
 		SDL_RenderFillRect(a->r, NULL);
-		menu_draw(a, "About ChaOS", rows, 6, -1, menu_std_width(a), MENU_ACCENT);
+		menu_draw(a, "About ChaOS", rows, 7, 6, menu_std_width(a), MENU_ACCENT);
 		if (g_about_shot) return;
 		plat_draw_osd(a->r);
 		plat_present();
@@ -18373,13 +18437,20 @@ static void hb_have_path(char *out, size_t n)
 	snprintf(out, n, "%s/itch/downloaded.list", P_USERDATA);
 }
 
-static void hb_have_add(const char *link, const char *rel)
-{
-	char p[LIB_PATH + 32];
-	FILE *f;
+static void hb_lists_drop(const char *link, const hb_have_rec *keep);
 
-	hb_have_path(p, sizeof p);
-	if ((f = fopen(p, "a"))) { fprintf(f, "%s\t%s\n", link, rel); fclose(f); }
+/* A game downloaded: where it went, and which of its files it was (its
+ * upload id and size then, so Check for Updates can tell a newer one) */
+static void hb_have_add(const char *link, const char *rel, const char *upload, long size)
+{
+	hb_have_rec r;
+
+	memset(&r, 0, sizeof r);
+	snprintf(r.link, sizeof r.link, "%s", link);
+	snprintf(r.rel, sizeof r.rel, "%s", rel);
+	snprintf(r.upload, sizeof r.upload, "%s", upload ? upload : "");
+	r.size = size;
+	hb_lists_drop(link, &r);
 }
 
 /* Where a game went, when it is still there */
@@ -18391,11 +18462,12 @@ static bool hb_have(const char *link, char *rel, size_t n)
 
 	hb_have_path(p, sizeof p);
 	if (!(f = fopen(p, "r"))) return false;
-	while (fgets(line, sizeof line, f))
-		if (!strncmp(line, link, l) && line[l] == '\t') {
-			line[strcspn(line, "\r\n")] = '\0';
-			snprintf(found, sizeof found, "%s", line + l + 1);   /* the last one wins */
-		}
+	while (fgets(line, sizeof line, f)) {
+		hb_have_rec r;
+
+		if (!strncmp(line, link, l) && line[l] == '\t' && hb_have_line(line, &r))
+			snprintf(found, sizeof found, "%s", r.rel);   /* the last one wins */
+	}
 	fclose(f);
 	if (!found[0]) return false;
 	{
@@ -18735,7 +18807,7 @@ static bool hb_download(app *a, int sys, const itch_game *g, const char *cover)
 
 		if (hb_same_on_card(tmp, folder, same, sizeof same)) {
 			unlink(tmp);
-			hb_have_add(g->link, same);
+			hb_have_add(g->link, same, up[pick].id, up[pick].size);
 			fprintf(stderr, "itch: %s is on the card already, as %s\n", g->title, same);
 			snprintf(say, sizeof say, "It's on this Brick already:\n%s", same);
 			pick_say(a, g->title, say, MENU_ACCENT);
@@ -18769,7 +18841,7 @@ static bool hb_download(app *a, int sys, const itch_game *g, const char *cover)
 		mkdir(media, 0755);
 		cover_save(a, cover, folder, name);
 	}
-	hb_have_add(g->link, rel);
+	hb_have_add(g->link, rel, up[pick].id, up[pick].size);
 	sync();
 	fprintf(stderr, "itch: %s downloaded into %s\n", g->title, folder);
 	rescan_all(a);
@@ -18782,20 +18854,22 @@ static bool hb_download(app *a, int sys, const itch_game *g, const char *cover)
 	return true;
 }
 
-/* ---- a console's games ---- */
+static int hb_strcmp(const void *x, const void *y)
+{
+	return strcmp(*(char *const *)x, *(char *const *)y);
+}
 
-typedef struct {
-	itch_game *all;
-	int nall;
-	int *idx;          /* what's shown: all, or the free ones */
-	int n;
-	bool free_only;
-	char (*have)[1];
-} hb_list;
+static bool shot_hb_qr, shot_hb_offline;   /* --hbqr: a game's QR code; --hboffline: the chip */
 
-/* The cover under the cursor, fetched into .userdata */
+/* ---- the catalogue: every console's games in one list ----
+ *
+ * As NextUI-Itchio-Pak shows them (hbcat.h): narrowed to a console, to what
+ * a game costs or to what is on this Brick, searched by title and author, and
+ * sorted. The view is kept between visits. */
+
+/* A picture fetched into .userdata/itch/covers, by its address */
 typedef struct {
-	int want, shown, fetching;
+	char want[256], shown[256], fetching[256];
 	pid_t pid;
 	unsigned since;
 	SDL_Texture *tex;
@@ -18812,7 +18886,15 @@ static void hb_cover_path(const char *image, char *out, size_t n)
 	snprintf(out, n, "%s/itch/covers/%08lx.img", P_USERDATA, h & 0xFFFFFFFFul);
 }
 
-static void hb_pic_step(app *a, hb_pic *pp, const itch_game *all)
+static void hb_pic_want(hb_pic *pp, const char *url)
+{
+	if (!strcmp(pp->want, url ? url : "")) return;
+	snprintf(pp->want, sizeof pp->want, "%s", url ? url : "");
+	pp->since = plat_now_ms();
+	pp->failed = false;
+}
+
+static void hb_pic_step(app *a, hb_pic *pp)
 {
 	char path[LIB_PATH];
 
@@ -18824,15 +18906,15 @@ static void hb_pic_step(app *a, hb_pic *pp, const itch_game *all)
 			char part[LIB_PATH + 8];
 
 			net_spawn_done(pp->pid);
-			hb_cover_path(all[pp->fetching].image, path, sizeof path);
+			hb_cover_path(pp->fetching, path, sizeof path);
 			snprintf(part, sizeof part, "%s.part", path);
 			if (r == pp->pid && WIFEXITED(st) && WEXITSTATUS(st) == 0) rename(part, path);
-			else { unlink(part); if (pp->fetching == pp->want) pp->failed = true; }
+			else { unlink(part); if (!strcmp(pp->fetching, pp->want)) pp->failed = true; }
 			pp->pid = 0;
 		}
 	}
-	if (pp->want < 0 || pp->shown == pp->want) return;
-	hb_cover_path(all[pp->want].image, path, sizeof path);
+	if (!pp->want[0] || !strcmp(pp->shown, pp->want)) return;
+	hb_cover_path(pp->want, path, sizeof path);
 	if (access(path, R_OK) == 0) {
 		SDL_Surface *s = IMG_Load(path);
 
@@ -18846,7 +18928,7 @@ static void hb_pic_step(app *a, hb_pic *pp, const itch_game *all)
 		} else {
 			pp->failed = true;
 		}
-		pp->shown = pp->want;
+		snprintf(pp->shown, sizeof pp->shown, "%s", pp->want);
 		return;
 	}
 	if (pp->pid <= 0 && !pp->failed && plat_now_ms() - pp->since > 180 && net_online()) {
@@ -18857,13 +18939,19 @@ static void hb_pic_step(app *a, hb_pic *pp, const itch_game *all)
 		mkdir(dir, 0755);
 		snprintf(part, sizeof part, "%s.part", path);
 		memset(&r, 0, sizeof r);
-		r.url = all[pp->want].image;
+		r.url = pp->want;
 		r.accept = "image/*";
 		r.timeout_s = 20;
 		pp->pid = net_request_spawn(&r, part);
-		pp->fetching = pp->want;
+		snprintf(pp->fetching, sizeof pp->fetching, "%s", pp->want);
 		if (pp->pid <= 0) { pp->pid = 0; pp->failed = true; }
 	}
+}
+
+/* Whether the picture under way is the one wanted and here */
+static bool hb_pic_ready(const hb_pic *pp)
+{
+	return pp->tex && pp->want[0] && !strcmp(pp->shown, pp->want) && pp->tw > 0 && pp->th > 0;
 }
 
 static void hb_pic_free(hb_pic *pp)
@@ -18871,22 +18959,111 @@ static void hb_pic_free(hb_pic *pp)
 	if (pp->pid > 0) { kill(pp->pid, SIGTERM); waitpid(pp->pid, NULL, 0); net_spawn_done(pp->pid); }
 	if (pp->tex) SDL_DestroyTexture(pp->tex);
 	memset(pp, 0, sizeof *pp);
-	pp->want = pp->shown = -1;
 }
 
-static int hb_strcmp(const void *x, const void *y)
+/* The picture fitted into `box`, or `none` said in its middle */
+static void hb_pic_draw(app *a, const hb_pic *pp, SDL_Rect box, const char *none)
 {
-	return strcmp(*(char *const *)x, *(char *const *)y);
+	TTF_Font *fs = ui_font(UI_F_META);
+
+	SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+	ui_round_rect(a->r, &box, 10, (SDL_Color){ 0, 0, 0, 90 });
+	if (hb_pic_ready(pp)) {
+		float k = (float)box.w / pp->tw < (float)box.h / pp->th ? (float)box.w / pp->tw
+		                                                       : (float)box.h / pp->th;
+		SDL_Rect d = { 0, 0, (int)(pp->tw * k), (int)(pp->th * k) };
+
+		d.x = box.x + (box.w - d.w) / 2;
+		d.y = box.y + (box.h - d.h) / 2;
+		SDL_RenderCopy(a->r, pp->tex, NULL, &d);
+	} else {
+		ui_text(a->r, fs, pp->failed || !pp->want[0] ? none : "Loading...", box.x + box.w / 2,
+		        box.y + box.h / 2 - ui_font_line(UI_F_META) / 2, 0, UI_TEXT_DIM);
+	}
 }
+
+typedef struct {
+	hb_game *g;
+	int n;
+	int *idx;
+	int nidx;
+	hb_view v;
+} hb_cat;
+
+/* The consoles Get Homebrew has, in the launcher's order */
+static int hb_consoles(app *a, int *out, int max)
+{
+	int i, n = 0;
+
+	for (i = 0; i < a->sys.count && n < max; i++)
+		if (itch_slugs(a->sys.systems[i].folder)) out[n++] = i;
+	return n;
+}
+
+/* The same, in the order a game in two lists is shown under: the pak's
+ * (its internal/itchio/platforms.go, AllPlatforms), more specific first, so a
+ * game tagged both Game Boy Color and GB Studio is a Game Boy Color game;
+ * then the consoles the pak doesn't have, in the launcher's order */
+static int hb_consoles_by_rank(app *a, int *out, int max)
+{
+	static const char *const PAK[] = { "Game Boy Color", "Game Boy", "Game Boy Advance", "NES", "Genesis",
+	                                   "PICO-8", NULL };
+	int all[32], na = hb_consoles(a, all, 32), n = 0, i, k;
+
+	for (k = 0; PAK[k]; k++)
+		for (i = 0; i < na && n < max; i++)
+			if (!strcmp(a->sys.systems[all[i]].folder, PAK[k])) out[n++] = all[i];
+	for (i = 0; i < na && n < max; i++) {
+		bool in = false;
+
+		for (k = 0; PAK[k]; k++) if (!strcmp(a->sys.systems[all[i]].folder, PAK[k])) in = true;
+		if (!in) out[n++] = all[i];
+	}
+	return n;
+}
+
+static const hb_game *S_DEDUP;
+
+static int hb_dedup_cmp(const void *x, const void *y)
+{
+	int i = *(const int *)x, j = *(const int *)y, c = strcmp(S_DEDUP[i].g.link, S_DEDUP[j].g.link);
+
+	return c ? c : i - j;
+}
+
+/* A game in more than one console's list kept once: the first, in rank */
+static void hb_dedup(hb_cat *c)
+{
+	int *o = malloc((size_t)(c->n ? c->n : 1) * sizeof *o), i, k = 0;
+	unsigned char *drop = calloc((size_t)(c->n ? c->n : 1), 1);
+
+	if (!o || !drop) { free(o); free(drop); return; }
+	for (i = 0; i < c->n; i++) o[i] = i;
+	S_DEDUP = c->g;
+	qsort(o, (size_t)c->n, sizeof *o, hb_dedup_cmp);
+	for (i = 1; i < c->n; i++)
+		if (!strcmp(c->g[o[i]].g.link, c->g[o[i - 1]].g.link)) {
+			drop[o[i]] = 1;
+			c->g[o[i - 1]].flags |= c->g[o[i]].flags & HB_HAVE;
+		}
+	for (i = 0; i < c->n; i++) if (!drop[i]) c->g[k++] = c->g[i];
+	if (k != c->n) fprintf(stderr, "itch: %d game%s in two lists shown once\n", c->n - k, c->n - k == 1 ? "" : "s");
+	c->n = k;
+	free(o);
+	free(drop);
+}
+
+static void hb_flags_path(char *out, size_t n) { snprintf(out, n, "%s/itch/updates.list", P_USERDATA); }
+static void hb_owned_path(char *out, size_t n) { snprintf(out, n, "%s/itch/owned.list", P_USERDATA); }
 
 /* Games on the shelf already by name: a file whose name, put the way itch.io
  * titles are compared (itch.h), is the title's exactly. Not a guess at a
  * near one: a download still says when the bytes are the same. */
-static void hb_mark_by_name(const char *folder, hb_list *l)
+static void hb_mark_by_name(const char *folder, hb_game *g, int n, int sys)
 {
 	const char *dirs[2] = { folder, hb_pair(folder) };
 	char **keys = NULL;
-	int n = 0, cap = 0, i, k;
+	int nk = 0, cap = 0, i, k;
 
 	for (k = 0; k < 2 && dirs[k]; k++) {
 		char dir[LIB_PATH * 2];
@@ -18901,280 +19078,1483 @@ static void hb_mark_by_name(const char *folder, hb_list *l)
 			if (e->d_name[0] == '.') continue;
 			snprintf(stem, sizeof stem, "%s", e->d_name);
 			if ((dot = strrchr(stem, '.'))) *dot = '\0';
+			if ((dot = strrchr(stem, '.')) && !strcasecmp(dot, ".p8")) *dot = '\0';
 			itch_title_key(stem, key, sizeof key);
 			if (!key[0]) continue;
-			if (n == cap) {
-				char **nk = realloc(keys, (size_t)(cap = cap ? cap * 2 : 128) * sizeof *nk);
+			if (nk == cap) {
+				char **nkp = realloc(keys, (size_t)(cap = cap ? cap * 2 : 128) * sizeof *nkp);
 
-				if (!nk) break;
-				keys = nk;
+				if (!nkp) break;
+				keys = nkp;
 			}
-			if (!(keys[n] = strdup(key))) break;
-			n++;
+			if (!(keys[nk] = strdup(key))) break;
+			nk++;
 		}
 		closedir(d);
 	}
-	if (n) {
-		qsort(keys, (size_t)n, sizeof *keys, hb_strcmp);
-		for (i = 0; i < l->nall; i++) {
+	if (nk) {
+		qsort(keys, (size_t)nk, sizeof *keys, hb_strcmp);
+		for (i = 0; i < n; i++) {
 			char key[256], *kp = key;
 
-			if (l->have[i][0]) continue;
-			itch_title_key(l->all[i].title, key, sizeof key);
-			if (key[0] && bsearch(&kp, keys, (size_t)n, sizeof *keys, hb_strcmp)) l->have[i][0] = 1;
+			if (g[i].sys != sys || (g[i].flags & HB_HAVE)) continue;
+			itch_title_key(g[i].g.title, key, sizeof key);
+			if (key[0] && bsearch(&kp, keys, (size_t)nk, sizeof *keys, hb_strcmp)) g[i].flags |= HB_HAVE;
 		}
 	}
-	for (i = 0; i < n; i++) free(keys[i]);
+	for (i = 0; i < nk; i++) free(keys[i]);
 	free(keys);
 }
 
-static void hb_filter(hb_list *l)
+/* A file of links (one a line, maybe with a tab and more after) as a sorted
+ * array for bsearch */
+static char **hb_links_load(const char *path, int *n)
+{
+	char line[1024], **l = NULL;
+	int cap = 0;
+	FILE *f = fopen(path, "r");
+
+	*n = 0;
+	if (!f) return NULL;
+	while (fgets(line, sizeof line, f)) {
+		line[strcspn(line, "\r\n")] = '\0';
+		if (!line[0]) continue;
+		if (*n == cap) {
+			char **nl = realloc(l, (size_t)(cap = cap ? cap * 2 : 64) * sizeof *nl);
+
+			if (!nl) break;
+			l = nl;
+		}
+		if (!(l[*n] = strdup(line))) break;
+		(*n)++;
+	}
+	fclose(f);
+	if (*n) qsort(l, (size_t)*n, sizeof *l, hb_strcmp);
+	return l;
+}
+
+/* The line for `link` in a sorted list of "link\t..." lines, or NULL */
+static const char *hb_links_find(char **l, int n, const char *link)
+{
+	int lo = 0, hi = n - 1;
+	size_t k = strlen(link);
+
+	while (lo <= hi) {
+		int mid = (lo + hi) / 2, c = strncmp(l[mid], link, k);
+
+		if (c == 0 && (l[mid][k] == '\0' || l[mid][k] == '\t')) return l[mid];
+		if (c == 0) c = 1;
+		if (c < 0) lo = mid + 1; else hi = mid - 1;
+	}
+	return NULL;
+}
+
+static void hb_links_free(char **l, int n)
 {
 	int i;
 
-	l->n = 0;
-	for (i = 0; i < l->nall; i++)
-		if (!l->free_only || itch_free(&l->all[i])) l->idx[l->n++] = i;
+	for (i = 0; i < n; i++) free(l[i]);
+	free(l);
 }
 
-static int hb_title_cmp(const void *x, const void *y)
+/* Every console's list on the card, with what is known of each game */
+static void hb_cat_load(app *a, hb_cat *c)
 {
-	return strcasecmp(((const itch_game *)x)->title, ((const itch_game *)y)->title);
+	int sys[32], ns = hb_consoles_by_rank(a, sys, 32), i, k, cap = 0;
+	char p[LIB_PATH + 32];
+	char **fl, **ow;
+	int nfl, now;
+
+	free(c->g);
+	free(c->idx);
+	c->g = NULL;
+	c->idx = NULL;
+	c->n = c->nidx = 0;
+	for (k = 0; k < ns; k++) {
+		char path[LIB_PATH * 3];
+		itch_game *g;
+		int cnt = 0;
+
+		itch_index_path(a->sys.systems[sys[k]].folder, path, sizeof path);
+		if (!(g = itch_index_load(path, &cnt, NULL, NULL))) continue;
+		for (i = 0; i < cnt; i++) {
+			hb_game *h;
+
+			if (c->n == cap) {
+				hb_game *ng = realloc(c->g, (size_t)(cap = cap ? cap * 2 : 1024) * sizeof *ng);
+
+				if (!ng) break;
+				c->g = ng;
+			}
+			h = &c->g[c->n++];
+			memset(h, 0, sizeof *h);
+			h->g = g[i];
+			h->sys = sys[k];
+			h->order = i;
+			h->rank = k;
+			hb_author_of(g[i].link, h->author, sizeof h->author);
+			if (hb_have(g[i].link, NULL, 0)) h->flags |= HB_HAVE;
+		}
+		free(g);
+		hb_mark_by_name(a->sys.systems[sys[k]].folder, c->g, c->n, sys[k]);
+	}
+	hb_dedup(c);
+	hb_flags_path(p, sizeof p);
+	fl = hb_links_load(p, &nfl);
+	hb_owned_path(p, sizeof p);
+	ow = hb_links_load(p, &now);
+	for (i = 0; i < c->n; i++) {
+		const char *f = nfl ? hb_links_find(fl, nfl, c->g[i].g.link) : NULL;
+
+		if (f && (c->g[i].flags & HB_HAVE)) {
+			const char *t = strchr(f, '\t');
+
+			if (t && t[1] == 'U') c->g[i].flags |= HB_UPDATE;
+			if (t && t[1] == 'G') c->g[i].flags |= HB_GONE;
+		}
+		if (now && hb_links_find(ow, now, c->g[i].g.link)) c->g[i].flags |= HB_OWNED;
+	}
+	hb_links_free(fl, nfl);
+	hb_links_free(ow, now);
+	c->idx = calloc((size_t)(c->n ? c->n : 1), sizeof *c->idx);
 }
 
-static void hb_list_draw(app *a, const char *heading, const hb_list *l, int sel, int first, int vis,
-                         hb_pic *pp)
+static void hb_cat_apply(hb_cat *c)
+{
+	c->nidx = c->idx ? hb_view_apply(c->g, c->n, &c->v, c->idx) : 0;
+}
+
+static void hb_cat_free(hb_cat *c)
+{
+	free(c->g);
+	free(c->idx);
+	memset(c, 0, sizeof *c);
+}
+
+/* The view, as it was left */
+static void hb_view_load(app *a, hb_view *v)
+{
+	char folder[CFG_STR];
+
+	memset(v, 0, sizeof *v);
+	v->sort = (hb_sort)db_get_int(db_dev(), "itch.sort", HB_SORT_POP);
+	v->show = (hb_show)db_get_int(db_dev(), "itch.show", HB_SHOW_ALL);
+	if (v->sort < 0 || v->sort >= HB_SORTS) v->sort = HB_SORT_POP;
+	if (v->show < 0 || v->show >= HB_SHOWS) v->show = HB_SHOW_ALL;
+	db_get_str(db_dev(), "itch.console", folder, sizeof folder, "");
+	v->sys = folder[0] ? hb_sys_by_folder(a, folder) : -1;
+	if (v->sys >= 0 && !itch_slugs(a->sys.systems[v->sys].folder)) v->sys = -1;
+	if (v->show == HB_SHOW_OWNED && !hb_has_key()) v->show = HB_SHOW_ALL;
+}
+
+static void hb_view_save(app *a, const hb_view *v)
+{
+	db_set_int(db_dev(), "itch.sort", v->sort);
+	db_set_int(db_dev(), "itch.show", v->show);
+	db_set_str(db_dev(), "itch.console", v->sys >= 0 ? a->sys.systems[v->sys].folder : "");
+}
+
+/* ---- bringing the lists up to date ---- */
+
+/* A day between catch-ups (ITCH_FRESH_S). `full` reads every list whole
+ * again (Refresh Game Lists); else only the ones with none yet, not whole, or
+ * a day old, and those only from their newest pages. B stops it: what is
+ * read by then is kept. False when stopped or the device is going away. */
+static bool hb_lists_update(app *a, bool full)
+{
+	int sys[32], ns = hb_consoles(a, sys, 32), k, todo[32], nt = 0, done = 0;
+	bool stopped = false;
+
+	for (k = 0; k < ns; k++) {
+		char path[LIB_PATH * 3];
+		time_t when = 0;
+		bool whole = false;
+		int cnt = 0;
+		itch_game *g;
+
+		itch_index_path(a->sys.systems[sys[k]].folder, path, sizeof path);
+		g = itch_index_load(path, &cnt, &when, &whole);
+		free(g);
+		/* A list from before 2.6.0 has no dates, and Game Boy Color's took
+		 * GB Studio's games too, which are the Game Boy's now (itch.c):
+		 * that one is read whole again, once ("itch.gbc3"); the rest catch
+		 * up, and Refresh Game Lists gives them dates */
+		if (full || !g || !whole || time(NULL) - when > ITCH_FRESH_S ||
+		    (g && !strcmp(a->sys.systems[sys[k]].folder, "Game Boy Color") && !db_get_int(db_dev(), "itch.gbc3", 0)))
+			todo[nt++] = sys[k];
+	}
+	if (!nt || !net_online()) return true;
+	sync_abandon();
+	for (k = 0; k < nt && !stopped && a->running; k++) {
+		const system_cfg *s = &a->sys.systems[todo[k]];
+		char path[LIB_PATH * 3], now[160];
+		bool going, gbc;
+
+		itch_index_path(s->folder, path, sizeof path);
+		gbc = !strcmp(s->folder, "Game Boy Color") && !db_get_int(db_dev(), "itch.gbc3", 0);
+		going = full || gbc ? itch_fetch_begin_whole(s->folder, path) : itch_fetch_begin(s->folder, path);
+		while (going && a->running) {
+			int st = itch_fetch_step(), g, pg;
+
+			plat_input_poll(&a->in);
+			if (a->in.quit_requested) { itch_fetch_cancel(); a->running = false; return false; }
+			if (a->in.pressed[IN_POWER] || idle_due(a)) { itch_fetch_cancel(); power_off(a); return false; }
+			if (menu_leaving(a)) { itch_fetch_cancel(); stopped = true; break; }
+			if (st <= 0) {
+				if (st < 0) fprintf(stderr, "itch: %s: %s\n", s->folder, itch_fetch_problem());
+				else if (gbc) db_set_int(db_dev(), "itch.gbc3", 1);
+				break;
+			}
+			itch_fetch_progress(&g, &pg);
+			snprintf(now, sizeof now, "Reading itch.io's lists, %d of %d\n%s \xC2\xB7 %d games\nB: stop",
+			         k + 1, nt, s->name, g);
+			pick_frame(a, "Get Homebrew", NULL, 0, 0, NULL, 0, 0, now, MENU_ACCENT);
+			SDL_Delay(8);
+		}
+		done++;
+	}
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+	return !stopped;
+}
+
+/* What the key's account owns, kept a day */
+static void hb_owned_update(app *a, bool force)
+{
+	char key[200], p[LIB_PATH + 32];
+	struct stat st;
+	char (*links)[192];
+	int n, i;
+	FILE *f;
+
+	hb_owned_path(p, sizeof p);
+	if (!hb_key(key, sizeof key)) { unlink(p); return; }
+	if (!force && stat(p, &st) == 0 && time(NULL) - st.st_mtime < ITCH_FRESH_S) return;
+	if (!net_online()) return;
+	if (!(links = calloc(2000, sizeof *links))) return;
+	pick_frame(a, "Get Homebrew", NULL, 0, 0, NULL, 0, 0, "Reading the games you own", MENU_ACCENT);
+	n = itchdl_owned(key, links, 2000);
+	memset(key, 0, sizeof key);
+	if (n >= 0 && (f = fopen(p, "w"))) {
+		for (i = 0; i < n; i++) fprintf(f, "%s\n", links[i]);
+		fclose(f);
+	}
+	free(links);
+}
+
+/* ---- the list ---- */
+
+/* The keys at a screen's foot, never wider than the panel: "B: back"
+ * goes first (B always goes back), then keys from the end */
+static void hb_footer(app *a, const char *keys)
+{
+	char k[200];
+	TTF_Font *f = ui_font(UI_F_META);
+	int room = PM_PANEL.w - 64;
+
+	snprintf(k, sizeof k, "%s", keys);
+	while (ui_text_width(f, k) > room) {
+		char *b = strstr(k, "   B: back"), *last = NULL, *p = k;
+
+		if (b) { memmove(b, b + 10, strlen(b + 10) + 1); continue; }
+		while ((p = strstr(p, "   "))) { last = p; p += 3; }
+		if (!last) break;
+		*last = '\0';
+	}
+	pm_footer(a, k);
+}
+
+/* A pill on the filter line, left-anchored: how wide */
+static int hb_pill(app *a, const char *s, int x, int cy, bool lit)
+{
+	TTF_Font *f = ui_font(UI_F_META);
+	int w = ui_text_width(f, s) + 24, h = ui_font_line(UI_F_META) + 8;
+	SDL_Rect r = { x, cy - h / 2, w, h };
+
+	ui_round_rect(a->r, &r, h / 2, lit ? (SDL_Color){ 0x3D, 0xD6, 0xFF, 60 } : (SDL_Color){ 255, 255, 255, 22 });
+	ui_text(a->r, f, s, x + w / 2, r.y + 4, 0, lit ? UI_TEXT : UI_TEXT_DIM);
+	return w;
+}
+
+#define HB_LIST_Y 146   /* below the band and the filter line */
+
+static int hb_list_vis(void)
+{
+	return (PM_PANEL.h - HB_LIST_Y - 24 - ui_font_line(UI_F_META) - 16) / menu_row_h();
+}
+
+/* A game's tag on the list: what matters most about it here */
+static int hb_row_tag(app *a, const hb_game *g, int right, int cy)
+{
+	if (g->flags & HB_GONE) return pm_tag(a, "Removed", right, cy, (SDL_Color){ 40, 8, 4, 255 }, PM_RED);
+	if (g->flags & HB_UPDATE) return pm_tag(a, "Update", right, cy, (SDL_Color){ 40, 24, 0, 255 }, PM_AMBER);
+	if (g->flags & HB_HAVE) return pm_tag(a, "On Brick", right, cy, (SDL_Color){ 0, 30, 12, 255 }, PM_GREEN);
+	if (!itch_free(&g->g) && (g->flags & HB_OWNED))
+		return pm_tag(a, "Owned", right, cy, (SDL_Color){ 0, 24, 40, 255 }, (SDL_Color){ 0x3D, 0xD6, 0xFF, 255 });
+	if (!itch_free(&g->g)) return pm_tag(a, g->g.price, right, cy, (SDL_Color){ 40, 24, 0, 255 }, PM_AMBER);
+	return 0;
+}
+
+static void hb_list_draw(app *a, const hb_cat *c, int sel, int first, int vis, hb_pic *pp, bool offline)
 {
 	SDL_Rect panel = PM_PANEL;
 	TTF_Font *fm = ui_font(UI_F_MENU), *fs = ui_font(UI_F_META);
 	int rh = menu_row_h(), lm = ui_font_line(UI_F_MENU), ls = ui_font_line(UI_F_META);
-	int lx = panel.x + 20, lw = 452, y0 = panel.y + 100, i;
+	int lx = panel.x + 20, lw = 492, y0 = panel.y + HB_LIST_Y, i, px = panel.x + 32, cy = panel.y + 116;
 	SDL_Rect box = { lx + lw + 24, y0, panel.x + panel.w - 36 - (lx + lw + 24), 0 };
-	char meta[48], fit[256], line[200];
+	char meta[48], fit[256], line[200], pill[96];
+	bool all = c->v.sys < 0;
 
-	snprintf(meta, sizeof meta, "%d game%s%s", l->n, l->n == 1 ? "" : "s", l->free_only ? " \xC2\xB7 free" : "");
-	pm_frame_begin(a, MENU_ACCENT, heading, meta);
-	if (l->n == 0) {
-		ui_text(a->r, fm, "No games here", panel.x + panel.w / 2, panel.y + panel.h / 2 - lm / 2, 0,
-		        UI_TEXT_DIM);
-		pm_footer(a, l->free_only ? "Y: all games   B: back" : "B: back");
+	snprintf(meta, sizeof meta, "%d game%s", c->nidx, c->nidx == 1 ? "" : "s");
+	pm_frame_begin(a, MENU_ACCENT, "Get Homebrew", meta);
+	if (offline) pm_tag(a, "Offline", panel.x + 36 + ui_text_width(fs, "Offline") + 18,
+	                    panel.y + 42, (SDL_Color){ 40, 24, 0, 255 }, PM_AMBER);
+	/* the filter line: console, what's shown, the sort, the search */
+	px += hb_pill(a, all ? "All Consoles" : a->sys.systems[c->v.sys].name, px, cy, !all) + 10;
+	px += hb_pill(a, hb_show_name(c->v.show), px, cy, c->v.show != HB_SHOW_ALL) + 10;
+	px += hb_pill(a, hb_sort_name(c->v.sort), px, cy, false) + 10;
+	if (c->v.search[0]) {
+		char q[80];
+
+		snprintf(q, sizeof q, "\xE2\x80\x9C%s\xE2\x80\x9D", c->v.search);
+		ui_fit_text(fs, q, pill, sizeof pill, panel.x + panel.w - 60 - px);
+		hb_pill(a, pill, px, cy, true);
+	}
+	if (c->nidx == 0) {
+		ui_text(a->r, fm, c->n ? "No games like that" : "No games yet",
+		        panel.x + panel.w / 2, panel.y + panel.h / 2 - lm / 2, 0, UI_TEXT_DIM);
+		hb_footer(a, c->n ? "X: filter   Y: search   B: back" : "B: back");
 		pm_frame_end(a);
 		return;
 	}
-	for (i = first; i < l->n && i < first + vis; i++) {
-		const itch_game *g = &l->all[l->idx[i]];
-		int y = y0 + (i - first) * rh, cy = y + rh / 2, tw = 0;
+	for (i = first; i < c->nidx && i < first + vis; i++) {
+		const hb_game *g = &c->g[c->idx[i]];
+		int y = y0 + (i - first) * rh, ry = y + rh / 2, tw = 0;
 
 		if (i == sel)
 			ui_round_rect(a->r, &(SDL_Rect){ lx, y, lw, rh }, rh / 4, (SDL_Color){ 255, 255, 255, 34 });
-		if (l->have[l->idx[i]][0])
-			tw = pm_tag(a, "On Brick", lx + lw - 12, cy, (SDL_Color){ 0, 30, 12, 255 }, PM_GREEN) + 8;
-		else if (!itch_free(g))
-			tw = pm_tag(a, g->price, lx + lw - 12, cy, (SDL_Color){ 40, 24, 0, 255 }, PM_AMBER) + 8;
-		ui_fit_text(fm, g->title, fit, sizeof fit, lw - 28 - tw);
-		ui_text(a->r, fm, fit, lx + 16, cy - lm / 2 - TTF_FontDescent(fm) / 2, -1, UI_TEXT);
+		tw = hb_row_tag(a, g, lx + lw - 12, ry);
+		/* the console's short name too, when every console is shown and
+		 * the title keeps at least half the row */
+		if (all && lw - 28 - tw - ui_text_width(fs, a->sys.systems[g->sys].tag) - 18 >= lw / 2) {
+			int t2 = ui_text_width(fs, a->sys.systems[g->sys].tag);
+
+			ui_text(a->r, fs, a->sys.systems[g->sys].tag, lx + lw - 12 - (tw ? tw + 10 : 0), ry - ls / 2, 1,
+			        UI_TEXT_DIM);
+			tw += t2 + (tw ? 10 : 0) + 8;
+		} else if (tw) {
+			tw += 8;
+		}
+		ui_fit_text(fm, g->g.title, fit, sizeof fit, lw - 28 - tw);
+		ui_text(a->r, fm, fit, lx + 16, ry - lm / 2 - TTF_FontDescent(fm) / 2, -1, UI_TEXT);
 	}
-	if (l->n > vis) {
-		int track = vis * rh, th = track * vis / l->n, ty = y0 + (track - th) * first / (l->n - vis);
+	if (c->nidx > vis) {
+		int track = vis * rh, th = track * vis / c->nidx, ty = y0 + (track - th) * first / (c->nidx - vis);
 
 		SDL_SetRenderDrawColor(a->r, 0x3D, 0xD6, 0xFF, 160);
 		SDL_RenderFillRect(a->r, &(SDL_Rect){ lx - 10, ty, 3, th > 12 ? th : 12 });
 	}
 	{
-		const itch_game *g = &l->all[l->idx[sel]];
+		const hb_game *g = &c->g[c->idx[sel]];
 		int y;
 
-		box.h = panel.y + panel.h - 24 - ls - 20 - (lm + ls + 30) - y0;
+		box.h = panel.y + panel.h - 24 - ls - 20 - (lm + 3 * ls + 36) - y0;
 		if (box.h > box.w) box.h = box.w;
-		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
-		ui_round_rect(a->r, &box, 10, (SDL_Color){ 0, 0, 0, 90 });
-		if (pp->tex && pp->shown == pp->want && pp->tw > 0 && pp->th > 0) {
-			float k = (float)box.w / pp->tw < (float)box.h / pp->th ? (float)box.w / pp->tw
-			                                                       : (float)box.h / pp->th;
-			SDL_Rect d = { 0, 0, (int)(pp->tw * k), (int)(pp->th * k) };
-
-			d.x = box.x + (box.w - d.w) / 2;
-			d.y = box.y + (box.h - d.h) / 2;
-			SDL_RenderCopy(a->r, pp->tex, NULL, &d);
-		} else {
-			ui_text(a->r, fs, pp->failed ? "No cover" : "Loading...", box.x + box.w / 2,
-			        box.y + box.h / 2 - ls / 2, 0, UI_TEXT_DIM);
-		}
-		y = box.y + box.h + 18;
-		ui_fit_text(fm, g->title, fit, sizeof fit, box.w);
+		hb_pic_draw(a, pp, box, "No cover");
+		y = box.y + box.h + 16;
+		ui_fit_text(fm, g->g.title, fit, sizeof fit, box.w);
 		ui_text(a->r, fm, fit, box.x, y, -1, UI_TEXT);
 		y += lm + 4;
-		{
-			const char *by = strstr(g->link, "://"), *dot;
-			char author[64] = "";
-
-			if (by && (dot = strchr(by + 3, '.')) && (size_t)(dot - by - 3) < sizeof author) {
-				memcpy(author, by + 3, (size_t)(dot - by - 3));
-				author[dot - by - 3] = '\0';
-			}
-			snprintf(line, sizeof line, "%s%s%s%s", itch_free(g) ? "Free" : g->price,
-			         author[0] ? "  \xC2\xB7  by " : "", author,
-			         l->have[l->idx[sel]][0] ? "  \xC2\xB7  on this Brick" : "");
-		}
+		snprintf(line, sizeof line, "%s%s%s", g->author[0] ? "by " : "", g->author,
+		         all ? "" : "");
 		ui_fit_text(fs, line, fit, sizeof fit, box.w);
 		ui_text(a->r, fs, fit, box.x, y, -1, UI_TEXT_DIM);
+		y += ls + 2;
+		/* the console by name, or by its short name when that won't fit */
+		snprintf(line, sizeof line, "%s  \xC2\xB7  %s", itch_free(&g->g) ? "Free" : g->g.price,
+		         a->sys.systems[g->sys].name);
+		if (ui_text_width(fs, line) > box.w)
+			snprintf(line, sizeof line, "%s  \xC2\xB7  %s", itch_free(&g->g) ? "Free" : g->g.price,
+			         a->sys.systems[g->sys].tag);
+		ui_fit_text(fs, line, fit, sizeof fit, box.w);
+		ui_text(a->r, fs, fit, box.x, y, -1, UI_TEXT_DIM);
+		if (g->g.tags[0]) {
+			y += ls + 2;
+			ui_fit_text(fs, g->g.tags, fit, sizeof fit, box.w);
+			ui_text(a->r, fs, fit, box.x, y, -1, UI_TEXT_DIM);
+		}
 	}
-	pm_footer(a, l->free_only ? "A: download   Y: all games   L2 R2: letter   B: back"
-	                          : "A: download   Y: free only   L2 R2: letter   B: back");
+	hb_footer(a, c->v.sort == HB_SORT_AZ || c->v.sort == HB_SORT_ZA
+	             ? "X: filter   Y: search   L1 R1: console   L2 R2: letter"
+	             : "A: open   X: filter   Y: search   L1 R1: console   B: back");
 	draw_letter_popup(a);
 	pm_frame_end(a);
 }
 
-static int hb_letter_jump(const hb_list *l, int cur, int dir)
+static int hb_letter_jump(const hb_cat *c, int cur, int dir)
 {
 	char c0;
 	int i;
 
-	if (l->n <= 1) return cur;
-	c0 = shelf_initial(l->all[l->idx[cur]].title);
+	if (c->nidx <= 1) return cur;
+	c0 = hb_initial(c->g[c->idx[cur]].g.title);
 	if (dir > 0) {
-		for (i = cur + 1; i < l->n; i++) if (shelf_initial(l->all[l->idx[i]].title) != c0) return i;
+		for (i = cur + 1; i < c->nidx; i++) if (hb_initial(c->g[c->idx[i]].g.title) != c0) return i;
 		return 0;
 	}
 	i = cur;
-	while (i > 0 && shelf_initial(l->all[l->idx[i - 1]].title) == c0) i--;
+	while (i > 0 && hb_initial(c->g[c->idx[i - 1]].g.title) == c0) i--;
 	if (i != cur) return i;
-	i = cur == 0 ? l->n - 1 : cur - 1;
-	c0 = shelf_initial(l->all[l->idx[i]].title);
-	while (i > 0 && shelf_initial(l->all[l->idx[i - 1]].title) == c0) i--;
+	i = cur == 0 ? c->nidx - 1 : cur - 1;
+	c0 = hb_initial(c->g[c->idx[i]].g.title);
+	while (i > 0 && hb_initial(c->g[c->idx[i - 1]].g.title) == c0) i--;
 	return i;
 }
 
-static void hb_games_screen(app *a, int sys)
+/* Search: the keyboard. An empty answer clears it. */
+static void hb_search(app *a, hb_cat *c)
 {
-	const system_cfg *s = &a->sys.systems[sys];
-	SDL_Rect panel = PM_PANEL;
-	hb_list l;
-	hb_pic pp;
-	int sel = 0, first = 0, i;
-	int vis = (panel.h - 100 - 24 - ui_font_line(UI_F_META) - 16) / menu_row_h();
-	Uint32 held = 0;
+	char q[64];
+	kb_result kr;
 
-	memset(&l, 0, sizeof l);
-	if (!(l.all = itch_list_get(a, s->folder, s->name, MENU_ACCENT, &l.nall))) return;
-	qsort(l.all, (size_t)l.nall, sizeof *l.all, hb_title_cmp);
-	l.idx = calloc((size_t)(l.nall ? l.nall : 1), sizeof *l.idx);
-	l.have = calloc((size_t)(l.nall ? l.nall : 1), 1);
-	if (!l.idx || !l.have) { free(l.idx); free(l.have); free(l.all); return; }
-	for (i = 0; i < l.nall; i++) l.have[i][0] = hb_have(l.all[i].link, NULL, 0);
-	hb_mark_by_name(s->folder, &l);
-	hb_filter(&l);
+	snprintf(q, sizeof q, "%s", c->v.search);
+	kr = kb_prompt(a->r, &a->in, "Search Title or Author", q, (int)sizeof q, MENU_ACCENT, wifi_backdrop,
+	               idle_due_ctx, a);
+	if (kr == KB_POWER) { power_off(a); return; }
+	if (kr != KB_ACCEPT) return;
+	snprintf(c->v.search, sizeof c->v.search, "%s", q);
+}
+
+/* ---- Filter & Search ---- */
+
+typedef struct {
+	app *a;
+	hb_cat *c;
+	int cons[32], ncons;
+	char search[80];
+	int ids[8];
+} hb_flt_ctx;
+
+enum { HBF_CONSOLE, HBF_SHOW, HBF_SORT, HBF_SEARCH, HBF_CLEAR, HBF_NONE };
+
+static int hb_flt_build(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	hb_flt_ctx *f = ctx;
+	int n = 0;
+
+	(void)max;
+	*heading = "Filter & Search";
+	f->ids[n] = HBF_CONSOLE;
+	rows[n] = (menu_row){ "Console", f->c->v.sys < 0 ? "All" : f->a->sys.systems[f->c->v.sys].name, true };
+	rows[n++].cycles = true;
+	f->ids[n] = HBF_SHOW;
+	rows[n] = (menu_row){ "Show", hb_show_name(f->c->v.show), true };
+	rows[n++].cycles = true;
+	f->ids[n] = HBF_SORT;
+	rows[n] = (menu_row){ "Sort", hb_sort_name(f->c->v.sort), true };
+	rows[n++].cycles = true;
+	snprintf(f->search, sizeof f->search, "%s", f->c->v.search[0] ? f->c->v.search : "None");
+	f->ids[n] = HBF_SEARCH;
+	rows[n] = (menu_row){ "Search", f->search, true, true };
+	rows[n++].hint = "Title or author";
+	f->ids[n] = HBF_CLEAR;
+	rows[n++] = (menu_row){ "Clear All", NULL, true };
+	return n;
+}
+
+static int hb_cycle(int v, int n, int d) { return ((v + d) % n + n) % n; }
+
+static menu_result hb_flt_key(app *a, void *ctx, in_button key, int sel)
+{
+	hb_flt_ctx *f = ctx;
+	hb_view *v = &f->c->v;
+	int id = sel >= 0 && sel < 8 ? f->ids[sel] : HBF_NONE, d = key == IN_LEFT ? -1 : 1;
+
+	if (key != IN_LEFT && key != IN_RIGHT && key != IN_ACCEPT) return MENU_STAY;
+	if (id == HBF_CONSOLE) {
+		int k, at = -1;
+
+		for (k = 0; k < f->ncons; k++) if (f->cons[k] == v->sys) at = k;
+		/* -1 is All, before the first */
+		at = hb_cycle(at + 1, f->ncons + 1, d) - 1;
+		v->sys = at < 0 ? -1 : f->cons[at];
+	} else if (id == HBF_SHOW) {
+		do v->show = (hb_show)hb_cycle(v->show, HB_SHOWS, d);
+		while (v->show == HB_SHOW_OWNED && !hb_has_key());
+	} else if (id == HBF_SORT) {
+		v->sort = (hb_sort)hb_cycle(v->sort, HB_SORTS, d);
+	} else if (id == HBF_SEARCH && key == IN_ACCEPT) {
+		hb_search(a, f->c);
+	} else if (id == HBF_CLEAR && key == IN_ACCEPT) {
+		v->sys = -1;
+		v->show = HB_SHOW_ALL;
+		v->sort = HB_SORT_POP;
+		v->search[0] = '\0';
+	}
+	return MENU_STAY;
+}
+
+static void hb_filter_screen(app *a, hb_cat *c)
+{
+	hb_flt_ctx f;
+	menu_style st = { 0 };
+
+	memset(&f, 0, sizeof f);
+	f.a = a;
+	f.c = c;
+	f.ncons = hb_consoles(a, f.cons, 32);
+	st.accent = MENU_ACCENT;
+	st.fixed_w = menu_std_width(a);
+	menu_run(a, &st, hb_flt_build, hb_flt_key, &f);
+}
+
+/* ---- a game's own page ---- */
+
+/* Which content warnings are on: a bit per hb_cw */
+static unsigned hb_cw_on(void)
+{
+	unsigned on = 0;
+	int c;
+
+	for (c = 0; c < HB_CWS; c++) {
+		char k[32];
+
+		snprintf(k, sizeof k, "itch.cw.%d", c);
+		if (db_get_int(db_dev(), k, hb_cw_default((hb_cw)c) ? 1 : 0)) on |= 1u << c;
+	}
+	return on;
+}
+
+static bool hb_cw_tag_off(const char *tag, void *ctx)
+{
+	char k[64];
+
+	(void)ctx;
+	snprintf(k, sizeof k, "itch.cwoff.%s", tag);
+	return db_get_int(db_dev(), k, 0) != 0;
+}
+
+/* A game's data.json and page, read behind a panel. False when itch.io
+ * didn't answer; `gone` when it says the game isn't there. */
+static bool hb_detail_get(app *a, const hb_game *g, hb_detail *d, char *desc, size_t dn, bool *gone)
+{
+	char url[256], *buf = malloc(1 << 20);
+	net_req r;
+	int http = 0;
+	long got;
+	bool ok = false;
+
+	*gone = false;
+	desc[0] = '\0';
+	memset(d, 0, sizeof *d);
+	if (!buf) return false;
+	if (g_pm_shot) {
+		/* screenshots: the game's page from the card, when it is there */
+		char p[LIB_PATH + 32];
+		FILE *f;
+
+		snprintf(p, sizeof p, "%s/itch/shot-data.json", P_USERDATA);
+		if ((f = fopen(p, "rb"))) {
+			got = (long)fread(buf, 1, (1 << 20) - 1, f);
+			buf[got] = '\0';
+			fclose(f);
+			ok = hb_data_parse(buf, (size_t)got, d);
+		}
+		snprintf(p, sizeof p, "%s/itch/shot-page.html", P_USERDATA);
+		if ((f = fopen(p, "rb"))) {
+			got = (long)fread(buf, 1, (1 << 20) - 1, f);
+			buf[got] = '\0';
+			fclose(f);
+			hb_desc_parse(buf, desc, dn);
+		}
+		free(buf);
+		return ok;
+	}
+	if (!net_online()) { free(buf); return false; }
+	pick_frame(a, g->g.title, NULL, 0, 0, NULL, 0, 0, "Asking itch.io", MENU_ACCENT);
+	snprintf(url, sizeof url, "%s/data.json", g->g.link);
+	memset(&r, 0, sizeof r);
+	r.url = url;
+	r.timeout_s = 20;
+	got = net_request(&r, buf, 1 << 20, &http);
+	if (got > 0 && http == 200) ok = hb_data_parse(buf, (size_t)got, d);
+	if (http == 404 || http == 410) *gone = true;
+	if (ok) {
+		memset(&r, 0, sizeof r);
+		r.url = g->g.link;
+		r.accept = "text/html,application/xhtml+xml";
+		r.timeout_s = 20;
+		got = net_request(&r, buf, 1 << 20, &http);
+		if (got > 0 && http == 200) hb_desc_parse(buf, desc, dn);
+	}
+	free(buf);
+	fprintf(stderr, "itch: %s: %s, %d screenshot%s, %zu bytes of description\n", g->g.title,
+	        ok ? "read" : *gone ? "gone" : "no answer", d->nshots, d->nshots == 1 ? "" : "s", strlen(desc));
+	return ok;
+}
+
+#define HB_DESC_LINES 400
+
+/* `text` wrapped to `w`: a "\n" a new line, a blank line a blank row */
+static int hb_wrap(TTF_Font *f, const char *text, int w, char out[][CHV_WRAP_COLS], int max)
+{
+	const char *p = text;
+	int n = 0;
+	bool blank = false;
+
+	while (*p && n < max) {
+		size_t l = strcspn(p, "\n");
+		char seg[2048];
+
+		if (l == 0) {
+			if (!blank && n) { out[n++][0] = '\0'; blank = true; }
+		} else {
+			snprintf(seg, sizeof seg, "%.*s", (int)(l < sizeof seg ? l : sizeof seg - 1), p);
+			n += wrap_text(f, seg, w, out + n, max - n);
+			blank = false;
+		}
+		p += l;
+		if (*p == '\n') p++;
+	}
+	return n;
+}
+
+/* A QR code of `text`, `size` pixels square, centred on (cx, cy) */
+static void hb_qr_draw(app *a, const char *text, int cx, int cy, int size)
+{
+	static uint8_t qr[qrcodegen_BUFFER_LEN_MAX], tmp[qrcodegen_BUFFER_LEN_MAX];
+	int n, m, x, y, quiet = 4;
+
+	if (!qrcodegen_encodeText(text, tmp, qr, qrcodegen_Ecc_MEDIUM, qrcodegen_VERSION_MIN,
+	                          qrcodegen_VERSION_MAX, qrcodegen_Mask_AUTO, true))
+		return;
+	n = qrcodegen_getSize(qr);
+	m = size / (n + 2 * quiet);
+	if (m < 1) m = 1;
+	size = m * (n + 2 * quiet);
+	SDL_SetRenderDrawColor(a->r, 255, 255, 255, 255);
+	SDL_RenderFillRect(a->r, &(SDL_Rect){ cx - size / 2, cy - size / 2, size, size });
+	SDL_SetRenderDrawColor(a->r, 0, 0, 0, 255);
+	for (y = 0; y < n; y++)
+		for (x = 0; x < n; x++)
+			if (qrcodegen_getModule(qr, x, y))
+				SDL_RenderFillRect(a->r, &(SDL_Rect){ cx - size / 2 + (quiet + x) * m,
+				                                      cy - size / 2 + (quiet + y) * m, m, m });
+}
+
+typedef struct {
+	const hb_game *g;
+	hb_detail d;
+	bool have_d, gone;
+	char (*lines)[CHV_WRAP_COLS];
+	int nl, top, shot;      /* shot: 0 the cover, 1 up the screenshots */
+	bool qr;
+} hb_page;
+
+static const char *hb_page_image(const hb_page *p)
+{
+	if (p->shot > 0 && p->shot <= p->d.nshots) return p->d.shots[p->shot - 1];
+	return p->g->g.image;
+}
+
+static int hb_page_desc_vis(void)
+{
+	return (PM_PANEL.h - 108 - 24 - ui_font_line(UI_F_META) - 24) / ui_font_line(UI_F_META);
+}
+
+static void hb_page_draw(app *a, const hb_page *p, const hb_pic *pp)
+{
+	SDL_Rect panel = PM_PANEL;
+	TTF_Font *fs = ui_font(UI_F_META);
+	int ls = ui_font_line(UI_F_META);
+	int lx = panel.x + 36, lw = 400, y = panel.y + 108, rx = lx + lw + 36, rw = panel.x + panel.w - 36 - rx;
+	int vis = hb_page_desc_vis(), i;
+	SDL_Rect box = { lx, y, lw, 240 };
+	char fit[256], line[200];
+	const hb_game *g = p->g;
+	bool have = g->flags & HB_HAVE;
+
+	if (p->qr) {
+		/* its own frame: the code, what it is, where it goes */
+		int s = 360, top = panel.y + 84 + (panel.h - 84 - 24 - ls - 16 - (s + 2 * ls + 30)) / 2;
+
+		pm_frame_begin(a, MENU_ACCENT, g->g.title, a->sys.systems[g->sys].tag);
+		hb_qr_draw(a, g->g.link, panel.x + panel.w / 2, top + s / 2, s);
+		ui_text(a->r, fs, "Scan to open it on itch.io", panel.x + panel.w / 2, top + s + 18, 0, UI_TEXT);
+		ui_fit_text(fs, g->g.link, fit, sizeof fit, panel.w - 80);
+		ui_text(a->r, fs, fit, panel.x + panel.w / 2, top + s + 18 + ls + 4, 0, UI_TEXT_DIM);
+		hb_footer(a, "B: close");
+		pm_frame_end(a);
+		return;
+	}
+	pm_frame_begin(a, MENU_ACCENT, g->g.title, a->sys.systems[g->sys].tag);
+	hb_pic_draw(a, pp, box, "No picture");
+	y += box.h + 8;
+	if (p->d.nshots) {
+		snprintf(line, sizeof line, "Picture %d of %d", p->shot + 1, p->d.nshots + 1);
+		ui_text(a->r, fs, line, lx + lw / 2, y, 0, UI_TEXT_DIM);
+	}
+	y += ls + 10;
+	snprintf(line, sizeof line, "by %s", p->d.authors[0] ? p->d.authors : g->author);
+	ui_fit_text(fs, line, fit, sizeof fit, lw);
+	ui_text(a->r, fs, fit, lx, y, -1, UI_TEXT_DIM);
+	y += ls + 6;
+	if (p->have_d) hb_price_line(&p->d, line, sizeof line);
+	else snprintf(line, sizeof line, "%s", itch_free(&g->g) ? "Free" : g->g.price);
+	if (!itch_free(&g->g) && (g->flags & HB_OWNED)) {
+		size_t l = strlen(line);
+
+		snprintf(line + l, sizeof line - l, "  \xC2\xB7  you own it");
+	}
+	{
+		char two[2][CHV_WRAP_COLS];
+		int np = wrap_text(fs, line, lw, two, 2), k;
+
+		for (k = 0; k < np; k++)
+			ui_text(a->r, fs, two[k], lx, y + k * ls, -1,
+			        itch_free(&g->g) || (g->flags & HB_OWNED) ? PM_GREEN : PM_AMBER);
+		y += np * ls + 6;
+	}
+	if (p->gone || (g->flags & HB_GONE)) snprintf(line, sizeof line, "Gone from itch.io");
+	else if (g->flags & HB_UPDATE) snprintf(line, sizeof line, "Update on itch.io");
+	else if (have) snprintf(line, sizeof line, "On this Brick");
+	else line[0] = '\0';
+	if (line[0]) {
+		ui_fit_text(fs, line, fit, sizeof fit, lw);
+		ui_text(a->r, fs, fit, lx, y, -1,
+		        p->gone || (g->flags & HB_GONE) ? PM_RED : (g->flags & HB_UPDATE) ? PM_AMBER : PM_GREEN);
+	}
+	if (line[0]) y += ls + 6;
+	{
+		/* its tags: the page's, else the feed's */
+		char tags[400] = "";
+		int k;
+
+		for (k = 0; k < p->d.ntags; k++) {
+			size_t l = strlen(tags);
+
+			snprintf(tags + l, sizeof tags - l, "%s%s", k ? ", " : "", p->d.tags[k]);
+		}
+		if (!tags[0]) snprintf(tags, sizeof tags, "%s", g->g.tags);
+		if (tags[0]) {
+			ui_fit_text(fs, tags, fit, sizeof fit, lw);
+			ui_text(a->r, fs, fit, lx, y, -1, UI_TEXT_DIM);
+		}
+	}
+	/* the description, scrolled with up and down */
+	y = panel.y + 108;
+	if (!p->nl) {
+		ui_text(a->r, fs, p->have_d ? "No description" : net_online() ? "itch.io didn't answer"
+		                                                              : "Connect to Wi-Fi to see more",
+		        rx, y, -1, UI_TEXT_DIM);
+	}
+	for (i = p->top; i < p->nl && i < p->top + vis; i++)
+		ui_text(a->r, fs, p->lines[i], rx, y + (i - p->top) * ls, -1, UI_TEXT);
+	if (p->nl > vis) {
+		int track = vis * ls, th = track * vis / p->nl, ty = y + (track - th) * p->top / (p->nl - vis);
+
+		SDL_SetRenderDrawColor(a->r, 0x3D, 0xD6, 0xFF, 160);
+		SDL_RenderFillRect(a->r, &(SDL_Rect){ rx + rw + 10, ty, 3, th > 12 ? th : 12 });
+	}
+	{
+		hb_footer(a, (g->flags & HB_UPDATE) ? "A: update   X: delete   Y: QR code   L1 R1: pictures   B: back"
+		             : have ? "A: get again   X: delete   Y: QR code   L1 R1: pictures   B: back"
+		                  : "A: download   Y: QR code   L1 R1: pictures   B: back");
+	}
+	pm_frame_end(a);
+}
+
+/* ---- what was downloaded ---- */
+
+/* Every game downloaded and still on the card, the last line for each game */
+static int hb_have_all(hb_have_rec *out, int max)
+{
+	char p[LIB_PATH + 32], line[1024];
+	FILE *f;
+	int n = 0, i;
+
+	hb_have_path(p, sizeof p);
+	if (!(f = fopen(p, "r"))) return 0;
+	while (fgets(line, sizeof line, f)) {
+		hb_have_rec r;
+
+		if (!hb_have_line(line, &r)) continue;
+		for (i = 0; i < n && strcmp(out[i].link, r.link); i++) ;
+		if (i < n) out[i] = r;
+		else if (n < max) out[n++] = r;
+	}
+	fclose(f);
+	for (i = 0; i < n; ) {
+		char full[LIB_PATH * 2];
+
+		snprintf(full, sizeof full, "%s/%s", P_ROMS, out[i].rel);
+		if (access(full, F_OK) != 0) { out[i] = out[--n]; continue; }
+		i++;
+	}
+	return n;
+}
+
+/* downloaded.list and updates.list without `link` (and with `keep` written
+ * back for it, when given) */
+static void hb_lists_drop(const char *link, const hb_have_rec *keep)
+{
+	char paths[2][LIB_PATH + 32];
+	int k;
+
+	hb_have_path(paths[0], sizeof paths[0]);
+	hb_flags_path(paths[1], sizeof paths[1]);
+	for (k = 0; k < 2; k++) {
+		char tmp[LIB_PATH + 40], line[1024];
+		FILE *f = fopen(paths[k], "r"), *o;
+		size_t l = strlen(link);
+
+		if (!f) continue;
+		snprintf(tmp, sizeof tmp, "%s.part", paths[k]);
+		if (!(o = fopen(tmp, "w"))) { fclose(f); continue; }
+		while (fgets(line, sizeof line, f))
+			if (strncmp(line, link, l) || line[l] != '\t') fputs(line, o);
+		if (k == 0 && keep)
+			fprintf(o, "%s\t%s\t%s\t%ld\n", keep->link, keep->rel, keep->upload, keep->size);
+		fclose(f);
+		if (fclose(o) == 0) rename(tmp, paths[k]);
+		else unlink(tmp);
+	}
+}
+
+/* A downloaded game off the card: the file and its box art. Its saves stay. */
+static bool hb_delete(app *a, const char *link, const char *title)
+{
+	char rel[LIB_PATH], full[LIB_PATH * 2], say[160];
+
+	if (!hb_have(link, rel, sizeof rel)) return false;
+	snprintf(say, sizeof say, "Delete it from this Brick?\nIts saves are kept.");
+	if (!confirm_panel(a, title, say, "Delete")) return false;
+	snprintf(full, sizeof full, "%s/%s", P_ROMS, rel);
+	if (unlink(full) != 0) { pick_say(a, title, "Couldn't delete it", MENU_ACCENT); return false; }
+	{
+		/* its box art: Roms/<console>/.media/<stem>.png */
+		char dir[LIB_PATH], stem[LIB_PATH], art[LIB_PATH * 3], *sl, *dot;
+
+		snprintf(dir, sizeof dir, "%s", rel);
+		if ((sl = strrchr(dir, '/'))) {
+			*sl = '\0';
+			snprintf(stem, sizeof stem, "%s", sl + 1);
+			if ((dot = strrchr(stem, '.'))) *dot = '\0';
+			if ((dot = strrchr(stem, '.')) && !strcasecmp(dot, ".p8")) *dot = '\0';
+			snprintf(art, sizeof art, "%s/%s/.media/%s.png", P_ROMS, dir, stem);
+			unlink(art);
+		}
+	}
+	hb_lists_drop(link, NULL);
+	sync();
+	fprintf(stderr, "itch: deleted %s\n", rel);
+	rescan_all(a);
+	return true;
+}
+
+static void hb_game_page(app *a, hb_cat *c, int gi)
+{
+	hb_game *g = &c->g[gi];
+	hb_page p;
+	hb_pic pp;
+	char *desc = malloc(32768);
+	int vis = hb_page_desc_vis();
+
+	memset(&p, 0, sizeof p);
 	memset(&pp, 0, sizeof pp);
-	pp.want = pp.shown = -1;
+	p.g = g;
+	if (!desc || !(p.lines = calloc(HB_DESC_LINES, sizeof *p.lines))) { free(desc); free(p.lines); return; }
+	p.have_d = hb_detail_get(a, g, &p.d, desc, 32768, &p.gone);
+	/* content warnings, before anything of it shows */
+	if (p.have_d) {
+		char hits[200], say[320];
+
+		if (hb_cw_hits(&p.d, hb_cw_on(), hb_cw_tag_off, NULL, hits, sizeof hits) > 0) {
+			snprintf(say, sizeof say, "Tagged on itch.io:\n%s\nShow it?", hits);
+			if (!confirm_panel(a, "Content Warning", say, "Show It")) {
+				free(desc); free(p.lines);
+				plat_input_flush();
+				memset(&a->in, 0, sizeof a->in);
+				return;
+			}
+		}
+	}
+	p.nl = hb_wrap(ui_font(UI_F_META), desc, PM_PANEL.x + PM_PANEL.w - 36 - (PM_PANEL.x + 36 + 400 + 36), p.lines,
+	               HB_DESC_LINES);
+	free(desc);
 	plat_input_flush();
 	memset(&a->in, 0, sizeof a->in);
 	while (a->running) {
-		if (l.n > 0 && pp.want != l.idx[sel]) { pp.want = l.idx[sel]; pp.since = plat_now_ms(); pp.failed = false; }
-		hb_pic_step(a, &pp, l.all);
+		int nimg = p.d.nshots + 1;
+
+		hb_pic_want(&pp, hb_page_image(&p));
+		hb_pic_step(a, &pp);
+		if (g_pm_shot) break;
+		plat_input_poll(&a->in);
+		if (a->in.quit_requested) { a->running = false; break; }
+		if (a->in.pressed[IN_POWER] || idle_due(a)) { power_off(a); break; }
+		if (p.qr) {
+			if (a->in.pressed[IN_Y] || a->in.pressed[IN_BACK]) p.qr = false;
+			if (a->in.pressed[IN_MENU]) g_menu_closing = true;
+			if (g_menu_closing) break;
+			hb_page_draw(a, &p, &pp);
+			SDL_Delay(8);
+			continue;
+		}
+		if (menu_leaving(a)) break;
+		if (in_repeat(&a->in, IN_VOLUP)) plat_volume_nudge(+1);
+		if (in_repeat(&a->in, IN_VOLDN)) plat_volume_nudge(-1);
+		if (in_repeat(&a->in, IN_DOWN) && p.top + vis < p.nl) p.top++;
+		if (in_repeat(&a->in, IN_UP) && p.top > 0) p.top--;
+		if (in_repeat(&a->in, IN_R2)) p.top = p.top + vis < p.nl - vis ? p.top + vis : (p.nl > vis ? p.nl - vis : 0);
+		if (in_repeat(&a->in, IN_L2)) p.top = p.top > vis ? p.top - vis : 0;
+		if (in_repeat(&a->in, IN_R1) || in_repeat(&a->in, IN_RIGHT)) p.shot = (p.shot + 1) % nimg;
+		if (in_repeat(&a->in, IN_L1) || in_repeat(&a->in, IN_LEFT)) p.shot = (p.shot + nimg - 1) % nimg;
+		if (a->in.pressed[IN_Y]) p.qr = true;
+		if (a->in.pressed[IN_X] && (g->flags & HB_HAVE)) {
+			if (hb_delete(a, g->g.link, g->g.title)) g->flags &= (unsigned char)~(HB_HAVE | HB_UPDATE | HB_GONE);
+			plat_input_flush();
+			memset(&a->in, 0, sizeof a->in);
+			continue;
+		}
+		if (a->in.pressed[IN_ACCEPT]) {
+			char cover[LIB_PATH];
+			bool go = true;
+
+			if ((g->flags & HB_HAVE) && !(g->flags & HB_UPDATE))
+				go = confirm_panel(a, "Download", "It's on this Brick already.\nDownload it again?", "Download");
+			if (go) {
+				hb_cover_path(g->g.image, cover, sizeof cover);
+				if (hb_download(a, g->sys, &g->g, cover)) {
+					g->flags |= HB_HAVE;
+					g->flags &= (unsigned char)~(HB_UPDATE | HB_GONE);
+				}
+			}
+			plat_input_flush();
+			memset(&a->in, 0, sizeof a->in);
+			continue;
+		}
+		hb_page_draw(a, &p, &pp);
+		SDL_Delay(8);
+	}
+	if (g_pm_shot) {
+		/* the frame for a screenshot, with the cover or picture on the card */
+		char path[LIB_PATH];
+		SDL_Surface *sf;
+
+		hb_cover_path(hb_page_image(&p), path, sizeof path);
+		if ((sf = IMG_Load(path))) {
+			pp.tex = SDL_CreateTextureFromSurface(a->r, sf);
+			pp.tw = sf->w; pp.th = sf->h;
+			snprintf(pp.shown, sizeof pp.shown, "%s", pp.want);
+			SDL_FreeSurface(sf);
+		}
+		p.qr = shot_hb_qr;
+		hb_page_draw(a, &p, &pp);
+	}
+	hb_pic_free(&pp);
+	free(p.lines);
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+}
+
+/* ---- the catalogue's screen ---- */
+
+static void hb_browse(app *a)
+{
+	hb_cat c;
+	hb_pic pp;
+	int sel = 0, first = 0, vis = hb_list_vis(), cons[32], ncons;
+	Uint32 held = 0;
+	bool offline = !net_online();
+
+	memset(&c, 0, sizeof c);
+	memset(&pp, 0, sizeof pp);
+	ncons = hb_consoles(a, cons, 32);
+	if (!offline) {
+		if (!hb_lists_update(a, false) && !a->running) return;
+		hb_owned_update(a, false);
+	}
+	hb_cat_load(a, &c);
+	if (!c.n) {
+		hb_cat_free(&c);
+		pick_say(a, "Get Homebrew", offline ? "Connect to Wi-Fi first" : "Couldn't read itch.io", MENU_ACCENT);
+		return;
+	}
+	hb_view_load(a, &c.v);
+	hb_cat_apply(&c);
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+	while (a->running) {
+		bool changed = false;
+		int was = c.nidx ? c.idx[sel] : -1;
+
+		if (c.nidx > 0) hb_pic_want(&pp, c.g[c.idx[sel]].g.image);
+		hb_pic_step(a, &pp);
 		plat_input_poll(&a->in);
 		if (a->in.quit_requested) { a->running = false; break; }
 		if (a->in.pressed[IN_POWER] || idle_due(a)) { power_off(a); break; }
 		if (menu_leaving(a)) break;
 		if (in_repeat(&a->in, IN_VOLUP)) plat_volume_nudge(+1);
 		if (in_repeat(&a->in, IN_VOLDN)) plat_volume_nudge(-1);
-		if (a->in.pressed[IN_Y]) {
-			int was = l.n ? l.idx[sel] : 0;
+		if (a->in.pressed[IN_X]) { hb_filter_screen(a, &c); changed = true; }
+		if (a->in.pressed[IN_Y]) { hb_search(a, &c); changed = true; }
+		if (in_repeat(&a->in, IN_R1) || in_repeat(&a->in, IN_L1)) {
+			int k, at = -1, d = a->in.pressed[IN_R1] || in_repeat(&a->in, IN_R1) ? 1 : -1;
 
-			l.free_only = !l.free_only;
-			hb_filter(&l);
-			for (sel = 0; sel < l.n - 1 && l.idx[sel] < was; sel++) ;
-			first = 0;
+			for (k = 0; k < ncons; k++) if (cons[k] == c.v.sys) at = k;
+			at = hb_cycle(at + 1, ncons + 1, d) - 1;
+			c.v.sys = at < 0 ? -1 : cons[at];
+			changed = true;
 		}
-		if (l.n > 0) {
-			if (in_repeat(&a->in, IN_DOWN)) sel = sel + 1 < l.n ? sel + 1 : 0;
-			if (in_repeat(&a->in, IN_UP)) sel = sel > 0 ? sel - 1 : l.n - 1;
-			if (in_repeat(&a->in, IN_RIGHT) || in_repeat(&a->in, IN_R1)) sel = sel + vis < l.n ? sel + vis : l.n - 1;
-			if (in_repeat(&a->in, IN_LEFT) || in_repeat(&a->in, IN_L1)) sel = sel - vis > 0 ? sel - vis : 0;
-			if (in_repeat(&a->in, IN_R2)) { sel = hb_letter_jump(&l, sel, +1); letter_show(shelf_initial(l.all[l.idx[sel]].title)); }
-			if (in_repeat(&a->in, IN_L2)) { sel = hb_letter_jump(&l, sel, -1); letter_show(shelf_initial(l.all[l.idx[sel]].title)); }
-			if (a->in.down[IN_UP] || a->in.down[IN_DOWN]) {
+		if (changed) {
+			hb_cat_apply(&c);
+			hb_view_save(a, &c.v);
+			/* the same game under the cursor, when it is still shown */
+			for (sel = 0; sel < c.nidx && c.idx[sel] != was; sel++) ;
+			if (sel >= c.nidx) sel = 0;
+			first = sel >= vis ? sel - vis / 2 : 0;
+			if (g_menu_closing) break;
+			plat_input_flush();
+			memset(&a->in, 0, sizeof a->in);
+		}
+		if (c.nidx > 0) {
+			bool az = c.v.sort == HB_SORT_AZ || c.v.sort == HB_SORT_ZA;
+
+			if (in_repeat(&a->in, IN_DOWN)) sel = sel + 1 < c.nidx ? sel + 1 : 0;
+			if (in_repeat(&a->in, IN_UP)) sel = sel > 0 ? sel - 1 : c.nidx - 1;
+			if (in_repeat(&a->in, IN_RIGHT)) sel = sel + vis < c.nidx ? sel + vis : c.nidx - 1;
+			if (in_repeat(&a->in, IN_LEFT)) sel = sel - vis > 0 ? sel - vis : 0;
+			if (in_repeat(&a->in, IN_R2)) {
+				if (az) { sel = hb_letter_jump(&c, sel, +1); letter_show(hb_initial(c.g[c.idx[sel]].g.title)); }
+				else sel = sel + vis < c.nidx ? sel + vis : c.nidx - 1;
+			}
+			if (in_repeat(&a->in, IN_L2)) {
+				if (az) { sel = hb_letter_jump(&c, sel, -1); letter_show(hb_initial(c.g[c.idx[sel]].g.title)); }
+				else sel = sel - vis > 0 ? sel - vis : 0;
+			}
+			if (az && (a->in.down[IN_UP] || a->in.down[IN_DOWN])) {
 				if (!held) held = plat_now_ms();
-				if (plat_now_ms() - held >= 2000) letter_show(shelf_initial(l.all[l.idx[sel]].title));
+				if (plat_now_ms() - held >= 2000) letter_show(hb_initial(c.g[c.idx[sel]].g.title));
 			} else {
 				held = 0;
 			}
 			if (a->in.pressed[IN_ACCEPT]) {
-				const itch_game *g = &l.all[l.idx[sel]];
-				char cover[LIB_PATH];
-				bool go = true;
-
-				if (l.have[l.idx[sel]][0])
-					go = confirm_panel(a, "Download", "It's on this Brick already.\nDownload it again?",
-					                   "Download");
-				if (go) {
-					hb_cover_path(g->image, cover, sizeof cover);
-					if (hb_download(a, sys, g, cover)) l.have[l.idx[sel]][0] = 1;
-				}
-				plat_input_flush();
-				memset(&a->in, 0, sizeof a->in);
+				hb_game_page(a, &c, c.idx[sel]);
+				/* a game downloaded or deleted there can change what's shown */
+				was = c.idx[sel];
+				hb_cat_apply(&c);
+				for (sel = 0; sel < c.nidx && c.idx[sel] != was; sel++) ;
+				if (sel >= c.nidx) sel = c.nidx ? c.nidx - 1 : 0;
+				if (g_menu_closing) break;
 				continue;
 			}
 		}
 		if (sel < first) first = sel;
 		if (sel >= first + vis) first = sel - vis + 1;
-		hb_list_draw(a, s->name, &l, sel, first, vis, &pp);
+		if (first < 0) first = 0;
+		hb_list_draw(a, &c, sel, first, vis, &pp, offline);
 		SDL_Delay(8);
 	}
 	hb_pic_free(&pp);
-	free(l.have);
-	free(l.idx);
-	free(l.all);
+	hb_cat_free(&c);
 	plat_input_flush();
 	memset(&a->in, 0, sizeof a->in);
 }
 
-/* ---- the page: consoles, and the key ---- */
+/* ---- Manage Downloads ---- */
+
+#define HB_HAVE_MAX 400
 
 typedef struct {
-	int sys[32];
-	char counts[32][16];
+	app *a;
+	hb_have_rec *r;
 	int n;
-	char keyval[24];
+	char names[HB_HAVE_MAX][96];
+	unsigned char flags[HB_HAVE_MAX];
+	int sys[HB_HAVE_MAX];
+	char checked[48], count[16];
+} hb_mgr_ctx;
+
+static void hb_mgr_load(hb_mgr_ctx *m)
+{
+	char p[LIB_PATH + 32];
+	char **fl;
+	int nfl, i;
+	long long t;
+
+	m->n = hb_have_all(m->r, HB_HAVE_MAX);
+	hb_flags_path(p, sizeof p);
+	fl = hb_links_load(p, &nfl);
+	for (i = 0; i < m->n; i++) {
+		const char *f = hb_links_find(fl, nfl, m->r[i].link), *sl = strchr(m->r[i].rel, '/'), *dot;
+		char folder[CFG_STR];
+
+		snprintf(m->names[i], sizeof m->names[i], "%s", sl ? sl + 1 : m->r[i].rel);
+		if ((dot = strrchr(m->names[i], '.'))) m->names[i][dot - m->names[i]] = '\0';
+		snprintf(folder, sizeof folder, "%.*s", sl ? (int)(sl - m->r[i].rel) : 0, m->r[i].rel);
+		m->sys[i] = hb_sys_by_folder(m->a, folder);
+		m->flags[i] = 0;
+		if (f && strchr(f, '\t')) m->flags[i] = strchr(f, '\t')[1] == 'U' ? HB_UPDATE : strchr(f, '\t')[1] == 'G' ? HB_GONE : 0;
+	}
+	hb_links_free(fl, nfl);
+	/* by name, as a shelf is */
+	for (i = 1; i < m->n; i++) {
+		int j;
+
+		for (j = i; j > 0 && strcasecmp(m->names[j], m->names[j - 1]) < 0; j--) {
+			hb_have_rec tr = m->r[j]; char tn[96]; unsigned char tf = m->flags[j]; int ts = m->sys[j];
+
+			m->r[j] = m->r[j - 1]; m->r[j - 1] = tr;
+			memcpy(tn, m->names[j], sizeof tn); memcpy(m->names[j], m->names[j - 1], sizeof tn);
+			memcpy(m->names[j - 1], tn, sizeof tn);
+			m->flags[j] = m->flags[j - 1]; m->flags[j - 1] = tf;
+			m->sys[j] = m->sys[j - 1]; m->sys[j - 1] = ts;
+		}
+	}
+	t = db_get_int(db_dev(), "itch.checked", 0);
+	if (t > 0) {
+		time_t tt = (time_t)t;
+		struct tm tmv;
+
+		localtime_r(&tt, &tmv);
+		strftime(m->checked, sizeof m->checked, "%b %e", &tmv);
+	} else {
+		snprintf(m->checked, sizeof m->checked, "Never");
+	}
+	snprintf(m->count, sizeof m->count, "%d", m->n);
+}
+
+static int hb_mgr_build(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	hb_mgr_ctx *m = ctx;
+	int n = 0, i;
+
+	*heading = "Manage Downloads";
+	rows[n] = (menu_row){ "Check for Updates", m->checked, m->n > 0 };
+	rows[n++].hint = "Newer files, and games gone from itch.io";
+	rows[n++] = (menu_row){ "Delete All", NULL, m->n > 0 };
+	rows[n++] = MENU_RULE;
+	if (!m->n) { rows[n++] = MENU_NOTE("Nothing downloaded yet"); return n; }
+	for (i = 0; i < m->n && n < max; i++) {
+		rows[n] = (menu_row){ m->names[i], m->flags[i] & HB_GONE ? "Removed" : m->flags[i] & HB_UPDATE ? "Update"
+		                                   : m->sys[i] >= 0 ? m->a->sys.systems[m->sys[i]].tag : "",
+		                      true };
+		n++;
+	}
+	return n;
+}
+
+/* Every download asked after: a newer file (the one downloaded no longer
+ * listed, or a different size), or the game gone. A download from before
+ * 2.6.0 records no file, so its first check notes the file there now. */
+static void hb_check_updates(app *a, hb_mgr_ctx *m)
+{
+	char key[200], p[LIB_PATH + 32], say[160];
+	bool has_key = hb_key(key, sizeof key);
+	int i, ups = 0, gone = 0;
+	FILE *f;
+
+	if (!net_online()) { pick_say(a, "Check for Updates", "Connect to Wi-Fi first", MENU_ACCENT); return; }
+	sync_abandon();
+	for (i = 0; i < m->n && a->running; i++) {
+		itchdl d;
+		itchdl_upload up[ITCHDL_UPLOADS];
+		bool paid = false;
+		char why[160];
+		int n, k;
+
+		plat_input_poll(&a->in);
+		if (menu_leaving(a)) break;
+		snprintf(say, sizeof say, "Checking %d of %d\n%s\nB: stop", i + 1, m->n, m->names[i]);
+		pick_frame(a, "Check for Updates", NULL, 0, 0, NULL, 0, 0, say, MENU_ACCENT);
+		memset(&d, 0, sizeof d);
+		snprintf(d.link, sizeof d.link, "%s", m->r[i].link);
+		d.api_key = has_key ? key : NULL;
+		n = itchdl_uploads(&d, up, ITCHDL_UPLOADS, &paid, why, sizeof why);
+		itchdl_done(&d);
+		m->flags[i] &= (unsigned char)~(HB_UPDATE | HB_GONE);
+		if (n < 0) {
+			if (d.http == 404 || d.http == 410) { m->flags[i] |= HB_GONE; gone++; }
+			continue;
+		}
+		if (!m->r[i].upload[0]) {
+			/* the first check: what it would download now is what's here */
+			int order[ITCHDL_UPLOADS];
+			bool several;
+			const system_cfg *s = m->sys[i] >= 0 ? &a->sys.systems[m->sys[i]] : NULL;
+
+			if (s && itchdl_rank(up, n, s->exts, order, &several) > 0) {
+				hb_have_rec keep = m->r[i];
+
+				snprintf(keep.upload, sizeof keep.upload, "%s", up[order[0]].id);
+				keep.size = up[order[0]].size;
+				hb_lists_drop(keep.link, &keep);
+				m->r[i] = keep;
+			}
+			continue;
+		}
+		for (k = 0; k < n && strcmp(up[k].id, m->r[i].upload); k++) ;
+		if (k == n || (up[k].size > 0 && m->r[i].size > 0 && up[k].size != m->r[i].size)) {
+			m->flags[i] |= HB_UPDATE;
+			ups++;
+		}
+	}
+	memset(key, 0, sizeof key);
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+	hb_flags_path(p, sizeof p);
+	if ((f = fopen(p, "w"))) {
+		for (i = 0; i < m->n; i++)
+			if (m->flags[i] & (HB_UPDATE | HB_GONE))
+				fprintf(f, "%s\t%c\n", m->r[i].link, m->flags[i] & HB_GONE ? 'G' : 'U');
+		fclose(f);
+	}
+	db_set_int(db_dev(), "itch.checked", (int)time(NULL));
+	if (!ups && !gone) snprintf(say, sizeof say, "Everything is up to date");
+	else snprintf(say, sizeof say, "%d update%s%s%s", ups, ups == 1 ? "" : "s",
+	              gone ? ", and gone from itch.io: " : "", "");
+	if (gone) {
+		size_t l = strlen(say);
+
+		snprintf(say + l, sizeof say - l, "%d", gone);
+	}
+	pick_say(a, "Check for Updates", say, MENU_ACCENT);
+	hb_mgr_load(m);
+}
+
+static menu_result hb_mgr_key(app *a, void *ctx, in_button key, int sel)
+{
+	hb_mgr_ctx *m = ctx;
+	int i = sel - 3;
+
+	if (sel == 0 && key == IN_ACCEPT && m->n) { hb_check_updates(a, m); return MENU_STAY; }
+	if (sel == 1 && key == IN_ACCEPT && m->n) {
+		char say[96];
+		int k;
+
+		snprintf(say, sizeof say, "Delete all %d downloaded game%s?\nTheir saves are kept.", m->n, m->n == 1 ? "" : "s");
+		if (!confirm_panel(a, "Delete All", say, "Delete All")) return MENU_STAY;
+		for (k = 0; k < m->n; k++) {
+			char full[LIB_PATH * 2];
+
+			snprintf(full, sizeof full, "%s/%s", P_ROMS, m->r[k].rel);
+			unlink(full);
+			hb_lists_drop(m->r[k].link, NULL);
+		}
+		sync();
+		rescan_all(a);
+		hb_mgr_load(m);
+		return MENU_STAY;
+	}
+	if (i < 0 || i >= m->n) return MENU_STAY;
+	if (key == IN_X || key == IN_ACCEPT) {
+		if (key == IN_ACCEPT) {
+			/* its page, when the game is in the catalogue */
+			hb_cat c;
+			int k;
+
+			memset(&c, 0, sizeof c);
+			hb_cat_load(a, &c);
+			for (k = 0; k < c.n && strcmp(c.g[k].g.link, m->r[i].link); k++) ;
+			if (k < c.n) hb_game_page(a, &c, k);
+			else pick_say(a, m->names[i], m->flags[i] & HB_GONE ? "Gone from itch.io.\nThe game stays here."
+			                                                    : "Not in the game lists:\nRefresh Game Lists first", MENU_ACCENT);
+			hb_cat_free(&c);
+		} else {
+			hb_delete(a, m->r[i].link, m->names[i]);
+		}
+		hb_mgr_load(m);
+		return g_menu_closing ? MENU_DONE : MENU_STAY;
+	}
+	return MENU_STAY;
+}
+
+static void hb_manage_screen(app *a)
+{
+	hb_mgr_ctx *m = calloc(1, sizeof *m);
+	menu_style st = { 0 };
+
+	if (!m || !(m->r = calloc(HB_HAVE_MAX, sizeof *m->r))) { free(m); return; }
+	m->a = a;
+	hb_mgr_load(m);
+	st.accent = MENU_ACCENT;
+	st.fixed_w = menu_std_width(a);
+	menu_run(a, &st, hb_mgr_build, hb_mgr_key, m);
+	free(m->r);
+	free(m);
+}
+
+/* ---- Content Warnings ---- */
+
+/* -1: the categories; -2: Choose Tags, a row a category; else that
+ * category's tags */
+typedef struct { int cat; } hb_cw_ctx;
+
+static int hb_cw_build(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	hb_cw_ctx *w = ctx;
+	unsigned on = hb_cw_on();
+	int n = 0, c;
+
+	if (w->cat == -1) {
+		*heading = "Content Warnings";
+		for (c = 0; c < HB_CWS; c++) {
+			rows[n] = (menu_row){ hb_cw_name((hb_cw)c), on & (1u << c) ? "On" : "Off", true };
+			rows[n].toggle = true;
+			rows[n++].hint = hb_cw_hint((hb_cw)c);
+		}
+		rows[n] = (menu_row){ "Choose Tags", NULL, true, true };
+		rows[n++].hint = "Which tags warn";
+		rows[n++] = MENU_RULE;
+		rows[n++] = MENU_NOTE("A game with these tags asks first");
+		return n;
+	}
+	if (w->cat == -2) {
+		*heading = "Choose Tags";
+		for (c = 0; c < HB_CWS; c++) rows[n++] = (menu_row){ hb_cw_name((hb_cw)c), NULL, true, true };
+		return n;
+	}
+	*heading = hb_cw_name((hb_cw)w->cat);
+	{
+		const char *const *t = hb_cw_tags((hb_cw)w->cat);
+
+		for (; *t && n < max; t++) {
+			rows[n] = (menu_row){ *t, hb_cw_tag_off(*t, NULL) ? "Off" : "On", true };
+			rows[n++].toggle = true;
+		}
+	}
+	return n;
+}
+
+static menu_result hb_cw_key(app *a, void *ctx, in_button key, int sel);
+
+static void hb_cw_page(app *a, int cat)
+{
+	hb_cw_ctx w = { cat };
+	menu_style st = { 0 };
+
+	st.accent = MENU_ACCENT;
+	st.fixed_w = menu_std_width(a);
+	menu_run(a, &st, hb_cw_build, hb_cw_key, &w);
+}
+
+static menu_result hb_cw_key(app *a, void *ctx, in_button key, int sel)
+{
+	hb_cw_ctx *w = ctx;
+
+	if (key != IN_ACCEPT && key != IN_LEFT && key != IN_RIGHT) return MENU_STAY;
+	if (w->cat == -1) {
+		if (sel >= 0 && sel < HB_CWS) {
+			char k[32];
+
+			snprintf(k, sizeof k, "itch.cw.%d", sel);
+			db_set_int(db_dev(), k, (hb_cw_on() & (1u << sel)) ? 0 : 1);
+		} else if (sel == HB_CWS && key == IN_ACCEPT) {
+			hb_cw_page(a, -2);
+		}
+		return g_menu_closing ? MENU_DONE : MENU_STAY;
+	}
+	if (w->cat == -2) {
+		if (key == IN_ACCEPT && sel >= 0 && sel < HB_CWS) hb_cw_page(a, sel);
+		return g_menu_closing ? MENU_DONE : MENU_STAY;
+	}
+	{
+		const char *const *t = hb_cw_tags((hb_cw)w->cat);
+		int i;
+
+		for (i = 0; t[i] && i < sel; i++) ;
+		if (sel >= 0 && t[i]) {
+			char k[64];
+
+			snprintf(k, sizeof k, "itch.cwoff.%s", t[i]);
+			db_set_int(db_dev(), k, hb_cw_tag_off(t[i], NULL) ? 0 : 1);
+		}
+	}
+	return MENU_STAY;
+}
+
+/* ---- the page: Browse Games, and the rest ---- */
+
+enum { HB_ROW_BROWSE, HB_ROW_MANAGE, HB_ROW_CW, HB_ROW_KEY, HB_ROW_REFRESH, HB_ROW_CLEAR, HB_ROWS_N };
+
+typedef struct {
+	char games[16], downloads[16], keyval[24], cache[24];
 	app *a;
 } hb_ctx;
 
+static long long hb_dir_bytes(const char *dir)
+{
+	DIR *d = opendir(dir);
+	struct dirent *e;
+	long long b = 0;
+
+	if (!d) return 0;
+	while ((e = readdir(d))) {
+		char p[LIB_PATH * 2];
+		struct stat st;
+
+		if (e->d_name[0] == '.') continue;
+		snprintf(p, sizeof p, "%s/%s", dir, e->d_name);
+		if (stat(p, &st) == 0 && S_ISREG(st.st_mode)) b += st.st_size;
+	}
+	closedir(d);
+	return b;
+}
+
 static void hb_refresh(app *a, hb_ctx *c)
 {
-	int i;
+	int sys[32], ns = hb_consoles(a, sys, 32), k, total = 0;
+	hb_have_rec *r = calloc(HB_HAVE_MAX, sizeof *r);
+	char dir[LIB_PATH];
+	long long b;
 
-	c->n = 0;
-	for (i = 0; i < a->sys.count && c->n < 32; i++) {
+	for (k = 0; k < ns; k++) {
 		char path[LIB_PATH * 3];
 		itch_game *g;
 		int cnt = 0;
 
-		if (!itch_slugs(a->sys.systems[i].folder)) continue;
-		c->sys[c->n] = i;
-		itch_index_path(a->sys.systems[i].folder, path, sizeof path);
+		itch_index_path(a->sys.systems[sys[k]].folder, path, sizeof path);
 		g = itch_index_load(path, &cnt, NULL, NULL);
 		free(g);
-		if (g) snprintf(c->counts[c->n], 16, "%d", cnt);
-		else c->counts[c->n][0] = '\0';
-		c->n++;
+		total += cnt;
+	}
+	if (total) snprintf(c->games, sizeof c->games, "%d", total);
+	else c->games[0] = '\0';
+	if (r) {
+		int n = hb_have_all(r, HB_HAVE_MAX);
+
+		if (n) snprintf(c->downloads, sizeof c->downloads, "%d", n);
+		else c->downloads[0] = '\0';
+		free(r);
 	}
 	snprintf(c->keyval, sizeof c->keyval, "%s", hb_has_key() ? "Kept" : "None");
+	snprintf(dir, sizeof dir, "%s/itch/covers", P_USERDATA);
+	b = hb_dir_bytes(dir);
+	if (b >= 1024 * 1024) snprintf(c->cache, sizeof c->cache, "%lld MB", b / (1024 * 1024));
+	else if (b > 0) snprintf(c->cache, sizeof c->cache, "%lld KB", (b + 1023) / 1024);
+	else c->cache[0] = '\0';
 }
 
 static int hb_build(void *ctx, menu_row *rows, int max, const char **heading)
 {
 	hb_ctx *c = ctx;
-	int i, n = 0;
+	int n = 0;
 
+	(void)max;
 	*heading = "Get Homebrew";
-	for (i = 0; i < c->n && n < max - 2; i++) {
-		rows[n] = (menu_row){ c->a->sys.systems[c->sys[i]].name, c->counts[i][0] ? c->counts[i] : NULL,
-		                      true, true };
-		rows[n].hint = "Its games on itch.io";
-		n++;
-	}
+	rows[n] = (menu_row){ "Browse Games", c->games[0] ? c->games : NULL, true, true };
+	rows[n++].hint = "Every console's games on itch.io";
+	rows[n] = (menu_row){ "Manage Downloads", c->downloads[0] ? c->downloads : NULL, true, true };
+	rows[n++].hint = "Updates, and deleting";
+	rows[n] = (menu_row){ "Content Warnings", NULL, true, true };
+	rows[n++].hint = "Ask before showing some games";
 	rows[n] = (menu_row){ "itch.io Key", c->keyval, true, true };
-	rows[n].hint = "For games you bought. Or paste it in ChaOS Transfer";
-	n++;
+	rows[n++].hint = "For games you bought. Or paste it in ChaOS Transfer";
+	rows[n] = (menu_row){ "Refresh Game Lists", NULL, true };
+	rows[n++].hint = "Read every list again, with dates";
+	rows[n] = (menu_row){ "Clear Image Cache", c->cache[0] ? c->cache : NULL, c->cache[0] != '\0' };
+	rows[n++].hint = "Covers and screenshots";
 	return n;
 }
 
@@ -19185,7 +20565,11 @@ static menu_result hb_key_row(app *a, hb_ctx *c)
 
 	if (hb_has_key()) {
 		if (confirm_panel(a, "itch.io Key", "Remove the key kept\non this Brick?", "Remove")) {
+			char p[LIB_PATH + 32];
+
 			hb_save_key("", who, sizeof who, why, sizeof why);
+			hb_owned_path(p, sizeof p);
+			unlink(p);
 			hb_refresh(a, c);
 		}
 		return MENU_STAY;
@@ -19202,6 +20586,7 @@ static menu_result hb_key_row(app *a, hb_ctx *c)
 	} else {
 		char say[160];
 
+		hb_owned_update(a, true);
 		snprintf(say, sizeof say, who[0] ? "Kept: %s's games" : "Kept", who);
 		pick_say(a, "itch.io Key", say, MENU_ACCENT);
 	}
@@ -19215,15 +20600,40 @@ static menu_result hb_menu_key(app *a, void *ctx, in_button key, int sel)
 	hb_ctx *c = ctx;
 
 	if (key != IN_ACCEPT || sel < 0) return MENU_STAY;
-	if (sel == c->n) return hb_key_row(a, c);
-	if (sel > c->n) return MENU_STAY;
-	if (!net_online()) {
-		char path[LIB_PATH * 3];
+	switch (sel) {
+	case HB_ROW_BROWSE:
+		hb_browse(a);
+		break;
+	case HB_ROW_MANAGE:
+		hb_manage_screen(a);
+		break;
+	case HB_ROW_CW:
+		hb_cw_page(a, -1);
+		break;
+	case HB_ROW_KEY:
+		return hb_key_row(a, c);
+	case HB_ROW_REFRESH:
+		if (!net_online()) { pick_say(a, "Refresh Game Lists", "Connect to Wi-Fi first", MENU_ACCENT); break; }
+		if (!confirm_panel(a, "Refresh Game Lists", "Read every console's list from\nitch.io again? It can take minutes.", "Refresh"))
+			break;
+		if (hb_lists_update(a, true)) {
+			hb_owned_update(a, true);
+			pick_say(a, "Refresh Game Lists", "Every list is up to date", MENU_ACCENT);
+		}
+		break;
+	case HB_ROW_CLEAR: {
+		char dir[LIB_PATH];
+		const char *rm[] = { "/bin/rm", "-rf", dir, NULL };
 
-		itch_index_path(a->sys.systems[c->sys[sel]].folder, path, sizeof path);
-		if (access(path, R_OK) != 0) { pick_say(a, "Get Homebrew", "Connect to Wi-Fi first", MENU_ACCENT); return MENU_STAY; }
+		snprintf(dir, sizeof dir, "%s/itch/covers", P_USERDATA);
+		if (!confirm_panel(a, "Clear Image Cache", "Delete the covers and screenshots\nkept for Get Homebrew? They come\nback as they're shown.", "Clear"))
+			break;
+		pm_run(a, "Clear Image Cache", "Clearing", MENU_ACCENT, rm, NULL);
+		break;
 	}
-	hb_games_screen(a, c->sys[sel]);
+	default:
+		break;
+	}
 	hb_refresh(a, c);
 	return g_menu_closing ? MENU_DONE : MENU_STAY;
 }
@@ -21308,7 +22718,6 @@ static int shot_romm_a, shot_romm_b;
  * SYS SEL [free]), from the itch.io lists in the userdata */
 static const char *shot_hb;
 static int shot_hb_a, shot_hb_b;
-static bool shot_hb_free;
 static const char *shot_pm;
 static const char *shot_pm_arg;
 static int shot_pm_n;
@@ -21667,62 +23076,93 @@ static void romm_shot(app *a)
 	}
 }
 
+static const char *shot_hb_q = "";   /* --hbq: the search, for --hb browse */
+
+static void hb_shot_menu(app *a, menu_build_fn build, void *ctx, int sel)
+{
+	menu_row rows[40];
+	const char *heading;
+	int n = build(ctx, rows, 40, &heading);
+
+	SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+	SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
+	SDL_RenderFillRect(a->r, NULL);
+	menu_draw(a, heading, rows, n, sel, menu_std_width(a), MENU_ACCENT);
+}
+
+/* --hb home N | browse SEL [VIEW] | game SEL [VIEW] | filter | manage N | cw | cwtags N
+ * VIEW: its ones the sort, its tens what's shown, its hundreds the console
+ * (1 up, in Get Homebrew's order; 0 every console) */
 static void hb_shot(app *a)
 {
 	g_pm_shot = true;
 	if (!strcmp(shot_hb, "home")) {
 		hb_ctx c;
-		menu_row rows[40];
-		const char *heading;
-		int n;
 
 		memset(&c, 0, sizeof c);
 		c.a = a;
 		hb_refresh(a, &c);
-		n = hb_build(&c, rows, 40, &heading);
-		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
-		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
-		SDL_RenderFillRect(a->r, NULL);
-		menu_draw(a, heading, rows, n, shot_hb_a, menu_std_width(a), MENU_ACCENT);
-	} else if (!strcmp(shot_hb, "games") && shot_hb_a < a->sys.count) {
-		const system_cfg *s = &a->sys.systems[shot_hb_a];
-		char path[LIB_PATH * 3];
-		hb_list l;
+		hb_shot_menu(a, hb_build, &c, shot_hb_a);
+	} else if (!strcmp(shot_hb, "browse") || !strcmp(shot_hb, "game") || !strcmp(shot_hb, "filter")) {
+		hb_cat c;
 		hb_pic pp;
-		int i, vis = (PM_PANEL.h - 100 - 24 - ui_font_line(UI_F_META) - 16) / menu_row_h(), sel, first;
+		int cons[32], ncons = hb_consoles(a, cons, 32), v = shot_hb_b, sel, vis = hb_list_vis(), first;
 
-		memset(&l, 0, sizeof l);
-		itch_index_path(s->folder, path, sizeof path);
-		if (!(l.all = itch_index_load(path, &l.nall, NULL, NULL))) { fprintf(stderr, "--hb games: no list at %s\n", path); return; }
-		qsort(l.all, (size_t)l.nall, sizeof *l.all, hb_title_cmp);
-		l.idx = calloc((size_t)l.nall + 1, sizeof *l.idx);
-		l.have = calloc((size_t)l.nall + 1, 1);
-		for (i = 0; i < l.nall; i++) l.have[i][0] = hb_have(l.all[i].link, NULL, 0);
-		hb_mark_by_name(s->folder, &l);
-		l.free_only = shot_hb_free;
-		hb_filter(&l);
-		sel = shot_hb_b < l.n ? shot_hb_b : 0;
-		first = sel >= vis ? sel - vis + 1 : 0;
+		memset(&c, 0, sizeof c);
 		memset(&pp, 0, sizeof pp);
-		pp.want = pp.shown = -1;
-		if (l.n) {
-			char cover[LIB_PATH];
-			SDL_Surface *sf;
+		hb_cat_load(a, &c);
+		c.v.sort = (hb_sort)(v % 10 % HB_SORTS);
+		c.v.show = (hb_show)(v / 10 % 10 % HB_SHOWS);
+		c.v.sys = v / 100 > 0 && v / 100 <= ncons ? cons[v / 100 - 1] : -1;
+		snprintf(c.v.search, sizeof c.v.search, "%s", shot_hb_q);
+		hb_cat_apply(&c);
+		sel = shot_hb_a < c.nidx ? shot_hb_a : 0;
+		first = sel >= vis ? sel - vis + 1 : 0;
+		if (!strcmp(shot_hb, "game") && c.nidx) {
+			hb_game_page(a, &c, c.idx[sel]);
+		} else if (!strcmp(shot_hb, "filter")) {
+			hb_flt_ctx f;
 
-			pp.want = l.idx[sel];
-			hb_cover_path(l.all[pp.want].image, cover, sizeof cover);
-			if ((sf = IMG_Load(cover))) {
-				pp.tex = SDL_CreateTextureFromSurface(a->r, sf);
-				pp.tw = sf->w; pp.th = sf->h;
-				SDL_FreeSurface(sf);
-				pp.shown = pp.want;
-			} else {
-				pp.failed = true;
+			memset(&f, 0, sizeof f);
+			f.a = a;
+			f.c = &c;
+			f.ncons = ncons;
+			memcpy(f.cons, cons, sizeof cons);
+			hb_shot_menu(a, hb_flt_build, &f, shot_hb_a);
+		} else {
+			if (c.nidx) {
+				char cover[LIB_PATH];
+				SDL_Surface *sf;
+
+				snprintf(pp.want, sizeof pp.want, "%s", c.g[c.idx[sel]].g.image);
+				hb_cover_path(pp.want, cover, sizeof cover);
+				if ((sf = IMG_Load(cover))) {
+					pp.tex = SDL_CreateTextureFromSurface(a->r, sf);
+					pp.tw = sf->w; pp.th = sf->h;
+					SDL_FreeSurface(sf);
+					snprintf(pp.shown, sizeof pp.shown, "%s", pp.want);
+				} else {
+					pp.failed = true;
+				}
 			}
+			hb_list_draw(a, &c, sel, first, vis, &pp, shot_hb_offline);
+			if (pp.tex) SDL_DestroyTexture(pp.tex);
 		}
-		hb_list_draw(a, s->name, &l, sel, first, vis, &pp);
-		if (pp.tex) SDL_DestroyTexture(pp.tex);
-		free(l.idx); free(l.have); free(l.all);
+		hb_cat_free(&c);
+	} else if (!strcmp(shot_hb, "manage")) {
+		hb_mgr_ctx *m = calloc(1, sizeof *m);
+
+		if (m && (m->r = calloc(HB_HAVE_MAX, sizeof *m->r))) {
+			m->a = a;
+			hb_mgr_load(m);
+			hb_shot_menu(a, hb_mgr_build, m, shot_hb_a);
+			free(m->r);
+		}
+		free(m);
+	} else if (!strcmp(shot_hb, "cw") || !strcmp(shot_hb, "cwtags")) {
+		hb_cw_ctx w = { !strcmp(shot_hb, "cw") ? -1 : shot_hb_a };
+
+		hb_shot_menu(a, hb_cw_build, &w, 0);
 	}
 }
 
@@ -21907,6 +23347,18 @@ static void take_shot(app *a)
 		menu_draw(a, heading, rows, n, shot_menu_sel, menu_std_width(a), MENU_ACCENT);
 	}
 	if (g_about_shot) about_screen(a);
+	if (g_chan_shot) {
+		menu_row rows[8];
+		const char *heading;
+		int n;
+
+		g_test_updates = g_chan_shot == 2;
+		n = chan_build(NULL, rows, 8, &heading);
+		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
+		SDL_RenderFillRect(a->r, NULL);
+		menu_draw(a, heading, rows, n, g_test_updates ? 1 : 0, 0, MENU_ACCENT);
+	}
 	if (shot_cheats >= 0) {
 		static cht_ui u;
 		menu_row *rows;
@@ -22297,6 +23749,7 @@ int main(int argc, char *argv[])
 		}
 		else if (!strcmp(argv[i], "--port-power") && i + 1 < argc) shot_port_power = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--about")) g_about_shot = true;
+		else if (!strcmp(argv[i], "--chan") && i + 1 < argc) g_chan_shot = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--romm") && i + 1 < argc) {
 			shot_romm = argv[++i];
 			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9') shot_romm_a = atoi(argv[++i]);
@@ -22306,8 +23759,10 @@ int main(int argc, char *argv[])
 			shot_hb = argv[++i];
 			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9') shot_hb_a = atoi(argv[++i]);
 			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9') shot_hb_b = atoi(argv[++i]);
-			if (i + 1 < argc && !strcmp(argv[i + 1], "free")) { shot_hb_free = true; i++; }
 		}
+		else if (!strcmp(argv[i], "--hbq") && i + 1 < argc) shot_hb_q = argv[++i];
+		else if (!strcmp(argv[i], "--hbqr")) shot_hb_qr = true;
+		else if (!strcmp(argv[i], "--hboffline")) shot_hb_offline = true;
 		else if (!strcmp(argv[i], "--pm") && i + 1 < argc) {
 			shot_pm = argv[++i];
 			if (i + 1 < argc && argv[i + 1][0] != '-') shot_pm_arg = argv[++i];
@@ -22906,6 +24361,8 @@ int main(int argc, char *argv[])
 		g_status_clock24 = db_get_int(db_dev(), "status.clock24", 0) != 0;
 		g_status_batt    = db_get_int(db_dev(), "status.battery", STATUS_BATT_ICON);
 		g_update_dot     = db_get_int(db_dev(), "update.dot", 1) != 0;
+		g_test_updates   = db_get_int(db_dev(), "update.testing", 0) != 0;
+		upd_set_testing(g_test_updates);
 		if (g_status_batt < 0 || g_status_batt >= STATUS_BATT_COUNT) g_status_batt = STATUS_BATT_ICON;
 	}
 	scan_all(&a);

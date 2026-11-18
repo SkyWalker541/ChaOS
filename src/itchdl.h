@@ -50,6 +50,7 @@ typedef struct {
 	char key_id[32];         /* the download key's id: the web's, or the purchase's */
 	char game_id[24];        /* the API's */
 	const char *api_key;     /* NULL: the web */
+	int http;                /* the answer to the game's own page (or data.json): 404 or 410, gone */
 } itchdl;
 
 /* The key kept, or "" (false) */
@@ -71,6 +72,10 @@ int  itchdl_uploads(itchdl *d, itchdl_upload *out, int max, bool *paid, char *wh
  * own token: not logged). False with `why`. */
 bool itchdl_file_url(itchdl *d, const itchdl_upload *u, char *url, size_t n, char *why, size_t wn);
 
+/* The games the key's account owns: their pages into `links`, up to `max`.
+ * How many, or -1 when itch.io didn't answer or refused the key. */
+int  itchdl_owned(const char *key, char (*links)[192], int max);
+
 /* The web flow's jar, removed */
 void itchdl_done(itchdl *d);
 
@@ -91,14 +96,17 @@ bool itchdl_key_id(const char *signed_url, char *out, size_t n);
  * comes first, earlier in the list first; then a zip; then a file with no
  * extension, which itch.io's download page often gives (it shows the
  * developer's label, "Criss Cross Cove (GB Rom)", not the file's name) and
- * is told apart by its first bytes once it is here (itchdl_sniff). A label
+ * is told apart by its first bytes once it is here (itchdl_sniff). As the
+ * pak chooses, a .gbc comes before a .gb for either Game Boy, and a .p8.png
+ * before a .p8. A label
  * for another machine or for a browser ("web", "Analogue Pocket", "source",
  * "Windows", "soundtrack", ...) goes after the rest, and files that are
  * plainly something else (a .pdf, a .png, an .exe, another console's ROM)
  * are left out. *several: more than one file is as good as the best, so the
  * player is asked. */
 int  itchdl_rank(const itchdl_upload *u, int n, const char *exts, int *order, bool *several);
-/* Whether a file name has one of `exts` (zip aside when `zip` is false) */
+/* Whether a file name has one of `exts` (zip aside when `zip` is false). A
+ * PICO-8 cart can be a picture: "png" counts only as ".p8.png". */
 bool itchdl_ext_in(const char *name, const char *exts, bool zip);
 
 /* What a file is, from its first bytes: its console's folder (systems.cfg's
@@ -106,7 +114,8 @@ bool itchdl_ext_in(const char *name, const char *exts, bool zip);
  * false. A zip is folder "" and extension "zip". Game Boy by its logo and
  * the Color flag at 0x143, Game Boy Advance by its logo at 4, NES by
  * "NES\x1A", Genesis by "SEGA" at 0x100, Master System and Game Gear by
- * "TMR SEGA" and the region after it. */
+ * "TMR SEGA" and the region after it. PICO-8 ("PICO-8", "p8" or "p8.png")
+ * by a text cart's first line, or a PNG 128 pixels wide. */
 bool itchdl_sniff(const char *path, char *folder, size_t fn, char *ext, size_t en);
 
 #endif

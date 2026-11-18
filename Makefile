@@ -9,7 +9,7 @@
         check check-cheevos check-hare check-httpd check-idle check-rahash \
         check-raset check-xfer check-menus check-artscrape check-artrun check-audioout \
         check-db check-stats check-sort check-bt check-ss check-update check-asan \
-        check-release check-updater check-chaos-names check-itch check-itchdl check-discset check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore check-gbsort
+        check-release check-updater check-chaos-names check-itch check-itchdl check-hbcat check-discset check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore check-gbsort
 
 all: check
 
@@ -22,7 +22,7 @@ CHECKS = check-cheevos check-hare check-httpd check-idle check-rahash \
          check-db check-stats check-sort check-bt check-ss \
          check-muselib check-musequeue check-museart check-controls check-logpack \
          check-clock check-update check-remap check-shots check-pixfont \
-         check-release check-updater check-chaos-names check-itch check-itchdl check-discset check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore check-gbsort
+         check-release check-updater check-chaos-names check-itch check-itchdl check-hbcat check-discset check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore check-gbsort
 
 check:
 	@fail=0; for c in $(CHECKS); do \
@@ -318,6 +318,18 @@ build-native/itch-check: tools/itch-check.c src/itch.c src/itch.h src/artscrape.
 	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g -DTORTOS_VERSION='"check"' \
 	      -DCHAOS_VERSION='"check"' -Isrc -o $@ tools/itch-check.c src/itch.c src/artscrape.c \
 	      src/net.c src/urlenc.c
+
+# ChaOS: Get Homebrew's catalogue (src/hbcat.h): its view, a game's page,
+# content warnings; no network.
+check-hbcat: build-native/hbcat-check
+	@./build-native/hbcat-check
+
+build-native/hbcat-check: tools/hbcat-check.c src/hbcat.c src/hbcat.h src/itch.c src/rajson.c \
+                          src/artscrape.c src/net.c src/urlenc.c FORCE
+	@mkdir -p build-native
+	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g -DTORTOS_VERSION='"check"' \
+	      -DCHAOS_VERSION='"check"' -Isrc -o $@ tools/hbcat-check.c src/hbcat.c src/itch.c \
+	      src/rajson.c src/artscrape.c src/net.c src/urlenc.c
 
 # ChaOS: ports (src/ports.h): the Ports shelf's scan, the scripts refused,
 # and PortMaster fetched from a file:// zip and put in place; no network.

@@ -68,6 +68,16 @@ int main(void)
 	CHECK(n > 5 && !strcmp(g[5].title, "Tab Title"), "a tab made a space: [%s]", g[5].title);
 	for (i = 0; i < n; i++)
 		CHECK(strcmp(g[i].title, "Elsewhere") && strcmp(g[i].title, "No Cover"), "left out: %s", g[i].title);
+	CHECK(n > 0 && g[0].pub == 1494908561LL, "its pubDate: %lld", g[0].pub);
+	CHECK(n > 1 && g[1].pub == 0, "none: 0");
+	CHECK(n > 1 && !strcmp(g[1].tags, "Fighting, Windows, macOS, Linux"),
+	      "the title's [tags], not [Free]: %s", n > 1 ? g[1].tags : "");
+	{
+		char t[64];
+
+		itch_title_tags("Game [$4.99] [Puzzle] [Free] [Freebie]", t, sizeof t);
+		CHECK(!strcmp(t, "Puzzle, Freebie"), "and not a price: %s", t);
+	}
 	CHECK(itch_feed_parse("<html>no</html>", strlen("<html>no</html>"), g, 4) == -1, "a page that isn't a feed");
 	CHECK(itch_feed_parse("<rss><item><plainTitle>x", strlen("<rss><item><plainTitle>x"), g, 4) == 0, "a cut-off feed reads none");
 

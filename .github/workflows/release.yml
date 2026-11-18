@@ -1,12 +1,15 @@
 # A ChaOS release, when a version in CHAOS_VERSION is pushed to main that has
-# no release yet: the Brick's card image, made from TortOS's release image
+# no release yet. A test build is the same pushed to the testing branch, with
+# a version N.N.N-testN: a prerelease, and its ChaOS-ota.txt and notes also on
+# the one prerelease tagged "testing", which a Brick on the testing channel
+# asks (src/update.h); the website is left alone: the Brick's card image, made from TortOS's release image
 # (TORTOS_BASE) with dist/brick's launcher and emulator in it, the source of
 # everything in it, and their SHA256SUMS. See dist/README.md.
 name: release
 
 on:
   push:
-    branches: [main]
+    branches: [main, testing]
   workflow_dispatch:
 
 permissions:
@@ -24,8 +27,17 @@ jobs:
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |
           V=$(tr -d ' \n' < CHAOS_VERSION)
+          B=$(tr -d ' \n' < TORTOS_BASE)
           echo "version=$V" >> "$GITHUB_OUTPUT"
-          echo "base=$(tr -d ' \n' < TORTOS_BASE)" >> "$GITHUB_OUTPUT"
+          echo "base=$B" >> "$GITHUB_OUTPUT"
+          # The base a card says it's on (ChaOS/BASE): TortOS's, and ChaOS's
+          # own boot files' revision when it carries them (chaos-image.sh)
+          if [ -f PLASTRON_REV ]; then echo "cardbase=$B+$(tr -d ' \n' < PLASTRON_REV)"; else echo "cardbase=$B"; fi >> "$GITHUB_OUTPUT"
+          case "$GITHUB_REF_NAME:$V" in
+          testing:*-test[0-9]*) echo "test=1" >> "$GITHUB_OUTPUT" ;;
+          main:*-*) echo "main takes releases only, not $V" >&2; exit 1 ;;
+          testing:*) echo "the testing branch takes test builds only (N.N.N-testN), not $V" >&2; exit 1 ;;
+          esac
           if gh release view "v$V" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
             echo "ChaOS $V is already released"; echo "out=1" >> "$GITHUB_OUTPUT"
           fi
@@ -72,7 +84,7 @@ jobs:
           cat > out/ChaOS-ota.txt <<EOF
           # ChaOS: an update over Wi-Fi. Read by the Brick (src/update.h).
           version = $V
-          base = $B
+          base = ${{ steps.v.outputs.cardbase }}
           root = $R
           sha256 = $(sha256sum out/$R | cut -d' ' -f1)
           size = $(stat -c%s out/$R)
@@ -103,6 +115,9 @@ jobs:
         run: |
           V=${{ steps.v.outputs.version }}
           B=${{ steps.v.outputs.base }}
+          # What's new first: the same notes the Brick's Updates screen shows
+          # (ChaOS-notes.txt), less their "ChaOS N.N.N" line
+          { echo "## What's new"; echo; tail -n +2 out/ChaOS-notes.txt | sed '/./,$!d'; echo; echo "---"; echo; } > new.md
           cat > notes.md <<EOF
           ChaOS $V for the TrimUI Brick and Brick Hammer.
 
@@ -111,11 +126,24 @@ jobs:
           ChaOS is built on [TortOS $B](https://github.com/ericreinsmidt/TortOS/releases/tag/v$B) by Eric Reinsmidt. \`ChaOS-v$V-brick-sources.tar\` is the source of everything in the image; what came from where is in [CREDITS.md](https://github.com/SkyWalker541/ChaOS/blob/main/CREDITS.md).
           EOF
           sed -i 's/^          //' notes.md
-          gh release create "v$V" out/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "ChaOS $V" --notes-file notes.md
+          cat new.md notes.md > notes2.md && mv notes2.md notes.md
+          if [ -n "${{ steps.v.outputs.test }}" ]; then
+            printf '\n**A test build**, before release: for the Pre-Release channel (MENU > About ChaOS > Update Channels). It can have bugs.\n' >> notes.md
+            gh release create "v$V" out/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title "ChaOS $V (test)" --notes-file notes.md --prerelease
+            # The testing channel's pointer: this build's update info, on the
+            # one prerelease every Brick on that channel asks
+            gh release view testing --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1 ||
+              gh release create testing --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
+                --title "Testing channel" --notes "The newest test build's update info, for Bricks on the testing channel. The builds themselves are the releases named (test)."
+            gh release upload testing out/ChaOS-ota.txt out/ChaOS-notes.txt --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "v$V" out/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title "ChaOS $V" --notes-file notes.md --latest
+          fi
 
       - name: The image on Pages, for ChaOS Wire's page
-        if: steps.v.outputs.out != '1'
+        if: steps.v.outputs.out != '1' && steps.v.outputs.test != '1'
         env: { GH_TOKEN: "${{ github.token }}" }
         # A release made with this token starts no workflow of its own accord,
         # so pages.yml is started here. If Pages isn't set up yet, that run

@@ -16,7 +16,8 @@
 # an update from TortOS to ChaOS takes. The boot partition, the kernel and
 # every other file are the release's, byte for byte.
 #
-# Needs xz, unsquashfs and mksquashfs, and root (to keep the files' owners).
+# Needs xz, unsquashfs and mksquashfs, mtools, and root (to keep the files'
+# owners).
 # DIATOM defaults to ../chaos-diatom/build/brick/diatom; tortos.elf is
 # build/tortos.elf (make -f mk/cross.mk DEVICE=brick), or TORTOS_ELF. The
 # release (.github/workflows/release.yml) uses dist/brick's, with
@@ -78,6 +79,40 @@ install -m 755 "$ELF" "$C/TortOS/tortos.elf"
 grep -q '::restart:/usr/sbin/tortos-update' "$W/root/etc/inittab" || { echo "inittab has changed: check the updater" >&2; exit 1; }
 install -m 755 "$UPDATER" "$W/root/usr/sbin/tortos-update"
 install -m 755 "$DIATOM" "$C/TortOS/diatom"
+
+# ChaOS's plastron (github.com/SkyWalker541/plastron, Eric Reinsmidt's with
+# ChaOS's changes for the Brick Pro: dist/brick/plastron/README.md): its boot
+# loader, which tells the Brick Pro from the Brick and sets up the Pro's DRAM;
+# its boot script, which loads the Pro's device tree on a Pro; that tree; and
+# the button driver, which reads the Pro's L3, R3 and sticks. TortOS's kernel,
+# its brick.dtb and every other module stay as they are: a Brick boots what it
+# did. The boot partition is FAT, written with mtools; the boot loader goes
+# 128 KiB into the card, ahead of the partitions.
+# Only where PLASTRON_REV says this release carries them (from 2.6.0)
+if [ -f "$ROOT/PLASTRON_REV" ]; then
+	P=$ROOT/dist/brick/plastron
+	for f in boot.scr brickpro.dtb u-boot-sunxi-with-spl.bin brick-pad.ko; do
+		[ -f "$P/$f" ] || { echo "no $f in dist/brick/plastron" >&2; exit 1; }
+	done
+	[ -f "$W/root/usr/lib/brick/brick-pad.ko" ] || { echo "no brick-pad.ko in the root: check plastron" >&2; exit 1; }
+	install -m 644 "$P/brick-pad.ko" "$W/root/usr/lib/brick/brick-pad.ko"
+	set -- $(python3 - "$W/card.img" <<-'EOF'
+	import struct, sys
+	f = open(sys.argv[1], 'rb'); f.seek(512); h = f.read(92)
+	lba, num, size = struct.unpack('<QII', h[72:88]); f.seek(lba * 512)
+	for i in range(num):
+	    e = f.read(size)
+	    if e[56:128].decode('utf-16le').rstrip('\0') == 'boot':
+	        a, b = struct.unpack('<QQ', e[32:48]); print(a)
+	EOF
+	)
+	BOOT_AT=$(($1 * 512))
+	[ "$BOOT_AT" -gt 0 ] || { echo "no boot partition in $IN" >&2; exit 1; }
+	mdir -i "$W/card.img@@$BOOT_AT" ::/brick.dtb > /dev/null || { echo "no brick.dtb on the boot partition" >&2; exit 1; }
+	mcopy -o -i "$W/card.img@@$BOOT_AT" "$P/boot.scr" "$P/brickpro.dtb" ::/
+	[ "$(stat -c%s "$P/u-boot-sunxi-with-spl.bin")" -le $(( (8192 - 256) * 512 )) ] || { echo "the boot loader is too big" >&2; exit 1; }
+	dd if="$P/u-boot-sunxi-with-spl.bin" of="$W/card.img" bs=1024 seek=128 conv=notrunc status=none
+fi
 # ChaOS: PlayStation, on PCSX-ReARMed (tools/build-pcsx.sh): ChaOS's own core,
 # beside TortOS's
 [ -d "$C/TortOS/cores" ] || { echo "no cores folder in this image: check the PlayStation core" >&2; exit 1; }
@@ -193,13 +228,28 @@ grep -q 'exfatlabel $games ChaOS' "$D" || { echo "datapart: the rename did not g
 sed -i 's|echo TortOS > \$g/strings/0x409/manufacturer|echo ChaOS > $g/strings/0x409/manufacturer|' "$W/root/etc/init.d/usbgadget"
 install -m 644 "$ROOT/CREDITS.md" "$C/Licenses/ChaOS.md"
 V=$(tr -d ' \n' < "$ROOT/CHAOS_VERSION")
-echo "$V" > "$C/TortOS/VERSION"
+# A test build (2.6.0-test1, the testing channel: src/update.h) seeds as just
+# before the release it leads to: init.d/tortos reads TortOS/VERSION as three
+# numbers at every boot, and a version it can't read would have it copy ChaOS
+# onto the card at every boot. So 2.6.0-test1 is 2.5.999 there, and in
+# SEED_V; TortOS/CHAOS keeps the real name.
+NUM=${V%%-*}
+IFS=. read -r va vb vc <<EOF
+$NUM
+EOF
+SEED=$((va * 1000000 + vb * 1000 + ${vc:-0}))
+SV=$NUM
+if [ "$NUM" != "$V" ]; then
+	case "$V" in *-test[0-9]*) ;; *) echo "CHAOS_VERSION $V: a test build is N.N.N-testN" >&2; exit 1 ;; esac
+	SEED=$((SEED - 1))
+	SV=$((SEED / 1000000)).$((SEED / 1000 % 1000)).$((SEED % 1000))
+fi
+echo "$SV" > "$C/TortOS/VERSION"
 echo "$V" > "$C/TortOS/CHAOS"
 chmod 644 "$C/TortOS/VERSION" "$C/TortOS/CHAOS"
-IFS=. read -r va vb vc < "$ROOT/CHAOS_VERSION"
 INIT=$W/root/etc/init.d/tortos
 grep -q '^SEED_V=' "$INIT" || { echo "no SEED_V in the image's init.d/tortos" >&2; exit 1; }
-sed -i "s/^SEED_V=.*/SEED_V=$((va * 1000000 + vb * 1000 + ${vc:-0}))/" "$INIT"
+sed -i "s/^SEED_V=.*/SEED_V=$SEED/" "$INIT"
 grep -q '^newer_seed() {$' "$INIT" || { echo "no newer_seed in the image's init.d/tortos" >&2; exit 1; }
 sed -i '/^newer_seed() {$/a\
 	# ChaOS: a card whose TortOS is not ChaOS gets ChaOS, whatever its version\
@@ -236,7 +286,14 @@ grep -q "TortOS's old folder removed" "$INIT" || { echo "init.d/tortos: the move
 # partition is, so the launcher offers only updates for the same one, and
 # launch.sh's last line rebooting instead of powering off when the launcher
 # leaves the flag for an update to install at the next boot
-tr -d ' \n' < "$ROOT/TORTOS_BASE" > "$C/ChaOS/BASE"
+# ChaOS's own boot files make it a base of its own: TORTOS_BASE and
+# PLASTRON_REV, "2.2.0+p1", so a card on TortOS's own boot files is offered
+# the whole image (System Update, over Wi-Fi) to get them
+if [ -f "$ROOT/PLASTRON_REV" ]; then
+	printf '%s+%s' "$(tr -d ' \n' < "$ROOT/TORTOS_BASE")" "$(tr -d ' \n' < "$ROOT/PLASTRON_REV")" > "$C/ChaOS/BASE"
+else
+	tr -d ' \n' < "$ROOT/TORTOS_BASE" > "$C/ChaOS/BASE"
+fi
 chmod 644 "$C/ChaOS/BASE"
 L=$C/ChaOS/launch.sh
 # ChaOS's logs are chaos.log (and .1 to .9), as a player sees them on the card

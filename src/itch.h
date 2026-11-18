@@ -34,7 +34,18 @@ typedef struct {
 	char link[192];    /* https://<author>.itch.io/<game> */
 	char image[256];   /* its cover, https://img.itch.zone/... */
 	char price[16];    /* as the feed says it, "$0.00"; "" when not known */
+	long long pub;     /* when it was published (the feed's pubDate), 0 when not known */
+	char tags[64];     /* the feed's [bracketed] tags after the title, "Platformer, Windows";
+	                    * not Free or a price */
 } itch_game;
+
+/* The [bracketed] tags of an RSS <title>, "Platformer, Windows": not Free,
+ * not a price */
+void itch_title_tags(const char *raw, char *out, size_t n);
+
+/* An RSS pubDate ("Tue, 11 Nov 2025 18:04:00 GMT", or with "+0000") as
+ * seconds since 1970, UTC; 0 when it isn't one */
+long long itch_date(const char *s);
 
 /* Free: a price of nothing, or none known (then the download will say) */
 bool itch_free(const itch_game *g);
@@ -68,6 +79,9 @@ int itch_match(const char *rom_name, const itch_game *games, int n, int *best, i
  * is whole, then a game a line, tab-separated. */
 bool itch_index_save(const char *path, const itch_game *games, int n, time_t when,
                      bool whole);
+/* Which list a file is: 3 now (with dates and tags), 2 before 2.6.0, 1
+ * before that (never whole), 0 none */
+int itch_index_version(const char *path);
 /* The list, from malloc for the caller to free, or NULL (count 0) when there
  * is none or it won't read. `when` and `whole` as saved. */
 itch_game *itch_index_load(const char *path, int *count, time_t *when, bool *whole);
@@ -78,6 +92,10 @@ itch_game *itch_index_load(const char *path, int *count, time_t *when, bool *who
  * there is none yet, or isn't whole, else only what is new since. False when
  * itch.io has no tag for that console. */
 bool itch_fetch_begin(const char *folder, const char *index_path);
+
+/* The same, the whole list read again even when there is one: Refresh Game
+ * Lists. The list on the card stays until the new one is whole. */
+bool itch_fetch_begin_whole(const char *folder, const char *index_path);
 
 /* One step: 1 going, 0 done (the list is on the card), -1 stopped (an error;
  * itch_fetch_problem says which). Starts a request or polls the one going;

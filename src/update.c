@@ -46,6 +46,12 @@ static void background_priority(pid_t pid)
 }
 
 #define OTA_URL "https://github.com/SkyWalker541/ChaOS/releases/latest/download/ChaOS-ota.txt"
+/* ChaOS: the testing channel's. A test build is a prerelease of its own
+ * (v2.6.0-test1), which GitHub's "latest" never names, so each one also puts
+ * its ChaOS-ota.txt on the one prerelease tagged "testing" (release.yml). A
+ * card on the testing channel asks both and takes the newer. */
+#define OTA_TEST_URL "https://github.com/SkyWalker541/ChaOS/releases/download/testing/ChaOS-ota.txt"
+#define OTA_TEST_TMP "/tmp/chaos-ota-test.txt"
 #define DL_URL  "https://github.com/SkyWalker541/ChaOS/releases/download/v%s/%s"
 #define OTA_TMP "/tmp/chaos-ota.txt"
 #define NOTES_URL "https://github.com/SkyWalker541/ChaOS/releases/download/v%s/ChaOS-notes.txt"
@@ -58,6 +64,8 @@ static char g_dl_part[310];
 static char g_root_upd[300];     /* what rootswitch looks for */
 static char g_stamp[300];        /* which version that is */
 static char g_version[32];       /* running */
+static bool g_testing;           /* the testing channel (upd_set_testing) */
+static bool g_asking_test;       /* the check's second question, the testing channel's */
 static char g_system[24];        /* this card's ChaOS/SYSTEM, "" before 0.9.2 */
 static char g_app_dir[300];      /* the small update, unpacked: ChaOS/, Licenses/ */
 static char g_root_dir[256];     /* the card's ChaOS/ */
@@ -93,13 +101,18 @@ static void trim(char *s)
 	memmove(s, s + strspn(s, " \t"), strlen(s + strspn(s, " \t")) + 1);
 }
 
+/* "2.5.0", and a test build's "2.6.0-test1" */
 static bool version_ok(const char *v)
 {
 	int dots = 0;
 	if (!isdigit((unsigned char)*v)) return false;
-	for (; *v; v++) {
+	for (; *v && *v != '-'; v++) {
 		if (*v == '.') dots++;
 		else if (!isdigit((unsigned char)*v)) return false;
+	}
+	if (*v == '-') {
+		if (strncmp(v, "-test", 5) || !isdigit((unsigned char)v[5])) return false;
+		for (v += 5; *v; v++) if (!isdigit((unsigned char)*v)) return false;
 	}
 	return dots >= 1 && dots <= 3;
 }
@@ -154,17 +167,28 @@ bool ota_parse(const char *text, ota_info *o)
 	       hex && strlen(o->sha256) == 64 && o->size > 0;
 }
 
+/* The numbers first; then a test build comes before the release it leads
+ * to (2.6.0-test2 < 2.6.0), and after the test before it */
 int ota_vercmp(const char *a, const char *b)
 {
-	while (*a || *b) {
+	while ((*a && *a != '-') || (*b && *b != '-')) {
 		long x = strtol(a, (char **)&a, 10), y = strtol(b, (char **)&b, 10);
 		if (x != y) return x < y ? -1 : 1;
 		if (*a == '.') a++;
 		if (*b == '.') b++;
-		if (!*a && !*b) break;
 	}
-	return 0;
+	if (!*a && !*b) return 0;
+	if (!*a) return 1;          /* b is a test of the same: a is newer */
+	if (!*b) return -1;
+	{
+		long x = strtol(a + strcspn(a, "0123456789"), NULL, 10);
+		long y = strtol(b + strcspn(b, "0123456789"), NULL, 10);
+		return x == y ? 0 : x < y ? -1 : 1;
+	}
 }
+
+void upd_set_testing(bool on) { g_testing = on; }
+bool upd_testing(void) { return g_testing; }
 
 /* ---- the card's side ------------------------------------------------------ */
 
@@ -350,6 +374,8 @@ bool upd_check(void)
 	if (g_pid > 0) return g_state == UPD_CHECKING;
 	if (g_state == UPD_READY) return true;   /* nothing to ask until it goes */
 	unlink(OTA_TMP);
+	unlink(OTA_TEST_TMP);
+	g_asking_test = false;
 	g_pid = net_get_spawn(OTA_URL, OTA_TMP, 20);
 	if (g_pid <= 0) { fail("Couldn't start the check"); return false; }
 	g_state = UPD_CHECKING;
@@ -366,8 +392,19 @@ static void checked(bool ok)
 		fail("Couldn't reach GitHub");
 		return;
 	}
-	unlink(OTA_TMP);
 	if (!ota_parse(text, &o)) { fail("Update info unreadable"); return; }
+	/* The testing channel's, when it is newer: a channel with no test out
+	 * yet (no file) is just the release's */
+	if (g_testing) {
+		char tt[2048];
+		ota_info t;
+
+		if (read_small(OTA_TEST_TMP, tt, sizeof tt) && ota_parse(tt, &t) &&
+		    ota_vercmp(t.version, o.version) > 0)
+			o = t;
+	}
+	unlink(OTA_TMP);
+	unlink(OTA_TEST_TMP);
 	g_check_failed = false;
 	/* The small one when this card's system is the release's: ChaOS's
 	 * own files, a few megabytes, rather than the whole system */
@@ -618,6 +655,15 @@ bool upd_tick(bool online)
 		switch (g_state) {
 		case UPD_CHECKING:
 			net_spawn_done(done);
+			/* The release's, then (testing) the testing channel's: its
+			 * failing only leaves the release's */
+			if (code == 0 && g_testing && !g_asking_test) {
+				g_asking_test = true;
+				g_pid = net_get_spawn(OTA_TEST_URL, OTA_TEST_TMP, 20);
+				if (g_pid > 0) break;
+			}
+			if (g_asking_test) code = 0;
+			g_asking_test = false;
 			checked(code == 0);
 			break;
 		case UPD_DOWNLOADING:

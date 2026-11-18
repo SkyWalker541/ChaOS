@@ -1,0 +1,32 @@
+# ChaOS: each release's description on GitHub, from .github/release-notes/
+# (vN.N.N.md): what's new, then how to install it. Run when a file there
+# changes, so the notes of a release already made can be put right. Only a
+# release's text is changed: its files, its tag and which release is Latest
+# are left as they are. New releases write their own (release.yml).
+name: Release notes
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/release-notes/**']
+
+permissions:
+  contents: write
+
+jobs:
+  notes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 2 }
+      - name: Set each release's description
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          for f in .github/release-notes/v*.md; do
+            t=$(basename "$f" .md)
+            if gh release view "$t" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+              gh release edit "$t" --repo "$GITHUB_REPOSITORY" --notes-file "$f" > /dev/null && echo "$t: done"
+            else
+              echo "$t: no such release"
+            fi
+          done

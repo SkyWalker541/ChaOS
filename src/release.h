@@ -47,6 +47,13 @@
 #define UPDATE_IMAGE_PREFIX "ChaOS"
 #endif
 
+/* ChaOS: the testing channel. With a test build's version ("2.6.0-test1"),
+ * the feed is that release (a prerelease, which "latest" never names) and a
+ * prerelease may answer; NULL (or a release's version) puts it back. The
+ * feed asked, for whoever asks it themselves. */
+void update_set_test(const char *version);
+const char *update_feed(void);
+
 /* At most one check a day: a menu opened between checks shows the answer
  * kept on the card. */
 #define UPDATE_CHECK_EVERY_S (24 * 60 * 60)

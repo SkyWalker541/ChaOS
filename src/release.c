@@ -23,10 +23,13 @@ static void say(char *why, size_t whyn, const char *text)
 }
 
 /* One to four numbers of up to five digits, joined by dots. */
-static bool version_parts(const char *v, long part[4], int *count)
+/* ChaOS: and a test build's "-testN" after the numbers, into *test (0 for a
+ * release, which comes after every test of it) */
+static bool version_parts(const char *v, long part[4], int *count, long *test)
 {
 	int n = 0;
 
+	*test = 0;
 	if (!v || !*v) return false;
 	for (;;) {
 		long x = 0;
@@ -39,25 +42,57 @@ static bool version_parts(const char *v, long part[4], int *count)
 		if (!digits || n == 4) return false;
 		part[n++] = x;
 		if (*v == '\0') break;
+		if (*v == '-') {
+			if (strncmp(v, "-test", 5) || !isdigit((unsigned char)v[5])) return false;
+			for (v += 5; isdigit((unsigned char)*v); v++) {
+				if (*test > 99999) return false;
+				*test = *test * 10 + (*v - '0');
+			}
+			if (*v || *test <= 0) return false;
+			break;
+		}
 		if (*v++ != '.') return false;
 	}
 	*count = n;
 	return true;
 }
 
+/* ChaOS: the feed asked, and whether a prerelease may answer: the testing
+ * channel's test build, by its tag (update_set_test) */
+static char g_feed[200] = UPDATE_FEED;
+static bool g_allow_pre;
+
+void update_set_test(const char *version)
+{
+	if (version && *version && strstr(version, "-test") && strlen(version) < 32) {
+		snprintf(g_feed, sizeof g_feed,
+		         "https://api.github.com/repos/SkyWalker541/ChaOS/releases/tags/v%s", version);
+		g_allow_pre = true;
+	} else {
+		snprintf(g_feed, sizeof g_feed, "%s", UPDATE_FEED);
+		g_allow_pre = false;
+	}
+}
+
+const char *update_feed(void) { return g_feed; }
+
 bool update_is_newer(const char *candidate, const char *installed)
 {
-	long a[4], b[4];
+	long a[4], b[4], ta, tb;
 	int  na, nb;
 
-	if (!version_parts(candidate, a, &na) || !version_parts(installed, b, &nb))
+	if (!version_parts(candidate, a, &na, &ta) || !version_parts(installed, b, &nb, &tb))
 		return false;
 	for (int i = 0; i < 4; i++) {
 		long x = i < na ? a[i] : 0, y = i < nb ? b[i] : 0;
 
 		if (x != y) return x > y;
 	}
-	return false;
+	/* the same numbers: a release after its tests, a test after the one before */
+	if (ta == tb) return false;
+	if (!ta) return true;
+	if (!tb) return false;
+	return ta > tb;
 }
 
 static bool is_sha256(const char *s)
@@ -136,7 +171,7 @@ bool update_parse(const char *json, size_t len, const char *device,
 	char tag[32], want[96], name[160];
 	bool image = false, sums = false;
 	long long sums_size;
-	long part[4];
+	long part[4], test;
 	int  parts;
 	jsv  root, v, assets, it = { 0 }, a;
 
@@ -145,12 +180,12 @@ bool update_parse(const char *json, size_t len, const char *device,
 	if (!json || !len) { say(why, whyn, "an empty reply"); return false; }
 	root = js_root(json, len);
 	if (!member_str(root, "tag_name", tag, sizeof tag) || tag[0] != 'v' ||
-	    !version_parts(tag + 1, part, &parts)) {
+	    !version_parts(tag + 1, part, &parts, &test)) {
 		say(why, whyn, "no release version in the reply");
 		return false;
 	}
 	if ((js_member(root, "draft", &v) && js_is_true(v)) ||
-	    (js_member(root, "prerelease", &v) && js_is_true(v))) {
+	    (!(g_allow_pre && test) && js_member(root, "prerelease", &v) && js_is_true(v))) {
 		say(why, whyn, "the latest release is a draft or a prerelease");
 		return false;
 	}
@@ -303,7 +338,7 @@ update_state update_check(const char *device, const char *installed,
 	long len;
 
 	if (!reply) { say(why, whyn, "out of memory"); return UPDATE_UNKNOWN; }
-	len = net_get_buf(UPDATE_FEED, NULL, 0, reply, REPLY_MAX, timeout_s);
+	len = net_get_buf(g_feed, NULL, 0, reply, REPLY_MAX, timeout_s);
 	if (len <= 0) {
 		free(reply);
 		say(why, whyn, "no answer from the release feed");
@@ -411,14 +446,14 @@ bool update_offer(const char *file, const char *version, const char *size,
 {
 	update_release r;
 	char want[96];
-	long part[4];
+	long part[4], test;
 	int  parts;
 	char *end;
 
 	memset(&r, 0, sizeof r);
 	if (!device_ok(device)) { say(why, whyn, "no device name"); return false; }
 	if (!version || strlen(version) >= sizeof r.version ||
-	    !version_parts(version, part, &parts)) {
+	    !version_parts(version, part, &parts, &test)) {
 		say(why, whyn, "not a version");
 		return false;
 	}

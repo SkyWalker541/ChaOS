@@ -126,6 +126,11 @@ static void check_versions(void)
 		{ "", "1", false },          { "2..1", "1", false },       { "2.1.", "1", false },
 		{ ".2", "1", false },        { "1.2.3.4.5", "1", false },  { "123456", "1", false },
 		{ "2.2.0-rc1", "2.1.1", false }, { "v2.2.0", "2.1.1", false }, { " 2.2", "2.1", false },
+		/* ChaOS: test builds, before the release they lead to */
+		{ "2.6.0-test1", "2.5.0", true }, { "2.6.0", "2.6.0-test3", true },
+		{ "2.6.0-test3", "2.6.0", false }, { "2.6.0-test2", "2.6.0-test1", true },
+		{ "2.6.0-test1", "2.6.0-test1", false }, { "2.6.0-test", "2.5.0", false },
+		{ "2.6.0-test0", "2.5.0", false },
 	};
 
 	printf("versions\n");

@@ -362,11 +362,20 @@ static int ext_rank(const char *ext, const char *exts)
 	return -1;
 }
 
+/* A .png is a game only as a PICO-8 cart, "x.p8.png" */
+static bool png_not_cart(const char *name, const char *e)
+{
+	size_t l = strlen(name);
+
+	return !strcasecmp(e, "png") && (l < 7 || strcasecmp(name + l - 7, ".p8.png"));
+}
+
 bool itchdl_ext_in(const char *name, const char *exts, bool zip)
 {
 	const char *e = real_ext(name);
 
 	if (!zip && !strcasecmp(e, "zip")) return false;
+	if (png_not_cart(name, e)) return false;
 	return ext_rank(e, exts) >= 0;
 }
 
@@ -438,9 +447,14 @@ int itchdl_rank(const itchdl_upload *u, int n, const char *exts, int *order, boo
 
 	for (i = 0; i < n && i < ITCHDL_UPLOADS; i++) {
 		const char *e = real_ext(u[i].name);
-		int r = e[0] ? ext_rank(e, exts) : -1, sc;
+		int r = e[0] && !png_not_cart(u[i].name, e) ? ext_rank(e, exts) : -1, sc;
 
 		if (e[0] && !strcasecmp(e, "zip")) sc = 100;
+		/* as the pak chooses (its roms.ScoreUpload): a Game Boy game's
+		 * Color version over its plain one, and a PICO-8 cart as a picture
+		 * (.p8.png, its label on it) over the text one */
+		else if (r >= 0 && !strcasecmp(e, "gbc") && ext_rank("gb", exts) >= 0) sc = -2;
+		else if (r >= 0 && !strcasecmp(e, "png") && ext_rank("p8", exts) >= 0) sc = -2;
 		else if (r >= 0) sc = r;
 		else if (!e[0]) sc = 200;
 		else if (in_list(e, NOT_A_GAME) || in_list(e, ROM_EXTS)) continue;
@@ -474,6 +488,13 @@ bool itchdl_sniff(const char *path, char *folder, size_t fn, char *ext, size_t e
 	got = fread(h, 1, sizeof h, f);
 	fclose(f);
 	if (got >= 4 && !memcmp(h, "PK\x03\x04", 4)) { fo = ""; ex = "zip"; }
+	/* PICO-8, as the pak tells it (its roms.DetectROMExt): a text cart
+	 * starts "pico-8 cartridge"; a picture cart is a PNG 128 wide */
+	else if (got >= 16 && !memcmp(h, "pico-8 cartridge", 16)) { fo = "PICO-8"; ex = "p8"; }
+	else if (got >= 24 && !memcmp(h, "\x89PNG", 4) && h[16] == 0 && h[17] == 0 && h[18] == 0 && h[19] == 128) {
+		fo = "PICO-8";
+		ex = "p8.png";
+	}
 	else if (got >= 4 && !memcmp(h, "NES\x1A", 4)) { fo = "NES"; ex = "nes"; }
 	else if (got >= 12 && !memcmp(h + 4, gba_logo, 8)) { fo = "Game Boy Advance"; ex = "gba"; }
 	else if (got >= 0x150 && !memcmp(h + 0x104, gb_logo, 8)) {
@@ -510,6 +531,7 @@ static int web_uploads(itchdl *d, itchdl_upload *out, int max, bool *paid, char 
 	unlink(d->jar);
 	/* 1: the game's page, for its token (and the jar's first cookie) */
 	if (!(b = ask(d->link, NULL, d->jar, NULL, 0, true, &http)) || http != 200) {
+		d->http = b ? http : 0;
 		say_http(b ? http : 0, why, wn);
 		free(b);
 		return -1;
@@ -521,6 +543,7 @@ static int web_uploads(itchdl *d, itchdl_upload *out, int max, bool *paid, char 
 		return -1;
 	}
 	free(b);
+	d->http = 200;
 	/* 2: what the Download button asks for, with nothing paid */
 	snprintf(url, sizeof url, "%s/download_url", d->link);
 	f[0] = (net_field){ "csrf_token", csrf };
@@ -598,10 +621,12 @@ static int api_uploads(itchdl *d, itchdl_upload *out, int max, bool *paid, char 
 	/* the game's id */
 	snprintf(url, sizeof url, "%s/data.json", d->link);
 	if (!(b = ask(url, NULL, NULL, NULL, 0, false, &http)) || http != 200) {
+		d->http = b ? http : 0;
 		say_http(b ? http : 0, why, wn);
 		free(b);
 		return -1;
 	}
+	d->http = 200;
 	root = js_root(b, strlen(b));
 	if (!js_member(root, "id", &v) || js_int(v) <= 0) {
 		free(b);
@@ -723,6 +748,37 @@ bool itchdl_file_url(itchdl *d, const itchdl_upload *u, char *url, size_t n, cha
 	why[0] = '\0';
 	return d->api_key && d->api_key[0] ? api_file(d, u, url, n, why, wn)
 	                                   : web_file(d, u, url, n, why, wn);
+}
+
+int itchdl_owned(const char *key, char (*links)[192], int max)
+{
+	int page, n = 0;
+
+	for (page = 1; page <= 40 && n < max; page++) {
+		char url[160];
+		char *b;
+		int http, got = 0;
+		jsv root, v, it = { 0 }, e;
+
+		snprintf(url, sizeof url, ITCHDL_API "/profile/owned-keys?page=%d", page);
+		if (!(b = ask(url, key, NULL, NULL, 0, false, &http))) return -1;
+		if (http != 200) { free(b); return -1; }
+		root = js_root(b, strlen(b));
+		/* owned_keys is an array, or {} past the last page */
+		if (js_member(root, "owned_keys", &v))
+			while (n < max && js_next(v, &it, &e)) {
+				jsv g, u;
+
+				got++;
+				if (js_member(e, "game", &g) && js_member(g, "url", &u) &&
+				    js_str(u, links[n], sizeof links[0]) && !strncmp(links[n], "https://", 8))
+					n++;
+			}
+		free(b);
+		if (!got) break;
+	}
+	fprintf(stderr, "itchdl: %d game%s owned\n", n, n == 1 ? "" : "s");
+	return n;
 }
 
 void itchdl_done(itchdl *d)

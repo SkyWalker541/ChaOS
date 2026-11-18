@@ -28,13 +28,13 @@ ChaOS is custom firmware for the **TrimUI Brick** and **Brick Hammer**. It runs 
 | **[PICO-8](https://skywalker541.github.io/ChaOS/#pico8)** | Your own copy of PICO-8, with Splore for the carts people share |
 | **[Game Boy or Color, sorted](https://skywalker541.github.io/ChaOS/#gbsort)** | Indie games named `.gb` that are really Game Boy Color play in color, and ChaOS offers to move them to the right folder with their saves, play time and covers |
 | **[RomM and Syncthing](https://skywalker541.github.io/ChaOS/#sync)** | In ROM Management: games, saves and BIOS from your own RomM server, and saves, games and BIOS kept the same on all your devices |
-| **[Get Homebrew](https://skywalker541.github.io/ChaOS/#homebrew)** | New games from itch.io for nine consoles, free ones and ones you bought, onto their shelves with their covers |
+| **[Get Homebrew](https://skywalker541.github.io/ChaOS/#homebrew)** | New games from itch.io for ten consoles in one list you can filter, sort and search, with a page for each game, update checks, and free games and ones you bought onto their shelves with their covers |
 | **[Multi-disc games, combined](https://skywalker541.github.io/ChaOS/#multidisc)** | Discs copied in loose are found and made one game, with Disc in its menu |
 | **[A look of its own](https://skywalker541.github.io/ChaOS/#shelves)** | Pixel Names and Pixel Cards themes, Game List View, letter scrubbing, menu colors |
 | **[Rewind, mapping, screenshots](https://skywalker541.github.io/ChaOS/#playing)** | Alongside TortOS's instant start, resume, fast forward, turbo and RetroAchievements |
 | **[PlayStation](https://skywalker541.github.io/ChaOS/#playstation)** | On PCSX-ReARMed, with achievements, and a Disc page for games on more than one disc |
 | **[Transfer and Wire](https://skywalker541.github.io/ChaOS/#transfer)** | Add games and covers from any browser, over Wi-Fi or the USB cable |
-| **[Updates](https://skywalker541.github.io/ChaOS/#updates)** | Over Wi-Fi, keeping your games, saves and settings |
+| **[Updates](https://skywalker541.github.io/ChaOS/#updates)** | Over Wi-Fi, keeping your games, saves and settings. Choose Public Release or Pre-Release in About ChaOS > Update Channels to test builds before they're released |
 
 The **[ChaOS website](https://skywalker541.github.io/ChaOS/)** has the full tour: the Brick's own screens, a setup walkthrough, every button shortcut, and an FAQ.
 
@@ -47,7 +47,7 @@ The **[ChaOS website](https://skywalker541.github.io/ChaOS/)** has the full tour
 Prefer to do it by hand? Write `ChaOS-v<version>-brick.img.xz` from [Releases](https://github.com/SkyWalker541/ChaOS/releases/latest) to the card with a disk-image writer. That erases the card.
 
 > [!NOTE]
-> ChaOS is for the TrimUI Brick and Brick Hammer only, and is still in active development. Keep a copy of your saves, and please [report what you find](https://github.com/SkyWalker541/ChaOS/issues) with the logs from ChaOS Transfer.
+> ChaOS is for the TrimUI Brick and Brick Hammer only. Found a problem? [Open an issue](https://github.com/SkyWalker541/ChaOS/issues) with the logs from ChaOS Transfer. Have an idea for a feature? Share it in [Discussions](https://github.com/SkyWalker541/ChaOS/discussions).
 
 ## Documentation
 

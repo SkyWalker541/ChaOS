@@ -52,6 +52,13 @@ int main(void)
 	ck(ota_vercmp("0.10.0", "0.9.2") > 0, "0.10.0 is after 0.9.2");
 	ck(ota_vercmp("0.7.1", "0.7.1") == 0, "the same is the same");
 	ck(ota_vercmp("0.7", "0.7.1") < 0 && ota_vercmp("1.0.0", "0.99.9") > 0, "and the rest");
+	/* ChaOS: test builds, before the release they lead to */
+	ck(ota_vercmp("2.6.0-test1", "2.5.0") > 0, "a test of 2.6.0 is after 2.5.0");
+	ck(ota_vercmp("2.6.0-test1", "2.6.0") < 0 && ota_vercmp("2.6.0", "2.6.0-test9") > 0,
+	   "and before 2.6.0");
+	ck(ota_vercmp("2.6.0-test10", "2.6.0-test9") > 0 && ota_vercmp("2.6.0-test2", "2.6.0-test2") == 0,
+	   "tests in order");
+	ck(ota_vercmp("2.6.1", "2.6.0-test3") > 0 && ota_vercmp("2.5.9", "2.6.0-test1") < 0, "and around them");
 
 	printf("the small update:\n");
 	ck(ota_parse("version = 0.9.3\nbase = 2.1.1\nroot = r.squashfs.xz\nsha256 = " SHA "\nsize = 9\n"

@@ -37,7 +37,7 @@
       <a class="btn primary" href="https://github.com/SkyWalker541/ChaOS-Installer/releases/latest">Get ChaOS Installer</a>
       <a class="btn" href="https://github.com/SkyWalker541/ChaOS/releases/latest">Latest release</a>
     </div>
-    <p class="small">Built on <a href="https://github.com/ericreinsmidt/TortOS">TortOS</a> by Eric Reinsmidt. For the Brick and Brick Hammer only. Still in testing: keep a copy of your saves.</p>
+    <p class="small">Built on <a href="https://github.com/ericreinsmidt/TortOS">TortOS</a> by Eric Reinsmidt. For the Brick and Brick Hammer only.</p>
   </div>
   <figure class="device hero-device">
     <div class="bezel"><img src="img/home-pixelnames.webp" alt="The ChaOS shelf in the Pixel Names theme" width="1024" height="768"></div>
@@ -470,16 +470,17 @@
   <article class="feature" id="homebrew">
     <div class="feature-text">
       <h3>Get Homebrew <span class="tag">ChaOS</span></h3>
-      <p>New games are still being made for these consoles, and most are on <a href="https://itch.io">itch.io</a>. <b>MENU &gt; ROM Management &gt; Get Homebrew</b> brings them to the Brick over Wi-Fi, for NES, Master System, Game Boy, Genesis, TurboGrafx-16, Game Gear, SNES, Game Boy Color and Game Boy Advance.</p>
+      <p>New games are still being made for these consoles, and most are on <a href="https://itch.io">itch.io</a>. <b>MENU &gt; ROM Management &gt; Get Homebrew</b> brings them to the Brick over Wi-Fi, for NES, Master System, Game Boy, Genesis, TurboGrafx-16, Game Gear, SNES, Game Boy Color, Game Boy Advance and PICO-8.</p>
       <ul>
-        <li><b>A console's games</b>, A to Z, with the cover of the one you're on. <kbd>Y</kbd> shows free games only; <kbd>L2</kbd>/<kbd>R2</kbd> jump by letter. Paid games show their price, and games you have already say <b>On Brick</b>.</li>
-        <li><kbd>A</kbd> <b>downloads it</b> onto its shelf, with its cover as box art. ChaOS picks the file for the Brick (not the web version or another handheld's), unpacks a zip, and puts a Game Boy Color game on the Color shelf. When a game has two files that could both be it, it asks which.</li>
-        <li><b>No doubles.</b> A download that's the same game as one on your card, under any name, isn't kept twice: ChaOS compares the files and says where you have it.</li>
-        <li><b>Games you bought</b> download with your own itch.io API key (itch.io, Settings, API keys). Type it in <b>itch.io Key</b> at the bottom of the console list, or paste it on ChaOS Transfer's first page. It stays on the card and is never shown again.</li>
+        <li><b>Every console in one list.</b> <kbd>L1</kbd>/<kbd>R1</kbd> change console, <kbd>Y</kbd> searches by title or author, and <kbd>X</kbd> filters: free, paid, games you own, or what's on your Brick, sorted by popular, newest, A to Z or downloaded first.</li>
+        <li><b>A page for each game</b>: its cover and screenshots, its description, what it costs (and what the developer suggests), its tags, and a QR code to open it on your phone. Games tagged with content you'd rather be asked about ask first.</li>
+        <li><kbd>A</kbd> <b>downloads it</b> onto its shelf, with its cover as box art. ChaOS picks the file for the Brick (not the web version or another handheld's), unpacks a zip, and puts a Game Boy Color game on the Color shelf and a PICO-8 cart on PICO-8's. A game already on your card, under any name, isn't kept twice.</li>
+        <li><b>Manage Downloads</b> checks your games for newer files on itch.io, and deletes them (their saves stay).</li>
+        <li><b>Games you bought</b> download with your own itch.io API key (itch.io, Settings, API keys). Type it in <b>itch.io Key</b>, or paste it on ChaOS Transfer's first page. It stays on the card and is never shown again.</li>
       </ul>
-      <p class="note">Free games download the way itch.io's own Download button works, so a change to itch.io's site can stop them until ChaOS catches up. Following <a href="https://github.com/carroarmato0/NextUI-Itchio-Pak">NextUI-Itchio-Pak</a> by Christophe Vanlancker.</p>
+      <p class="note">Free games download the way itch.io's own Download button works, so a change to itch.io's site can stop them until ChaOS catches up. The catalogue, game pages and content warnings, and much of how games are sorted into consoles, follow <a href="https://github.com/carroarmato0/NextUI-Itchio-Pak">NextUI-Itchio-Pak</a> by Christophe Vanlancker.</p>
     </div>
-    <figure class="device" data-screens='[["homebrew","Games"],["homebrew-home","Consoles"],["rom-management","ROM Management"]]'>
+    <figure class="device" data-screens='[["homebrew","Games"],["homebrew-game","A game"],["homebrew-home","Get Homebrew"]]'>
       <div class="bezel"><img src="img/homebrew.webp" alt="" loading="lazy" width="1024" height="768"></div>
       <figcaption class="chips"></figcaption>
     </figure>
@@ -676,6 +677,7 @@
         <li><b>Full Install</b> is always offered, and repairs a card whose files have gone wrong.</li>
         <li>Needs the charger or a quarter charge. If the power goes out, the Brick finishes on the next start.</li>
         <li>Or update over the cable with ChaOS Wire, or with ChaOS Installer on a computer.</li>
+        <li><b>Update Channels</b> (About ChaOS): <b>Public Release</b> or <b>Pre-Release</b>. On Pre-Release a Brick is offered test builds, which come before a release and can have bugs, as well as releases. On Public Release it only ever hears of releases. Switching back never takes a Brick back; it waits for the next release.</li>
       </ul>
     </div>
     <figure class="device" data-screens='[["updates","Updates"]]'>
@@ -685,6 +687,7 @@
   </div>
   <div class="releases">
     <h3>Recent releases</h3>
+    <div class="rel"><span class="ver">2.6.0</span><p><a href="#homebrew">Get Homebrew</a>, rebuilt: every console in one list to filter, sort and search, a page for each game with screenshots and a QR code, update checks for your downloads, content warnings, and PICO-8. <b>Update Channels</b> in About ChaOS: Public Release or Pre-Release, for test builds before they're released.</p></div>
     <div class="rel"><span class="ver">2.5.0</span><p><a href="#homebrew">Get Homebrew</a>: new games from itch.io for nine consoles, free ones and ones you bought, onto their shelves with their covers. <a href="#multidisc">Multi-disc games</a> copied in loose are found and combined into one game.</p></div>
     <div class="rel"><span class="ver">2.4.1</span><p>ChaOS Transfer's folder path no longer crowds the buttons when you're deep in folders: it has a line of its own, a <b>Back</b> button, and a long path folds its middle into <b>…</b>.</p></div>
     <div class="rel"><span class="ver">2.4.0</span><p><a href="#playstation">PlayStation</a>, with achievements and <a href="#discs">changing discs</a>. A tidier main menu: Wi-Fi &amp; Bluetooth and System Settings pages, and a dot on Updates when one is waiting. Logs are named ChaOS.</p></div>
@@ -747,6 +750,8 @@
       <p>Check it's under <b>May Run on ChaOS</b>. If ChaOS names a missing library, it may come in a later library pack. Otherwise send the port's log from <code>.userdata/brick/ports/logs/</code>.</p></details>
     <details><summary>Something went wrong. How do I send the logs?</summary>
       <p>Open <b>MENU &gt; ChaOS Transfer</b>, open its address in a browser, and click <b>Download logs</b>. Then <a href="https://github.com/SkyWalker541/ChaOS/issues">open an issue</a> with it attached.</p></details>
+    <details><summary>I have an idea for a feature. Where do I suggest it?</summary>
+      <p>In <a href="https://github.com/SkyWalker541/ChaOS/discussions">Discussions</a> on GitHub. Problems and bugs go in <a href="https://github.com/SkyWalker541/ChaOS/issues">Issues</a>.</p></details>
     <details><summary>Is PICO-8 included?</summary>
       <p>No. PICO-8 is sold by Lexaloffle, and ChaOS runs your own copy: its Raspberry Pi download, put in the card's <code>PICO-8</code> folder. See <a href="#pico8">PICO-8</a>.</p></details>
     <details><summary>Should I use RomM or Syncthing for saves?</summary>

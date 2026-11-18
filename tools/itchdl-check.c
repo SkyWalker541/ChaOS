@@ -76,10 +76,20 @@ int main(void)
 		const char *gb = "gb,dmg,gbc,cgb,zip", *gbc = "gbc,cgb,gb,dmg,zip", *nes = "nes,fds,unf,unif,zip";
 		int order[ITCHDL_UPLOADS];
 
-		CHECK(itchdl_rank(a, 4, gb, order, &several) == 3 && order[0] == 3 && !several, "Game Boy takes the .gb");
+		CHECK(itchdl_rank(a, 4, gb, order, &several) == 3 && order[0] == 2 && !several,
+		      "Game Boy takes the .gbc first, as the pak does: the Color version");
 		CHECK(itchdl_rank(a, 4, gbc, order, &several) == 3 && order[0] == 2 && !several, "Game Boy Color takes the .gbc");
 		CHECK(itchdl_rank(a, 4, nes, order, &several) == 1 && order[0] == 1, "NES takes the zip, the ROMs being others'");
 		CHECK(itchdl_rank(a, 1, nes, order, &several) == 0, "a manual alone is nothing");
+		{
+			itchdl_upload p[] = { { "1", "screenshot.png", 0 }, { "2", "celeste.p8.png", 0 },
+			                      { "3", "celeste.p8", 0 } };
+
+			CHECK(itchdl_rank(p, 3, "p8,png", order, &several) == 2 && order[0] == 1 && order[1] == 2,
+			      "PICO-8: a .p8.png cart, then a .p8, as the pak chooses; never a picture");
+			CHECK(itchdl_ext_in("cart.p8.png", "p8,png", false) && !itchdl_ext_in("shot.png", "p8,png", false),
+			      "and a .png counts only as a .p8.png");
+		}
 		{
 			itchdl_upload b[] = { { "1", "demo.nes", 0 }, { "2", "full.NES", 0 } };
 
@@ -118,6 +128,14 @@ int main(void)
 		CHECK(itchdl_sniff(t, fo, sizeof fo, ex, sizeof ex) && !strcmp(fo, "Master System"), "Master System");
 		rom[0x7FFF] = 0x6C; WRITE();
 		CHECK(itchdl_sniff(t, fo, sizeof fo, ex, sizeof ex) && !strcmp(fo, "Game Gear"), "Game Gear");
+		memset(rom, 0, sizeof rom); memcpy(rom, "pico-8 cartridge // http://www.pico-8.com", 41); WRITE();
+		CHECK(itchdl_sniff(t, fo, sizeof fo, ex, sizeof ex) && !strcmp(fo, "PICO-8") && !strcmp(ex, "p8"),
+		      "a PICO-8 text cart");
+		memset(rom, 0, sizeof rom); memcpy(rom, "\x89PNG\r\n\x1a\n\0\0\0\rIHDR\0\0\0\x80\0\0\0\xa0", 24); WRITE();
+		CHECK(itchdl_sniff(t, fo, sizeof fo, ex, sizeof ex) && !strcmp(fo, "PICO-8") && !strcmp(ex, "p8.png"),
+		      "a PICO-8 picture cart: a PNG 128 wide");
+		rom[19] = 0x81; WRITE();
+		CHECK(!itchdl_sniff(t, fo, sizeof fo, ex, sizeof ex), "and any other picture: nothing");
 		memset(rom, 0, sizeof rom); memcpy(rom, "PK\x03\x04", 4); WRITE();
 		CHECK(itchdl_sniff(t, fo, sizeof fo, ex, sizeof ex) && !strcmp(ex, "zip"), "a zip");
 		memset(rom, 0, sizeof rom); WRITE();

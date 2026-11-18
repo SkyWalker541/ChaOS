@@ -60,8 +60,15 @@ typedef struct {
  * small update's fields are optional, and dropped when not all good. */
 bool ota_parse(const char *text, ota_info *o);
 
-/* Compare dotted versions, "0.10.0" after "0.9.2": <0, 0, >0. */
+/* Compare dotted versions, "0.10.0" after "0.9.2": <0, 0, >0. A test build
+ * ("2.6.0-test1") comes before its release, after the tests before it. */
 int ota_vercmp(const char *a, const char *b);
+
+/* ChaOS: the testing channel (MENU > About ChaOS > Update Channels > Pre-Release): the
+ * check takes the newest test build as well as the newest release, whichever
+ * is newer. Off by default; the caller keeps the setting. */
+void upd_set_testing(bool on);
+bool upd_testing(void);
 
 typedef enum {
 	UPD_IDLE,         /* not asked yet */

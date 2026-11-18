@@ -126,6 +126,10 @@ sold, put behind a paywall, or shipped with a device that is sold.
 
 ---
 
+## Code ChaOS carries
+
+- **QR Code generator library** by **Project Nayuki** (https://www.nayuki.io/page/qr-code-generator-library), `src/qrcodegen.c` and `src/qrcodegen.h`, unchanged from https://github.com/nayuki/QR-Code-generator (commit bcfe1b0): the QR code on a Get Homebrew game's page. Licence: **MIT**, Copyright (c) Project Nayuki; the notice is in the files.
+
 ## Art, fonts and data
 
 - **Josefin Sans** by **Santiago Orozco**: the UI and wordmark font. SIL Open
@@ -172,7 +176,7 @@ names, and the port screenshot shown is from PortMaster's catalog.
 - **libretro thumbnails** (https://thumbnails.libretro.com): box art.
 - **MusicBrainz Cover Art Archive** (https://musicbrainz.org): album art.
 - **itch.io** (https://itch.io): homebrew games and their box art (Get Homebrew, and Search itch.io for a game's cover), from its public tag feeds, its download pages and, with the player's own API key, its API. Each game and cover is its developer's; ChaOS keeps nothing of itch.io's and is not affiliated with it.
-- **NextUI-Itchio-Pak** by Christophe Vanlancker (https://github.com/carroarmato0/NextUI-Itchio-Pak, MIT): how to read itch.io's tag feeds on a handheld and how its free and paid downloads work, which ChaOS's own itch.io code (src/itch.c, src/itchdl.c) follows. Three of its test pages are in `tools/fixtures/itch` (MIT, unchanged).
+- **NextUI-Itchio-Pak** by Christophe Vanlancker (https://github.com/carroarmato0/NextUI-Itchio-Pak, MIT): how to read itch.io's tag feeds on a handheld and how its free and paid downloads work, which ChaOS's own itch.io code (src/itch.c, src/itchdl.c, src/hbcat.c) follows, and what Get Homebrew's catalogue, game pages and content warnings offer. Six of its test files are in `tools/fixtures/itch` (MIT, unchanged).
 - **PortMaster** (https://portmaster.games, https://github.com/PortsMaster/PortMaster-GUI, MIT): ports, and the files they run with. Not in the image: the Brick downloads PortMaster's own release only when you choose **Get PortMaster**. Each port's screenshot in ChaOS's PortMaster browser comes from PortMaster's catalog and is its porter's or developer's. ChaOS's settings for it (`res/ports/mod_ChaOS.txt`, MIT) follow its other systems' `mod_*.txt`.
 - **minui-portmaster** by ben16w (https://github.com/ben16w/minui-portmaster, MIT), which NextUI's PortMaster pak now points to: the reference for running PortMaster on a TrimUI Brick.
 - **Syncthing** (https://syncthing.net, https://github.com/syncthing/syncthing, MPL-2.0): keeps folders the same across the player's devices. Not in the image: the Brick downloads Syncthing's own arm64 release, the version and its SHA-256 pinned in `src/syncthing.h`, only when you choose **Get Syncthing**, and runs it unchanged. ChaOS talks to it through its REST API; no Syncthing code is in ChaOS.

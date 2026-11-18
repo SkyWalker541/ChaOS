@@ -139,6 +139,7 @@ than any one console:
 | **Show Clock** (System Settings) | `On` or `Off` - the time at the top of every menu |
 | **Show Battery** (System Settings) | `Icon`, `Percent`, `Icon and percent` or `Off` - the battery at the top of every menu |
 | **Update Available Dot** (System Settings) | `On` or `Off` - a dot beside **Updates** while a newer ChaOS is waiting |
+| **Update Channels** (About ChaOS) | `Public Release` or `Pre-Release` (asked first) - on Pre-Release, **Updates** also offers test builds (`2.6.0-test1`), which come before a release and can have bugs. On Public Release, only releases. Switching back takes nothing back: the Brick keeps its test build until the next release |
 | **Auto Off** (System Settings) | how long without a button before the device powers itself down |
 | **Appearance** | the look settings on their own page: UI Theme, UI Direction, Transition Speed, Game List View and Menu Color |
 | **UI Theme** | `Plain Jane`, `Fancy Pants`, `ChaOS Pixel Cards` or `ChaOS Pixel Names` - which art the shelves wear. On the Appearance page |
@@ -785,34 +786,81 @@ fetch BIOS files. It runs only when you choose something.
 
 ### Get Homebrew
 
-New games for old consoles, mostly from itch.io. **Get Homebrew** lists the
-consoles itch.io has a tag for (NES, Master System, Game Boy, Genesis,
-TurboGrafx-16, Game Gear, SNES, Game Boy Color, Game Boy Advance), each with
-how many games ChaOS knows of. The first look at a console reads its whole
-list from itch.io (a minute or two for Game Boy, which has about 2,000), then
-only what's new, once a day. It is the same list **Search itch.io** box art uses.
+New games for old consoles, from itch.io: NES, Master System, Game Boy,
+Genesis, TurboGrafx-16, Game Gear, SNES, Game Boy Color, Game Boy Advance and
+PICO-8. Its catalogue, game pages, content warnings and much of how it sorts
+games into consoles follow [NextUI-Itchio-Pak](https://github.com/carroarmato0/NextUI-Itchio-Pak)
+by Christophe Vanlancker.
 
-| In a console's list | |
+| Row | |
 |---|---|
-| A | download the game |
-| Y | free games only / all games |
-| L2, R2 | the previous or next letter |
+| **Browse Games** | every console's games in one list (the number is how many) |
+| **Manage Downloads** | what you've downloaded: check for updates, open, delete |
+| **Content Warnings** | ask before showing a game with some tags |
+| **itch.io Key** | for games you bought |
+| **Refresh Game Lists** | read every console's list from itch.io again |
+| **Clear Image Cache** | delete the covers and screenshots kept (they come back as they're shown) |
+
+The first look reads each console's whole list from itch.io (a minute or two
+for Game Boy, which has about 2,000), then only what's new, once a day. **B**
+stops it and keeps what's read. It is the same list **Search itch.io** box art
+uses. A game tagged for two consoles is shown once, under the more specific one,
+in the pak's order: Game Boy Color, Game Boy, Game Boy Advance, NES, Genesis,
+PICO-8, then the rest.
+
+| In the list | |
+|---|---|
+| A | the game's page |
+| X | Filter & Search: console, what's shown, the sort, the search |
+| Y | search by title or author (empty clears it) |
+| L1, R1 | the previous or next console (or all) |
+| L2, R2 | the previous or next letter (A-Z, Z-A), else a page |
+| Left, Right | a page |
 | B | back |
 
-- A game's cover shows beside the list. A paid game shows its price; a game
-  you have already shows **On Brick**: one Get Homebrew downloaded, or a file
-  of the game's exact name on that shelf (or the other Game Boy shelf).
+- **Show**: All Games, Free, Paid, Owned (with a key: the games your account
+  owns) or On This Brick. **Sort**: Popular (itch.io's own order), Newest (by
+  the date each was published), A-Z, Z-A, or Downloaded First (updates and
+  removed games first). Kept between visits.
+- Each row has the console (when every console is shown) and a tag: **On
+  Brick**, **Update**, **Removed**, **Owned**, or its price. Beside the list:
+  the cover, the author, the price, the console and the game's itch.io tags.
+- A list from before 2.6.0 has no dates: Newest puts those games after the
+  dated ones until **Refresh Game Lists** reads them again.
+
+| On a game's page | |
+|---|---|
+| A | download it (or again) |
+| X | delete it from this Brick (its saves stay) |
+| Y | a QR code of its itch.io page, to open on a phone |
+| L1, R1 (Left, Right) | its cover and screenshots |
+| Up, Down; L2, R2 | scroll the description; a page |
+| B | back |
+
+- The page shows the cover and screenshots, the author, what it costs (free,
+  name your own price and what's suggested, a sale), whether it's on this
+  Brick, its tags, and the description as itch.io has it.
+- **Content Warnings**: a game tagged with one of a category's tags asks before
+  its page shows. Adult Content, Heavy Themes and Drugs and Alcohol, each on
+  or off; **Choose Tags** turns single tags off.
 - A download picks the game's file for the Brick: a file with that console's
-  extension first, then a zip, then a file named only by its label (itch.io
-  often shows "My Game (GB Rom)", not a file name), which ChaOS identifies by
-  its first bytes. A file for the web, another handheld, a manual, a map or a
-  soundtrack comes last or not at all. When two files look equally right, it
-  asks which.
-- A zip is unpacked and its game taken out. The game is named for its title
-  on itch.io, goes onto the shelf its bytes say (a Game Boy Color game found
-  under Game Boy goes to Game Boy Color), and gets its itch.io cover as box art.
+  extension first (a Game Boy game's Color version before its plain one, and a
+  PICO-8 cart as a `.p8.png` before a `.p8`, as the pak chooses), then a zip,
+  then a file named only by its label (itch.io often shows "My Game (GB Rom)",
+  not a file name), which ChaOS identifies by its first bytes. A file for the
+  web, another handheld, a manual, a map or a soundtrack comes last or not at
+  all. When two files look equally right, it asks which.
+- A zip is unpacked and its game taken out. The game is named for its title on
+  itch.io, goes onto the shelf its bytes say (a Game Boy Color game found under
+  Game Boy goes to Game Boy Color; a PICO-8 cart by its first line, or a
+  picture 128 pixels wide), and gets its itch.io cover as box art.
 - The same game on the card already, under any name (the same size and MD5),
   isn't kept twice: ChaOS says where you have it.
+- **Manage Downloads**: **Check for Updates** asks itch.io about each game
+  downloaded: a newer file shows **Update**, a game itch.io no longer has
+  shows **Removed** (the game stays). A game downloaded before 2.6.0 has its
+  file noted at its first check. A opens a game's page, X deletes it, and
+  **Delete All** deletes them all; saves always stay.
 - **itch.io Key**: for games you bought. Make a key on itch.io (Settings, API
   keys), then type it here or paste it on ChaOS Transfer's first page. It's
   checked with itch.io, kept in ChaOS's userdata (only ChaOS can read it) and
