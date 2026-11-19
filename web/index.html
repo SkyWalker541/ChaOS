@@ -540,7 +540,7 @@
         <li><b>Files</b> go in <code>Roms/PlayStation</code>: <code>.chd</code> (about half the size: the best choice), <code>.cue</code> with its <code>.bin</code>, <code>.pbp</code>, <code>.iso</code> or <code>.img</code>. Only the <code>.cue</code> shows; its <code>.bin</code> stays beside it.</li>
         <li><b>A game on more than one disc</b> gets a folder of its own, its discs in it and an <code>.m3u</code> naming them, one per line. It's one game on the shelf. More below.</li>
         <li><b>No BIOS needed.</b> PCSX-ReARMed has its own. A real one in <code>Bios/</code> (<code>scph5501.bin</code>, <code>scph1001.bin</code> or <code>scph7001.bin</code>) runs a few more games.</li>
-        <li><b>Memory cards</b> save to <code>Saves/</code>, as every console's saves do, so they stay through updates.</li>
+        <li><b>Memory cards</b> save to <code>Saves/</code>, as every console's saves do, so they stay through updates. The card a game starts with is kept beside it as <code>.srm.bak</code>, and a save copied in while its game is running is kept as <code>.srm.outside</code> rather than written over: copy saves in with the game closed.</li>
         <li><b>Achievements</b> for <code>.chd</code>, <code>.cue</code>/<code>.bin</code>, <code>.iso</code>, <code>.img</code> and multi-disc games. A <code>.pbp</code> plays, but has none.</li>
         <li>The Brick has no analog sticks, so games that need them, like Ape Escape, don't play well. Almost every other game uses the d-pad.</li>
       </ul>
@@ -690,6 +690,7 @@
   </div>
   <div class="releases">
     <h3>Recent releases</h3>
+    <div class="rel"><span class="ver">2.6.8</span><p>In-game saves are kept: from the second game after turning on, a game's own saves (a memory card, a cartridge battery) were not being written to the card. They are now, and straight away when you open the menu or Reset. The save each game starts with is kept as a .bak beside it. And sound that keeps up: when a game falls behind (a heavy scene, a shader), ChaOS skips drawing one frame to catch up, so the game keeps its original speed and its sound stops crackling.</p></div>
     <div class="rel"><span class="ver">2.6.7</span><p>Games in .7z archives: they show on their shelves and play, with achievements, Game Boy sorting and box art, as a .zip does. Bugs and ideas now go to the ChaOS Control Discord.</p></div>
     <div class="rel"><span class="ver">2.6.6</span><p>Rewind costs games less: its saves are compared faster and on another core, which should stop the sound crackling with rewind on, as in Game Boy Advance games with the SkyWalker541 shader.</p></div>
     <div class="rel"><span class="ver">2.6.5</span><p>Better logs, for finding bugs: a time on every line, each game's start, save, load, reset and disc change, each setting changed, and Download logs in ChaOS Transfer now includes port, PICO-8, update and system logs, and a list of your save files.</p></div>
