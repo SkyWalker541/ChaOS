@@ -81,8 +81,40 @@ li::marker { color: var(--orange); }
 .links a, .gh { color: var(--text); font-size: 16px; }
 .links a:hover, .gh:hover { color: var(--orange); text-decoration: none; }
 .gh { border: 1px solid var(--line); padding: 6px 14px 4px; border-radius: 999px; }
-@media (max-width: 860px) { .links { display: none; } .gh { margin-left: auto; } }
 .gh + .gh { margin-left: -14px; }
+.jump, .only-phone { display: none; }
+/* Phones and small tablets: the sections fold into one button, which opens
+ * them as a list under the header (app.js); GitHub and Discord join them
+ * there on a phone, where the header has no room. */
+@media (max-width: 860px) {
+  .jump {
+    display: block; margin-left: auto; order: 3;
+    font: inherit; font-size: 16px; color: var(--text); cursor: pointer;
+    background: var(--panel); border: 1px solid var(--line);
+    padding: 6px 14px 4px; border-radius: 999px;
+  }
+  .top.open .jump { color: #1b1208; background: var(--orange); border-color: var(--orange); }
+  .gh { margin-left: auto; }
+  .gh + .gh { margin-left: -14px; }
+  .links {
+    display: none; position: absolute; top: 100%; left: 0; right: 0;
+    flex-direction: column; gap: 0; margin: 0;
+    padding: 6px max(16px, calc((100vw - var(--max)) / 2)) 12px;
+    background: rgba(23, 21, 28, 0.97); border-bottom: 1px solid var(--line);
+    max-height: calc(100vh - 70px); overflow-y: auto;
+  }
+  .top.open .links { display: flex; }
+  .links a { padding: 12px 2px; font-size: 18px; border-bottom: 1px solid var(--line); }
+  .links a:last-child { border-bottom: 0; }
+}
+@media (max-width: 520px) {
+  .gh { display: none; }
+  .only-phone { display: block; }
+}
+/* Nothing wider than the screen shifts the page sideways */
+html, body { overflow-x: clip; }
+.feature-text { min-width: 0; }
+pre.tree { max-width: 100%; }
 
 /* ---- layout -------------------------------------------------------- */
 section { padding: 0 16px; }

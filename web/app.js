@@ -203,3 +203,16 @@
     })
     .catch(function () {});
 })();
+
+/* ChaOS: the Sections button on a phone opens the sections under the
+ * header; a pick, a tap elsewhere or Escape closes them. */
+(() => {
+  const top = document.querySelector('.top');
+  const btn = document.querySelector('.jump');
+  if (!top || !btn) return;
+  const set = (open) => { top.classList.toggle('open', open); btn.setAttribute('aria-expanded', open ? 'true' : 'false'); };
+  btn.addEventListener('click', (e) => { e.stopPropagation(); set(!top.classList.contains('open')); });
+  document.getElementById('sections').addEventListener('click', (e) => { if (e.target.closest('a')) set(false); });
+  document.addEventListener('click', (e) => { if (!top.contains(e.target)) set(false); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') set(false); });
+})();
