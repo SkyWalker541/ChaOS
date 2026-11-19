@@ -14693,8 +14693,30 @@ static void game_menu(app *a)
 		              cht_offered(&a->sys, gm_owner(a), sv->list.items[sv->cursor].file);
 		c.hide[GM_CHEATS] = !c.cht_shown;
 		c.hide[GM_OVERSCAN] = !os_for(a->sys.systems[gm_owner(a)].tag);
-		/* ChaOS: the discs, for a game on more than one */
-		if (!plat_resident_disc(-1, &g_disc_n, &g_disc_i, 500)) g_disc_n = 0;
+		/* ChaOS: the discs, for a game on more than one. Diatom answers
+		 * once it has paused, which for a PlayStation game (its frame kept
+		 * for the menu, its state) can run past half a second; a late answer
+		 * hid the row at random. A game's disc count doesn't change while it
+		 * plays, so once known it is kept for that game, and a slow answer
+		 * keeps the row and the disc it last said. */
+		{
+			static char known_game[LIB_PATH];
+			static int known_n, known_i;
+			const char *game = sv->list.items[sv->cursor].file;
+			int n = 0, i = -1;
+
+			if (strcmp(known_game, game)) {
+				snprintf(known_game, sizeof known_game, "%s", game);
+				known_n = 0;
+				known_i = -1;
+			}
+			if (plat_resident_disc(-1, &n, &i, 3000) && n > 0) {
+				known_n = n;
+				known_i = i;
+			}
+			g_disc_n = known_n;
+			g_disc_i = known_i;
+		}
 		c.hide[GM_DISC] = g_disc_n < 2;
 	}
 	/* The frame as the shader drew it, when it did: what the player was
