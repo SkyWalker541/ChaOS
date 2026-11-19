@@ -14254,7 +14254,19 @@ static bool disc_screen(app *a, gm_ctx *g)
 	if (!plat_resident_disc(u.pick, &n, &i, 2000) || i != u.pick) return false;
 	g_disc_n = n;
 	g_disc_i = i;
-	if (u.how == 2) plat_resident_line("RESET");
+	if (u.how == 2) {
+		/* The core reads the lid open for 2 seconds after a disc goes in,
+		 * and a console restarted inside them boots to its CD player and
+		 * memory card screen, not the game (2.6.1). Diatom waits it out
+		 * before the reset; this says so meanwhile, so it isn't a freeze. */
+		char say[40];
+		unsigned t0 = plat_now_ms();
+
+		snprintf(say, sizeof say, "Restarting with Disc %d...", i + 1);
+		wait_panel(a, "Disc", say);
+		while (plat_now_ms() - t0 < 3000) SDL_Delay(20);
+		plat_resident_line("RESET");
+	}
 	return true;
 }
 
