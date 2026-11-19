@@ -41,7 +41,7 @@ typedef enum {
 	 * (net_page), and System Settings (sys_page) - the sound, the clock, the
 	 * status line's clock and battery, Auto Off */
 	PM_NETPAGE, PM_WIFI, PM_BT,
-	PM_SYSPAGE, PM_AUDIO, PM_CHANNELS, PM_NIGHT, PM_CLOCK, PM_SHOWCLOCK, PM_SHOWBATT, PM_UPDDOT,
+	PM_SYSPAGE, PM_AUDIO, PM_CHANNELS, PM_NIGHT, PM_CLOCK, PM_SHOWCLOCK, PM_SHOWBATT, PM_BATTWARN, PM_UPDDOT,
 	PM_SLEEP, PM_APPEARANCE, PM_THEME, PM_DIR, PM_SPEED, PM_LISTVIEW, PM_COLOR,
 	/* ChaOS: which of the shelves that aren't consoles are on the systems row */
 	PM_SHELF_FAV, PM_RECENT, PM_SHELF_MUSE,

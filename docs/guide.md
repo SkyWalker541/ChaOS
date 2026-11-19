@@ -138,6 +138,7 @@ than any one console:
 | **Date & Time** (System Settings) | the clock, the time zone and 12- or 24-hour, set with left and right - see below |
 | **Show Clock** (System Settings) | `On` or `Off` - the time at the top of every menu |
 | **Show Battery** (System Settings) | `Icon`, `Percent`, `Icon and percent` or `Off` - the battery at the top of every menu |
+| **Battery Warnings** (System Settings) | when the low battery dot shows (5% to 30%, 10% to start) and when it starts to blink (Auto, which goes by the battery itself, or a percentage under the first), and whether each shows over your games too. At 2% ChaOS saves your game and turns off, whatever these say |
 | **Update Available Dot** (System Settings) | `On` or `Off` - a dot beside **Updates** while a newer ChaOS is waiting |
 | **Update Channels** (About ChaOS) | `Public Release` or `Pre-Release` (asked first) - on Pre-Release, **Updates** also offers test builds (`2.6.0-test1`), which come before a release and can have bugs. On Public Release, only releases. Switching back takes nothing back: the Brick keeps its test build until the next release |
 | **Auto Off** (System Settings) | how long without a button before the device powers itself down |

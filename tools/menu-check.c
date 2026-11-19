@@ -183,7 +183,7 @@ static bool has_label(const menu_row *rows, int n, const char *label);
  * (Audio Output, Audio Channels, Night Mode, Date & Time, Show Clock, Show
  * Battery, Update Available Dot, Auto Off) */
 #define NET_ROWS 2
-#define SYS_ROWS 8
+#define SYS_ROWS 9
 #define TOP_ROWS (PM_ROWS - PAGE_ROWS - ROM_ROWS - NET_ROWS - SYS_ROWS)
 /* (the page's description line is drawn by menu_draw, not a row) */
 #define PAGE_NOTE 0
@@ -866,7 +866,7 @@ static void radio_less(void)
 		    pm[i] == PM_SYNC || pm[i] == PM_GBSORT || pm[i] == PM_DISCSETS || pm[i] == PM_WIFI ||
 		    pm[i] == PM_BT || pm[i] == PM_AUDIO || pm[i] == PM_CHANNELS ||
 		    pm[i] == PM_NIGHT || pm[i] == PM_CLOCK || pm[i] == PM_SHOWCLOCK ||
-		    pm[i] == PM_SHOWBATT || pm[i] == PM_UPDDOT || pm[i] == PM_SLEEP) ok = false;
+		    pm[i] == PM_SHOWBATT || pm[i] == PM_BATTWARN || pm[i] == PM_UPDDOT || pm[i] == PM_SLEEP) ok = false;
 	/* The top level, in the enum's order, with the Appearance rows on their page
 	 * and Appearance in their place */
 	ck(k == TOP_ROWS && ok, "every TortOS row, in the enum's order");
@@ -910,7 +910,8 @@ static void radio_less(void)
 	n = sys_menu_build(&u, rows, &b, &heading);
 	ck(has_label(rows, n, "Audio Output") && has_label(rows, n, "Date & Time") &&
 	   has_label(rows, n, "Show Clock") && has_label(rows, n, "Show Battery") &&
-	   has_label(rows, n, "Update Available Dot") && !strcmp(heading, "System Settings"),
+	   has_label(rows, n, "Update Available Dot") && has_label(rows, n, "Battery Warnings") &&
+	   !strcmp(heading, "System Settings"),
 	   "System Settings holds the sound, the clock and the status line");
 	u.sys_page = false;
 	n = sys_menu_build(&u, rows, &b, &heading);

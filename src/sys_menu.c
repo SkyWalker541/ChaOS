@@ -60,7 +60,7 @@ int sys_menu_tortos_rows(const sys_ui *u, pm_row *out)
 			            r == PM_DISCSETS;
 			bool net  = r == PM_WIFI || r == PM_BT;
 			bool sys  = r == PM_AUDIO || r == PM_CHANNELS || r == PM_NIGHT ||
-			            r == PM_CLOCK || r == PM_SHOWCLOCK || r == PM_SHOWBATT ||
+			            r == PM_CLOCK || r == PM_SHOWCLOCK || r == PM_SHOWBATT || r == PM_BATTWARN ||
 			            r == PM_UPDDOT ||
 			            r == PM_SLEEP;
 			int page = look ? 1 : roms ? 2 : net ? 3 : sys ? 4 : 0;
@@ -250,6 +250,9 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	full[PM_SYSPAGE] = (menu_row){ "System Settings", NULL, true };
 	full[PM_SHOWCLOCK] = (menu_row){ "Show Clock", u->show_clock ? u->show_clock : "On", true };
 	full[PM_SHOWBATT]  = (menu_row){ "Show Battery", u->show_batt ? u->show_batt : "Icon", true };
+	/* ChaOS: its own page (battwarn_screen in main.c), so its row says
+	 * nothing of what is on it */
+	full[PM_BATTWARN]  = (menu_row){ "Battery Warnings", NULL, true };
 	full[PM_UPDDOT] = (menu_row){ "Update Available Dot",
 	                              u->update_dot ? u->update_dot : "On", true };
 	full[PM_SHOWCLOCK].toggle = full[PM_UPDDOT].toggle = true;
@@ -365,6 +368,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	full[PM_SYSPAGE].hint      = "Sound, clock, battery and Auto Off";
 	full[PM_SHOWCLOCK].hint    = "The time at the top of the menus";
 	full[PM_SHOWBATT].hint     = "The battery at the top of the menus";
+	full[PM_BATTWARN].hint     = "When the low battery dot shows, and in games";
 	full[PM_UPDDOT].hint       = "A dot on Updates when a new ChaOS is out";
 	full[PM_SLEEP].hint        = "Power off after this long with no buttons pressed";
 	full[PM_APPEARANCE].hint   = "Theme, layout, menu color and which shelves show";

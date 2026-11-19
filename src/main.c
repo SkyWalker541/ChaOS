@@ -1015,6 +1015,18 @@ static void rom_page_screen(app *a);
 /* ChaOS: the Wi-Fi & Bluetooth page, and the System Settings page */
 static bool g_net_page, g_sys_page;
 static bool g_update_dot = true;   /* ChaOS: Update Available Dot, "update.dot" */
+/* ChaOS: System Settings > Battery Warnings. Where the low battery dot
+ * starts (battwarn.low, a percentage), where it starts to blink (battwarn.crit:
+ * 0 for Auto, the device's own reading - the Brick's voltage, truest near
+ * empty - or a percentage under the low one), and whether each shows over a
+ * game as well as in the menus (battwarn.lowgame, battwarn.critgame). Saving
+ * the game and powering off near empty (BATT_EMPTY_PCT) isn't a warning and
+ * isn't here: it is what keeps the game's progress. */
+static int  g_bw_low = BATT_LOW_PCT, g_bw_crit;
+static bool g_bw_low_game = true, g_bw_crit_game = true;
+static const int BW_LOWS[]  = { 5, 10, 15, 20, 25, 30 };
+static const int BW_CRITS[] = { 0, 3, 4, 5, 6, 8, 10, 15, 20, 25 };
+static int battery_game_level(void);   /* below, with battery_level */
 static bool g_test_updates;        /* ChaOS: the Pre-Release channel, "update.testing" */
 static void net_page_screen(app *a);
 static void sys_page_screen(app *a);
@@ -2909,7 +2921,7 @@ static void on_game_tick(void)
 	/* The low-battery disc over the game, which Diatom draws as this process
 	 * can draw nothing while a game runs, blinking when critical. Sent only
 	 * on a change; the level is read every five seconds. */
-	plat_resident_low_battery(battery_level());
+	plat_resident_low_battery(battery_game_level());
 
 	/* Play time. Writes at most one unsynced row and usually nothing, and
 	 * never an fsync: measured on the card, an fsync is 1.56 ms median but
@@ -3350,16 +3362,31 @@ static int battery_level(void)
 		level = 0;
 		/* Once it blinks by voltage it goes on blinking: the voltage can come
 		 * back over the point for a reading as the load changes. */
+		/* ChaOS: a percentage chosen in Battery Warnings goes by the
+		 * percentage, Auto by the device's own reading */
+		if (g_bw_crit > 0) point = 0;
 		if (plat_battery(&pct, &charging) && !charging) {
-			if ((was == 2 && point > 0) || battery_at_or_below(pct, BATT_CRITICAL_PCT, point, &mv))
+			if ((was == 2 && point > 0) ||
+			    battery_at_or_below(pct, g_bw_crit > 0 ? g_bw_crit : BATT_CRITICAL_PCT, point, &mv))
 				level = 2;
-			else if (pct <= BATT_LOW_PCT)
+			else if (pct <= g_bw_low)
 				level = 1;
 		}
 	}
 	return level;
 }
 
+
+/* ChaOS: the dot over a game, as Battery Warnings has it: each stage can be
+ * kept to the menus */
+static int battery_game_level(void)
+{
+	int l = battery_level();
+
+	if (l == 1 && !g_bw_low_game) return 0;
+	if (l == 2 && !g_bw_crit_game) return 0;
+	return l;
+}
 
 /* Too low to go on, cached as battery_level is. Asked by every screen through
  * idle_due, and by the game's wait loop (plat_resident_on_battery_empty), so
@@ -3549,7 +3576,7 @@ static void draw_menu_status(SDL_Renderer *r, int left, int right, int y,
 			int tw = 0, gap = icon && words ? bh / 2 : 0;
 			int iw = icon ? bw + nub : 0;
 			int total, ix;
-			SDL_Color fill = pct <= BATT_LOW_PCT ? (SDL_Color){ 224, 72, 72, 255 }
+			SDL_Color fill = pct <= g_bw_low ? (SDL_Color){ 224, 72, 72, 255 }
 			               : charging ? (SDL_Color){ 120, 200, 120, 255 }
 			               : UI_TEXT_SOFT;
 
@@ -10301,6 +10328,102 @@ static void update_after_start(app *a)
 	memset(&a->in, 0, sizeof a->in);
 }
 
+/* ChaOS: System Settings > Battery Warnings (see g_bw_low). Left and right
+ * step a percentage, A too; the two switches flip. The blinking one never
+ * sits at or above the low one: it is the last of the two. */
+static int g_bw_shot;   /* --battwarn: the page, one frame */
+
+static int bw_build(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	static char low[8], crit[8];
+	int n = 0;
+
+	(void)ctx; (void)max;
+	*heading = "Battery Warnings";
+	snprintf(low, sizeof low, "%d%%", g_bw_low);
+	if (g_bw_crit > 0) snprintf(crit, sizeof crit, "%d%%", g_bw_crit);
+	else snprintf(crit, sizeof crit, "Auto");
+	rows[n] = (menu_row){ "Low Battery At", low, true };
+	rows[n].cycles = true;
+	rows[n++].hint = "A red dot shows from here, on the battery";
+	rows[n] = (menu_row){ "Low Dot in Games", g_bw_low_game ? "On" : "Off", true };
+	rows[n].toggle = true;
+	rows[n++].hint = "The red dot over a game too, not only in menus";
+	rows[n] = (menu_row){ "Blinking At", crit, true };
+	rows[n].cycles = true;
+	rows[n++].hint = g_bw_crit > 0 ? "The dot blinks from here: a few minutes left"
+	                               : "Auto: when the battery says it's nearly out";
+	rows[n] = (menu_row){ "Blinking Dot in Games", g_bw_crit_game ? "On" : "Off", true };
+	rows[n].toggle = true;
+	rows[n++].hint = "The blinking dot over a game too";
+	rows[n++] = MENU_RULE;
+	rows[n++] = MENU_NOTE("At 2% ChaOS saves and turns off");
+	return n;
+}
+
+static void bw_save(void)
+{
+	db_set_int(db_dev(), "battwarn.low", g_bw_low);
+	db_set_int(db_dev(), "battwarn.crit", g_bw_crit);
+	db_set_int(db_dev(), "battwarn.lowgame", g_bw_low_game ? 1 : 0);
+	db_set_int(db_dev(), "battwarn.critgame", g_bw_crit_game ? 1 : 0);
+}
+
+/* The next of `opts` from `cur`, `d` steps round; `below` > 0 skips any
+ * percentage at or over it (Auto, 0, always fits) */
+static int bw_step(const int *opts, int n, int cur, int d, int below)
+{
+	int i, at = 0, k;
+
+	for (i = 0; i < n; i++) if (opts[i] == cur) at = i;
+	for (k = 0; k < n; k++) {
+		at = (at + d + n) % n;
+		if (below <= 0 || opts[at] == 0 || opts[at] < below) return opts[at];
+	}
+	return cur;
+}
+
+static void bw_load(void)
+{
+	int i, ok = 0;
+
+	g_bw_low = db_get_int(db_dev(), "battwarn.low", BATT_LOW_PCT);
+	for (i = 0; i < (int)(sizeof BW_LOWS / sizeof *BW_LOWS); i++) if (BW_LOWS[i] == g_bw_low) ok = 1;
+	if (!ok) g_bw_low = BATT_LOW_PCT;
+	g_bw_crit = db_get_int(db_dev(), "battwarn.crit", 0);
+	if (g_bw_crit < 0 || g_bw_crit >= g_bw_low) g_bw_crit = 0;
+	g_bw_low_game  = db_get_int(db_dev(), "battwarn.lowgame", 1) != 0;
+	g_bw_crit_game = db_get_int(db_dev(), "battwarn.critgame", 1) != 0;
+}
+
+static menu_result bw_key(app *a, void *ctx, in_button key, int sel)
+{
+	int d = key == IN_LEFT ? -1 : key == IN_RIGHT || key == IN_ACCEPT ? 1 : 0;
+
+	(void)a; (void)ctx;
+	if (!d) return MENU_STAY;
+	switch (sel) {
+	case 0:
+		g_bw_low = bw_step(BW_LOWS, (int)(sizeof BW_LOWS / sizeof *BW_LOWS), g_bw_low, d, 0);
+		if (g_bw_crit >= g_bw_low)
+			g_bw_crit = bw_step(BW_CRITS, (int)(sizeof BW_CRITS / sizeof *BW_CRITS), g_bw_crit, -1, g_bw_low);
+		break;
+	case 1: g_bw_low_game = !g_bw_low_game; break;
+	case 2:
+		g_bw_crit = bw_step(BW_CRITS, (int)(sizeof BW_CRITS / sizeof *BW_CRITS), g_bw_crit, d, g_bw_low);
+		break;
+	case 3: g_bw_crit_game = !g_bw_crit_game; break;
+	default: return MENU_STAY;
+	}
+	bw_save();
+	return MENU_STAY;
+}
+
+static void battwarn_screen(app *a)
+{
+	menu_run(a, &(menu_style){ .accent = MENU_ACCENT, .fixed_w = 0 }, bw_build, bw_key, NULL);
+}
+
 static bool g_about_shot;   /* --about: one frame, drawn and not shown */
 static int  g_chan_shot;    /* --chan 1|2: Update Channels, on Public Release or Pre-Release */
 
@@ -11121,6 +11244,7 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 
 	if (key != IN_ACCEPT) return MENU_STAY;
 	switch (sel) {
+	case PM_BATTWARN:     battwarn_screen(a); break;
 	case PM_WIFI:         wifi_screen(a); break;
 	case PM_XFER:         xfer_screen(a); break;
 	case PM_SCRAPE:       art_screen(a, NULL, NULL, NULL, NULL, MENU_ACCENT); break;
@@ -21097,7 +21221,7 @@ static void launch_game(app *a)
 	 * QUIET. Stated before the RUN goes out, which sends it. */
 	plat_resident_quiet(musec_playing());
 	/* And whether the battery is low, so the disc is over its first frame. */
-	plat_resident_low_battery(battery_level());
+	plat_resident_low_battery(battery_game_level());
 
 	/* A game resumed at boot waited 71 and 47 ms for the resident on the
 	 * Pixel 2 (2026-10-05, a DAC plugged in), where it had been falling back
@@ -23627,6 +23751,16 @@ static void take_shot(app *a)
 		menu_draw(a, heading, rows, n, shot_menu_sel, menu_std_width(a), MENU_ACCENT);
 	}
 	if (g_about_shot) about_screen(a);
+	if (g_bw_shot) {
+		menu_row rows[10];
+		const char *heading;
+		int n = bw_build(NULL, rows, 10, &heading);
+
+		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
+		SDL_RenderFillRect(a->r, NULL);
+		menu_draw(a, heading, rows, n, g_bw_shot - 1, 0, MENU_ACCENT);
+	}
 	if (g_chan_shot) {
 		menu_row rows[8];
 		const char *heading;
@@ -24030,6 +24164,7 @@ int main(int argc, char *argv[])
 		else if (!strcmp(argv[i], "--port-power") && i + 1 < argc) shot_port_power = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--about")) g_about_shot = true;
 		else if (!strcmp(argv[i], "--chan") && i + 1 < argc) g_chan_shot = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "--battwarn") && i + 1 < argc) g_bw_shot = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--romm") && i + 1 < argc) {
 			shot_romm = argv[++i];
 			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9') shot_romm_a = atoi(argv[++i]);
@@ -24641,6 +24776,7 @@ int main(int argc, char *argv[])
 		g_status_clock24 = db_get_int(db_dev(), "status.clock24", 0) != 0;
 		g_status_batt    = db_get_int(db_dev(), "status.battery", STATUS_BATT_ICON);
 		g_update_dot     = db_get_int(db_dev(), "update.dot", 1) != 0;
+		bw_load();
 		/* A test build put on a card as it is (its image, or ChaOS
 		 * Installer's Pre-Release) starts on Pre-Release: whoever chose it
 		 * wants the next one. Once chosen, the choice stands. */
