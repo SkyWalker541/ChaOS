@@ -47,7 +47,7 @@ The **[ChaOS website](https://skywalker541.github.io/ChaOS/)** has the full tour
 Prefer to do it by hand? Write `ChaOS-v<version>-brick.img.xz` from [Releases](https://github.com/SkyWalker541/ChaOS/releases/latest) to the card with a disk-image writer. That erases the card.
 
 > [!NOTE]
-> ChaOS is for the TrimUI Brick and Brick Hammer only. Found a problem? [Open an issue](https://github.com/SkyWalker541/ChaOS/issues) with the logs from ChaOS Transfer. Have an idea for a feature? Share it in [Discussions](https://github.com/SkyWalker541/ChaOS/discussions). To chat, get help, or test pre-releases, join the [ChaOS Control Discord](https://discord.gg/axxyBSS2me).
+> ChaOS is for the TrimUI Brick and Brick Hammer only. Found a problem, or have an idea for a feature? Join the [ChaOS Control Discord](https://discord.gg/axxyBSS2me): bugs go in #bugs, with the logs from ChaOS Transfer, and ideas in #feature-requests. It's also the place to get help or test pre-releases.
 
 ## Documentation
 
