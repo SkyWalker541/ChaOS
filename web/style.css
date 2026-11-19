@@ -81,21 +81,31 @@ li::marker { color: var(--orange); }
 .links a, .gh { color: var(--text); font-size: 16px; }
 .links a:hover, .gh:hover { color: var(--orange); text-decoration: none; }
 .gh { border: 1px solid var(--line); padding: 6px 14px 4px; border-radius: 999px; }
+.gh { display: inline-flex; align-items: center; gap: 7px; }
+.gh svg { width: 18px; height: 18px; flex: none; }
 .gh + .gh { margin-left: -14px; }
-.jump, .only-phone { display: none; }
-/* Phones and small tablets: the sections fold into one button, which opens
- * them as a list under the header (app.js); GitHub and Discord join them
- * there on a phone, where the header has no room. */
+.jump { display: none; }
+/* Up to a wide screen, GitHub and Discord are round icons, so the header
+ * never runs past the edge */
+@media (max-width: 1180px) {
+  .gh { width: 38px; height: 38px; padding: 0; justify-content: center; }
+  .gh span { display: none; }
+}
+/* Phones and small tablets: GitHub and Discord become round icons, and the
+ * sections fold into one button that opens them as a list under the header
+ * (app.js). */
 @media (max-width: 860px) {
+  .top { gap: 8px; }
+  .gh { flex: none; }
+  .gh { margin-left: auto; }
+  .gh + .gh { margin-left: 0; }
   .jump {
-    display: block; margin-left: auto; order: 3;
+    display: block; flex: none; order: 3;
     font: inherit; font-size: 16px; color: var(--text); cursor: pointer;
     background: var(--panel); border: 1px solid var(--line);
-    padding: 6px 14px 4px; border-radius: 999px;
+    padding: 7px 14px 5px; border-radius: 999px;
   }
   .top.open .jump { color: #1b1208; background: var(--orange); border-color: var(--orange); }
-  .gh { margin-left: auto; }
-  .gh + .gh { margin-left: -14px; }
   .links {
     display: none; position: absolute; top: 100%; left: 0; right: 0;
     flex-direction: column; gap: 0; margin: 0;
@@ -106,10 +116,6 @@ li::marker { color: var(--orange); }
   .top.open .links { display: flex; }
   .links a { padding: 12px 2px; font-size: 18px; border-bottom: 1px solid var(--line); }
   .links a:last-child { border-bottom: 0; }
-}
-@media (max-width: 520px) {
-  .gh { display: none; }
-  .only-phone { display: block; }
 }
 /* Nothing wider than the screen shifts the page sideways */
 html, body { overflow-x: clip; }
@@ -365,4 +371,12 @@ pre.tree {
   font: 14px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   color: var(--text); background: var(--panel); border: 1px solid var(--line);
   border-radius: 8px; padding: 12px 14px; margin: 0 0 16px; overflow-x: auto; white-space: pre;
+}
+/* The narrowest phones: the header's pieces a little smaller, to fit */
+@media (max-width: 360px) {
+  .top { gap: 6px; }
+  .brand { gap: 6px; }
+  .brand .word { width: 70px; height: 17px; }
+  .gh { width: 34px; height: 34px; }
+  .jump { padding: 6px 11px 4px; font-size: 15px; }
 }
