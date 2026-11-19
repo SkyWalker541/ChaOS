@@ -81,23 +81,14 @@ li::marker { color: var(--orange); }
 .links a, .gh { color: var(--text); font-size: 16px; }
 .links a:hover, .gh:hover { color: var(--orange); text-decoration: none; }
 .gh { border: 1px solid var(--line); padding: 6px 14px 4px; border-radius: 999px; }
-.gh { display: inline-flex; align-items: center; gap: 7px; }
-.gh svg { width: 18px; height: 18px; flex: none; }
 .gh + .gh { margin-left: -14px; }
 .jump { display: none; }
-/* Up to a wide screen, GitHub and Discord are round icons, so the header
- * never runs past the edge */
-@media (max-width: 1180px) {
-  .gh { width: 38px; height: 38px; padding: 0; justify-content: center; }
-  .gh span { display: none; }
-}
 /* Phones and small tablets: GitHub and Discord become round icons, and the
  * sections fold into one button that opens them as a list under the header
  * (app.js). */
-@media (max-width: 860px) {
+@media (max-width: 940px) {
   .top { gap: 8px; }
-  .gh { flex: none; }
-  .gh { margin-left: auto; }
+  .gh { flex: none; margin-left: auto; font-size: 15px; padding: 6px 11px 4px; }
   .gh + .gh { margin-left: 0; }
   .jump {
     display: block; flex: none; order: 3;
@@ -373,10 +364,25 @@ pre.tree {
   border-radius: 8px; padding: 12px 14px; margin: 0 0 16px; overflow-x: auto; white-space: pre;
 }
 /* The narrowest phones: the header's pieces a little smaller, to fit */
+.brand, .brand .word { flex: none; }
+@media (max-width: 400px) {
+  .top { gap: 5px; }
+  .brand { gap: 5px; }
+  .brand > img { width: 36px; height: 36px; }
+  .brand .word { width: 64px; height: 15px; }
+}
+/* The narrowest phones: the console alone, without its name */
 @media (max-width: 360px) {
-  .top { gap: 6px; }
-  .brand { gap: 6px; }
-  .brand .word { width: 70px; height: 17px; }
-  .gh { width: 34px; height: 34px; }
-  .jump { padding: 6px 11px 4px; font-size: 15px; }
+  .brand span { display: none; }
+  .gh { font-size: 14px; padding: 5px 9px 3px; }
+  .jump { font-size: 14px; padding: 5px 10px 3px; }
+}
+/* A laptop-sized screen: the section links a little closer, so GitHub and
+ * Discord fit beside them */
+@media (min-width: 941px) and (max-width: 1180px) {
+  .top { gap: 14px; }
+  .links { gap: 14px; }
+  .links a, .gh { font-size: 15px; }
+  .gh { padding: 5px 11px 3px; }
+  .gh + .gh { margin-left: -6px; }
 }
