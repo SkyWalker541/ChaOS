@@ -117,12 +117,51 @@ static void pack(void)
 	if (system(cmd) != 0) { }
 }
 
+/* ChaOS: the other logs, in more/ under their names, masked the same; one
+ * that isn't there is left out */
+static void pack_more(void)
+{
+	char dir[] = "/tmp/logpack-more.XXXXXX", p[600], k[600], out[600], cmd[1400], line[512], err[128];
+	const char *more[4];
+	FILE *f;
+	bool masked = false, leaked = false, missing_left_out = true;
+
+	printf("the other logs, in more/\n");
+	if (!mkdtemp(dir)) { perror("mkdtemp"); failures++; return; }
+	snprintf(p, sizeof p, "%s/logs", dir);
+	mkdir(p, 0755);
+	snprintf(p, sizeof p, "%s/logs/chaos.log", dir);
+	if ((f = fopen(p, "w"))) { fputs("boot\n", f); fclose(f); }
+	snprintf(k, sizeof k, "%s/kernel.txt", dir);
+	if ((f = fopen(k, "w"))) { fputs("mmc0: error on ReinFi\n", f); fclose(f); }
+	more[0] = k;               more[1] = "kernel-now.log";
+	more[2] = "/nonexistent";  more[3] = "gone.log";
+	snprintf(p, sizeof p, "%s/logs", dir);
+	snprintf(out, sizeof out, "%s/pack.tar.gz", dir);
+	CHECK(logpack_build_more(p, "ChaOS\n", SECRETS, NSECRETS, more, 2, "chaos-logs-test", out, err, sizeof err),
+	      "built: %s", err);
+	snprintf(cmd, sizeof cmd, "cd '%s' && tar -xzf pack.tar.gz && ls chaos-logs-test/more && cat chaos-logs-test/more/*", dir);
+	if ((f = popen(cmd, "r"))) {
+		while (fgets(line, sizeof line, f)) {
+			if (strstr(line, "gone.log")) missing_left_out = false;
+			if (strstr(line, "ReinFi")) leaked = true;
+			if (strstr(line, "mmc0: error on R...i")) masked = true;
+		}
+		pclose(f);
+	}
+	CHECK(masked && !leaked, "the kernel's log is packed, its names masked");
+	CHECK(missing_left_out, "a log that isn't there is left out");
+	snprintf(cmd, sizeof cmd, "rm -rf '%s'", dir);
+	if (system(cmd) != 0) { }
+}
+
 int main(void)
 {
 	printf("logpack: the logs, masked and packed\n");
 	words();
 	lines();
 	pack();
+	pack_more();
 	if (failures) {
 		printf("\n%d failure%s\n", failures, failures == 1 ? "" : "s");
 		return 1;

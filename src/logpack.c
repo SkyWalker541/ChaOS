@@ -128,6 +128,14 @@ bool logpack_build(const char *logs_dir, const char *about,
                    const char *const *secrets, int n,
                    const char *folder, const char *out, char *err, size_t en)
 {
+	return logpack_build_more(logs_dir, about, secrets, n, NULL, 0, folder, out, err, en);
+}
+
+bool logpack_build_more(const char *logs_dir, const char *about,
+                        const char *const *secrets, int n,
+                        const char *const *more, int nmore,
+                        const char *folder, const char *out, char *err, size_t en)
+{
 	char stage[] = "/tmp/tortos-logpack.XXXXXX", dir[512], path[1024], from[1024];
 	DIR *d;
 	struct dirent *e;
@@ -153,6 +161,20 @@ bool logpack_build(const char *logs_dir, const char *about,
 			if (copy_masked(from, path, secrets, n)) logs++;
 		}
 		closedir(d);
+	}
+	/* ChaOS: the other logs, each masked as chaos.log is, in more/ under
+	 * the name given: a port's, PICO-8's, the updater's, the kernel's. A
+	 * file that isn't there is simply left out. */
+	if (nmore > 0) {
+		int k;
+
+		snprintf(path, sizeof path, "%s/more", dir);
+		mkdir(path, 0755);
+		for (k = 0; k + 1 < nmore * 2; k += 2) {
+			if (!more[k] || !more[k + 1] || access(more[k], R_OK) != 0) continue;
+			snprintf(path, sizeof path, "%s/more/%s", dir, more[k + 1]);
+			copy_masked(more[k], path, secrets, n);
+		}
 	}
 	snprintf(path, sizeof path, "%s/about.txt", dir);
 	if ((f = fopen(path, "w"))) {

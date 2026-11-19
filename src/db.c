@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
+#define _GNU_SOURCE
 /* See db.h. No SDL and no platform header, deliberately, so the check can link
  * it without a window - the same reason atomic.c is kept clean. */
 #include <sqlite3.h>
@@ -242,6 +243,29 @@ bool db_set_str(db *d, const char *key, const char *val)
 	bool ok;
 
 	if (!d || !key || !val) return false;
+	/* ChaOS: each change in the log, only when it is one, and with the value
+	 * of anything that could be a password, a token or a key hidden */
+	{
+		sqlite3_stmt *q = NULL;
+		bool same = false;
+
+		if (sqlite3_prepare_v2(d->h, "SELECT value FROM settings WHERE key=?;", -1, &q, NULL) == SQLITE_OK) {
+			const unsigned char *was;
+
+			sqlite3_bind_text(q, 1, key, -1, SQLITE_TRANSIENT);
+			if (sqlite3_step(q) == SQLITE_ROW && (was = sqlite3_column_text(q, 0)))
+				same = !strcmp((const char *)was, val);
+			sqlite3_finalize(q);
+		}
+		if (!same) {
+			static const char *const secret[] = { "pass", "token", "key", "secret", "user", "login", NULL };
+			bool hide = false;
+			int k;
+
+			for (k = 0; secret[k] && !hide; k++) if (strcasestr(key, secret[k])) hide = true;
+			fprintf(stderr, "setting: %s = %s\n", key, hide ? "(hidden)" : val);
+		}
+	}
 	/* INSERT OR REPLACE rather than UPSERT: 3.12.2 predates ON CONFLICT,
 	 * and the device is the oldest sqlite this has to run against. */
 	if (sqlite3_prepare_v2(d->h, "INSERT OR REPLACE INTO settings(key,value) VALUES(?,?);",

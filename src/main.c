@@ -41,6 +41,7 @@ static void os_cycle(const char *tag, int d, bool live);
 #include "net.h"
 #include "keyboard.h"
 #include "logpack.h"
+#include "logstamp.h"
 #include "wifi.h"
 #include "audioout.h"
 #include "menu.h"
@@ -3372,6 +3373,19 @@ static int battery_level(void)
 			else if (pct <= g_bw_low)
 				level = 1;
 		}
+		/* ChaOS: for the log, each change of warning and each tenth of the
+		 * battery gone or back */
+		{
+			static int last_tenth = -1;
+			int tenth = plat_battery(&pct, &charging) ? pct / 10 : -1;
+
+			if (level != was)
+				fprintf(stderr, "battery: %d%%%s, %s\n", pct, charging ? " charging" : "",
+				        level == 2 ? "blinking warning" : level == 1 ? "low warning" : "no warning");
+			else if (tenth >= 0 && tenth != last_tenth)
+				fprintf(stderr, "battery: %d%%%s\n", pct, charging ? " charging" : "");
+			last_tenth = tenth;
+		}
 	}
 	return level;
 }
@@ -4681,8 +4695,25 @@ static void anim_poweroff(app *a)
 	plat_present();
 }
 
+/* ChaOS: the kernel's own log, kept at each power off (kernel.log, and the
+ * one before as kernel.log.1) for Download logs: SD card errors, crashes and
+ * power trouble are written there, not in chaos.log, and a power off is when
+ * it would otherwise be lost. A few kilobytes, after the game has ended. */
+static void log_kernel_at_off(void)
+{
+	char a1[CFG_STR * 2], a2[CFG_STR * 2], cmd[CFG_STR * 3];
+
+	snprintf(a1, sizeof a1, "%s/logs/kernel.log", P_USERDATA);
+	snprintf(a2, sizeof a2, "%s/logs/kernel.log.1", P_USERDATA);
+	rename(a1, a2);
+	snprintf(cmd, sizeof cmd, "dmesg > '%s' 2>/dev/null", a1);
+	if (system(cmd) != 0) fprintf(stderr, "logs: the kernel's log could not be kept\n");
+}
+
 static void power_off(app *a)
 {
+	fprintf(stderr, "power: turning off\n");
+	log_kernel_at_off();
 	remember_place(a);
 	book_keep(true);
 	plat_request_poweroff();
@@ -6862,9 +6893,62 @@ static bool pack_logs(char *path, size_t pn, char *name, size_t nn)
 	snprintf(logs, sizeof logs, "%s/logs", P_USERDATA);
 	snprintf(name, nn, "%s.tar.gz", folder);
 	snprintf(path, pn, "/tmp/%s", name);
-	if (!logpack_build(logs, about, secrets, n, folder, path, err, sizeof err)) {
-		fprintf(stderr, "logs: could not pack them: %s\n", err);
-		return false;
+	/* ChaOS: everything else that can say what happened, in more/ */
+	{
+		static char from[48][CFG_STR * 2], as[48][96];
+		const char *more[96];
+		int m = 0;
+		DIR *d;
+		struct dirent *e;
+#define MORE(fmt_from, name_) do { if (m < 48) { \
+			snprintf(from[m], sizeof from[m], "%s", fmt_from); \
+			snprintf(as[m], sizeof as[m], "%s", name_); \
+			more[2 * m] = from[m]; more[2 * m + 1] = as[m]; m++; } } while (0)
+		char p[CFG_STR * 2];
+
+		/* the kernel now, and as it was at the last power off
+		 * (log_kernel_at_off): SD card errors, crashes, power */
+		system("dmesg > /tmp/chaos-kernel-now.log 2>/dev/null");
+		MORE("/tmp/chaos-kernel-now.log", "kernel-now.log");
+		snprintf(p, sizeof p, "%s/kernel.log", logs);   MORE(p, "kernel-at-last-off.log");
+		snprintf(p, sizeof p, "%s/kernel.log.1", logs); MORE(p, "kernel-at-off-before.log");
+		/* the updater's, PICO-8's, the last port's and each port's own */
+		up_path(p, sizeof p, "update.log");              MORE(p, "update.log");
+		snprintf(p, sizeof p, "%s/pico-8/last.log", P_USERDATA); MORE(p, "pico8-last.log");
+		snprintf(p, sizeof p, "%s/ports/last.log", P_USERDATA);  MORE(p, "port-last.log");
+		snprintf(p, sizeof p, "%s/ports/logs", P_USERDATA);
+		if ((d = opendir(p))) {
+			while ((e = readdir(d)) && m < 40) {
+				char f2[CFG_STR * 3], nm[96];
+
+				if (e->d_name[0] == '.') continue;
+				snprintf(f2, sizeof f2, "%s/%s", p, e->d_name);
+				snprintf(nm, sizeof nm, "port-%.80s", e->d_name);
+				MORE(f2, nm);
+			}
+			closedir(d);
+		}
+		/* what is in the save folders, with sizes and times: a save that
+		 * "disappeared" is often there under another name */
+		{
+			FILE *lf = fopen("/tmp/chaos-saves.txt", "w");
+
+			if (lf) {
+				char cmd[CFG_STR * 6];
+
+				fclose(lf);
+				snprintf(cmd, sizeof cmd,
+				         "{ echo '== Saves'; ls -laR '%s/Saves'; echo; echo '== Save States'; ls -laR '%s/.tortos'; } "
+				         ">> /tmp/chaos-saves.txt 2>&1", P_CARD, P_SHARED);
+				system(cmd);
+				MORE("/tmp/chaos-saves.txt", "saves-list.txt");
+			}
+		}
+#undef MORE
+		if (!logpack_build_more(logs, about, secrets, n, more, m, folder, path, err, sizeof err)) {
+			fprintf(stderr, "logs: could not pack them: %s\n", err);
+			return false;
+		}
 	}
 	fprintf(stderr, "logs: packed %s, %d names masked\n", name, n);
 	return true;
@@ -21271,6 +21355,23 @@ static void launch_game(app *a)
 		}
 		sth_hold(true);   /* ChaOS: Syncthing stopped while it plays */
 		gbs_cancel();     /* and the Game Boy look, tried again later */
+		/* ChaOS: what is starting, with what, and from where its saves and
+		 * its resume come, for the log */
+		{
+			struct stat rs;
+			const char *slash = strrchr(rom, '/');
+			char srm[CFG_STR * 3];
+
+			snprintf(srm, sizeof srm, "%s/%.*s.srm", save,
+			         (int)(strrchr(slash ? slash + 1 : rom, '.') ? strrchr(slash ? slash + 1 : rom, '.') - (slash ? slash + 1 : rom)
+			                                                  : (long)strlen(slash ? slash + 1 : rom)),
+			         slash ? slash + 1 : rom);
+			fprintf(stderr, "game: start %s on %s (%s)\n", rom, s->tag, core);
+			fprintf(stderr, "game: battery save %s (%s), resume %s (%s), rewind %s\n",
+			        srm, stat(srm, &rs) == 0 ? "there" : "none yet",
+			        st, stat(st, &rs) == 0 ? "there" : "none",
+			        rewind_load(a->sys.systems[o].tag) ? "on" : "off");
+		}
 		if (plat_resident_send(s->tag, core, rom, st, st, pv,
 		                       console, active[0] ? active : NULL)) {
 			int r;
@@ -24132,6 +24233,8 @@ shot_done:
 
 int main(int argc, char *argv[])
 {
+	/* ChaOS: a time on every line of chaos.log (logstamp.h) */
+	logstamp_install();
 	app a = { 0 };
 	char path[CFG_STR * 2];
 	char startup[CFG_STR];

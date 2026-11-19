@@ -478,6 +478,31 @@ bool plat_resident_line(const char *fmt, ...)
 	/* RESUME hands the display back to the game, which presents the moment it
 	 * reads the line: let go first, the same as before RUN. */
 	if (!strncmp(line, "RESUME", 6)) device_display_release();
+	/* ChaOS: every line to Diatom in the log - a save, a load, a reset, a
+	 * disc, a setting - with anything that could be a secret hidden */
+	{
+		static const char *const hide[] = { "password=", "pass=", "token=", "key=", "apikey=", NULL };
+		char shown[1600];
+		int h;
+
+		snprintf(shown, sizeof shown, "%s", line);
+		for (h = 0; hide[h]; h++) {
+			char *v = strstr(shown, hide[h]);
+
+			while (v) {
+				char *end, *val = v + strlen(hide[h]);
+
+				end = strchr(val, '\t');
+				if (*val) {
+					memmove(val + 3, end ? end : val + strlen(val), strlen(end ? end : val + strlen(val)) + 1);
+					memcpy(val, "***", 3);
+				}
+				v = strstr(val, hide[h]);
+			}
+		}
+		for (h = 0; shown[h]; h++) if (shown[h] == '\t') shown[h] = ' ';
+		fprintf(stderr, "to diatom: %s\n", shown);
+	}
 	if (dsend("%s", line)) return true;
 	/* Closed under us - Diatom restarted, or a newer client displaced this
 	 * connection. dsend has closed our end, so this is a fresh connection,

@@ -38,4 +38,11 @@ bool logpack_build(const char *logs_dir, const char *about,
                    const char *const *secrets, int n,
                    const char *folder, const char *out, char *err, size_t en);
 
+/* ChaOS: logpack_build, with `nmore` other files packed too, masked the
+ * same way: more[2k] the file, more[2k + 1] its name under more/. */
+bool logpack_build_more(const char *logs_dir, const char *about,
+                        const char *const *secrets, int n,
+                        const char *const *more, int nmore,
+                        const char *folder, const char *out, char *err, size_t en);
+
 #endif
