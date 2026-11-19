@@ -1,9 +1,11 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* ChaOS: one game's core options - see gamecore.h */
 #include "gamecore.h"
+#include "../lib/7z/sevenz.h"
 
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <zlib.h>
@@ -73,7 +75,17 @@ int gc_cgb_flag(const char *rom)
 	FILE *f;
 	int v = -1;
 
-	if (!rom || !(f = fopen(rom, "rb"))) return -1;
+	if (!rom) return -1;
+	/* ChaOS: a .7z, its game read whole (a Game Boy cartridge is at most 8MB) */
+	if (sevenz_is(rom)) {
+		unsigned char *d = NULL;
+		size_t n = 0;
+
+		if (sevenz_largest(rom, 8u * 1024 * 1024, &d, &n, NULL, 0) && n > 0x143) v = d[0x143];
+		free(d);
+		return v;
+	}
+	if (!(f = fopen(rom, "rb"))) return -1;
 	if (ends(rom, ".zip")) v = zip_flag(f);
 	else {
 		unsigned char b;

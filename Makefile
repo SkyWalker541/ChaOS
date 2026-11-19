@@ -24,7 +24,7 @@ CHECKS = check-cheevos check-hare check-httpd check-idle check-rahash \
          check-clock check-update check-remap check-shots check-pixfont \
          check-release check-updater check-chaos-names check-itch check-itchdl check-hbcat check-discset check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore check-gbsort
 
-check:
+check: check-sevenz
 	@fail=0; for c in $(CHECKS); do \
 		printf '\n=== %s ===\n' "$$c"; \
 		$(MAKE) --no-print-directory "$$c" || fail=1; \
@@ -312,11 +312,11 @@ build-native/itchdl-check: tools/itchdl-check.c src/itchdl.c src/itchdl.h src/ne
 check-itch: build-native/itch-check
 	@./build-native/itch-check
 
-build-native/itch-check: tools/itch-check.c src/itch.c src/itch.h src/artscrape.c src/net.c \
+build-native/itch-check: tools/itch-check.c src/itch.c src/itch.h src/artscrape.c src/net.c build-native/7z.o \
                          src/urlenc.c FORCE
 	@mkdir -p build-native
 	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g -DTORTOS_VERSION='"check"' \
-	      -DCHAOS_VERSION='"check"' -Isrc -o $@ tools/itch-check.c src/itch.c src/artscrape.c \
+	      -DCHAOS_VERSION='"check"' -Isrc -o $@ tools/itch-check.c src/itch.c src/artscrape.c build-native/7z.o \
 	      src/net.c src/urlenc.c
 
 # ChaOS: Get Homebrew's catalogue (src/hbcat.h): its view, a game's page,
@@ -325,11 +325,11 @@ check-hbcat: build-native/hbcat-check
 	@./build-native/hbcat-check
 
 build-native/hbcat-check: tools/hbcat-check.c src/hbcat.c src/hbcat.h src/itch.c src/rajson.c \
-                          src/artscrape.c src/net.c src/urlenc.c FORCE
+                          src/artscrape.c src/net.c src/urlenc.c FORCE build-native/7z.o
 	@mkdir -p build-native
 	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g -DTORTOS_VERSION='"check"' \
 	      -DCHAOS_VERSION='"check"' -Isrc -o $@ tools/hbcat-check.c src/hbcat.c src/itch.c \
-	      src/rajson.c src/artscrape.c src/net.c src/urlenc.c
+	      src/rajson.c src/artscrape.c src/net.c src/urlenc.c build-native/7z.o
 
 # ChaOS: ports (src/ports.h): the Ports shelf's scan, the scripts refused,
 # and PortMaster fetched from a file:// zip and put in place; no network.
@@ -384,15 +384,15 @@ check-syncthing: build-native/syncthing-check
 	@./build-native/syncthing-check
 
 # ChaOS: Game Boy games into their folders (src/gbsort.h)
-check-gbsort:
+check-gbsort: build-native/7z.o
 	@mkdir -p build-native
-	@$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -Isrc -o build-native/gbsort-check tools/gbsort-check.c src/gbsort.c src/gamecore.c -lz
+	@$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -Isrc -o build-native/gbsort-check tools/gbsort-check.c src/gbsort.c src/gamecore.c build-native/7z.o -lz
 	@./build-native/gbsort-check
 
 # ChaOS: one game's core options (src/gamecore.h)
-check-gamecore:
+check-gamecore: build-native/7z.o
 	@mkdir -p build-native
-	@$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -Isrc -o build-native/gamecore-check tools/gamecore-check.c src/gamecore.c -lz
+	@$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -Isrc -o build-native/gamecore-check tools/gamecore-check.c src/gamecore.c build-native/7z.o -lz
 	@./build-native/gamecore-check
 
 check-pico8:
@@ -403,11 +403,11 @@ check-pico8:
 check-cheats: build-native/cheats-check
 	@./build-native/cheats-check
 
-build-native/cheats-check: tools/cheats-check.c src/cheats.c src/cheats.h src/artscrape.c src/net.c src/urlenc.c FORCE
+build-native/cheats-check: tools/cheats-check.c src/cheats.c src/cheats.h src/artscrape.c src/net.c src/urlenc.c FORCE build-native/7z.o
 	@mkdir -p build-native
 	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g -Isrc \
 	      -DTORTOS_VERSION='"check"' -DCHAOS_VERSION='"check"' \
-	      -o $@ tools/cheats-check.c src/cheats.c src/artscrape.c src/net.c src/urlenc.c
+	      -o $@ tools/cheats-check.c src/cheats.c src/artscrape.c src/net.c src/urlenc.c build-native/7z.o
 
 check-romm: build-native/romm-check
 	@./build-native/romm-check
@@ -435,11 +435,11 @@ check-artscrape: build-native/artscrape-check
 	@ART_SCORING=1 ./build-native/artscrape-check
 	@python3 tools/artscrape-check.py
 
-build-native/artscrape-check: tools/artscrape-check.c src/artscrape.c src/artscrape.h src/urlenc.c
+build-native/artscrape-check: tools/artscrape-check.c src/artscrape.c src/artscrape.h src/urlenc.c build-native/7z.o
 	@mkdir -p build-native
 	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g -Isrc \
 	      -DTORTOS_VERSION='"check"' \
-	      -o $@ tools/artscrape-check.c src/artscrape.c src/net.c src/urlenc.c
+	      -o $@ tools/artscrape-check.c src/artscrape.c src/net.c src/urlenc.c build-native/7z.o
 
 # Replace fetches over a cover rather than deleting it first. The real scraper
 # against a stubbed network, so a hit and a miss are both pinned with no device
@@ -447,10 +447,10 @@ build-native/artscrape-check: tools/artscrape-check.c src/artscrape.c src/artscr
 check-artrun: build-native/artrun-check
 	@./build-native/artrun-check
 
-build-native/artrun-check: tools/artrun-check.c src/artscrape.c src/artscrape.h src/urlenc.c FORCE
+build-native/artrun-check: tools/artrun-check.c src/artscrape.c src/artscrape.h src/urlenc.c FORCE build-native/7z.o
 	@mkdir -p build-native
 	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g -Isrc -DSS_BUSY_WAIT=0 -DART_QUIET \
-	      -o $@ tools/artrun-check.c src/artscrape.c src/urlenc.c
+	      -o $@ tools/artrun-check.c src/artscrape.c src/urlenc.c build-native/7z.o
 
 # The two hashers - one C for the device, one Python for the host tools - over
 # every ROM in the library. A wrong rule does not crash; it produces a hash RA
@@ -459,14 +459,25 @@ check-rahash: build-native/rahash-check
 	@python3 tools/rahash-check.py
 
 # ChaOS: libchdr, for a .chd's hash (src/rahash_disc.c), built once
+# ChaOS: .7z ROMs, read as a .zip is (lib/7z)
+check-sevenz: build-native/7z.o
+	@mkdir -p build-native
+	$(CC) -std=gnu11 -Wall -Wextra -O1 -Ilib/7z -o build-native/sevenz-check tools/sevenz-check.c build-native/7z.o -lz
+	@build-native/sevenz-check
+
+# ChaOS: 7-Zip's C decoder, for .7z ROMs (lib/7z/sevenz.h)
+build-native/7z.o: lib/7z/chaos_7z.c lib/7z/sevenz.h
+	@mkdir -p build-native
+	$(CC) -c -O2 -w -o $@ $<
+
 build-native/chd.o: lib/libchdr/chaos_chd.c
 	@mkdir -p build-native
 	$(CC) -c -O2 -w -DCHDR_SYSTEM_ZLIB -Ilib/libchdr/include -o $@ $<
 
-build-native/rahash-check: tools/rahash-check.c src/rahash.c src/rahash_disc.c src/rahash.h build-native/chd.o FORCE
+build-native/rahash-check: tools/rahash-check.c src/rahash.c src/rahash_disc.c src/rahash.h build-native/chd.o build-native/7z.o FORCE
 	@mkdir -p build-native
 	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g \
-	      -o $@ tools/rahash-check.c src/rahash.c src/rahash_disc.c build-native/chd.o -lz
+	      -o $@ tools/rahash-check.c src/rahash.c src/rahash_disc.c build-native/chd.o build-native/7z.o -lz
 
 # The two set converters - one C on the device, one Python in the bulk tool -
 # over real RetroAchievements responses. Needs credentials and a network;
@@ -474,10 +485,10 @@ build-native/rahash-check: tools/rahash-check.c src/rahash.c src/rahash_disc.c s
 check-raset: build-native/raset-check
 	@python3 tools/raset-check.py
 
-build-native/raset-check: tools/raset-check.c src/rafetch.c src/rajson.c src/rahash.c src/rahash_disc.c src/net.c src/atomic.c src/db.c build-native/chd.o FORCE
+build-native/raset-check: tools/raset-check.c src/rafetch.c src/rajson.c src/rahash.c src/rahash_disc.c src/net.c src/atomic.c src/db.c build-native/chd.o build-native/7z.o FORCE
 	@mkdir -p build-native
 	$(CC) -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers -D_GNU_SOURCE -O1 -g -DTORTOS_VERSION='"check"' \
-	      -o $@ tools/raset-check.c src/rafetch.c src/rajson.c src/rahash.c src/rahash_disc.c src/net.c src/atomic.c src/db.c build-native/chd.o -lsqlite3 -lz
+	      -o $@ tools/raset-check.c src/rafetch.c src/rajson.c src/rahash.c src/rahash_disc.c src/net.c src/atomic.c src/db.c build-native/chd.o build-native/7z.o -lsqlite3 -lz
 
 # Whether this build can reach ScreenScraper, and whether an account survives
 # a restart. The live half needs a network and .screenscraper.env, and skips

@@ -129,6 +129,7 @@ sold, put behind a paywall, or shipped with a device that is sold.
 ## Code ChaOS carries
 
 - **QR Code generator library** by **Project Nayuki** (https://www.nayuki.io/page/qr-code-generator-library), `src/qrcodegen.c` and `src/qrcodegen.h`, unchanged from https://github.com/nayuki/QR-Code-generator (commit bcfe1b0): the QR code on a Get Homebrew game's page. Licence: **MIT**, Copyright (c) Project Nayuki; the notice is in the files.
+- **7-Zip's C decoder** by **Igor Pavlov** (https://7-zip.org), `lib/7z/src`, unchanged from https://github.com/ip7z/7zip (26.06): games in `.7z` archives, in ChaOS and in ChaOS-diatom. Licence: **public domain**, as the files say.
 
 ## Art, fonts and data
 

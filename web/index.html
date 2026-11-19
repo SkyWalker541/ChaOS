@@ -519,7 +519,7 @@
       <h3>Game Boy or Color, sorted <span class="tag">ChaOS</span></h3>
       <p>Lots of new Game Boy games come from indie developers, on <a href="https://itch.io/games/tag-game-boy-color">itch.io</a> and elsewhere, many made with <b>GB Studio</b>. Plenty of them are Game Boy Color games named <code>.gb</code>, so they end up in the Game Boy folder, where they either don't show up or start in black and white, or tell you they need a Game Boy Color. Some black-and-white games come named <code>.gbc</code> the other way round.</p>
       <ul>
-        <li><b>Every game plays right, wherever it is.</b> Both folders show <code>.gb</code>, <code>.gbc</code>, <code>.cgb</code> and <code>.dmg</code> files. ChaOS reads the game's header, which says what it was made for, and plays it on that machine: Color games in color, black-and-white games exactly as they were, never tinted. Zipped games too.</li>
+        <li><b>Every game plays right, wherever it is.</b> Both folders show <code>.gb</code>, <code>.gbc</code>, <code>.cgb</code> and <code>.dmg</code> files. ChaOS reads the game's header, which says what it was made for, and plays it on that machine: Color games in color, black-and-white games exactly as they were, never tinted. Games in a .zip or .7z too.</li>
         <li><b>And ChaOS sorts them for you.</b> After ChaOS Transfer sends anything, and once a week, it looks in the background for games in the wrong folder (never while you play, and it only reads new files). If it finds any, it asks: <b>Move Them</b> or <b>Not Now</b>. Not Now is remembered.</li>
         <li><b>Everything goes with the game:</b> its saves and save states, box art, play time and its place in Recently Played, favorite, cheats, game info and RomM link.</li>
         <li><b>MENU &gt; ROM Management &gt; Sort Game Boy Games</b> lists every game in the wrong folder whenever you like. <kbd>A</kbd> moves one, <b>Move All</b> moves the lot.</li>
@@ -648,17 +648,17 @@
   <table class="data">
     <thead><tr><th>Console</th><th>Folder</th><th>Files</th><th>Core</th></tr></thead>
     <tbody>
-      <tr><td>NES</td><td><code>Roms/NES</code></td><td>.nes .fds .unf .unif .zip</td><td>FCEUmm</td></tr>
-      <tr><td>SNES</td><td><code>Roms/SNES</code></td><td>.sfc .smc .zip</td><td>Snes9x 2010</td></tr>
-      <tr><td>Genesis</td><td><code>Roms/Genesis</code></td><td>.md .gen .bin .smd .zip</td><td>Genesis Plus GX</td></tr>
-      <tr><td>Master System</td><td><code>Roms/Master System</code></td><td>.sms .zip</td><td>Genesis Plus GX</td></tr>
-      <tr><td>TurboGrafx-16 and CD</td><td><code>Roms/TurboGrafx-16</code></td><td>.pce .sgx .cue .ccd .chd .toc .m3u .zip</td><td>Beetle PCE Fast</td></tr>
-      <tr><td>Game Boy</td><td><code>Roms/Game Boy</code></td><td>.gb .dmg .gbc .cgb .zip</td><td>mGBA</td></tr>
-      <tr><td>Game Boy Color</td><td><code>Roms/Game Boy Color</code></td><td>.gbc .cgb .gb .dmg .zip</td><td>mGBA</td></tr>
-      <tr><td>Game Boy Advance</td><td><code>Roms/Game Boy Advance</code></td><td>.gba .agb .zip</td><td>mGBA</td></tr>
-      <tr><td>Game Gear</td><td><code>Roms/Game Gear</code></td><td>.gg .zip</td><td>Genesis Plus GX</td></tr>
-      <tr><td>Neo Geo Pocket</td><td><code>Roms/Neo Geo Pocket</code></td><td>.ngp .ngc .ngpc .npc .zip</td><td>Beetle NeoPop</td></tr>
-      <tr><td>Neo Geo Pocket Color</td><td><code>Roms/Neo Geo Pocket Color</code></td><td>.ngp .ngc .ngpc .npc .zip</td><td>Beetle NeoPop</td></tr>
+      <tr><td>NES</td><td><code>Roms/NES</code></td><td>.nes .fds .unf .unif .zip .7z</td><td>FCEUmm</td></tr>
+      <tr><td>SNES</td><td><code>Roms/SNES</code></td><td>.sfc .smc .zip .7z</td><td>Snes9x 2010</td></tr>
+      <tr><td>Genesis</td><td><code>Roms/Genesis</code></td><td>.md .gen .bin .smd .zip .7z</td><td>Genesis Plus GX</td></tr>
+      <tr><td>Master System</td><td><code>Roms/Master System</code></td><td>.sms .zip .7z</td><td>Genesis Plus GX</td></tr>
+      <tr><td>TurboGrafx-16 and CD</td><td><code>Roms/TurboGrafx-16</code></td><td>.pce .sgx .cue .ccd .chd .toc .m3u .zip .7z</td><td>Beetle PCE Fast</td></tr>
+      <tr><td>Game Boy</td><td><code>Roms/Game Boy</code></td><td>.gb .dmg .gbc .cgb .zip .7z</td><td>mGBA</td></tr>
+      <tr><td>Game Boy Color</td><td><code>Roms/Game Boy Color</code></td><td>.gbc .cgb .gb .dmg .zip .7z</td><td>mGBA</td></tr>
+      <tr><td>Game Boy Advance</td><td><code>Roms/Game Boy Advance</code></td><td>.gba .agb .zip .7z</td><td>mGBA</td></tr>
+      <tr><td>Game Gear</td><td><code>Roms/Game Gear</code></td><td>.gg .zip .7z</td><td>Genesis Plus GX</td></tr>
+      <tr><td>Neo Geo Pocket</td><td><code>Roms/Neo Geo Pocket</code></td><td>.ngp .ngc .ngpc .npc .zip .7z</td><td>Beetle NeoPop</td></tr>
+      <tr><td>Neo Geo Pocket Color</td><td><code>Roms/Neo Geo Pocket Color</code></td><td>.ngp .ngc .ngpc .npc .zip .7z</td><td>Beetle NeoPop</td></tr>
       <tr><td>PlayStation</td><td><code>Roms/PlayStation</code></td><td>.chd .cue .pbp .m3u .iso .img .ccd</td><td>PCSX-ReARMed</td></tr>
       <tr><td>Ports</td><td><code>Roms/Ports</code></td><td>installed from the Brick</td><td>PortMaster</td></tr>
       <tr><td>PICO-8</td><td><code>Roms/PICO-8</code></td><td>.p8 .p8.png</td><td><a href="#pico8">your own PICO-8</a></td></tr>

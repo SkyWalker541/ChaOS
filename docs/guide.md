@@ -216,7 +216,7 @@ you put it. The folder decides the shelf's shader, overlay, buttons and
 settings. The game itself decides the machine, as a real cartridge does: one
 made for the Color (its header says so) plays on a Game Boy Color in its own
 colors, in either folder, and one that isn't plays on a Game Boy, as it was
-meant to, never colorized. A `.zip` is looked into for this.
+meant to, never colorized. A `.zip` or `.7z` is looked into for this.
 
 **Sorting them.** ChaOS also looks, now and then, for games in the other
 folder for their cartridge: once after the update that brings this, after
@@ -579,7 +579,7 @@ Card art comes from, in order:
 
 1. box art in `Roms/<system>/.media/<name>.png`, whether you put it there or
    the Box Art row fetched it. The fetch asks libretro's thumbnail
-   collection: by file name, and where no name matches, by checksum: a zip
+   collection: by file name, and where no name matches, by checksum: a zip or 7z
    records its ROM's CRC, which names the game in No-Intro's list - the catalog
    libretro files its covers under - so a file still carrying an older name
    finds its box anyway. On the main card that found 29 more, every one the

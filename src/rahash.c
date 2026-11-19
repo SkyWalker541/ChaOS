@@ -9,6 +9,7 @@
 #include <zlib.h>
 
 #include "rahash.h"
+#include "../lib/7z/sevenz.h"
 
 /* ---------------------------------------------------------------- MD5 ---- */
 
@@ -317,6 +318,9 @@ bool ra_hash_rom(const char *path, const char *tag, char *out)
 	if (is_zip(path)) {
 		data = zip_largest(path, &len);
 		if (!data) return false;
+	} else if (sevenz_is(path)) {
+		/* ChaOS: a .7z as a .zip, the game inside hashed */
+		if (!sevenz_largest(path, 64u * 1024 * 1024, &data, &len, NULL, 0)) return false;
 	} else {
 		FILE *f = fopen(path, "rb");
 		long sz;

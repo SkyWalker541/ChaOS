@@ -14,6 +14,7 @@
 #include <time.h>
 
 #include "artscrape.h"
+#include "../lib/7z/sevenz.h"
 #include "artshrink.h"
 #include "config.h"
 #include "library.h"
@@ -1099,6 +1100,9 @@ static void load_dat(void)
 static uint32_t le16(const unsigned char *p) { return (uint32_t)p[0] | (uint32_t)p[1] << 8; }
 static uint32_t le32(const unsigned char *p) { return le16(p) | le16(p + 2) << 16; }
 
+/* ChaOS: ext_allowed for sevenz_crc's callback */
+static bool art_ext_allow(const char *name, void *exts) { return ext_allowed(name, (const char *)exts); }
+
 /* The CRC32 of the ROM inside <dir>/<stem>.zip, as the zip records it.
  *
  * From the central directory, so nothing is decompressed and nothing hashed:
@@ -1121,7 +1125,15 @@ bool art_rom_crc(const char *dir, const char *stem, const char *exts,
 
 	if (snprintf(path, sizeof path, "%s/%s.zip", dir, stem) >= (int)sizeof path)
 		return false;
-	if (!(f = fopen(path, "rb"))) return false;
+	if (!(f = fopen(path, "rb"))) {
+		/* ChaOS: a .7z records its CRCs too, read from its index the same way */
+		unsigned c;
+
+		if (snprintf(path, sizeof path, "%s/%s.7z", dir, stem) >= (int)sizeof path) return false;
+		if (!sevenz_crc(path, art_ext_allow, (void *)exts, &c)) return false;
+		*crc = c;
+		return true;
+	}
 	if (fseek(f, 0, SEEK_END) != 0 || (size = ftell(f)) < 22) goto out;
 
 	/* The end-of-central-directory record: the last thing in the file, save

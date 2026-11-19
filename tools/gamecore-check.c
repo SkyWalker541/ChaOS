@@ -46,6 +46,8 @@ int main(void)
 
 	snprintf(p, sizeof p, "%s/color.gb", d);
 	CK(gc_cgb_flag(p) == 0x80, "flag from a file");
+	/* ChaOS: and from inside a .7z */
+	CK(gc_cgb_flag("tools/fixtures/7z/gbc.7z") == 0x80, "flag from a .7z");
 	n = gc_options("GBC", p, -1, kv);
 	CK(has(kv, n, "mgba_gb_model=Game Boy Color"), "a color .gb plays in color in Game Boy Color");
 	n = gc_options("GB", p, -1, kv);

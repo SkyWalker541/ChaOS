@@ -20,7 +20,7 @@ static bool gb_file(const char *n)
 
 	if (!dot || n[0] == '.') return false;
 	return !strcasecmp(dot, ".gb") || !strcasecmp(dot, ".gbc") || !strcasecmp(dot, ".cgb") ||
-	       !strcasecmp(dot, ".dmg") || !strcasecmp(dot, ".zip");
+	       !strcasecmp(dot, ".dmg") || !strcasecmp(dot, ".zip") || !strcasecmp(dot, ".7z");
 }
 
 /* ---- the cache: folder \t file \t size \t mtime \t flag ---- */

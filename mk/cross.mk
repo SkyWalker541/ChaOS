@@ -61,13 +61,18 @@ $(NOTES): FORCE
 
 # ChaOS: libchdr, for reading a .chd disc to hash it (src/rahash_disc.c), one
 # file of someone else's C built on its own, without our warnings
+# ChaOS: 7-Zip's C decoder, for .7z ROMs (lib/7z/sevenz.h), the same way
+$(BUILD)/7z.o: lib/7z/chaos_7z.c lib/7z/sevenz.h
+	mkdir -p $(BUILD)
+	$(CC) -c -O2 -w -mcpu=cortex-a53 -o $@ $<
+
 $(BUILD)/chd.o: lib/libchdr/chaos_chd.c
 	mkdir -p $(BUILD)
 	$(CC) -c -O2 -w -mcpu=cortex-a53 -DCHDR_SYSTEM_ZLIB -I$(SYSROOT)/usr/include -I$(SYSROOT)/include -Ilib/libchdr/include -o $@ $<
 
-$(BUILD)/tortos.elf: $(SRC) $(CREDS) $(NOTES) $(wildcard src/*.h) $(BUILD)/chd.o
+$(BUILD)/tortos.elf: $(SRC) $(CREDS) $(NOTES) $(wildcard src/*.h) $(BUILD)/chd.o $(BUILD)/7z.o
 	mkdir -p $(BUILD)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(SRC) $(BUILD)/chd.o $(LDLIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(SRC) $(BUILD)/chd.o $(BUILD)/7z.o $(LDLIBS)
 
 # Muse, the audio player's engine: a second binary, not part of tortos.elf -
 # SRC above is src/*.c, which does not descend into src/muse/. Linked against

@@ -56,10 +56,15 @@ $(NOTES): FORCE
 	@sh mk/notes.sh $@
 
 # ChaOS: libchdr (see mk/cross.mk)
+# ChaOS: 7-Zip's C decoder, for .7z ROMs (lib/7z/sevenz.h), the same way
+$(BUILD)/7z.o: lib/7z/chaos_7z.c lib/7z/sevenz.h
+	mkdir -p $(BUILD)
+	$(CC) -c -O2 -w -o $@ $<
+
 $(BUILD)/chd.o: lib/libchdr/chaos_chd.c
 	mkdir -p $(BUILD)
 	$(CC) -c -O2 -w -DCHDR_SYSTEM_ZLIB -Ilib/libchdr/include -o $@ $<
 
-$(BUILD)/tortos: $(SRC) $(CREDS) $(NOTES) $(wildcard src/*.h) $(BUILD)/chd.o
+$(BUILD)/tortos: $(SRC) $(CREDS) $(NOTES) $(wildcard src/*.h) $(BUILD)/chd.o $(BUILD)/7z.o
 	mkdir -p $(BUILD)
-	$(CC) $(CFLAGS) -o $@ $(SRC) $(BUILD)/chd.o $(LDLIBS)
+	$(CC) $(CFLAGS) -o $@ $(SRC) $(BUILD)/chd.o $(BUILD)/7z.o $(LDLIBS)
