@@ -447,6 +447,7 @@ function coverPanel(e, li) {
 	say.textContent = 'A cover for ' + e.name.replace(/\.[^.]+$/, '') + ':';
 	const pick = mkbtn('Choose a picture', () => file.click());
 	const link = mkbtn('Use a link', () => coverLink(e));
+	const lbox = mkbtn('Search LaunchBox', () => lboxOpen(e, p));
 	const shut = mkbtn('Cancel', () => { p.remove(); coverOpen = null; });
 	const file = document.createElement('input');
 	file.type = 'file';
@@ -458,7 +459,7 @@ function coverPanel(e, li) {
 	hint.textContent = 'A link can be a picture, an itch.io game\'s page, or a Google Images result. The Brick needs Wi-Fi to follow one.';
 	const row = document.createElement('div');
 	row.className = 'acts';
-	row.append(pick, link, shut, file);
+	row.append(pick, lbox, link, shut, file);
 	p.append(say, row, hint);
 	li.after(p);
 	coverOpen = p;
@@ -496,6 +497,89 @@ async function coverSend(e, f) {
 async function coverLink(e) {
 	const url = (prompt('Paste a link: a picture, an itch.io game page, or a Google Images result') || '').trim();
 	if (!url) return;
+	toast('The Brick is fetching it...');
+	try {
+		await api('POST', '/api/cover?p=' + enc(e.path) + '&url=' + enc(url));
+		await coverDone(e);
+	} catch (err) { toast(err.message, true); }
+}
+
+/* ChaOS: LaunchBox's Games Database, searched and picked here. The Brick
+ * reads LaunchBox's pages (this page can't read another site's), lists the
+ * games found - this console's first - and, for the one chosen, the pictures
+ * that can be a cover; the one clicked is set as a linked cover is. */
+function lboxOpen(e, panel) {
+	let box = panel.querySelector('.lbox');
+	if (box) { box.remove(); return; }
+	box = document.createElement('div');
+	box.className = 'lbox';
+	const form = document.createElement('form');
+	const q = document.createElement('input');
+	q.type = 'search';
+	q.id = 'lbox-q';
+	q.value = e.name.replace(/\.[^.]+$/, '').replace(/\s*[([].*$/, '');
+	q.setAttribute('aria-label', 'Search LaunchBox for');
+	const go = document.createElement('button');
+	go.textContent = 'Search';
+	form.append(q, go);
+	const out = document.createElement('div');
+	out.className = 'lbox-out';
+	form.onsubmit = (ev) => { ev.preventDefault(); lboxSearch(e, q.value.trim(), out); };
+	box.append(form, out);
+	panel.append(box);
+	q.focus();
+	q.select();
+}
+
+async function lboxSearch(e, words, out) {
+	if (!words) return;
+	out.textContent = 'The Brick is searching LaunchBox...';
+	try {
+		const r = await api('GET', '/api/lbox?q=' + enc(words) + '&p=' + enc(e.path));
+		const games = (await r.json()).games || [];
+		out.textContent = '';
+		if (!games.length) { out.textContent = 'No games found. Try fewer words.'; return; }
+		const list = document.createElement('ul');
+		list.className = 'lbox-games';
+		for (const g of games) {
+			const li = document.createElement('li');
+			const b = mkbtn(g.title, () => lboxGame(e, g, out));
+			const plat = document.createElement('span');
+			plat.textContent = g.platform;
+			li.append(b, plat);
+			list.append(li);
+		}
+		out.append(list);
+	} catch (err) { out.textContent = ''; toast(err.message, true); }
+}
+
+async function lboxGame(e, g, out) {
+	out.textContent = 'Finding pictures of ' + g.title + '...';
+	try {
+		const r = await api('GET', '/api/lbox?id=' + g.id);
+		const ims = (await r.json()).images || [];
+		out.textContent = '';
+		if (!ims.length) { out.textContent = 'LaunchBox has no box art for ' + g.title + '.'; return; }
+		const grid = document.createElement('div');
+		grid.className = 'lbox-pics';
+		for (const im of ims) {
+			const b = document.createElement('button');
+			b.className = 'lbox-pic';
+			const img = document.createElement('img');
+			img.src = im.thumb || im.url;
+			img.alt = im.kind;
+			img.loading = 'lazy';
+			const cap = document.createElement('span');
+			cap.textContent = im.kind + (im.region ? ' (' + im.region + ')' : '');
+			b.append(img, cap);
+			b.onclick = () => lboxUse(e, im.url);
+			grid.append(b);
+		}
+		out.append(grid);
+	} catch (err) { out.textContent = ''; toast(err.message, true); }
+}
+
+async function lboxUse(e, url) {
 	toast('The Brick is fetching it...');
 	try {
 		await api('POST', '/api/cover?p=' + enc(e.path) + '&url=' + enc(url));

@@ -32,7 +32,10 @@ static SDL_Renderer *ren;
 static int fd_pad = -1;     /* "Brick Gamepad": every button, the volume keys too */
 static int fd_keys = -1;    /* "sunxi-keyboard": declares the volume keys, never sends them */
 static int fd_power = -1;   /* "axp2202-pek" */
-static int jack_fd = -1;    /* "audiocodec sunxi Audio Jack": the jack switch, for the settings */
+static int jack_fd = -1;
+/* ChaOS: MENU as a modifier for brightness (key_in) */
+static bool menu_held, menu_chorded, menu_release_next;
+static in_button vol_as[2] = { IN_NONE, IN_NONE };    /* "audiocodec sunxi Audio Jack": the jack switch, for the settings */
 
 /* TORTOS_INPUT_DEBUG=1 logs raw evdev codes, so one press tells you exactly
  * which device a control arrives on. */
@@ -42,8 +45,8 @@ static int dbg_input;
 /* Every button by its key code, as the Pixel 2 reads its own. brick-pad sends
  * the Pixel's codes: A, B, X and Y as SOUTH, EAST, NORTH and WEST, named for
  * their labels, and the d-pad as BTN_DPAD_*. Then the Brick's own: MENU, and
- * the two front keys, which are brightness. L2 and R2 exist and TortOS has no
- * use for them. */
+ * the two front keys - ChaOS: F1 and F2, rewind and fast forward in a game;
+ * brightness is MENU plus the volume keys (key_in). */
 static const struct { int code; in_button b; } keymap[] = {
 	{ BTN_DPAD_UP, IN_UP },       { BTN_DPAD_DOWN, IN_DOWN },
 	{ BTN_DPAD_LEFT, IN_LEFT },   { BTN_DPAD_RIGHT, IN_RIGHT },
@@ -52,7 +55,7 @@ static const struct { int code; in_button b; } keymap[] = {
 	{ BTN_TL, IN_L1 },            { BTN_TR, IN_R1 },
 	{ BTN_SELECT, IN_SELECT },    { BTN_START, IN_START },
 	{ BTN_MODE, IN_MENU },
-	{ BTN_THUMBL, IN_BRIGHTDN },  { BTN_THUMBR, IN_BRIGHTUP },
+	{ BTN_THUMBL, IN_F1 },        { BTN_THUMBR, IN_F2 },
 	{ KEY_VOLUMEDOWN, IN_VOLDN }, { KEY_VOLUMEUP, IN_VOLUP },
 	{ KEY_POWER, IN_POWER },
 	/* ChaOS: L2 and R2, for the shelves' letter scrub */
@@ -262,6 +265,9 @@ void plat_input_flush(void)
 		for (i = 0; i < 3; i++)
 			while (fds[i] >= 0 &&
 			       read(fds[i], &ev, sizeof ev) == (ssize_t)sizeof ev) { }
+		/* ChaOS: a MENU held across this is not a tap on its release */
+		menu_held = menu_chorded = false;
+		vol_as[0] = vol_as[1] = IN_NONE;
 	}
 #endif
 }
@@ -374,6 +380,68 @@ static void sticks_dpad(in_state *st)
 	}
 }
 
+#ifdef __linux__
+/* ChaOS: brightness is MENU plus the volume keys. So MENU is a modifier, and
+ * like the Pixel 2's FUNCTION it is told only on its release, and only when it
+ * changed no brightness meanwhile: a tap is MENU, a chord is not. Nothing in
+ * the launcher waits on MENU being held, so a tap reported a moment later
+ * costs nothing. */
+static void key_in(in_state *st, int code, bool down)
+{
+	size_t i;
+
+	if (code == BTN_MODE) {
+		if (down) {
+			menu_held = true;
+			menu_chorded = false;
+		} else if (menu_held) {
+			menu_held = false;
+			if (!menu_chorded) {
+				plat_set_btn(st, IN_MENU, true);
+				menu_release_next = true;
+			}
+		}
+		return;
+	}
+	if (code == KEY_VOLUMEUP || code == KEY_VOLUMEDOWN) {
+		int k = code == KEY_VOLUMEUP ? 0 : 1;
+
+		if (down) {
+			if (menu_held) {
+				vol_as[k] = k == 0 ? IN_BRIGHTUP : IN_BRIGHTDN;
+				menu_chorded = true;
+			} else {
+				vol_as[k] = k == 0 ? IN_VOLUP : IN_VOLDN;
+			}
+			plat_set_btn(st, vol_as[k], true);
+		} else if (vol_as[k] != IN_NONE) {
+			/* let go as whatever it went down as */
+			plat_set_btn(st, vol_as[k], false);
+			vol_as[k] = IN_NONE;
+		}
+		return;
+	}
+	for (i = 0; i < sizeof keymap / sizeof keymap[0]; i++)
+		if (keymap[i].code == code) {
+			plat_set_btn(st, keymap[i].b, down);
+			return;
+		}
+}
+#endif
+
+/* A MENU tap reported last poll is let go of on this one. */
+static void menu_tap_end(in_state *st)
+{
+#ifdef __linux__
+	if (menu_release_next) {
+		plat_set_btn(st, IN_MENU, false);
+		menu_release_next = false;
+	}
+#else
+	(void)st;
+#endif
+}
+
 static void poll_fd(int fd, in_state *st)
 {
 #ifdef __linux__
@@ -389,11 +457,7 @@ static void poll_fd(int fd, in_state *st)
 		}
 		if (ev.type != EV_KEY || ev.value == 2) continue;
 		if (dbg_input) fprintf(stderr, "[in] fd=%d code=%d val=%d\n", fd, ev.code, ev.value);
-		for (i = 0; i < sizeof keymap / sizeof keymap[0]; i++)
-			if (keymap[i].code == ev.code) {
-				plat_set_btn(st, keymap[i].b, ev.value == 1);
-				break;
-			}
+		key_in(st, ev.code, ev.value == 1);
 	}
 	if (moved) sticks_dpad(st);
 #else
@@ -404,6 +468,7 @@ static void poll_fd(int fd, in_state *st)
 void device_child_poll(in_state *st)
 {
 	memset(st->pressed, 0, sizeof st->pressed);
+	menu_tap_end(st);
 	poll_fd(fd_pad, st);
 	poll_fd(fd_keys, st);
 }
@@ -441,6 +506,7 @@ static in_button map_key(SDL_Keycode k)
 void plat_input_poll(in_state *st)
 {
 	memset(st->pressed, 0, sizeof st->pressed);
+	menu_tap_end(st);
 	if (plat_terminating()) st->quit_requested = true;
 	/* The jack, checked here because this is the one thing every screen does
 	 * once a frame - and, more to the point, the one thing the launcher stops

@@ -119,6 +119,16 @@ void hare_set_after_write(void (*fn)(const char *abs));
 void hare_set_cover(bool (*fn)(const char *rom, const char *url, const char *file,
                                char *out, size_t on, char *why, size_t wn));
 
+/* ChaOS: box art from LaunchBox, searched and picked on the page
+ * (GET /api/lbox?q=<words>&p=<the game>, then GET /api/lbox?id=<game id>):
+ * the games found, this console's first, then one game's pictures for a
+ * cover. The device fetches LaunchBox's pages, which a page can't read from
+ * another site, and the picture chosen is set as any linked cover is, through
+ * /api/cover. Malloc'd JSON or NULL with why; unset, 404. */
+void hare_set_lbox(char *(*search)(const char *game, const char *words,
+                                   size_t *len, char *why, size_t wn),
+                   char *(*images)(int id, size_t *len, char *why, size_t wn));
+
 /* Updating over Down To The Wire (#69). The page downloads a release itself
  * (from GitHub Pages: release downloads carry no CORS header) and sends it
  * here with GitHub's size and SHA-256; the launcher checks it and asks on the

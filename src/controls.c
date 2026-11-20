@@ -57,12 +57,13 @@ static int cc_buttons(const ctl_console *cc, int *idx)
 static int cc_shortcuts(const ctl_console *cc, menu_row *out)
 {
 	int n = 0;
-	out[n++] = (menu_row){ "MENU",    "Menu",              false };
-	out[n++] = (menu_row){ "MENU+R1", "Fast forward",      false };
+	out[n++] = (menu_row){ "MENU",        "Menu",              false };
+	out[n++] = (menu_row){ "MENU+SELECT", "Save and quit",     false };
+	out[n++] = (menu_row){ "F2",          "Fast forward",      false };
 	if (cc->rewind)
-		out[n++] = (menu_row){ "MENU+L1", "Rewind, held",  false };
-	out[n++] = (menu_row){ "MENU+X",  "Screenshot",        false };
-	out[n++] = (menu_row){ "POWER",   "Save and turn off", false };
+		out[n++] = (menu_row){ "F1",      "Rewind, held",      false };
+	out[n++] = (menu_row){ "MENU+X",      "Screenshot",        false };
+	out[n++] = (menu_row){ "POWER",       "Save and turn off", false };
 	return n;
 }
 
@@ -229,7 +230,7 @@ static int anywhere(menu_row *out)
 	 * game it is a different menu, and that page says so. */
 	out[n++] = (menu_row){ "MENU",          "Settings",   false };
 	out[n++] = (menu_row){ "Volume rocker", "Sound",      false };
-	out[n++] = (menu_row){ fn_volume ? "FN+Vol" : "F1/F2", "Brightness", false };
+	out[n++] = (menu_row){ fn_volume ? "FN+Vol" : "MENU+Vol", "Brightness", false };
 	out[n++] = (menu_row){ "POWER",         "Turn off",   false };
 	return n;
 }

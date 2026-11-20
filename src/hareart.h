@@ -70,4 +70,12 @@ char *hareart_crc(const char *folder, const char *dat, size_t *len,
  * every device, so a cover uploaded by hand is shrunk too. */
 void hareart_after_write(const char *abs);
 
+/* ChaOS: the answers to hare_set_lbox. `game` is the page's path to it
+ * ("roms/<folder>/<file>"), which says the console; "" for none.
+ *   {"games":[{"id":N,"title":..,"platform":..},..]}
+ *   {"images":[{"kind":..,"region":..,"url":..,"thumb":..},..]} */
+char *hareart_lbox_search(const char *game, const char *words, size_t *len,
+                          char *why, size_t wn);
+char *hareart_lbox_images(int id, size_t *len, char *why, size_t wn);
+
 #endif

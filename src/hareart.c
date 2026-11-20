@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* See hareart.h. */
 #include "hareart.h"
+#include "lbox.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -294,4 +295,61 @@ void hareart_after_write(const char *abs)
 	if (!strstr(abs + n, "/.media/")) return;
 	if (len < 4 || strcasecmp(abs + len - 4, ".png")) return;
 	art_shrink(abs);
+}
+
+/* ---- ChaOS: LaunchBox, for the page's cover search (lbox.h) ---------------- */
+
+char *hareart_lbox_search(const char *game, const char *words, size_t *len,
+                          char *why, size_t wn)
+{
+	lbox_game g[30];
+	const char *tag = NULL;
+	char folder[256] = "";
+	hj o = { 0 };
+	int n, i;
+
+	/* "roms/<folder>/<file>": the console it's on, for its games first */
+	if (game && !strncmp(game, "roms/", 5)) {
+		const char *s = game + 5, *slash = strchr(s, '/');
+		if (slash && (size_t)(slash - s) < sizeof folder) {
+			memcpy(folder, s, (size_t)(slash - s));
+			folder[slash - s] = '\0';
+		}
+	}
+	for (i = 0; g_sys && folder[0] && i < g_sys->count; i++)
+		if (!strcmp(g_sys->systems[i].folder, folder)) { tag = g_sys->systems[i].tag; break; }
+	n = lbox_search(words, tag, g, 30);
+	if (n < 0) { snprintf(why, wn, "couldn't reach LaunchBox"); return NULL; }
+	hj_lit(&o, "{\"games\":[");
+	for (i = 0; i < n; i++) {
+		if (i) hj_lit(&o, ",");
+		hj_lit(&o, "{\"id\":"); hj_int(&o, g[i].id);
+		hj_lit(&o, ",\"title\":"); hj_str(&o, g[i].title);
+		hj_lit(&o, ",\"platform\":"); hj_str(&o, g[i].platform);
+		hj_lit(&o, "}");
+	}
+	hj_lit(&o, "]}");
+	return hj_done(&o, len, why, wn);
+}
+
+char *hareart_lbox_images(int id, size_t *len, char *why, size_t wn)
+{
+	lbox_image im[24];
+	hj o = { 0 };
+	int n, i;
+
+	if (id <= 0) { snprintf(why, wn, "which game?"); return NULL; }
+	n = lbox_images(id, NULL, im, 24);
+	if (n < 0) { snprintf(why, wn, "couldn't reach LaunchBox"); return NULL; }
+	hj_lit(&o, "{\"images\":[");
+	for (i = 0; i < n; i++) {
+		if (i) hj_lit(&o, ",");
+		hj_lit(&o, "{\"kind\":"); hj_str(&o, im[i].kind);
+		hj_lit(&o, ",\"region\":"); hj_str(&o, im[i].region);
+		hj_lit(&o, ",\"url\":"); hj_str(&o, im[i].url);
+		hj_lit(&o, ",\"thumb\":"); hj_str(&o, im[i].thumb);
+		hj_lit(&o, "}");
+	}
+	hj_lit(&o, "]}");
+	return hj_done(&o, len, why, wn);
 }

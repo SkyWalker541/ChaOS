@@ -74,7 +74,7 @@ typedef enum {
 	/* ChaOS: Crop Overscan (overscan.h), only where the emulator can */
 	SM_OVERSCAN,
 	/* ChaOS: what each of the Brick's buttons presses (src/remap.h), and
-	 * whether MENU+L1 can step the game back */
+	 * whether F1 can step the game back */
 	SM_BUTTONS, SM_REWIND, SM_BOXART, SM_RESCAN, SM_ROWS
 } sm_row;
 

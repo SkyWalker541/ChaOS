@@ -339,6 +339,28 @@ header { flex-wrap: wrap; }
 }
 .coverpanel .acts button:hover { border-color: var(--accent); }
 
+/* ChaOS: LaunchBox search, inside Cover's panel */
+.lbox { margin-top: 12px; }
+.lbox form { display: flex; gap: 6px; max-width: 520px; }
+.lbox input { flex: 1; min-width: 0; font: inherit; font-size: 15px; color: var(--text);
+              background: var(--ground); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+.lbox form button { background: none; border: 1px solid var(--line); border-radius: 8px;
+                    color: var(--text); font: inherit; font-size: 14px; cursor: pointer; padding: 6px 12px; }
+.lbox-out { margin-top: 10px; color: var(--dim); font-size: 14px; }
+.lbox-games { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.lbox-games li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.lbox-games button { background: none; border: none; padding: 2px 0; color: var(--accent);
+                     font: inherit; font-size: 15px; cursor: pointer; text-align: left; }
+.lbox-games span { color: var(--dim); font-size: 13px; }
+.lbox-pics { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+.lbox-pic { display: flex; flex-direction: column; gap: 4px; align-items: stretch; background: none;
+            border: 1px solid var(--line); border-radius: 8px; padding: 6px; cursor: pointer;
+            color: var(--dim); font: inherit; font-size: 12px; text-align: left; }
+.lbox-pic:hover { border-color: var(--accent); color: var(--text); }
+.lbox-pic { min-width: 0; }
+.lbox-pic span { display: block; white-space: normal; overflow-wrap: anywhere; line-height: 1.3; }
+.lbox-pic img { width: 100%; aspect-ratio: 3 / 4; object-fit: contain; background: var(--ground); border-radius: 4px; }
+
 /* Tidy names' preview: every rename, old above new, before any is made */
 .tidy { max-width: var(--wrap); margin: 12px auto; padding: 14px 16px;
         border: 1px solid var(--accent); border-radius: 10px; }

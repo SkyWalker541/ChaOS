@@ -32,7 +32,7 @@ static void ck(int cond, const char *what)
  * written with no air around the slash - "L1/R1", not "L1 / R1". */
 static const char *const BUTTONS[] = {
 	"Up/Down", "Left/Right", "A", "B", "X", "Y", "L1/R1", "L2/R2",
-	"MENU", "SELECT", "POWER", "Volume rocker", "F1/F2", "F1+F2",
+	"MENU", "SELECT", "POWER", "Volume rocker", "MENU+Vol", "F1+F2",
 	"FN+Vol", "FN+both Vol", "L2+R2",
 };
 #define NBUTTONS ((int)(sizeof BUTTONS / sizeof BUTTONS[0]))
@@ -44,7 +44,9 @@ static const char *const BUTTONS[] = {
 static bool pixel;
 static int other_devices(const char *b)
 {
-	return pixel ? !strcmp(b, "F1/F2") || !strcmp(b, "F1+F2")
+	/* ChaOS: the Brick's brightness is MENU+Vol now; F1 and F2 are rewind
+	 * and fast forward, on a console's own page */
+	return pixel ? !strcmp(b, "MENU+Vol") || !strcmp(b, "F1+F2")
 	             : !strcmp(b, "FN+Vol") || !strcmp(b, "FN+both Vol") ||
 	               !strcmp(b, "L2+R2");
 }
@@ -288,7 +290,7 @@ static void pagers_and_consoles(void)
 		gb.value[i] = i < 4 || i >= 8 ? "A" : "None";
 		md.value[i] = "C";
 	}
-	ck(ctl_console_pages(&gb) == 3, "six Game Boy buttons: two pages of them and the shortcuts");
+	ck(ctl_console_pages(&gb) == 4, "six Game Boy buttons: two pages of them and two of shortcuts");
 	ck(ctl_console_pages(&md) == 5, "ten Genesis buttons: three, and two of shortcuts (rewind on)");
 	for (p = 0; p < ctl_console_pages(&md); p++) {
 		int text = 0, live = 0;
@@ -313,16 +315,19 @@ static void pagers_and_consoles(void)
 		for (pg = 3; pg < ctl_console_pages(&md); pg++) {
 			n = ctl_console_rows(&md, pg, rows);
 			for (i = 0; i < n; i++) {
-				if (rows[i].label && !strcmp(rows[i].label, "MENU+L1")) p = 1;
+				if (rows[i].label && !strcmp(rows[i].label, "F1")) p = 1;
 				if (rows[i].label && !strcmp(rows[i].label, "MENU+X")) shot = 1;
 			}
 		}
-		ck(p, "rewind on: MENU+L1 among the shortcuts");
+		ck(p, "rewind on: F1 among the shortcuts");
 		ck(shot, "MENU+X, the screenshot, among them");
 	}
-	n = ctl_console_rows(&gb, ctl_console_pages(&gb) - 1, rows);
-	for (i = p = 0; i < n; i++) if (rows[i].label && !strcmp(rows[i].label, "MENU+L1")) p = 1;
-	ck(!p, "rewind off: no MENU+L1");
+	for (p = 0, i = 2; i < ctl_console_pages(&gb); i++) {
+		int k;
+		n = ctl_console_rows(&gb, i, rows);
+		for (k = 0; k < n; k++) if (rows[k].label && !strcmp(rows[k].label, "F1")) p = 1;
+	}
+	ck(!p, "rewind off: no F1");
 	n = ctl_console_rows(&gb, 0, rows);
 	for (i = p = 0; i < n; i++)
 		if (rows[i].value && !ROW_IS_NOTE(rows[i]) && !strcmp(rows[i].value, "None")) p = 1;
