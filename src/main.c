@@ -1034,8 +1034,10 @@ static bool g_muse_attach;          /* SELECT has Muse open with its shelf off *
 /* ChaOS: the Appearance page is open. Read by the row list (sys_menu.c) and the
  * key mapping alike, so the page's rows and the keys that act on them agree. */
 static bool g_appearance_page;
+static bool g_shelf_page;     /* ChaOS: MENU > Shelves */
+static void page_screen(app *a, bool *flag);
 static void appearance_screen(app *a);
-static void arrange_screen(app *a);   /* Appearance > Arrange Shelves */
+static void arrange_screen(app *a);   /* Shelves > Arrange Shelves */
 /* The virtual shelves' tags (vshelf_insert) */
 #define VSHELF_FAV "FAV"
 #define VSHELF_REC "REC"
@@ -6050,6 +6052,7 @@ static int menu_build(app *a, screen_id screen, int sys,
 		u.night     = plat_volume_night_get() ? "On" : "Off";
 		u.night_ok  = plat_volume_night_ok();
 		u.appearance = g_appearance_page;
+		u.shelf_page = g_shelf_page;
 		u.rom_page  = g_rom_page;
 		u.net_page  = g_net_page;
 		u.sys_page  = g_sys_page;
@@ -11146,7 +11149,7 @@ static void tortos_menu_draw(app *a, int sel)
 	/* The shelf's menu is TortOS's own on the systems screen and a system's on
 	 * a game list, which is where it gains rows that belong to that system. */
 	g_menu_root = !g_appearance_page && !g_rom_page &&   /* ChaOS: those are submenus */
-	              !g_net_page && !g_sys_page;
+	              !g_net_page && !g_sys_page && !g_shelf_page;
 	menu_draw(a, heading, rows, n, sel, menu_shelf_width(a),
 	          a->screen == SCREEN_SYSTEMS ? MENU_ACCENT : a->tint);
 	g_menu_root = false;
@@ -11345,6 +11348,7 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 		               .night_ok = plat_volume_night_ok(), .appearance = g_appearance_page,
 		               .rom_page = g_rom_page, .net_page = g_net_page, .sys_page = g_sys_page,
 		               .sticks = plat_sticks((int[4]){ 0 }),
+		               .shelf_page = g_shelf_page,
 		               .name_speed = CARDS_DRAWN(g_cards) ? PN_SPEEDS[g_pn_speed[g_dir]].name
 		                                                  : NULL,
 		               .list_view = CARD_DIRS[g_dir].both ? NULL : "" };
@@ -11537,6 +11541,7 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 	case PM_APPEARANCE:   appearance_screen(a); break;
 	case PM_NETPAGE:      net_page_screen(a); break;
 	case PM_SYSPAGE:      sys_page_screen(a); break;
+	case PM_SHELVES:      page_screen(a, &g_shelf_page); break;
 	case PM_STATS:        if (stats_screen(a)) return MENU_DONE; break;
 	case PM_CONTROLS:     controls_screen(a); break;
 	case PM_STICKS:       sticks_screen(a); break;
@@ -11577,7 +11582,7 @@ static void tortos_menu_for(app *a, int screen)
 
 /* MENU > Appearance: the look rows on their own page, B back to the menu. The
  * same runner and keys as the menu; only the rows it lists are different. */
-/* ChaOS: Appearance > Arrange Shelves. The consoles that have games, in the
+/* ChaOS: Shelves > Arrange Shelves. The consoles that have games, in the
  * order they're in now: A picks one up, up and down carry it, A puts it down.
  * Leaving keeps the order as Custom, and the row is read again in it. Muse,
  * Favorites and Recently Played keep their own places, so aren't listed. */
@@ -25143,6 +25148,12 @@ int main(int argc, char *argv[])
 		else if (!strcmp(argv[i], "--netpage") || !strcmp(argv[i], "--syspage")) {
 			shot_menu = 1;
 			if (argv[i][2] == 'n') g_net_page = true; else g_sys_page = true;
+			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9')
+				shot_menu_sel = atoi(argv[++i]);
+		}
+		else if (!strcmp(argv[i], "--shelves")) {
+			shot_menu = 1;
+			g_shelf_page = true;
 			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9')
 				shot_menu_sel = atoi(argv[++i]);
 		}

@@ -176,7 +176,10 @@ static bool has_label(const menu_row *rows, int n, const char *label);
 /* The top level is shorter than the list of rows by the Appearance page's: the
  * five look rows and the three shelf switches are on that page, and the menu
  * holds one row for it. */
-#define PAGE_ROWS 11
+#define PAGE_ROWS 4
+/* ChaOS: and the Shelves page's seven: Game List View, Show Shelf Name,
+ * Shelf Order, Arrange Shelves and the three shelf switches */
+#define SHELF_ROWS 7
 /* ChaOS: and the ROM Management page's two, RomM and Syncthing */
 #define ROM_ROWS 5
 /* ChaOS: and the Wi-Fi & Bluetooth page's two, and System Settings' eight
@@ -185,7 +188,7 @@ static bool has_label(const menu_row *rows, int n, const char *label);
 #define NET_ROWS 2
 #define SYS_ROWS 9
 /* less Calibrate Sticks, on System Settings for a Brick Pro alone */
-#define TOP_ROWS (PM_ROWS - PAGE_ROWS - ROM_ROWS - NET_ROWS - SYS_ROWS - 1)
+#define TOP_ROWS (PM_ROWS - PAGE_ROWS - ROM_ROWS - NET_ROWS - SYS_ROWS - SHELF_ROWS - 1)
 /* (the page's description line is drawn by menu_draw, not a row) */
 #define PAGE_NOTE 0
 static const menu_row *by_id(const sys_ui *u, const menu_row *rows, int n, pm_row id);
@@ -221,10 +224,17 @@ static void tortos_menu_offline(void)
 	u.appearance = true;
 	n = sys_menu_build(&u, rows, &b, &heading);
 	ck(n == PAGE_ROWS + PAGE_NOTE && !strcmp(heading, "Appearance"),
-	   "the Appearance page holds the look rows and the shelf switches, under its own heading");
+	   "the Appearance page holds the look rows, under its own heading");
 	ck(!strcmp(val(by_id(&u, rows, n, PM_COLOR)), "ChaOS Orange") && (*by_id(&u, rows, n, PM_COLOR)).live,
 	   "Menu Color names the accent, and is reachable offline");
 	u.appearance = false;
+	/* ChaOS: Shelves, the same way */
+	u.shelf_page = true;
+	n = sys_menu_build(&u, rows, &b, &heading);
+	ck(n == SHELF_ROWS && !strcmp(heading, "Shelves") && has_label(rows, n, "Game List View") &&
+	   has_label(rows, n, "Shelf Order") && has_label(rows, n, "Show Muse"),
+	   "the Shelves page holds the shelf rows, under its own heading");
+	u.shelf_page = false;
 	/* ChaOS: ROM Management, the same way: its page, and one row for it */
 	u.rom_page = true;
 	n = sys_menu_build(&u, rows, &b, &heading);
@@ -375,7 +385,7 @@ static void tortos_menu_online(void)
 	/* Recently Played is a switch like the Wi-Fi and audio ones: always there,
 	 * since it is the shelf that is hidden, not the setting. */
 	printf("Shelf switches:\n");
-	u.appearance = true;
+	u.shelf_page = true;
 	u.recent = "On";
 	u.fav_shelf = "On";
 	u.muse_shelf = "Off";
@@ -401,10 +411,12 @@ static void tortos_menu_online(void)
 	u.recent = "Off";
 	n = sys_menu_build(&u, rows, &b, &heading);
 	ck(!strcmp(val(by_id(&u, rows, n, PM_RECENT)), "Off"), "and Off when it is turned off");
-	u.appearance = false;
+	u.shelf_page = false;
 	n = sys_menu_build(&u, rows, &b, &heading);
 	ck(!has_label(rows, n, "Show Recently Played") && !has_label(rows, n, "Show Muse"),
-	   "on the Appearance page, not the menu");
+	   "on the Shelves page, not the menu");
+	ck(has_label(rows, n, "Shelves") && by_id(&u, rows, n, PM_SHELVES)->opens,
+	   "where the menu has a Shelves row that opens it");
 	u.recent = u.fav_shelf = u.muse_shelf = NULL;
 	/* Night Mode: a switch on a device with a night ladder, gone without one */
 	u.night = "On";
@@ -424,10 +436,10 @@ static void tortos_menu_online(void)
 	u.night_ok = true;
 	u.night = NULL;
 	printf("Game List View:\n");
-	u.appearance = true;
+	u.shelf_page = true;
 	u.list_view = NULL;
 	n = sys_menu_build(&u, rows, &b, &heading);
-	ck(n == PAGE_ROWS + PAGE_NOTE - 2 && !has_label(rows, n, "Game List View") &&
+	ck(n == SHELF_ROWS - 2 && !has_label(rows, n, "Game List View") &&
 	   !has_label(rows, n, "Show Shelf Name"), "not there in Cubic, nor Show Shelf Name");
 	u.list_view = "List";
 	n = sys_menu_build(&u, rows, &b, &heading);
@@ -445,7 +457,9 @@ static void tortos_menu_online(void)
 		ck(lv >= 0 && sn == lv + 1, "and right under Game List View");
 	}
 
+	u.shelf_page = false;
 	printf("Transition Speed:\n");
+	u.appearance = true;
 	u.name_speed = NULL;
 	n = sys_menu_build(&u, rows, &b, &heading);
 	ck(n == PAGE_ROWS + PAGE_NOTE - 1 && !has_label(rows, n, "Transition Speed"),
