@@ -759,8 +759,9 @@ static void cursor_reaches(void)
 	u.sys_name = "PICO-8"; u.sys_core = "pico8"; u.native = true;
 	n = sys_menu_build(&u, rows, &b, &heading);
 	k = reachable(rows, n, got, MENU_MAX_ROWS);
-	ck(n == 4 && k == 2 && reaches(rows, got, k, "Sort By") && reaches(rows, got, k, "Rescan Folder"),
-	   "PICO-8: Games, Core, Sort By and Rescan Folder, and nothing about the picture");
+	ck(n == 5 && k == 3 && reaches(rows, got, k, "Sort By") && reaches(rows, got, k, "Rescan Folder") &&
+	   reaches(rows, got, k, "Overlay") && !reaches(rows, got, k, "Display Mode"),
+	   "PICO-8: Games, Core, Sort By, Overlay and Rescan Folder, and nothing else about the picture");
 	u.native = false; u.sys_name = "NES"; u.sys_core = "nestopia";
 
 	memset(&u, 0, sizeof u);

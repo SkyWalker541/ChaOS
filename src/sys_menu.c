@@ -82,7 +82,8 @@ int sys_menu_system_rows(const sys_ui *u, sm_row *out)
 		if (u->no_wifi && r == SM_BOXART) continue;
 		if (!u->shader && r == SM_SHADER) continue;
 		if (!u->overscan && r == SM_OVERSCAN) continue;
-		if (u->native && (r == SM_DISPLAY || r == SM_OVERLAY || r == SM_BUTTONS ||
+		/* ChaOS: Overlay stays: one is drawn over PICO-8 too (res/pico8) */
+		if (u->native && (r == SM_DISPLAY || r == SM_BUTTONS ||
 		                  r == SM_REWIND || r == SM_BOXART))
 			continue;
 		out[n++] = (sm_row)r;

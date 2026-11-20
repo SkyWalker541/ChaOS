@@ -714,9 +714,13 @@ speak https. `run.sh` puts a `wget` of ChaOS's first on PICO-8's path that
 hands the call to curl with the certificates ChaOS keeps (spruceUI's approach),
 and sets `use_wget 1` in PICO-8's `config.txt` before every start.
 
-The shelf's menu has Games, Core, Sort By and Rescan Folder: the picture,
-buttons, rewind and box art rows are the emulator's, and PICO-8 isn't run by
-it.
+The shelf's menu has Games, Core, Sort By, Overlay and Rescan Folder: the
+other picture rows, buttons, rewind and box art are the emulator's, and PICO-8
+isn't run by it. An overlay of your own (a PNG in `Overlays/PICO-8`, the
+screen's size, with a 768x768 window in the middle, where PICO-8 draws) is
+drawn over PICO-8's own picture by a small helper `run.sh` loads into it
+(`res/pico8/overlay.c`). PICO-8 can't save states: it's Lexaloffle's own
+program, which has no way to hand its moment over.
 
 ### Ports (ChaOS)
 

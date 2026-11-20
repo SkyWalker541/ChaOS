@@ -501,7 +501,9 @@ static void overlay_dirs_ensure(const app *a)
 	       strcmp(was, CHAOS_VERSION) != 0;
 	if (seed) overlays_retire();
 	for (i = 0; i < a->sys.count; i++) {
-		if (!a->sys.systems[i].folder[0] || !strcmp(a->sys.systems[i].core, PICO8_CORE)) continue;
+		/* ChaOS: PICO-8's too, for overlays of the player's own
+		 * (res/pico8/overlay.c) */
+		if (!a->sys.systems[i].folder[0]) continue;
 		overlay_dir(a, i, d, sizeof d);
 		mkdir(d, 0755);
 		if (seed) overlay_seed(a, i, d);
@@ -569,6 +571,9 @@ static const struct { const char *tag; int w, h; double aspect; } OVL_SCREENS[] 
 	{ "GG",   160, 144, 10.0 / 9.0 },
 	{ "NGP",  160, 152, 160.0 / 152.0 },
 	{ "NGPC", 160, 152, 160.0 / 152.0 },
+	/* ChaOS: PICO-8, which draws itself, always at a whole multiple
+	 * (768x768 on the Brick) whatever the Display Mode (res/pico8) */
+	{ "PICO8", 128, 128, 1.0 },
 };
 
 /* Where the game is drawn at `mode`, as ChaOS-diatom works it out
@@ -583,7 +588,7 @@ static bool overlay_game_rect(const app *a, int sys, int mode, SDL_Rect *r)
 		double asp = OVL_SCREENS[i].aspect;
 
 		if (strcmp(OVL_SCREENS[i].tag, a->sys.systems[sys].tag)) continue;
-		if (!strcmp(DMODES[mode].name, "integer")) {
+		if (!strcmp(DMODES[mode].name, "integer") || !strcmp(a->sys.systems[sys].tag, "PICO8")) {
 			f = W / w < H / h ? W / w : H / h;
 			if (f < 1) f = 1;
 			r->w = w * f; r->h = h * f;
@@ -15576,6 +15581,8 @@ static void port_launch(app *a, int o, const char *romfile, const char *title)
 	render(a);
 }
 
+#define P8_OVERLAY_BMP "/tmp/chaos-p8-overlay.bmp"
+
 /* ChaOS: PICO-8 (pico8.h), as a port is run - its own process group, the
  * power prompt over it, Select+Start held to end it - by
  * ChaOS/pico8/run.sh, with a cart or Splore */
@@ -15585,7 +15592,7 @@ static void p8_launch(app *a, int o, const char *file, const char *title)
 	char runner[CFG_STR * 2], cart[LIB_PATH * 2], ud[LIB_PATH + 32], card[LIB_PATH + 32];
 	char dir[LIB_PATH + 16];
 	char *argv[4];
-	const char *envkv[3];
+	const char *envkv[4];
 	bool music, splore = !strcmp(file, PICO8_SPLORE_FILE);
 	int how = PORT_ENDED, rc;
 	p8_status st;
@@ -15613,6 +15620,31 @@ static void p8_launch(app *a, int o, const char *file, const char *title)
 	envkv[0] = ud;
 	envkv[1] = card;
 	envkv[2] = NULL;
+	envkv[3] = NULL;
+	/* ChaOS: its overlay, made the screen's size, as a BMP the SDL PICO-8
+	 * has can read for itself (res/pico8/overlay.c) */
+	unlink(P8_OVERLAY_BMP);
+	{
+		char ol[256];
+
+		if (overlay_label(a, o, ol, sizeof ol)) {
+			char path[LIB_PATH * 3];
+			SDL_Surface *img, *full;
+
+			overlay_dir(a, o, path, sizeof path);
+			snprintf(path + strlen(path), sizeof path - strlen(path), "/%s", a->view[o].overlay);
+			if ((img = IMG_Load(path))) {
+				full = SDL_CreateRGBSurfaceWithFormat(0, TORTOS_SCREEN_W, TORTOS_SCREEN_H, 32, SDL_PIXELFORMAT_ARGB8888);
+				if (full) {
+					SDL_SetSurfaceBlendMode(img, SDL_BLENDMODE_NONE);
+					SDL_BlitScaled(img, NULL, full, NULL);
+					if (SDL_SaveBMP(full, P8_OVERLAY_BMP) == 0) envkv[2] = "CHAOS_P8_OVERLAY=" P8_OVERLAY_BMP;
+					SDL_FreeSurface(full);
+				}
+				SDL_FreeSurface(img);
+			}
+		}
+	}
 	argv[0] = (char *)"/bin/sh";
 	argv[1] = runner;
 	argv[2] = splore ? (char *)"-splore" : cart;
