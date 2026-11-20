@@ -46,8 +46,8 @@ typedef enum {
 	/* ChaOS: on the Brick Pro only, its sticks taught to ChaOS */
 	PM_STICKS,
 	PM_APPEARANCE, PM_THEME, PM_DIR, PM_SPEED, PM_COLOR,
-	/* ChaOS: Shelves, a page of its own: how a shelf of games shows, and which
-	 * shelves there are and in what order */
+	/* ChaOS: Shelves, a page of its own under Appearance: how a shelf of games
+	 * shows, and which shelves there are and in what order */
 	PM_SHELVES, PM_LISTVIEW, PM_SHELF_NAME,
 	/* ChaOS: which of the shelves that aren't consoles are on the systems row */
 	PM_SHELF_FAV, PM_RECENT, PM_SHELF_MUSE, PM_SHELF_ORDER, PM_SHELF_ARRANGE,

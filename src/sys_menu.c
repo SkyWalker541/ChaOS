@@ -56,7 +56,8 @@ int sys_menu_tortos_rows(const sys_ui *u, pm_row *out)
 		 * and the device's own settings on System Settings; the menu has one
 		 * row for each page */
 		{
-			bool look = r == PM_THEME || r == PM_DIR || r == PM_SPEED || r == PM_COLOR;
+			bool look = r == PM_THEME || r == PM_DIR || r == PM_SPEED || r == PM_COLOR ||
+			            r == PM_SHELVES;   /* Shelves opens from Appearance */
 			bool shelf = r == PM_LISTVIEW || r == PM_SHELF_NAME || r == PM_SHELF_ORDER ||
 			             r == PM_SHELF_ARRANGE || r == PM_SHELF_FAV || r == PM_RECENT ||
 			             r == PM_SHELF_MUSE;
@@ -68,8 +69,9 @@ int sys_menu_tortos_rows(const sys_ui *u, pm_row *out)
 			            r == PM_UPDDOT ||
 			            r == PM_SLEEP || r == PM_STICKS;
 			int page = look ? 1 : roms ? 2 : net ? 3 : sys ? 4 : shelf ? 5 : 0;
-			int want = u->appearance ? 1 : u->rom_page ? 2 : u->net_page ? 3
-			         : u->sys_page ? 4 : u->shelf_page ? 5 : 0;
+			/* Shelves first: it opens from Appearance, which is still open */
+			int want = u->shelf_page ? 5 : u->appearance ? 1 : u->rom_page ? 2
+			         : u->net_page ? 3 : u->sys_page ? 4 : 0;
 
 			if (page != want) continue;
 		}
@@ -237,9 +239,9 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 
 	menu_row full[PM_ROWS];
 
-	*heading = u->appearance ? "Appearance" : u->rom_page ? "ROM Management"
-	         : u->net_page ? "Wi-Fi & Bluetooth" : u->sys_page ? "System Settings"
-	         : u->shelf_page ? "Shelves" : "ChaOS";
+	*heading = u->shelf_page ? "Shelves" : u->appearance ? "Appearance"
+	         : u->rom_page ? "ROM Management" : u->net_page ? "Wi-Fi & Bluetooth"
+	         : u->sys_page ? "System Settings" : "ChaOS";
 	/* The network's name, not its address. A settings row should say what the
 	 * setting IS; the address is a fact about the machine and lives on the
 	 * About page with the other ones. */
@@ -385,7 +387,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	full[PM_UPDDOT].hint       = "A dot on Updates when a new ChaOS is out";
 	full[PM_SLEEP].hint        = "Power off after this long with no buttons pressed";
 	full[PM_STICKS].hint       = "Their middles, their ends, which way is up";
-	full[PM_APPEARANCE].hint   = "Theme, layout and menu color";
+	full[PM_APPEARANCE].hint   = "Theme, layout, menu color and the shelves";
 	full[PM_SHELVES].hint      = "Which shelves show, their order and their games";
 	full[PM_THEME].hint        = "The look of the cards on the shelf";
 	full[PM_DIR].hint          = "Which way the shelves move";
