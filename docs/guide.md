@@ -255,12 +255,12 @@ needs restarting.
 Game System **Game Boy** covers both the original Game Boy (DMG) and the
 Game Boy Pocket. The backing that goes with each:
 
-| Console | Game System | Backing Color |
-|---|---|---|
-| Game Boy (DMG) or Pocket | Game Boy | Pocket |
-| Game Boy Color | Game Boy Color | Grey |
-| Game Boy Advance SP (front-lit) | GBA SP | White |
-| Game Boy Advance | GBA | Grey |
+| Console | Game System | Backing Color | (PT's name for it) |
+|---|---|---|---|
+| Game Boy (DMG) or Pocket | Game Boy | DMG / Pocket | Pocket |
+| Game Boy Color | Game Boy Color | GBC / GBA | Grey |
+| Game Boy Advance | GBA | GBC / GBA | Grey |
+| Game Boy Advance SP (front-lit) | GBA SP | GBA SP | White |
 
 Every shader setting says what it does in the line under the menu when it's
 picked, and Game System and Backing Color say which console they suit.
