@@ -45,6 +45,8 @@ int sys_menu_tortos_rows(const sys_ui *u, pm_row *out)
 		/* ChaOS: only with the ChaOS pixel themes, the ones that move */
 		if (!u->name_speed && r == PM_SPEED) continue;
 		if (!u->list_view && r == PM_LISTVIEW) continue;
+		/* ChaOS: the shelf's name is for the cards; the List says it */
+		if (r == PM_SHELF_NAME && (!u->list_view || strcmp(u->list_view, "Normal"))) continue;
 		if (!u->night_ok && r == PM_NIGHT) continue;
 		/* ChaOS: the Wi-Fi & Bluetooth page only where there is a radio */
 		if (r == PM_NETPAGE && u->no_wifi && u->no_bt) continue;
@@ -56,7 +58,7 @@ int sys_menu_tortos_rows(const sys_ui *u, pm_row *out)
 			bool look = r == PM_THEME || r == PM_DIR || r == PM_SPEED ||
 			            r == PM_LISTVIEW || r == PM_COLOR || r == PM_SHELF_FAV ||
 			            r == PM_RECENT || r == PM_SHELF_MUSE || r == PM_SHELF_ORDER ||
-			            r == PM_SHELF_ARRANGE;
+			            r == PM_SHELF_ARRANGE || r == PM_SHELF_NAME;
 			bool roms = r == PM_ROMM || r == PM_HOMEBREW || r == PM_SYNC || r == PM_GBSORT ||
 			            r == PM_DISCSETS;
 			bool net  = r == PM_WIFI || r == PM_BT;
@@ -320,6 +322,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	full[PM_SHELF_ORDER]  = (menu_row){ "Shelf Order", u->shelf_order ? u->shelf_order : "Release Date", true };
 	full[PM_SHELF_ORDER].cycles = true;
 	full[PM_SHELF_ARRANGE] = (menu_row){ "Arrange Shelves", NULL, true, .opens = true };
+	full[PM_SHELF_NAME]   = (menu_row){ "Show Shelf Name", u->shelf_name ? u->shelf_name : "On", true, .toggle = true };
 	/* ChaOS: the menus' accent, beside the other two rows about the look. */
 	full[PM_COLOR]        = (menu_row){ "Menu Color", u->menu_color, true };
 	/* Not "Sleep". The device has no suspend and is not getting one. This
@@ -388,6 +391,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	full[PM_SHELF_MUSE].hint   = "Muse on the systems row. SELECT always opens it";
 	full[PM_SHELF_ORDER].hint  = "By release date, by name, by maker, or your own";
 	full[PM_SHELF_ARRANGE].hint = "Move the consoles into your own order";
+	full[PM_SHELF_NAME].hint   = "The console's name, briefly, on changing shelf";
 	full[PM_SCRAPE].hint       = "Download box art for your games";
 	full[PM_ACHIEVEMENTS].hint = "Sign in to earn achievements as you play";
 	full[PM_SS].hint           = "Sign in for more box art and game info";

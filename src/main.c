@@ -1011,6 +1011,9 @@ static bool g_recent_shelf = true;
  * taken off again after (muse_open). */
 static bool g_fav_shelf = true;
 static bool g_muse_shelf = true;
+/* ChaOS: Show Shelf Name (shelf_name): the console's name, after turning to
+ * its shelf in card view (draw_shelf_note) */
+static bool g_shelf_name = true;
 /* ChaOS: the consoles' order on the systems row (shelf_order, "release",
  * "az" or "maker"): systems.cfg's own, which is by release; by name; or by
  * maker, each maker's home consoles then its handhelds, so the Game Boys sit
@@ -6042,6 +6045,7 @@ static int menu_build(app *a, screen_id screen, int sys,
 		u.recent    = g_recent_shelf ? "On" : "Off";
 		u.fav_shelf = g_fav_shelf ? "On" : "Off";
 		u.muse_shelf = g_muse_shelf ? "On" : "Off";
+		u.shelf_name = g_shelf_name ? "On" : "Off";
 		u.shelf_order = SHELF_ORDER_LABEL[g_shelf_order];
 		u.night     = plat_volume_night_get() ? "On" : "Off";
 		u.night_ok  = plat_volume_night_ok();
@@ -11414,6 +11418,11 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 		g_shelf_order = (g_shelf_order + (d ? d : 1) + SHELF_ORDERS) % SHELF_ORDERS;
 		db_set_str(db_dev(), "shelf_order", SHELF_ORDER_KEY[g_shelf_order]);
 		rescan_all(a);
+		return MENU_STAY;
+	}
+	if (sel == PM_SHELF_NAME && (d || key == IN_ACCEPT)) {
+		g_shelf_name = !g_shelf_name;
+		db_set_str(db_dev(), "shelf_name", g_shelf_name ? "on" : "off");
 		return MENU_STAY;
 	}
 	if (sel == PM_SHELF_ARRANGE && key == IN_ACCEPT) {
@@ -22564,8 +22573,8 @@ static void shelf_pan(app *a, int to, int dir)
 	}
 	/* ChaOS: the cards don't say which console they are, so its name comes
 	 * up for a moment (draw_shelf_note); the List has it in its heading */
-	g_sn_since = LIST_VIEW_ON() ? 0 : plat_now_ms();
-	if (!g_sn_since && !LIST_VIEW_ON()) g_sn_since = 1;
+	g_sn_since = LIST_VIEW_ON() || !g_shelf_name ? 0 : plat_now_ms();
+	if (!g_sn_since && !LIST_VIEW_ON() && g_shelf_name) g_sn_since = 1;
 	redraw_now();
 }
 
@@ -25416,6 +25425,8 @@ int main(int argc, char *argv[])
 		g_fav_shelf = strcmp(rs, "off") != 0;
 		db_get_str(db_dev(), "muse_shelf", rs, sizeof rs, "on");
 		g_muse_shelf = strcmp(rs, "off") != 0;
+		db_get_str(db_dev(), "shelf_name", rs, sizeof rs, "on");
+		g_shelf_name = strcmp(rs, "off") != 0;
 		db_get_str(db_dev(), "shelf_order", rs, sizeof rs, "release");
 		db_get_str(db_dev(), "shelf_custom", g_shelf_custom, sizeof g_shelf_custom, "");
 		for (g_shelf_order = SHELF_ORDERS - 1; g_shelf_order > 0; g_shelf_order--)
