@@ -1085,6 +1085,9 @@ static int g_menu_fill = -1;
 static void letter_note(sysview *v);
 static void letter_hold(sysview *v, bool held);
 static void draw_letter_popup(app *a);
+static void draw_shelf_note(app *a);   /* ChaOS: the shelf's name, after a turn */
+static Uint32 g_sn_since;              /* when it came up, 0: not up */
+static int    shot_shelfnote = -1;     /* --shelfnote MS: as it is MS in */
 static int shelf_letter_jump(sysview *v, int dir);
 static char shelf_initial(const char *s);
 static void letter_show(char c);   /* ChaOS: the popup for a letter, any list */
@@ -4566,6 +4569,7 @@ static void draw_shelf(app *a)
 		 * games screen, or Cubic, whose faces are games */
 		if (a->screen != SCREEN_SYSTEMS || CARD_DIRS[g_dir].both)
 			draw_letter_popup(a);
+		if (a->screen == SCREEN_GAMES) draw_shelf_note(a);
 	}
 	draw_low_battery_chrome(a->r);
 }
@@ -22558,6 +22562,74 @@ static void shelf_pan(app *a, int to, int dir)
 		if (shot_shelfpan > 0.0f) return;   /* drawn, for --shot to take */
 		plat_present();
 	}
+	/* ChaOS: the cards don't say which console they are, so its name comes
+	 * up for a moment (draw_shelf_note); the List has it in its heading */
+	g_sn_since = LIST_VIEW_ON() ? 0 : plat_now_ms();
+	if (!g_sn_since && !LIST_VIEW_ON()) g_sn_since = 1;
+	redraw_now();
+}
+
+/* ChaOS: the shelf's name, on a panel in its own color, after turning to it
+ * on the other axis: in over 0.12 s, up 0.9 s, out over 0.4 s. Over the
+ * cards only; the List's heading already names it. */
+static void draw_shelf_note(app *a)
+{
+	static TTF_Font *f;
+	static SDL_Renderer *made_for;
+	const system_cfg *sy;
+	Uint32 now = plat_now_ms(), el;
+	float al;
+
+	if (shot_shelfnote >= 0) {
+		if (!g_sn_since) g_sn_since = now ? now : 1;
+		el = (Uint32)shot_shelfnote;
+	} else {
+		if (!g_sn_since || LIST_VIEW_ON()) { g_sn_since = 0; return; }
+		el = now - g_sn_since;
+	}
+	if (el >= 1300) { g_sn_since = 0; return; }
+	if (a->sys_cursor < 0 || a->sys_cursor >= a->sys.count) return;
+	sy = &a->sys.systems[a->sys_cursor];
+	al = el < 120 ? (float)el / 120.0f : el < 900 ? 1.0f : 1.0f - (float)(el - 900) / 400.0f;
+
+	if (made_for != a->r) { f = NULL; made_for = a->r; }
+	if (!f) f = TTF_OpenFont(P_FONT, 56);
+	if (!f) return;
+	{
+		SDL_Surface *ts = TTF_RenderUTF8_Blended(f, sy->name, UI_TEXT);
+		SDL_Texture *layer, *tt, *was;
+		int pw, ph;
+
+		if (!ts) return;
+		pw = ts->w + 96; ph = ts->h + 56;
+		if (pw > TORTOS_SCREEN_W - 64) pw = TORTOS_SCREEN_W - 64;
+		layer = SDL_CreateTexture(a->r, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, pw, ph);
+		tt = SDL_CreateTextureFromSurface(a->r, ts);
+		was = SDL_GetRenderTarget(a->r);
+		if (layer && tt && SDL_SetRenderTarget(a->r, layer) == 0) {
+			SDL_Rect q = { 0, 0, pw, ph };
+			SDL_Rect d = { (pw - ts->w) / 2, (ph - ts->h) / 2, ts->w, ts->h };
+
+			SDL_SetTextureBlendMode(layer, SDL_BLENDMODE_BLEND);
+			SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_NONE);
+			SDL_SetRenderDrawColor(a->r, 0, 0, 0, 0);
+			SDL_RenderClear(a->r);
+			SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+			ui_panel(a->r, &q, 28, sy->accent);
+			SDL_RenderCopy(a->r, tt, NULL, &d);
+			SDL_SetRenderTarget(a->r, was);
+			{
+				SDL_Rect o = { (TORTOS_SCREEN_W - pw) / 2, (TORTOS_SCREEN_H - ph) / 2, pw, ph };
+				SDL_SetTextureAlphaMod(layer, (Uint8)(al * 255));
+				SDL_RenderCopy(a->r, layer, NULL, &o);
+			}
+		} else {
+			SDL_SetRenderTarget(a->r, was);
+		}
+		if (tt) SDL_DestroyTexture(tt);
+		if (layer) SDL_DestroyTexture(layer);
+		SDL_FreeSurface(ts);
+	}
 	redraw_now();
 }
 
@@ -24733,6 +24805,7 @@ int main(int argc, char *argv[])
 		else if (!strcmp(argv[i], "--about")) g_about_shot = true;
 		else if (!strcmp(argv[i], "--chan") && i + 1 < argc) g_chan_shot = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--arrange") && i + 1 < argc) g_arrange_shot = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "--shelfnote") && i + 1 < argc) shot_shelfnote = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--battwarn") && i + 1 < argc) g_bw_shot = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--romm") && i + 1 < argc) {
 			shot_romm = argv[++i];
