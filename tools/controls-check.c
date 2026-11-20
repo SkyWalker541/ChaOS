@@ -239,8 +239,8 @@ static void direction_changes_the_shelf(void)
 	   "horizontal moves along the row");
 	ck(!strcmp(v[0].label, "Up/Down") && !strcmp(v[0].value, "Move"),
 	   "vertical moves up and down");
-	ck(!strcmp(h[1].value, "Jump by letter") && !strcmp(v[1].value, "Jump by letter"),
-	   "and the other axis jumps by letter");
+	ck(!strcmp(h[1].value, "Next shelf") && !strcmp(v[1].value, "Next shelf"),
+	   "and the other axis goes to the next shelf");
 	for (i = 0; i < nc; i++)
 		if (c[i].value && !ROW_IS_NOTE(c[i]) && strstr(c[i].value, "Jump"))
 			jump = 1;

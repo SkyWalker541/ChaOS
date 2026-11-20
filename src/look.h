@@ -116,6 +116,12 @@ bool look_step(look_settings *s, look_param p, int dir, int mult);
 /* The value as the row shows it: "Grid", "35%", "Off", "1.5". */
 void look_format(const look_settings *s, look_param p, char *out, size_t n);
 
+/* What the row does, for the menu's hint footer: a line, plain words. Some
+ * say what the value chosen means (Game System's Game Boy covers the DMG and
+ * the Pocket; which Backing Color suits which console). Never NULL. */
+const char *look_param_hint(const look_settings *s, look_param p);
+const char *look_group_hint(look_group g);
+
 /* Does the row matter with the settings as they are? A Grid's line width with
  * LCD Dot chosen does not, and is not shown. */
 bool look_param_shown(const look_settings *s, look_param p);

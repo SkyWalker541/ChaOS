@@ -147,10 +147,10 @@ static int moving(ctl_dir dir, menu_row *out)
 		out[n++] = (menu_row){ "Left/Right", "Game",           false };
 	} else if (dir == CTL_VERTICAL) {
 		out[n++] = (menu_row){ "Up/Down",    "Move",           false };
-		out[n++] = (menu_row){ "Left/Right", "Jump by letter", false };
+		out[n++] = (menu_row){ "Left/Right", "Next shelf",     false };
 	} else {
 		out[n++] = (menu_row){ "Left/Right", "Move",           false };
-		out[n++] = (menu_row){ "Up/Down",    "Jump by letter", false };
+		out[n++] = (menu_row){ "Up/Down",    "Next shelf",     false };
 	}
 	out[n++] = (menu_row){ "L1/R1", "A screenful", false };
 	/* ChaOS: the letter scrub, with its letter shown big */

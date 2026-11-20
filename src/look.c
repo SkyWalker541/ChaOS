@@ -143,6 +143,115 @@ const char *look_group_label(look_group g)
 	return g >= 0 && g < LG_COUNT ? GROUP_LABEL[g] : "";
 }
 
+/* ChaOS: what each setting does, for the hint under the menu (Aquilus,
+ * 2026-11-20: say that Game Boy covers the DMG and the Pocket, and which
+ * backing goes with which console). Short enough to read whole on the Brick's
+ * screen; a longer one would slide. */
+static const char *const PARAM_HINT[LP_COUNT] = {
+	[LP_WHITE_LEVEL]            = "How bright a pixel must be to count as white",
+	[LP_TRANSPARENCY]           = "How much backing shows through the pixels",
+	[LP_MIN_WHITE_TRANSPARENCY] = "The least backing that white pixels show",
+	[LP_BACKING_STRENGTH]       = "How strongly the backing's color shows",
+	[LP_GLARE_AND_SHEEN]        = "A light shining on the screen",
+	[LP_GLARE_STRENGTH]         = "How bright the light's glare is",
+	[LP_GLARE_SPREAD]           = "How wide the glare spreads from the light",
+	[LP_SHEEN_STRENGTH]         = "How strong the bands of sheen are",
+	[LP_SHEEN_DENSITY]          = "How many bands of sheen cross the screen",
+	[LP_SHEEN_HUE]              = "Turns the sheen's color, toward a rainbow",
+	[LP_SHEEN_RIPPLE]           = "Makes the bands of sheen wavy",
+	[LP_SHEEN_RIPPLE_SIZE]      = "How big the waves in the sheen are",
+	[LP_LIGHT_X]                = "Where the light sits, from left to right",
+	[LP_LIGHT_Y]                = "Where the light sits, from top to bottom",
+	[LP_LIGHT_DRIFT]            = "How fast the light wanders. Off: still",
+	[LP_DARKEN]                 = "Softens harsh dark colors. Good for GBC",
+	[LP_GAP_COLOR]              = "What fills the lines between the pixels",
+	[LP_GRID_WIDTH]             = "How thick the lines between pixels are",
+	[LP_GRID_OPACITY]           = "How strongly the lines between pixels show",
+	[LP_DOT_SIZE]               = "How big each pixel's dot is",
+	[LP_DOT_SOFTNESS]           = "How soft each dot's edge is",
+	[LP_DOT_GAP_OPACITY]        = "How strongly the gaps between dots show",
+	[LP_DOT_MIN_BRIGHTNESS]     = "Pixels darker than this get no dot",
+	[LP_SHADOW_OPACITY]         = "The shadow the pixels cast on the backing",
+	[LP_SHADOW_DISTANCE]        = "How far from the pixels their shadow falls",
+	[LP_SHADOW_DIRECTION]       = "Which way the pixels' shadow falls",
+	[LP_BEZEL_SHADOW]           = "Shade at the screen's edges, from the bezel",
+	[LP_CRT_MASK]               = "The pattern of a CRT's colored phosphors",
+	[LP_CRT_MASK_INTENSITY]     = "How strongly the phosphor pattern shows",
+	[LP_CRT_SCANLINE_THINNESS]  = "How dark the gaps between the lines are",
+	[LP_CRT_SCAN_BLUR]          = "How sharp the picture is. Lower is softer",
+	[LP_CRT_CURVATURE]          = "How much the screen bulges, like a tube",
+	[LP_CRT_TRINITRON]          = "Curves side to side only, as a Trinitron did",
+	[LP_CRT_CORNER]             = "How round the screen's corners are",
+	[LP_CRT_GAMMA]              = "The tube's brightness curve",
+	[LP_LCD_SCANLINES]          = "Higher fades the dark lines between rows",
+	[LP_LCD_STRIPES]            = "Higher fades the color stripes in each pixel",
+	[LP_SCAN_AMP]               = "How bright the picture is",
+	[LP_SCAN_LINES_BLACK]       = "How bright the dark lines are. 0% is black",
+};
+
+const char *look_param_hint(const look_settings *s, look_param p)
+{
+	int v;
+
+	if (p < 0 || p >= LP_COUNT) return "";
+	v = s ? (int)lrintf(s->v[p]) : 0;
+	switch (p) {
+	case LP_GAME_SYSTEM: {
+		static const char *const H[] = {
+			"Set the white level yourself, on Screen",
+			"Game Boy (DMG) and Game Boy Pocket",
+			"Game Boy Color: white level and bezel",
+			"Front-lit GBA SP: white level and bezel",
+			"Original GBA: white level and bezel",
+		};
+		return v >= 0 && v < 5 ? H[v] : "";
+	}
+	case LP_BACKING_COLOR: {
+		static const char *const H[] = {
+			"No tint: a plain grey behind the pixels",
+			"Pocket green-grey. For Game Boy and GBC",
+			"A neutral grey. For the original GBA",
+			"For the GBA SP's front-lit screen",
+		};
+		return v >= 0 && v < 4 ? H[v] : "";
+	}
+	case LP_TRANSPARENT_PIXELS: {
+		static const char *const H[] = {
+			"Only white pixels, as on the hardware",
+			"White and near-white pixels show the backing",
+			"Every pixel shows a little of the backing",
+		};
+		return v >= 0 && v < 3 ? H[v] : "";
+	}
+	case LP_GAP_COLOR:
+		return v == 1 ? "Black lines between the pixels"
+		     : v == 2 ? "White lines between the pixels"
+		              : "The backing shows between the pixels";
+	case LP_PIXEL_EFFECT:
+		return v ? "Lines between the pixels, like the real LCD"
+		         : "Plain pixels, no lines between them";
+	case LP_PT_STYLE:
+		return v ? "lcd3x: a plain LCD grid, light on speed"
+		         : "A Game Boy LCD: backing, shadows and light";
+	case LP_CRT_STYLE:
+		return v ? "Scanlines only, light on speed"
+		         : "A CRT: phosphors, scanlines, curved glass";
+	default:
+		return PARAM_HINT[p] ? PARAM_HINT[p] : "";
+	}
+}
+
+const char *look_group_hint(look_group g)
+{
+	static const char *const H[LG_COUNT] = {
+		"The backing behind the pixels",
+		"Lines between the pixels",
+		"The pixels' shadow and the bezel's",
+		"A light on the screen: glare and sheen",
+	};
+	return g >= 0 && g < LG_COUNT ? H[g] : "";
+}
+
 /* By tag (systems.cfg), and the name Diatom knows each by, which is the tag
  * in lower case */
 static const char *const CONSOLE_TAG[LOOK_CONSOLES] = {

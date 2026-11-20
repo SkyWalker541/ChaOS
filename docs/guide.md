@@ -69,7 +69,7 @@ card is the thing to wipe before it goes to anyone else.
 |---|---|
 | **Left/Right** | move along the row, when the shelf runs horizontally. In `Cubic`, always the games |
 | **Up/Down** | move along the shelf when it runs vertically - **up advances**. In `Cubic`, always the systems |
-| **the other axis** | jump to the previous / next initial (games). Not in `Cubic`, where both axes are taken |
+| **the other axis** | on a game shelf, the shelf before or after, panned across (Muse is passed over). Not in `Cubic`, where both axes are taken; L2 and R2 jump by letter |
 | **L1/R1** | jump a screenful (games) |
 | **A** | open a system, or start a game. In `Cubic`, start it |
 | **B** | back to the systems row. In `Cubic`, this system's menu |
@@ -148,6 +148,7 @@ than any one console:
 | **Show Favorites** (Appearance) | `On` or `Off` - whether the Favorites shelf appears on the systems row. Off, Y still marks favorites, and they come back when it's on |
 | **Show Recently Played** (Appearance) | `On` or `Off` - whether the Recently Played shelf appears on the systems row. It lists the last twelve games played, across every system, and is hidden until something has been played |
 | **Show Muse** (Appearance) | `On` or `Off` - whether Muse's shelf appears on the systems row. SELECT opens Muse either way |
+| **Shelf Order** (Appearance) | `Release Date` (as `systems.cfg` lists them), `A to Z`, or `By Maker` (NEC, Nintendo, Sega, SNK, Sony; each maker's home consoles, then its handhelds, so the Game Boys sit together). Favorites, Recently Played and Muse keep their places, and Ports is always last |
 | **Box Art** | fetch what the whole library is missing |
 | **RetroAchievements** | the account, or `sign in` |
 | **Updates** | a newer ChaOS, and installing it; a dot beside it while one is waiting (unless **Update Available Dot** is off) |
@@ -249,6 +250,19 @@ by the shader's Game System:
 With PT off, or its lcd3x style, they're back at the emulator's own (off, and
 the shelf's palette). A change in the in-game menu shows at once; nothing
 needs restarting.
+
+Game System **Game Boy** covers both the original Game Boy (DMG) and the
+Game Boy Pocket. The backing that goes with each, as PT recommends:
+
+| Console | Game System | Backing Color |
+|---|---|---|
+| Game Boy (DMG) or Pocket | Game Boy | Pocket |
+| Game Boy Color | Game Boy Color | Pocket |
+| Game Boy Advance SP (front-lit) | GBA SP | White |
+| Game Boy Advance | GBA | Grey |
+
+Every shader setting says what it does in the line under the menu when it's
+picked, and Game System and Backing Color say which console they suit.
 
 Display Mode is per-system, because a Game Boy and a Genesis do not want the
 same answer. Set here it applies from the next launch; the same row in the

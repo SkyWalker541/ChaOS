@@ -47,7 +47,7 @@ typedef enum {
 	PM_STICKS,
 	PM_APPEARANCE, PM_THEME, PM_DIR, PM_SPEED, PM_LISTVIEW, PM_COLOR,
 	/* ChaOS: which of the shelves that aren't consoles are on the systems row */
-	PM_SHELF_FAV, PM_RECENT, PM_SHELF_MUSE,
+	PM_SHELF_FAV, PM_RECENT, PM_SHELF_MUSE, PM_SHELF_ORDER,
 	PM_SCRAPE, PM_ACHIEVEMENTS, PM_SS,
 	/* ChaOS: PortMaster's ports, browsed and installed (src/pmcat.h) */
 	PM_PORTS,
@@ -114,7 +114,7 @@ typedef enum { SMM_COUNT, SMM_SHOW, SMM_SORT, SMM_LOCK, SMM_ART, SMM_RESCAN } sm
  * two cannot disagree about what row 2 is. */
 int sys_menu_muse_rows(bool books, bool both, bool no_wifi, sm_muse_row *out);
 
-#define MENU_MAX_ROWS 38
+#define MENU_MAX_ROWS 39
 
 /* The array every caller declares must hold every row a build can produce, and
  * on 2026-09-16 it stopped: PM_ROWS went to 13 against a cap of 12 when the
@@ -200,6 +200,7 @@ typedef struct {
 	const char *fav_shelf;
 	const char *recent;
 	const char *muse_shelf;
+	const char *shelf_order;   /* ChaOS: Shelf Order's value */
 	const char *night;       /* ChaOS: night volume, "On" or "Off" */
 	bool        night_ok;    /* the device has a night ladder to offer */
 	/* ChaOS: the Appearance page, not the menu. It holds the look rows and
