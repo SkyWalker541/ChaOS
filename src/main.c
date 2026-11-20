@@ -244,6 +244,9 @@ static void rescan_all(app *a);
 /* And again: Play Time can send you to a game's shelf, which is the input
  * loop's job and lives with it. */
 static void enter_system(app *a);
+static int  shelf_neighbour(app *a, int dir);
+static void shelf_pan(app *a, int to, int dir);
+static float shot_shelfpan;     /* --shelfpan F: the pan frozen at F, for a shot */
 static int  menu_std_width(app *a);
 
 static volatile sig_atomic_t want_quit;
@@ -1008,6 +1011,15 @@ static bool g_recent_shelf = true;
  * taken off again after (muse_open). */
 static bool g_fav_shelf = true;
 static bool g_muse_shelf = true;
+/* ChaOS: the consoles' order on the systems row (shelf_order, "release",
+ * "az" or "maker"): systems.cfg's own, which is by release; by name; or by
+ * maker, each maker's home consoles then its handhelds, so the Game Boys sit
+ * together. Favorites, Recently Played and Muse keep their places, and Ports
+ * is always last of the shelves of games. Aquilus's suggestion. */
+enum { SHELF_BY_RELEASE, SHELF_BY_NAME, SHELF_BY_MAKER, SHELF_ORDERS };
+static int g_shelf_order = SHELF_BY_RELEASE;
+static const char *const SHELF_ORDER_KEY[SHELF_ORDERS]   = { "release", "az", "maker" };
+static const char *const SHELF_ORDER_LABEL[SHELF_ORDERS] = { "Release Date", "A to Z", "By Maker" };
 static bool g_muse_attach;          /* SELECT has Muse open with its shelf off */
 
 /* ChaOS: the status bar, the clock top left and the battery top right, each set
@@ -6018,6 +6030,7 @@ static int menu_build(app *a, screen_id screen, int sys,
 		u.recent    = g_recent_shelf ? "On" : "Off";
 		u.fav_shelf = g_fav_shelf ? "On" : "Off";
 		u.muse_shelf = g_muse_shelf ? "On" : "Off";
+		u.shelf_order = SHELF_ORDER_LABEL[g_shelf_order];
 		u.night     = plat_volume_night_get() ? "On" : "Off";
 		u.night_ok  = plat_volume_night_ok();
 		u.appearance = g_appearance_page;
@@ -11373,6 +11386,13 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 		refresh_virtual_shelves(a);
 		return MENU_STAY;
 	}
+	/* ChaOS: Shelf Order: the systems row read again in the new order */
+	if (sel == PM_SHELF_ORDER && (d || key == IN_ACCEPT)) {
+		g_shelf_order = (g_shelf_order + (d ? d : 1) + SHELF_ORDERS) % SHELF_ORDERS;
+		db_set_str(db_dev(), "shelf_order", SHELF_ORDER_KEY[g_shelf_order]);
+		rescan_all(a);
+		return MENU_STAY;
+	}
 	if (sel == PM_SHELF_MUSE && (d || key == IN_ACCEPT)) {
 		g_muse_shelf = !g_muse_shelf;
 		db_set_str(db_dev(), "muse_shelf", g_muse_shelf ? "on" : "off");
@@ -14782,16 +14802,19 @@ static int shader_build(void *ctx, menu_row *rows, int max, const char **heading
 	if (c->group < 0) {
 		snprintf(c->heading, sizeof c->heading, "%s Shader", c->a->sys.systems[c->sys].name);
 		c->ids[n] = SH_SWITCH;
-		rows[n++] = (menu_row){ "Shader", ls->on ? "On" : "Off", true, .toggle = true };
+		rows[n++] = (menu_row){ "Shader", ls->on ? "On" : "Off", true, .toggle = true,
+		                        .hint = "A screen effect: a CRT, or a handheld's LCD" };
 		if (ls->on) {
 			/* A CRT console chooses between two, and so does a Game Boy
 			 * console; the others have one. */
 			if (own == LS_CRT || own == LS_PT) {
 				c->ids[n] = SH_NONE + 1 + (int)(own == LS_CRT ? LP_CRT_STYLE : LP_PT_STYLE);
-				rows[n++] = (menu_row){ "Style", look_style_name(lc, ls), true, .cycles = true };
+				rows[n++] = (menu_row){ "Style", look_style_name(lc, ls), true, .cycles = true,
+				                        .hint = look_param_hint(ls, own == LS_CRT ? LP_CRT_STYLE : LP_PT_STYLE) };
 			} else {
 				c->ids[n] = SH_NAME;
-				rows[n++] = (menu_row){ "Style", look_style_name(lc, ls), false };
+				rows[n++] = (menu_row){ "Style", look_style_name(lc, ls), false,
+				                        .hint = "The one shader this console has" };
 			}
 			n = shader_speed_rows(c, rows, n);
 			if (sh != LS_PT) {
@@ -14804,14 +14827,16 @@ static int shader_build(void *ctx, menu_row *rows, int max, const char **heading
 					look_format(ls, ps[k], c->vals[n], sizeof c->vals[n]);
 					rows[n] = (menu_row){ look_params[ps[k]].label, c->vals[n], true,
 			                     .toggle = look_param_is_switch(ps[k]),
-			                     .cycles = !look_param_is_switch(ps[k]) };
+			                     .cycles = !look_param_is_switch(ps[k]),
+			                     .hint = look_param_hint(ls, ps[k]) };
 					n++;
 				}
 			}
 			if (sh == LS_PT) {
 				c->ids[n] = SH_SYSTEM;
 				look_format(ls, LP_GAME_SYSTEM, c->vals[n], sizeof c->vals[n]);
-				rows[n] = (menu_row){ "Game System", c->vals[n], true, .cycles = true };
+				rows[n] = (menu_row){ "Game System", c->vals[n], true, .cycles = true,
+				                      .hint = look_param_hint(ls, LP_GAME_SYSTEM) };
 				n++;
 				c->ids[n] = SH_NONE; rows[n++] = MENU_RULE;
 			}
@@ -14824,12 +14849,14 @@ static int shader_build(void *ctx, menu_row *rows, int max, const char **heading
 				if (g == LG_PIXELS && ls->any_size) continue;
 				c->ids[n] = SH_GROUP + g;
 				look_format(ls, SUMMARY[g], c->vals[n], sizeof c->vals[n]);
-				rows[n] = (menu_row){ look_group_label((look_group)g), c->vals[n], true, true };
+				rows[n] = (menu_row){ look_group_label((look_group)g), c->vals[n], true, true,
+				                      .hint = look_group_hint((look_group)g) };
 				n++;
 			}
 			c->ids[n] = SH_NONE; rows[n++] = MENU_RULE;
 			c->ids[n] = SH_RESET;
-			rows[n++] = (menu_row){ "Reset to Recommended", NULL, true };
+			rows[n++] = (menu_row){ "Reset to Recommended", NULL, true,
+			                        .hint = "This console's recommended settings" };
 		}
 	} else {
 		look_param ps[LP_COUNT];
@@ -14841,7 +14868,8 @@ static int shader_build(void *ctx, menu_row *rows, int max, const char **heading
 			look_format(ls, ps[k], c->vals[n], sizeof c->vals[n]);
 			rows[n] = (menu_row){ look_params[ps[k]].label, c->vals[n], true,
 			                     .toggle = look_param_is_switch(ps[k]),
-			                     .cycles = !look_param_is_switch(ps[k]) };
+			                     .cycles = !look_param_is_switch(ps[k]),
+			                     .hint = look_param_hint(ls, ps[k]) };
 			n++;
 		}
 	}
@@ -14873,16 +14901,16 @@ static int shader_speed_rows(shader_ctx *c, menu_row *rows, int n)
 		         : sp.busy_ms <= sp.frame_ms ? "Near the Limit" : "Too Slow",
 		         sp.measured ? "" : " (est.)");
 	c->ids[n] = SH_NONE;
-	rows[n++] = (menu_row){ "Speed", v, false };
+	rows[n++] = (menu_row){ "Speed", v, false, .hint = "Whether the game keeps full speed" };
 	v = c->vals[n];
 	snprintf(v, sizeof c->vals[n], "%.1f ms", sp.shade_ms);
 	c->ids[n] = SH_NONE;
-	rows[n++] = (menu_row){ "Shader Time", v, false };
+	rows[n++] = (menu_row){ "Shader Time", v, false, .hint = "How long the shader takes each frame" };
 	if (sp.busy_ms >= 0) {
 		v = c->vals[n];
 		snprintf(v, sizeof c->vals[n], "%.1f of %.1f ms", sp.busy_ms, sp.frame_ms);
 		c->ids[n] = SH_NONE;
-		rows[n++] = (menu_row){ "Frame Time", v, false };
+		rows[n++] = (menu_row){ "Frame Time", v, false, .hint = "The whole frame, against its time budget" };
 	}
 	return n;
 }
@@ -22267,9 +22295,10 @@ static void update_games(app *a)
 		return;
 	}
 	/* The two axes trade roles with the shelf rather than one of them being
-	 * reassigned onto the other: stepping always runs along the row, and the
-	 * letter jump always runs across it. Turning the shelf turns the d-pad
-	 * with it and nothing is left doing two jobs. */
+	 * reassigned onto the other: stepping always runs along the row, and -
+	 * ChaOS - the other axis goes to the next shelf, the letter jump being
+	 * L2 and R2's. Turning the shelf turns the d-pad with it and nothing is
+	 * left doing two jobs. */
 	bool vert = CARD_DIRS[g_dir].vertical;
 	in_button back = vert ? IN_DOWN : IN_LEFT, fwd = vert ? IN_UP : IN_RIGHT;
 	in_button jup = vert ? IN_LEFT : IN_UP, jdn = vert ? IN_RIGHT : IN_DOWN;
@@ -22281,8 +22310,17 @@ static void update_games(app *a)
 
 	if (in_repeat(&a->in, back)) { v->cursor = (v->cursor - 1 + n) % n; dir = -1; }
 	if (in_repeat(&a->in, fwd))  { v->cursor = (v->cursor + 1) % n; dir = +1; }
-	if (in_repeat(&a->in, jdn))  v->cursor = shelf_letter_jump(v, +1);
-	if (in_repeat(&a->in, jup))  v->cursor = shelf_letter_jump(v, -1);
+	/* ChaOS: across, to the shelf before or after, panned (shelf_pan) */
+	{
+		bool sdn = in_repeat(&a->in, jdn), sup = in_repeat(&a->in, jup);
+
+		if (sdn != sup) {
+			int sd = sdn ? +1 : -1, to = shelf_neighbour(a, sd);
+
+			if (to >= 0) shelf_pan(a, to, sd);
+			return;
+		}
+	}
 	/* ChaOS: L2 and R2 scrub by letter, with the letter shown; holding
 	 * the way along for two seconds shows it too */
 	if (in_repeat(&a->in, IN_R2)) { v->cursor = shelf_letter_jump(v, +1); letter_note(v); }
@@ -22346,6 +22384,141 @@ static void update_games(app *a)
 }
 
 /* ---------- main ---------------------------------------------------------- */
+
+/* ChaOS: the next shelf of games either way from this one, by the d-pad's
+ * other axis (update_games). Muse is passed over: its card opens Muse's own
+ * screen, not a shelf of cards. -1 when there is no other. Aquilus's
+ * suggestion, 2026-11-20. */
+static int shelf_neighbour(app *a, int dir)
+{
+	int ns = a->sys.count, i, s = a->sys_cursor;
+
+	for (i = 1; i < ns; i++) {
+		int k = ((s + dir * i) % ns + ns) % ns;
+
+		if (!is_muse(&a->sys.systems[k]) && a->view[k].list.count > 0) return k;
+	}
+	return -1;
+}
+
+/* The turn to another shelf, panned: the shelf being left slides off across
+ * the d-pad's other axis and the next one slides in behind it, as one sheet,
+ * eased in and out. Each frame draws the arriving shelf live, so its covers
+ * come in as they decode. Blocking and short, as anim_launch is; the button
+ * held carries on afterwards. */
+#define SHELF_PAN_MS 240
+
+static void shelf_pan(app *a, int to, int dir)
+{
+	static SDL_Texture *from_tex, *to_tex;
+	const int W = TORTOS_SCREEN_W, H = TORTOS_SCREEN_H;
+	/* across the other axis: sideways when that's left and right (a
+	 * vertical shelf, or the List), up and down otherwise */
+	bool vert = CARD_DIRS[g_dir].vertical || LIST_VIEW_ON();
+	sysview *old = &a->view[a->sys_cursor];
+	unsigned t0, now;
+
+	if (!from_tex) from_tex = SDL_CreateTexture(a->r, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, W, H);
+	if (!to_tex)   to_tex   = SDL_CreateTexture(a->r, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, W, H);
+
+	/* the shelf being left, as it is now */
+	if (from_tex && SDL_SetRenderTarget(a->r, from_tex) == 0) {
+		draw_shelf(a);
+		SDL_RenderFlush(a->r);
+		plat_draw_to_screen();
+	}
+	fprintf(stderr, "shelf: %s to %s\n", a->sys.systems[a->sys_cursor].tag, a->sys.systems[to].tag);
+	a->sys_cursor = to;
+	cf_set_cursor_dir(&a->cf_sys, to, a->sys.count, dir);
+	enter_system(a);
+	evict_far(old, TEX_KEEP_FAR);
+	if (!from_tex || !to_tex) return;   /* no room for the pan: just there */
+
+	t0 = plat_now_ms();
+	while ((now = plat_now_ms()) - t0 < SHELF_PAN_MS || shot_shelfpan > 0.0f) {
+		float k = shot_shelfpan > 0.0f ? shot_shelfpan : (float)(now - t0) / (float)SHELF_PAN_MS;
+		float e = k * k * (3.0f - 2.0f * k);            /* eased in and out */
+		int off = (int)(e * (float)(vert ? W : H) + 0.5f);
+		SDL_Rect r1 = { 0, 0, W, H }, r2 = { 0, 0, W, H };
+
+		tick_tint(a);
+		if (SDL_SetRenderTarget(a->r, to_tex) == 0) {
+			draw_shelf(a);
+			SDL_RenderFlush(a->r);
+			plat_draw_to_screen();
+		}
+		/* down (or right) for the next shelf: the sheet moves up (or left) */
+		if (vert) { r1.x = -dir * off; r2.x = dir * (W - off); }
+		else      { r1.y = -dir * off; r2.y = dir * (H - off); }
+		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 255);
+		SDL_RenderClear(a->r);
+		SDL_RenderCopy(a->r, from_tex, NULL, &r1);
+		SDL_RenderCopy(a->r, to_tex, NULL, &r2);
+		plat_draw_osd(a->r);
+		if (shot_shelfpan > 0.0f) return;   /* drawn, for --shot to take */
+		plat_present();
+	}
+	redraw_now();
+}
+
+/* ChaOS: g_shelf_order, on systems.cfg's list as read, before the scan, so
+ * everything after indexes the new order. A stable sort: the cfg's order
+ * (release) breaks every tie, and a console this table doesn't know keeps
+ * its place among the unknowns, after the known ones. */
+static int shelf_maker_rank(const char *tag)
+{
+	/* makers A to Z; each maker's home consoles, then its handhelds, by
+	 * release */
+	static const char *const order[] = {
+		"PCE",                                  /* NEC */
+		"NES", "SFC", "GB", "GBC", "GBA",       /* Nintendo */
+		"SMS", "MD", "GG",                      /* Sega */
+		"NGP", "NGPC",                          /* SNK */
+		"PS",                                   /* Sony */
+		"PICO8",                                /* Lexaloffle */
+		NULL
+	};
+	int i;
+
+	for (i = 0; order[i]; i++) if (!strcasecmp(tag, order[i])) return i;
+	return 100;
+}
+
+static int shelf_cmp_order;
+
+static int shelf_cmp(const void *x, const void *y)
+{
+	const system_cfg *a = x, *b = y;
+	bool pa = !strcmp(a->core, PORTS_CORE), pb = !strcmp(b->core, PORTS_CORE);
+	int d = 0;
+
+	if (pa != pb) return pa ? 1 : -1;          /* Ports last */
+	if (shelf_cmp_order == SHELF_BY_NAME) d = strcasecmp(a->name, b->name);
+	else if (shelf_cmp_order == SHELF_BY_MAKER) d = shelf_maker_rank(a->tag) - shelf_maker_rank(b->tag);
+	return d;
+}
+
+static void order_systems(app *a)
+{
+	system_cfg *s = a->sys.systems;
+	int n = a->sys.count, i, j;
+
+	if (g_shelf_order == SHELF_BY_RELEASE || n < 2) return;
+	shelf_cmp_order = g_shelf_order;
+	/* insertion sort: stable, and fifteen rows */
+	for (i = 1; i < n; i++) {
+		system_cfg t = s[i];
+
+		for (j = i; j > 0 && shelf_cmp(&s[j - 1], &t) > 0; j--) s[j] = s[j - 1];
+		s[j] = t;
+	}
+	{
+		char line[600] = "";
+		for (i = 0; i < n; i++)
+			snprintf(line + strlen(line), sizeof line - strlen(line), "%s%s", i ? ", " : "", s[i].tag);
+		fprintf(stderr, "shelves: in order %s: %s\n", SHELF_ORDER_KEY[g_shelf_order], line);
+	}
+}
 
 /* Drop systems with nothing in them.
  *
@@ -23321,6 +23494,7 @@ static void rescan_all(app *a)
 		a->screen = SCREEN_SYSTEMS;
 		return;
 	}
+	order_systems(a);       /* ChaOS: Shelf Order */
 
 	scan_all(a);
 	look_load(a);        /* indexes by tag, so it is safe to run again */
@@ -23893,6 +24067,11 @@ static void take_shot(app *a)
 	                                                  SDL_PIXELFORMAT_RGBA32);
 	muse_covers_settle();
 	draw_shelf(a);
+	/* ChaOS: --shelfpan F, the turn to the next shelf, frozen at F */
+	if (shot_shelfpan > 0.0f && a->screen == SCREEN_GAMES) {
+		int to = shelf_neighbour(a, +1);
+		if (to >= 0) shelf_pan(a, to, +1);
+	}
 	/* An empty card's welcome, as render draws it, on its own: the device
 	 * shows it only on the shelf, never under another screen */
 	if (a->sys.count <= 0 && !shot_menu && !shot_slots && !shot_kb && !shot_wait &&
@@ -24564,6 +24743,8 @@ int main(int argc, char *argv[])
 			shot_sysmove = (float)atof(argv[++i]);
 		else if (!strcmp(argv[i], "--gamemove") && i + 1 < argc)
 			shot_gamemove = (float)atof(argv[++i]);
+		else if (!strcmp(argv[i], "--shelfpan") && i + 1 < argc)
+			shot_shelfpan = (float)atof(argv[++i]);
 		else if (!strcmp(argv[i], "--info")) shot_info = 1;
 		else if (!strcmp(argv[i], "--cc") && i + 1 < argc)
 			shot_cc_page = atoi(argv[++i]);
@@ -25026,6 +25207,9 @@ int main(int argc, char *argv[])
 		g_fav_shelf = strcmp(rs, "off") != 0;
 		db_get_str(db_dev(), "muse_shelf", rs, sizeof rs, "on");
 		g_muse_shelf = strcmp(rs, "off") != 0;
+		db_get_str(db_dev(), "shelf_order", rs, sizeof rs, "release");
+		for (g_shelf_order = SHELF_ORDERS - 1; g_shelf_order > 0; g_shelf_order--)
+			if (!strcmp(rs, SHELF_ORDER_KEY[g_shelf_order])) break;
 		g_status_clock   = db_get_int(db_dev(), "status.clock", 1) != 0;
 		g_status_clock24 = db_get_int(db_dev(), "status.clock24", 0) != 0;
 		g_status_batt    = db_get_int(db_dev(), "status.battery", STATUS_BATT_ICON);
@@ -25039,6 +25223,7 @@ int main(int argc, char *argv[])
 		upd_set_testing(g_test_updates);
 		if (g_status_batt < 0 || g_status_batt >= STATUS_BATT_COUNT) g_status_batt = STATUS_BATT_ICON;
 	}
+	order_systems(&a);      /* ChaOS: Shelf Order, before the scan */
 	scan_all(&a);
 	t_mark("library scan");
 	/* After the scan, because it indexes by system, and before anything can
