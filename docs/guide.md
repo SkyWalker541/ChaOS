@@ -69,7 +69,7 @@ card is the thing to wipe before it goes to anyone else.
 |---|---|
 | **Left/Right** | move along the row, when the shelf runs horizontally. In `Cubic`, always the games |
 | **Up/Down** | move along the shelf when it runs vertically - **up advances**. In `Cubic`, always the systems |
-| **the other axis** | on a game shelf, the shelf before or after, panned across (Muse is passed over); in card view its name comes up for a moment. Not in `Cubic`, where both axes are taken; L2 and R2 jump by letter |
+| **the other axis** | on a game shelf, the shelf before or after, panned across (Muse is passed over); in card view its name comes up for a moment (Appearance > Show Shelf Name turns it off). Not in `Cubic`, where both axes are taken; L2 and R2 jump by letter |
 | **L1/R1** | jump a screenful (games) |
 | **A** | open a system, or start a game. In `Cubic`, start it |
 | **B** | back to the systems row. In `Cubic`, this system's menu |
@@ -149,6 +149,7 @@ than any one console:
 | **Show Recently Played** (Appearance) | `On` or `Off` - whether the Recently Played shelf appears on the systems row. It lists the last twelve games played, across every system, and is hidden until something has been played |
 | **Show Muse** (Appearance) | `On` or `Off` - whether Muse's shelf appears on the systems row. SELECT opens Muse either way |
 | **Shelf Order** (Appearance) | `Release Date` (as `systems.cfg` lists them), `A to Z`, or `By Maker` (NEC, Nintendo, Sega, SNK, Sony; each maker's home consoles, then its handhelds, so the Game Boys sit together), or `Custom`. Favorites, Recently Played and Muse keep their places, and Ports is last unless Custom puts it elsewhere |
+| **Show Shelf Name** (Appearance, under Game List View, with Normal only) | On: in card view, the console's name comes up for a moment after the other axis turns to its shelf. Off: just the pan |
 | **Arrange Shelves** (Appearance) | Your own order: A picks a console up, up and down move it, A puts it down. Leaving sets Shelf Order to `Custom`. A console that gets its first games later goes at the end |
 | **Box Art** | fetch what the whole library is missing |
 | **RetroAchievements** | the account, or `sign in` |

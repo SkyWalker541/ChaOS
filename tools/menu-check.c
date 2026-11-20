@@ -176,7 +176,7 @@ static bool has_label(const menu_row *rows, int n, const char *label);
 /* The top level is shorter than the list of rows by the Appearance page's: the
  * five look rows and the three shelf switches are on that page, and the menu
  * holds one row for it. */
-#define PAGE_ROWS 10
+#define PAGE_ROWS 11
 /* ChaOS: and the ROM Management page's two, RomM and Syncthing */
 #define ROM_ROWS 5
 /* ChaOS: and the Wi-Fi & Bluetooth page's two, and System Settings' eight
@@ -395,6 +395,9 @@ static void tortos_menu_online(void)
 	ck(has_label(rows, n, "Arrange Shelves") && by_id(&u, rows, n, PM_SHELF_ARRANGE)->opens &&
 	   by_id(&u, rows, n, PM_SHELF_ARRANGE)->hint,
 	   "Arrange Shelves, beside it, opens its own screen");
+	ck(has_label(rows, n, "Show Shelf Name") && by_id(&u, rows, n, PM_SHELF_NAME)->toggle &&
+	   !strcmp(val(by_id(&u, rows, n, PM_SHELF_NAME)), "On") && by_id(&u, rows, n, PM_SHELF_NAME)->hint,
+	   "Show Shelf Name, a switch, on unless turned off, with its note");
 	u.recent = "Off";
 	n = sys_menu_build(&u, rows, &b, &heading);
 	ck(!strcmp(val(by_id(&u, rows, n, PM_RECENT)), "Off"), "and Off when it is turned off");
@@ -424,11 +427,23 @@ static void tortos_menu_online(void)
 	u.appearance = true;
 	u.list_view = NULL;
 	n = sys_menu_build(&u, rows, &b, &heading);
-	ck(n == PAGE_ROWS + PAGE_NOTE - 1 && !has_label(rows, n, "Game List View"), "not there in Cubic");
+	ck(n == PAGE_ROWS + PAGE_NOTE - 2 && !has_label(rows, n, "Game List View") &&
+	   !has_label(rows, n, "Show Shelf Name"), "not there in Cubic, nor Show Shelf Name");
 	u.list_view = "List";
 	n = sys_menu_build(&u, rows, &b, &heading);
 	ck(has_label(rows, n, "Game List View") && !strcmp(val(by_id(&u, rows, n, PM_LISTVIEW)), "List"),
 	   "there otherwise, saying which");
+	ck(!has_label(rows, n, "Show Shelf Name"), "Show Shelf Name only with Normal: the List names its shelf");
+	u.list_view = "Normal";
+	n = sys_menu_build(&u, rows, &b, &heading);
+	{
+		int lv = -1, sn = -1, k;
+		for (k = 0; k < n; k++) {
+			if (rows[k].label && !strcmp(rows[k].label, "Game List View")) lv = k;
+			if (rows[k].label && !strcmp(rows[k].label, "Show Shelf Name")) sn = k;
+		}
+		ck(lv >= 0 && sn == lv + 1, "and right under Game List View");
+	}
 
 	printf("Transition Speed:\n");
 	u.name_speed = NULL;
@@ -883,7 +898,7 @@ static void radio_less(void)
 	for (i = 0; i < k; i++)
 		if (pm[i] == PM_THEME || pm[i] == PM_DIR || pm[i] == PM_SPEED ||
 		    pm[i] == PM_LISTVIEW || pm[i] == PM_COLOR || pm[i] == PM_SHELF_FAV ||
-		    pm[i] == PM_RECENT || pm[i] == PM_SHELF_MUSE || pm[i] == PM_SHELF_ORDER || pm[i] == PM_SHELF_ARRANGE || pm[i] == PM_ROMM || pm[i] == PM_HOMEBREW ||
+		    pm[i] == PM_RECENT || pm[i] == PM_SHELF_MUSE || pm[i] == PM_SHELF_ORDER || pm[i] == PM_SHELF_ARRANGE || pm[i] == PM_SHELF_NAME || pm[i] == PM_ROMM || pm[i] == PM_HOMEBREW ||
 		    pm[i] == PM_SYNC || pm[i] == PM_GBSORT || pm[i] == PM_DISCSETS || pm[i] == PM_WIFI ||
 		    pm[i] == PM_BT || pm[i] == PM_AUDIO || pm[i] == PM_CHANNELS ||
 		    pm[i] == PM_NIGHT || pm[i] == PM_CLOCK || pm[i] == PM_SHOWCLOCK ||
