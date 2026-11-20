@@ -209,8 +209,8 @@ const char *look_param_hint(const look_settings *s, look_param p)
 	case LP_BACKING_COLOR: {
 		static const char *const H[] = {
 			"No tint: a plain grey behind the pixels",
-			"Pocket green-grey. For Game Boy and GBC",
-			"A neutral grey. For the original GBA",
+			"Pocket green-grey. For DMG and Pocket",
+			"A neutral grey. For GBC and original GBA",
 			"For the GBA SP's front-lit screen",
 		};
 		return v >= 0 && v < 4 ? H[v] : "";
@@ -300,9 +300,11 @@ const char *look_shader_name(look_shader s)
 	}
 }
 
-/* The shader README's "Recommended Settings": Game system and Backing color
- * per console. GBA is the original, unlit model, whose screen this shader
- * recreates; GBA SP is a step left on the Game System row. */
+/* Game system and Backing color per console, as SkyWalker541 set them for
+ * ChaOS on 2026-11-20: Pocket for the DMG and the Pocket, Grey for the Game
+ * Boy Color and the original GBA, White for the GBA SP. (The shader README's
+ * own table had the Color on Pocket.) GBA is the original, unlit model; GBA
+ * SP is a step left on the Game System row. */
 void look_recommended(look_console c, look_settings *out)
 {
 	int i;
@@ -312,7 +314,7 @@ void look_recommended(look_console c, look_settings *out)
 	for (i = 0; i < LP_COUNT; i++) out->v[i] = look_params[i].def;
 	switch (c) {
 	case LOOK_GB:  out->v[LP_GAME_SYSTEM] = 1; out->v[LP_BACKING_COLOR] = 1; break;
-	case LOOK_GBC: out->v[LP_GAME_SYSTEM] = 2; out->v[LP_BACKING_COLOR] = 1; break;
+	case LOOK_GBC: out->v[LP_GAME_SYSTEM] = 2; out->v[LP_BACKING_COLOR] = 2; break;
 	case LOOK_GBA: out->v[LP_GAME_SYSTEM] = 4; out->v[LP_BACKING_COLOR] = 2; break;
 	default: break;
 	}
