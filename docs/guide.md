@@ -148,7 +148,8 @@ than any one console:
 | **Show Favorites** (Appearance) | `On` or `Off` - whether the Favorites shelf appears on the systems row. Off, Y still marks favorites, and they come back when it's on |
 | **Show Recently Played** (Appearance) | `On` or `Off` - whether the Recently Played shelf appears on the systems row. It lists the last twelve games played, across every system, and is hidden until something has been played |
 | **Show Muse** (Appearance) | `On` or `Off` - whether Muse's shelf appears on the systems row. SELECT opens Muse either way |
-| **Shelf Order** (Appearance) | `Release Date` (as `systems.cfg` lists them), `A to Z`, or `By Maker` (NEC, Nintendo, Sega, SNK, Sony; each maker's home consoles, then its handhelds, so the Game Boys sit together). Favorites, Recently Played and Muse keep their places, and Ports is always last |
+| **Shelf Order** (Appearance) | `Release Date` (as `systems.cfg` lists them), `A to Z`, or `By Maker` (NEC, Nintendo, Sega, SNK, Sony; each maker's home consoles, then its handhelds, so the Game Boys sit together), or `Custom`. Favorites, Recently Played and Muse keep their places, and Ports is last unless Custom puts it elsewhere |
+| **Arrange Shelves** (Appearance) | Your own order: A picks a console up, up and down move it, A puts it down. Leaving sets Shelf Order to `Custom`. A console that gets its first games later goes at the end |
 | **Box Art** | fetch what the whole library is missing |
 | **RetroAchievements** | the account, or `sign in` |
 | **Updates** | a newer ChaOS, and installing it; a dot beside it while one is waiting (unless **Update Available Dot** is off) |

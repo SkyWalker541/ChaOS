@@ -176,7 +176,7 @@ static bool has_label(const menu_row *rows, int n, const char *label);
 /* The top level is shorter than the list of rows by the Appearance page's: the
  * five look rows and the three shelf switches are on that page, and the menu
  * holds one row for it. */
-#define PAGE_ROWS 9
+#define PAGE_ROWS 10
 /* ChaOS: and the ROM Management page's two, RomM and Syncthing */
 #define ROM_ROWS 5
 /* ChaOS: and the Wi-Fi & Bluetooth page's two, and System Settings' eight
@@ -392,6 +392,9 @@ static void tortos_menu_online(void)
 	ck(has_label(rows, n, "Shelf Order") && by_id(&u, rows, n, PM_SHELF_ORDER)->cycles &&
 	   !strcmp(val(by_id(&u, rows, n, PM_SHELF_ORDER)), "Release Date"),
 	   "Shelf Order, Release Date unless chosen, and it goes round");
+	ck(has_label(rows, n, "Arrange Shelves") && by_id(&u, rows, n, PM_SHELF_ARRANGE)->opens &&
+	   by_id(&u, rows, n, PM_SHELF_ARRANGE)->hint,
+	   "Arrange Shelves, beside it, opens its own screen");
 	u.recent = "Off";
 	n = sys_menu_build(&u, rows, &b, &heading);
 	ck(!strcmp(val(by_id(&u, rows, n, PM_RECENT)), "Off"), "and Off when it is turned off");
@@ -880,7 +883,7 @@ static void radio_less(void)
 	for (i = 0; i < k; i++)
 		if (pm[i] == PM_THEME || pm[i] == PM_DIR || pm[i] == PM_SPEED ||
 		    pm[i] == PM_LISTVIEW || pm[i] == PM_COLOR || pm[i] == PM_SHELF_FAV ||
-		    pm[i] == PM_RECENT || pm[i] == PM_SHELF_MUSE || pm[i] == PM_SHELF_ORDER || pm[i] == PM_ROMM || pm[i] == PM_HOMEBREW ||
+		    pm[i] == PM_RECENT || pm[i] == PM_SHELF_MUSE || pm[i] == PM_SHELF_ORDER || pm[i] == PM_SHELF_ARRANGE || pm[i] == PM_ROMM || pm[i] == PM_HOMEBREW ||
 		    pm[i] == PM_SYNC || pm[i] == PM_GBSORT || pm[i] == PM_DISCSETS || pm[i] == PM_WIFI ||
 		    pm[i] == PM_BT || pm[i] == PM_AUDIO || pm[i] == PM_CHANNELS ||
 		    pm[i] == PM_NIGHT || pm[i] == PM_CLOCK || pm[i] == PM_SHOWCLOCK ||
