@@ -46,6 +46,16 @@ jobs:
         if: steps.v.outputs.out != '1'
         run: sudo apt-get update && sudo apt-get install -y squashfs-tools xz-utils mtools
 
+      - name: ChaOS's own program says this version
+        if: steps.v.outputs.out != '1'
+        run: |
+          # 2.6.8 shipped a tortos.elf still built as 2.6.7: the device kept
+          # calling itself 2.6.7 and offering the same update again
+          V="${{ steps.v.outputs.version }}"
+          if ! strings dist/brick/tortos.elf | grep -qx "$V"; then
+            echo "dist/brick/tortos.elf was not built as $V; rebuild it" >&2; exit 1
+          fi
+
       - name: TortOS's release, checked
         if: steps.v.outputs.out != '1'
         run: |
