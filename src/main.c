@@ -1082,6 +1082,13 @@ static const char *const STATUS_BATT_NAMES[STATUS_BATT_COUNT] = {
 	"Off", "Icon", "Percent", "Icon and percent",
 };
 #define LIST_VIEW_ON() (g_list_view && !CARD_DIRS[g_dir].both)
+/* Game List View's value, as the menu shows it and as the row list hides by:
+ * NULL in Cubic, where there's no choice. One function for both, so a row
+ * hidden by it is hidden the same way in the build and in the keys. */
+static const char *list_view_label(void)
+{
+	return CARD_DIRS[g_dir].both ? NULL : g_list_view ? "List" : "Normal";
+}
 /* ChaOS: a menu drawn to fill the screen, this far from its edges, for the
  * one draw it is set around (the game List); -1 for the usual */
 static int g_menu_fill = -1;
@@ -6043,7 +6050,7 @@ static int menu_build(app *a, screen_id screen, int sys,
 		u.cards     = CARD_SETS[g_cards].name;
 		u.cards_dir = CARD_DIRS[g_dir].name;
 		u.name_speed = CARDS_DRAWN(g_cards) ? PN_SPEEDS[g_pn_speed[g_dir]].name : NULL;
-		u.list_view = CARD_DIRS[g_dir].both ? NULL : g_list_view ? "List" : "Normal";
+		u.list_view = list_view_label();
 		u.recent    = g_recent_shelf ? "On" : "Off";
 		u.fav_shelf = g_fav_shelf ? "On" : "Off";
 		u.muse_shelf = g_muse_shelf ? "On" : "Off";
@@ -11168,6 +11175,30 @@ typedef struct {
 	int       screen;
 } sysmenu_ctx;
 
+/* ChaOS: which row is which on the ChaOS menu and its pages, for the keys.
+ * Every field that hides a row, as the build sets it - a row hidden there and
+ * not here moves every row under it by one (0.10.2's Transition Speed turned
+ * Menu Color; 2.7.0's Show Shelf Name turned Shelf Order into Arrange
+ * Shelves). --menu-ids holds it to the build on every page. */
+static int sysmenu_ids(pm_row *ids)
+{
+	sys_ui dev = { .no_wifi = !plat_has_wifi(), .no_bt = !plat_has_bluetooth(),
+	               .cable_xfer = plat_cable_link(NULL, 0), .ss_have = ss_have_dev(),
+	               .pm_have = ports_pm_ready(P_ROMS),
+	               .night_ok = plat_volume_night_ok(), .appearance = g_appearance_page,
+	               .rom_page = g_rom_page, .net_page = g_net_page, .sys_page = g_sys_page,
+	               .sticks = plat_sticks((int[4]){ 0 }),
+	               .shelf_page = g_shelf_page,
+	               .name_speed = CARDS_DRAWN(g_cards) ? PN_SPEEDS[g_pn_speed[g_dir]].name
+	                                                  : NULL,
+	               /* the same value as the build's: Show Shelf Name is
+	                * there only with "Normal", so "" here hid it and
+	                * every row under it answered for the one above
+	                * (2.7.0: Shelf Order and Arrange Shelves) */
+	               .list_view = list_view_label() };
+	return sys_menu_tortos_rows(&dev, ids);
+}
+
 static int sysmenu_build(void *ctx, menu_row *rows, int max,
                          const char **heading)
 {
@@ -11339,21 +11370,8 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 	/* The row's identity rather than its position: a device with no radio has
 	 * fewer of them, and the same list the build used says which is which. */
 	{
-		/* Every field that hides a row, as the build sets it - a row hidden
-		 * there and not here moves every row under it by one (0.10.2's
-		 * Transition Speed turned Menu Color) */
-		sys_ui dev = { .no_wifi = !plat_has_wifi(), .no_bt = !plat_has_bluetooth(),
-		               .cable_xfer = plat_cable_link(NULL, 0), .ss_have = ss_have_dev(),
-		               .pm_have = ports_pm_ready(P_ROMS),
-		               .night_ok = plat_volume_night_ok(), .appearance = g_appearance_page,
-		               .rom_page = g_rom_page, .net_page = g_net_page, .sys_page = g_sys_page,
-		               .sticks = plat_sticks((int[4]){ 0 }),
-		               .shelf_page = g_shelf_page,
-		               .name_speed = CARDS_DRAWN(g_cards) ? PN_SPEEDS[g_pn_speed[g_dir]].name
-		                                                  : NULL,
-		               .list_view = CARD_DIRS[g_dir].both ? NULL : "" };
 		pm_row ids[PM_ROWS];
-		int n = sys_menu_tortos_rows(&dev, ids);
+		int n = sysmenu_ids(ids);
 
 		sel = sel >= 0 && sel < n ? (int)ids[sel] : PM_ROWS;
 	}
@@ -24526,8 +24544,49 @@ static void pm_shot(app *a)
 	}
 }
 
+/* ChaOS: --menu-ids: every page of the ChaOS menu, in both Game List Views
+ * and every UI Direction, built and keyed: the rows drawn and the rows the
+ * keys go by must be the same number, or a key lands on the wrong row.
+ * Prints each and exits 1 on a difference. */
+static bool g_menu_ids;
+
+static int menu_ids_check(app *a)
+{
+	bool *pages[] = { NULL, &g_appearance_page, &g_shelf_page, &g_rom_page, &g_net_page, &g_sys_page };
+	static const char *const names[] = { "ChaOS", "Appearance", "Shelves", "ROM Management",
+	                                     "Wi-Fi & Bluetooth", "System Settings" };
+	int bad = 0, p, lv, d, was_dir = g_dir;
+	bool was_lv = g_list_view;
+
+	for (d = 0; d < (int)(sizeof CARD_DIRS / sizeof CARD_DIRS[0]); d++)
+		for (lv = 0; lv < 2; lv++)
+			for (p = 0; p < (int)(sizeof pages / sizeof pages[0]); p++) {
+				menu_row rows[MENU_MAX_ROWS];
+				menu_bufs b;
+				const char *heading = NULL;
+				pm_row ids[PM_ROWS];
+				int nb, nk;
+
+				g_dir = d;
+				g_list_view = lv;
+				if (pages[p]) *pages[p] = true;
+				if (p == 2) g_appearance_page = true;     /* Shelves opens from Appearance */
+				nb = menu_build(a, SCREEN_SYSTEMS, 0, rows, &b, &heading);
+				nk = sysmenu_ids(ids);
+				if (pages[p]) *pages[p] = false;
+				if (p == 2) g_appearance_page = false;
+				printf("%s %-18s %s, %-10s built %2d, keyed %2d\n", nb == nk ? "ok  " : "FAIL",
+				       names[p], lv ? "List  " : "Normal", CARD_DIRS[d].name, nb, nk);
+				if (nb != nk) bad++;
+			}
+	g_dir = was_dir;
+	g_list_view = was_lv;
+	return bad ? 1 : 0;
+}
+
 static void take_shot(app *a)
 {
+	if (g_menu_ids) exit(menu_ids_check(a));
 	SDL_Surface *out = SDL_CreateRGBSurfaceWithFormat(0, TORTOS_SCREEN_W,
 	                                                  TORTOS_SCREEN_H, 32,
 	                                                  SDL_PIXELFORMAT_RGBA32);
@@ -25089,6 +25148,7 @@ int main(int argc, char *argv[])
 		else if (!strcmp(argv[i], "--chan") && i + 1 < argc) g_chan_shot = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--arrange") && i + 1 < argc) g_arrange_shot = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--shelfnote") && i + 1 < argc) shot_shelfnote = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "--menu-ids")) g_menu_ids = true;
 		else if (!strcmp(argv[i], "--battwarn") && i + 1 < argc) g_bw_shot = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--romm") && i + 1 < argc) {
 			shot_romm = argv[++i];
