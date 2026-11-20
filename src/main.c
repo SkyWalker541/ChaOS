@@ -10666,7 +10666,7 @@ static int chan_build(void *ctx, menu_row *rows, int max, const char **heading)
 	rows[n] = (menu_row){ "Public Release", !g_test_updates ? "In Use" : NULL, true };
 	rows[n++].hint = "Official releases";
 	rows[n] = (menu_row){ "Pre-Release", g_test_updates ? "In Use" : NULL, true };
-	rows[n++].hint = "Test builds, before they're released";
+	rows[n++].hint = "Public Release plus Brick Pro testing";
 	rows[n++] = MENU_RULE;
 	rows[n++] = MENU_NOTE("Saves and settings stay either way");
 	return n;
@@ -10687,7 +10687,7 @@ static menu_result chan_key(app *a, void *ctx, in_button key, int sel)
 	if (sel == 0 && g_test_updates) {
 		chan_set(false);
 	} else if (sel == 1 && !g_test_updates &&
-	           confirm_panel(a, "Pre-Release", "Test builds come before a release\nand can have bugs. Get them?", "Get Them")) {
+	           confirm_panel(a, "Pre-Release", "The same as Public Release, plus\nBrick Pro support still in testing.\nGet it?", "Get It")) {
 		chan_set(true);
 	}
 	return MENU_STAY;
