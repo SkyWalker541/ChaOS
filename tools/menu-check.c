@@ -1420,15 +1420,15 @@ static void look_rows(void)
 	look_format(&st, LP_GAME_SYSTEM, v, sizeof v);
 	ck(st.on && !strcmp(v, "Game Boy"), "on, and Game System reads Game Boy");
 	look_format(&st, LP_BACKING_COLOR, v, sizeof v);
-	ck(!strcmp(v, "Pocket"), "the Pocket's backing");
+	ck(!strcmp(v, "DMG / Pocket"), "the Pocket's backing, named for the DMG and Pocket");
 	look_recommended(LOOK_GBC, &st);
 	look_format(&st, LP_BACKING_COLOR, v, sizeof v);
-	ck(!strcmp(v, "Grey"), "a Game Boy Color's is Grey");
+	ck(!strcmp(v, "GBC / GBA"), "a Game Boy Color's is the grey, named GBC / GBA");
 	look_recommended(LOOK_GBA, &st);
 	look_format(&st, LP_GAME_SYSTEM, v, sizeof v);
 	ck(!strcmp(v, "GBA"), "a GBA's is the original GBA");
 	look_format(&st, LP_BACKING_COLOR, v, sizeof v);
-	ck(!strcmp(v, "Grey"), "with the grey backing");
+	ck(!strcmp(v, "GBC / GBA"), "with the grey backing");
 	ck(st.v[LP_GRID_WIDTH] == 0.30f, "and a Grid line wide enough to show at 4x");
 	ck(look_console_of("GBC") == LOOK_GBC && look_shader_of(LOOK_GBC) == LS_PT,
 	   "the Game Boys have PT");

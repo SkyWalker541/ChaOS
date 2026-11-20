@@ -11,7 +11,10 @@ enum { F_WORDS, F_PCT, F_PCT_OFF, F_DARKEN, F_NUM1, F_NUM2, F_SPEED, F_INT };
 static const char *const W_SYSTEM[] = { "Manual", "Game Boy", "Game Boy Color",
                                         "GBA SP", "GBA", NULL };
 static const char *const W_TRANSP[] = { "White", "Bright", "All", NULL };
-static const char *const W_BACKING[] = { "Off", "Pocket", "Grey", "White", NULL };
+/* ChaOS: named for the consoles each suits (SkyWalker541, 2026-11-20); the
+ * shader's own names are Pocket, Grey and White. Saved by number, so a
+ * setting chosen before reads the same. */
+static const char *const W_BACKING[] = { "Off", "DMG / Pocket", "GBC / GBA", "GBA SP", NULL };
 static const char *const W_ONOFF[] = { "Off", "On", NULL };
 /* LCD Dot is gone (ChaOS): too slow on the Brick to keep a game at speed.
  * A console that had it comes back with Grid, the next one down. */
@@ -209,9 +212,9 @@ const char *look_param_hint(const look_settings *s, look_param p)
 	case LP_BACKING_COLOR: {
 		static const char *const H[] = {
 			"No tint: a plain grey behind the pixels",
-			"Pocket green-grey. For DMG and Pocket",
-			"A neutral grey. For GBC and original GBA",
-			"For the GBA SP's front-lit screen",
+			"The Pocket's green-grey",
+			"A neutral grey, for the GBC and original GBA",
+			"White, for the GBA SP's front-lit screen",
 		};
 		return v >= 0 && v < 4 ? H[v] : "";
 	}
