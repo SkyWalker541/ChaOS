@@ -123,7 +123,7 @@
   <div class="panel" id="b-any" role="tabpanel">
     <table class="keys">
       <tr><td><kbd>Volume</kbd></td><td>Volume, in games too</td></tr>
-      <tr><td><kbd>F1</kbd> <kbd>F2</kbd></td><td>Brightness down and up, in games too</td></tr>
+      <tr><td><kbd>MENU</kbd> + <kbd>Volume</kbd></td><td>Brightness down and up, in games and ports too</td></tr>
       <tr><td><kbd>SELECT</kbd></td><td>Open or close Muse (everywhere but a running game; the in-game menu counts)</td></tr>
       <tr><td><kbd>MENU</kbd></td><td>Settings for what you're looking at. Inside a menu, closes the whole menu at once</td></tr>
       <tr><td><kbd>B</kbd></td><td>Back one screen</td></tr>
@@ -145,8 +145,9 @@
   <div class="panel" id="b-game" role="tabpanel" hidden>
     <table class="keys">
       <tr><td><kbd>MENU</kbd></td><td>The in-game menu, with Cheats, shaders, saves and more</td></tr>
-      <tr><td><kbd>MENU</kbd> + <kbd>R1</kbd></td><td>Fast forward: 2×, 3×, 4×, then normal</td></tr>
-      <tr><td><kbd>MENU</kbd> + <kbd>L1</kbd> (hold)</td><td>Rewind, when it's on for the console</td></tr>
+      <tr><td><kbd>MENU</kbd> + <kbd>SELECT</kbd></td><td>Save and quit, back to the shelf</td></tr>
+      <tr><td><kbd>F2</kbd></td><td>Fast forward: 2×, 3×, 4×, then normal</td></tr>
+      <tr><td><kbd>F1</kbd> (hold)</td><td>Rewind, when it's on for the console</td></tr>
       <tr><td><kbd>MENU</kbd> + <kbd>X</kbd></td><td>Screenshot</td></tr>
       <tr><td><kbd>X</kbd> <kbd>Y</kbd></td><td>Turbo A and turbo B, on consoles with two face buttons</td></tr>
       <tr><td><kbd>L2</kbd> <kbd>R2</kbd></td><td>Turbo L and turbo R, on Game Boy Advance</td></tr>
@@ -187,8 +188,8 @@
         <li><b>Instant start.</b> The emulator is already running, so nothing loads between you and the game.</li>
         <li><b>Resume.</b> Quit from the menu or press power: the game is saved on the way out and continues from that moment next time.</li>
         <li><b>Six save slots</b> per game, each with a picture of where you were, from <b>Save</b> and <b>Load</b> in the in-game menu.</li>
-        <li><b>Fast forward</b> with <kbd>MENU</kbd>+<kbd>R1</kbd>: 2×, 3×, 4×, then normal. Silent while fast; heavy SNES and GBA games top out around 2.5×.</li>
-        <li><b>Rewind</b> <span class="tag">ChaOS</span>: turn it on in a console's menu, then hold <kbd>MENU</kbd>+<kbd>L1</kbd> to step back through the last minutes. It costs a little speed, so it's off until you want it.</li>
+        <li><b>Fast forward</b> with <kbd>F2</kbd>: 2×, 3×, 4×, then normal. Silent while fast; heavy SNES and GBA games top out around 2.5×.</li>
+        <li><b>Rewind</b> <span class="tag">ChaOS</span>: turn it on in a console's menu, then hold <kbd>F1</kbd> to step back through the last minutes. It costs a little speed, so it's off until you want it.</li>
         <li><b>Button mapping</b> <span class="tag">ChaOS</span>: a console's <b>Controls</b> shows every button and lets you change it, for the console or just one game, with turbo on any button.</li>
         <li><b>Turbo</b>: <kbd>X</kbd> and <kbd>Y</kbd> are turbo A and B on the consoles with two face buttons; <kbd>L2</kbd>/<kbd>R2</kbd> are turbo L and R on Game Boy Advance.</li>
         <li><b>Screenshots</b> <span class="tag">ChaOS</span> with <kbd>MENU</kbd>+<kbd>X</kbd>, looked at full screen from <b>Screenshots</b> in the in-game menu. They're PNGs in <code>Screenshots/&lt;console&gt;/&lt;game&gt;/</code>.</li>
@@ -202,7 +203,7 @@
   </article>
   <div class="cards3">
     <div class="mini"><h4>Games come first <span class="tag">ChaOS</span></h4><p>Nothing of ChaOS's own runs while you play. An update that was downloading pauses and carries on afterwards, its progress shown on the shelf.</p></div>
-    <div class="mini"><h4>The battery to the end</h4><p>The game is saved and the Brick turns off when the battery is truly empty, judged by its voltage: about half an hour past the gauge's 2%. A red dot blinks for the last stretch.</p></div>
+    <div class="mini"><h4>The battery to the end</h4><p>The game is saved and the Brick turns off when the battery is truly empty, judged by its voltage: about half an hour past the gauge's 2%. A red dot blinks for the last stretch. Rather stop sooner? <b>Battery Warnings &gt; Save and Turn Off At</b> takes 3% to 10%.</p></div>
     <div class="mini"><h4>Play Time</h4><p><b>MENU &gt; Play Time</b>: per game or per console, for today, the week, month, year or all time. <kbd>Y</kbd> switches; the bottom line has launches, longest session and last played.</p></div>
   </div>
 
@@ -363,8 +364,8 @@
       <h3>Box art</h3>
       <ul>
         <li><b>MENU &gt; Box Art</b> fetches every missing cover over Wi-Fi from libretro's collection, by file name or, where none matches, by the ROM's checksum. A console's menu does just that console.</li>
-        <li><b>For one game</b> <span class="tag">ChaOS</span>: <kbd>X</kbd> on it, then <b>Get Box Art</b> or <b>Replace Box Art</b>: <b>Find Automatically</b>, <b>Search itch.io</b> (where most new homebrew lives), or <b>Use a Screenshot</b> of your own. Left and right look through them; <kbd>A</kbd> uses one.</li>
-        <li><b>From your phone</b> <span class="tag">ChaOS</span>: in ChaOS Transfer, open a console's folder and press <b>Cover</b> beside a game. Send a photo or saved picture, or give a link: a picture, an itch.io page, or a Google Images result.</li>
+        <li><b>For one game</b> <span class="tag">ChaOS</span>: <kbd>X</kbd> on it, then <b>Get Box Art</b> or <b>Replace Box Art</b>: <b>Find Automatically</b>, <b>Search LaunchBox</b> (search by name and pick the game, then its box art: romhacks and homebrew too), <b>Search itch.io</b> (where most new homebrew lives), or <b>Use a Screenshot</b> of your own. Left and right look through them; <kbd>A</kbd> uses one.</li>
+        <li><b>From your phone</b> <span class="tag">ChaOS</span>: in ChaOS Transfer, open a console's folder and press <b>Cover</b> beside a game. Send a photo or saved picture, search LaunchBox and click a cover, or give a link: a picture, an itch.io page, or a Google Images result.</li>
         <li>Covers you put in <code>Roms/&lt;console&gt;/.media/&lt;game&gt;.png</code> yourself are never touched. A game without one shows its last moment of play, or a card with its name.</li>
       </ul>
     </div>
@@ -680,7 +681,7 @@
         <li><b>Full Install</b> is always offered, and repairs a card whose files have gone wrong.</li>
         <li>Needs the charger or a quarter charge. If the power goes out, the Brick finishes on the next start.</li>
         <li>Or update over the cable with ChaOS Wire, or with ChaOS Installer on a computer.</li>
-        <li><b>Update Channels</b> (About ChaOS): <b>Public Release</b> or <b>Pre-Release</b>. On Pre-Release a Brick is offered test builds, which come before a release and can have bugs, as well as releases. On Public Release it only ever hears of releases. Switching back never takes a Brick back; it waits for the next release.</li>
+        <li><b>Update Channels</b> (About ChaOS): <b>Public Release</b> or <b>Pre-Release</b>. Pre-Release is the same as Public Release, with the <b>Brick Pro</b> support that's still being tested added. Its builds are numbered like <code>2.7.0-test13</code>. On Public Release a Brick only ever hears of releases. Switching back never takes a Brick back; it waits for the next release.</li>
       </ul>
     </div>
     <figure class="device" data-screens='[["updates","Updates"]]'>
@@ -690,6 +691,7 @@
   </div>
   <div class="releases">
     <h3>Recent releases</h3>
+    <div class="rel"><span class="ver">2.6.9</span><p>New buttons in games: hold <kbd>F1</kbd> to rewind, <kbd>F2</kbd> for fast forward, and <kbd>MENU</kbd>+<kbd>SELECT</kbd> to save and quit. Brightness is <kbd>MENU</kbd>+<kbd>Volume</kbd> everywhere. Box art from LaunchBox, searched and picked on the Brick or in ChaOS Transfer. Battery Warnings can choose when ChaOS saves and turns off. The SkyWalker541 shader is quicker, for Game Boy Advance with rewind. And 2.6.8's version number after updating is right.</p></div>
     <div class="rel"><span class="ver">2.6.8</span><p>In-game saves are kept: from the second game after turning on, a game's own saves (a memory card, a cartridge battery) were not being written to the card. They are now, and straight away when you open the menu or Reset. The save each game starts with is kept as a .bak beside it. And sound that keeps up: when a game falls behind (a heavy scene, a shader), ChaOS skips drawing one frame to catch up, so the game keeps its original speed and its sound stops crackling.</p></div>
     <div class="rel"><span class="ver">2.6.7</span><p>Games in .7z archives: they show on their shelves and play, with achievements, Game Boy sorting and box art, as a .zip does. Bugs and ideas now go to the ChaOS Control Discord.</p></div>
     <div class="rel"><span class="ver">2.6.6</span><p>Rewind costs games less: its saves are compared faster and on another core, which should stop the sound crackling with rewind on, as in Game Boy Advance games with the SkyWalker541 shader.</p></div>
@@ -762,7 +764,7 @@
     <details><summary>Something went wrong. How do I send the logs?</summary>
       <p>Open <b>MENU &gt; ChaOS Transfer</b>, open its address in a browser, and click <b>Download logs</b>. Then post it in <b>#bugs</b> on the <a href="https://discord.gg/axxyBSS2me">ChaOS Control Discord</a>, with what you were doing and roughly when it happened.</p></details>
     <details><summary>I have an idea for a feature. Where do I suggest it?</summary>
-      <p>In <b>#feature-requests</b> on the <a href="https://discord.gg/axxyBSS2me">ChaOS Control Discord</a>. Problems and bugs go in <b>#bugs</b> there, and it's also where to get help or join in testing pre-releases.</p></details>
+      <p>In <b>#feature-requests</b> on the <a href="https://discord.gg/axxyBSS2me">ChaOS Control Discord</a>. Problems and bugs go in <b>#bugs</b> there, and it's also where to get help or join in testing the Brick Pro on Pre-Release.</p></details>
     <details><summary>Is PICO-8 included?</summary>
       <p>No. PICO-8 is sold by Lexaloffle, and ChaOS runs your own copy: its Raspberry Pi download, put in the card's <code>PICO-8</code> folder. See <a href="#pico8">PICO-8</a>.</p></details>
     <details><summary>Should I use RomM or Syncthing for saves?</summary>

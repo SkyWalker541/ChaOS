@@ -56,6 +56,7 @@ static void os_cycle(const char *tag, int d, bool live);
 #include "remap.h"
 #include "shots.h"
 #include "itch.h"
+#include "lbox.h"
 #include "itchdl.h"
 #include "hbcat.h"
 #include "qrcodegen.h"
@@ -1027,6 +1028,10 @@ static int  g_bw_low = BATT_LOW_PCT, g_bw_crit;
 static bool g_bw_low_game = true, g_bw_crit_game = true;
 static const int BW_LOWS[]  = { 5, 10, 15, 20, 25, 30 };
 static const int BW_CRITS[] = { 0, 3, 4, 5, 6, 8, 10, 15, 20, 25 };
+/* ChaOS: where it saves the game and turns off (battwarn.off; 0 is Auto, the
+ * device's own reading, BATT_EMPTY_PCT or its voltage) */
+static int  g_bw_off;
+static const int BW_OFFS[] = { 0, 3, 4, 5, 8, 10 };
 static int battery_game_level(void);   /* below, with battery_level */
 static bool g_test_updates;        /* ChaOS: the Pre-Release channel, "update.testing" */
 static void net_page_screen(app *a);
@@ -3421,7 +3426,8 @@ static bool battery_empty(void)
 		primed = true;
 		last = now;
 		if (plat_battery(&pct, &charging) && !charging &&
-		    battery_at_or_below(pct, BATT_EMPTY_PCT, plat_battery_empty_mv(), &mv))
+		    battery_at_or_below(pct, g_bw_off > 0 ? g_bw_off : BATT_EMPTY_PCT,
+		                        g_bw_off > 0 ? 0 : plat_battery_empty_mv(), &mv))
 			seen++;
 		else
 			seen = 0;
@@ -7336,6 +7342,7 @@ static void xfer_screen_over(app *a, bool over_cable)
 	hare_set_page(cable ? "wire.html" : NULL);
 	hare_set_after_write(xfer_after_write);
 	hare_set_cover(cover_from_web);
+	hare_set_lbox(hareart_lbox_search, hareart_lbox_images);   /* ChaOS: covers from LaunchBox */
 	hare_set_itch_key(hb_has_key, hb_save_key);
 	g_wu = WU_NONE;
 	if (cable) {
@@ -8538,6 +8545,89 @@ static bool shot_cover_screen(app *a, const char *folder, const char *file,
 	return i >= 0 && cover_save(a, it[i].path, folder, stem);
 }
 
+/* ChaOS: LaunchBox's Games Database (src/lbox.h), searched by name and
+ * picked by hand - for romhacks and homebrew above all, which libretro's
+ * No-Intro names never have. The words start as the game's title; the
+ * games found are listed, this console's first; the one chosen shows its
+ * box fronts, then 3D boxes, cartridges and title screens, in the picker. */
+#define LB_GAMES 20
+
+typedef struct { lbox_game g[LB_GAMES]; int n; int chose; } lb_ctx;
+
+static int lb_build(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	lb_ctx *c = ctx;
+	int i, n = 0;
+
+	*heading = "LaunchBox";
+	for (i = 0; i < c->n && n < max - 2; i++)
+		rows[n++] = (menu_row){ c->g[i].title, c->g[i].platform, true };
+	rows[n++] = MENU_RULE;
+	rows[n++] = MENU_NOTE("Choose the game, then its picture");
+	return n;
+}
+
+static menu_result lb_key(app *a, void *ctx, in_button key, int sel)
+{
+	lb_ctx *c = ctx;
+
+	(void)a;
+	if (key != IN_ACCEPT || sel < 0 || sel >= c->n) return MENU_STAY;
+	c->chose = sel;
+	return MENU_DONE;
+}
+
+static bool lbox_cover_screen(app *a, const char *folder, const char *tag, const char *stem,
+                              const char *title, unsigned accent)
+{
+	static lb_ctx c;
+	lbox_image im[PICK_MAX];
+	pick_item it[PICK_MAX];
+	char words[96];
+	kb_result kr;
+	int n, i;
+	bool picked = false;
+
+	if (!net_online()) { pick_say(a, title, "Needs Wi-Fi", accent); return false; }
+	snprintf(words, sizeof words, "%s", title);
+	/* "(USA)", "[T-En...]" and the like are no part of the game's name */
+	for (i = 0; words[i]; i++)
+		if ((words[i] == '(' || words[i] == '[') && i > 0) { words[i] = '\0'; break; }
+	while ((n = (int)strlen(words)) > 0 && words[n - 1] == ' ') words[n - 1] = '\0';
+	kr = kb_prompt(a->r, &a->in, "Search LaunchBox", words, (int)sizeof words, accent,
+	               NULL, idle_due_ctx, a);
+	if (kr == KB_POWER) { power_off(a); return false; }
+	if (kr != KB_ACCEPT || !words[0]) return false;
+
+	wait_panel(a, "LaunchBox", "Searching...");
+	memset(&c, 0, sizeof c);
+	c.chose = -1;
+	c.n = lbox_search(words, tag, c.g, LB_GAMES);
+	if (c.n < 0) { pick_say(a, title, "Couldn't reach LaunchBox", accent); return false; }
+	if (c.n == 0) { pick_say(a, title, "No games found on LaunchBox", accent); return false; }
+	menu_run(a, &(menu_style){ .accent = accent }, lb_build, lb_key, &c);
+	if (c.chose < 0) return false;
+
+	wait_panel(a, "LaunchBox", "Finding its pictures...");
+	n = lbox_images(c.g[c.chose].id, tag, im, PICK_MAX);
+	if (n < 0) { pick_say(a, title, "Couldn't reach LaunchBox", accent); return false; }
+	if (n == 0) { pick_say(a, title, "No box art for that game", accent); return false; }
+	memset(it, 0, sizeof it);
+	for (i = 0; i < n; i++) {
+		if (im[i].region[0])
+			snprintf(it[i].label, sizeof it[i].label, "LaunchBox: %s (%s)", im[i].kind, im[i].region);
+		else
+			snprintf(it[i].label, sizeof it[i].label, "LaunchBox: %s", im[i].kind);
+		snprintf(it[i].url, sizeof it[i].url, "%s", im[i].url);
+		snprintf(it[i].path, sizeof it[i].path, PICK_TMP, i);
+	}
+	i = pick_cover(a, title, it, n, accent);
+	if (i >= 0) picked = cover_save(a, it[i].path, folder, stem);
+	for (int j = 0; j < n; j++) unlink(it[j].path);
+	fprintf(stderr, "launchbox: %s/%s %s\n", folder, stem, picked ? "has a new cover" : "kept its cover");
+	return picked;
+}
+
 /* Get / Replace Box Art: where from */
 typedef struct {
 	info_ctx *ic;
@@ -8545,7 +8635,7 @@ typedef struct {
 	bool      itch;
 } boxart_ctx;
 
-enum { BA_AUTO, BA_ITCH, BA_SHOT };
+enum { BA_AUTO, BA_LBOX, BA_ITCH, BA_SHOT };
 
 static int boxart_build(void *ctx, menu_row *rows, int max, const char **heading)
 {
@@ -8557,12 +8647,13 @@ static int boxart_build(void *ctx, menu_row *rows, int max, const char **heading
 	(void)max;
 	*heading = "Box Art";
 	rows[n++] = (menu_row){ "Find Automatically", net ? NULL : "needs Wi-Fi", true };
+	rows[n++] = (menu_row){ "Search LaunchBox", net ? NULL : "needs Wi-Fi", true };
 	if (c->itch)
 		rows[n++] = (menu_row){ "Search itch.io", net ? NULL : "needs Wi-Fi", true };
 	snprintf(shots, sizeof shots, "%d", c->shots);
 	rows[n++] = (menu_row){ "Use a Screenshot", c->shots ? shots : "none yet", c->shots > 0 };
 	rows[n++] = MENU_RULE;
-	rows[n++] = MENU_NOTE("itch.io: homebrew; screenshots: MENU+X");
+	rows[n++] = MENU_NOTE("LaunchBox: romhacks too; screenshots: MENU+X");
 	return n;
 }
 
@@ -8572,7 +8663,7 @@ static menu_result boxart_key(app *a, void *ctx, in_button key, int sel)
 	info_ctx *ic = c->ic;
 	const char *folder = a->sys.systems[ic->owner].folder;
 	unsigned accent = a->sys.systems[ic->owner].accent;
-	int id = sel == 0 ? BA_AUTO : (c->itch && sel == 1) ? BA_ITCH : BA_SHOT;
+	int id = sel == 0 ? BA_AUTO : sel == 1 ? BA_LBOX : (c->itch && sel == 2) ? BA_ITCH : BA_SHOT;
 	bool done = false;
 
 	if (key != IN_ACCEPT) return MENU_STAY;
@@ -8581,6 +8672,12 @@ static menu_result boxart_key(app *a, void *ctx, in_button key, int sel)
 		 * the new cover renamed over the old only once it has arrived whole */
 		art_screen(a, folder, ic->g->title, ic->g->name, ic->g->file, accent);
 		return MENU_DONE;
+	}
+	if (id == BA_LBOX) {
+		if (!net_online()) return MENU_STAY;
+		done = lbox_cover_screen(a, folder, a->sys.systems[ic->owner].tag, ic->g->name,
+		                         ic->g->title, accent);
+		return done ? MENU_DONE : MENU_STAY;
 	}
 	if (id == BA_ITCH) {
 		if (!net_online()) return MENU_STAY;
@@ -10419,11 +10516,13 @@ static int g_bw_shot;   /* --battwarn: the page, one frame */
 
 static int bw_build(void *ctx, menu_row *rows, int max, const char **heading)
 {
-	static char low[8], crit[8];
+	static char low[8], crit[8], off[8];
 	int n = 0;
 
 	(void)ctx; (void)max;
 	*heading = "Battery Warnings";
+	if (g_bw_off > 0) snprintf(off, sizeof off, "%d%%", g_bw_off);
+	else snprintf(off, sizeof off, "Auto");
 	snprintf(low, sizeof low, "%d%%", g_bw_low);
 	if (g_bw_crit > 0) snprintf(crit, sizeof crit, "%d%%", g_bw_crit);
 	else snprintf(crit, sizeof crit, "Auto");
@@ -10440,8 +10539,10 @@ static int bw_build(void *ctx, menu_row *rows, int max, const char **heading)
 	rows[n] = (menu_row){ "Blinking Dot in Games", g_bw_crit_game ? "On" : "Off", true };
 	rows[n].toggle = true;
 	rows[n++].hint = "The blinking dot over a game too";
-	rows[n++] = MENU_RULE;
-	rows[n++] = MENU_NOTE("At 2% ChaOS saves and turns off");
+	rows[n] = (menu_row){ "Save and Turn Off At", off, true };
+	rows[n].cycles = true;
+	rows[n++].hint = g_bw_off > 0 ? "ChaOS saves your game and turns off here"
+	                              : "Auto: when the battery says it's empty";
 	return n;
 }
 
@@ -10451,6 +10552,7 @@ static void bw_save(void)
 	db_set_int(db_dev(), "battwarn.crit", g_bw_crit);
 	db_set_int(db_dev(), "battwarn.lowgame", g_bw_low_game ? 1 : 0);
 	db_set_int(db_dev(), "battwarn.critgame", g_bw_crit_game ? 1 : 0);
+	db_set_int(db_dev(), "battwarn.off", g_bw_off);
 }
 
 /* The next of `opts` from `cur`, `d` steps round; `below` > 0 skips any
@@ -10478,6 +10580,10 @@ static void bw_load(void)
 	if (g_bw_crit < 0 || g_bw_crit >= g_bw_low) g_bw_crit = 0;
 	g_bw_low_game  = db_get_int(db_dev(), "battwarn.lowgame", 1) != 0;
 	g_bw_crit_game = db_get_int(db_dev(), "battwarn.critgame", 1) != 0;
+	g_bw_off = db_get_int(db_dev(), "battwarn.off", 0);
+	ok = 0;
+	for (i = 0; i < (int)(sizeof BW_OFFS / sizeof *BW_OFFS); i++) if (BW_OFFS[i] == g_bw_off) ok = 1;
+	if (!ok || (g_bw_off > 0 && g_bw_off >= g_bw_low)) g_bw_off = 0;
 }
 
 static menu_result bw_key(app *a, void *ctx, in_button key, int sel)
@@ -10497,8 +10603,15 @@ static menu_result bw_key(app *a, void *ctx, in_button key, int sel)
 		g_bw_crit = bw_step(BW_CRITS, (int)(sizeof BW_CRITS / sizeof *BW_CRITS), g_bw_crit, d, g_bw_low);
 		break;
 	case 3: g_bw_crit_game = !g_bw_crit_game; break;
+	case 4:
+		/* below the low warning, and never at or above the blinking one */
+		g_bw_off = bw_step(BW_OFFS, (int)(sizeof BW_OFFS / sizeof *BW_OFFS), g_bw_off, d,
+		                   g_bw_crit > 0 ? g_bw_crit : g_bw_low);
+		break;
 	default: return MENU_STAY;
 	}
+	/* turning off stays under both warnings, or goes back to Auto */
+	if (g_bw_off > 0 && g_bw_off >= (g_bw_crit > 0 ? g_bw_crit : g_bw_low)) g_bw_off = 0;
 	bw_save();
 	return MENU_STAY;
 }
@@ -10527,7 +10640,7 @@ static int chan_build(void *ctx, menu_row *rows, int max, const char **heading)
 	rows[n] = (menu_row){ "Public Release", !g_test_updates ? "In Use" : NULL, true };
 	rows[n++].hint = "Official releases";
 	rows[n] = (menu_row){ "Pre-Release", g_test_updates ? "In Use" : NULL, true };
-	rows[n++].hint = "Test builds, before they're released";
+	rows[n++].hint = "Public Release plus Brick Pro testing";
 	rows[n++] = MENU_RULE;
 	rows[n++] = MENU_NOTE("Saves and settings stay either way");
 	return n;
@@ -10548,7 +10661,7 @@ static menu_result chan_key(app *a, void *ctx, in_button key, int sel)
 	if (sel == 0 && g_test_updates) {
 		chan_set(false);
 	} else if (sel == 1 && !g_test_updates &&
-	           confirm_panel(a, "Pre-Release", "Test builds come before a release\nand can have bugs. Get them?", "Get Them")) {
+	           confirm_panel(a, "Pre-Release", "The same as Public Release, plus\nBrick Pro support still in testing.\nGet it?", "Get It")) {
 		chan_set(true);
 	}
 	return MENU_STAY;
@@ -12546,11 +12659,15 @@ static void muse_ask_lock(void) { g_lock_asked = true; }
 static bool lock_chord(const in_state *in)
 {
 	Uint32 later;
+	/* ChaOS: F1+F2 on the Brick; on the Pixel 2, FUNCTION and both volume
+	 * keys, which arrive as the two brightness keys */
+	in_button k1 = IN_F1, k2 = IN_F2;
 
-	if (!in->down[IN_BRIGHTUP] && !in->down[IN_BRIGHTDN]) g_lock_armed = true;
-	if (!g_lock_armed || !in->down[IN_BRIGHTUP] || !in->down[IN_BRIGHTDN]) return false;
-	later = in->down_since[IN_BRIGHTUP] > in->down_since[IN_BRIGHTDN]
-	      ? in->down_since[IN_BRIGHTUP] : in->down_since[IN_BRIGHTDN];
+	if (!in->down[IN_F1] && !in->down[IN_F2]) { k1 = IN_BRIGHTUP; k2 = IN_BRIGHTDN; }
+	if (!in->down[k1] && !in->down[k2]) g_lock_armed = true;
+	if (!g_lock_armed || !in->down[k1] || !in->down[k2]) return false;
+	later = in->down_since[k1] > in->down_since[k2]
+	      ? in->down_since[k1] : in->down_since[k2];
 	if (SDL_GetTicks() - later < 1000) return false;
 	g_lock_armed = false;
 	return true;
@@ -12572,6 +12689,8 @@ static bool muse_keys(app *a)
 
 	if (in_repeat(in, IN_VOLUP)) plat_volume_nudge(+1);
 	if (in_repeat(in, IN_VOLDN)) plat_volume_nudge(-1);
+	if (in->down[IN_F1] && in->down[IN_F2])
+		return lock_chord(in) && lock_allowed();
 	if (in->down[IN_BRIGHTUP] && in->down[IN_BRIGHTDN]) {
 		if (in->pressed[IN_BRIGHTUP]) plat_brightness_nudge(+1);
 		if (in->pressed[IN_BRIGHTDN]) plat_brightness_nudge(-1);
@@ -25108,7 +25227,8 @@ int main(int argc, char *argv[])
 		bool charging;
 
 		if (plat_battery(&pct, &charging) && !charging &&
-		    battery_at_or_below(pct, BATT_EMPTY_PCT, plat_battery_empty_mv(), &mv)) {
+		    battery_at_or_below(pct, g_bw_off > 0 ? g_bw_off : BATT_EMPTY_PCT,
+		                        g_bw_off > 0 ? 0 : plat_battery_empty_mv(), &mv)) {
 			if (mv > 0)
 				fprintf(stderr, "battery: %d mV, too low to resume; the shelf instead\n", mv);
 			else

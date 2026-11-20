@@ -76,12 +76,14 @@ card is the thing to wipe before it goes to anyone else.
 | **X** | game info for the card under the cursor |
 | **Y** | favorite it - Favorites is a shelf of its own. Nothing on Muse's shelf |
 | **Volume rocker** | volume, everywhere, including in game |
-| **F1/F2** | brightness, everywhere, including in game |
+| **MENU+Volume** | brightness, everywhere, including in games and ports |
 | **MENU** (on the systems row) | the main menu - settings that are about the firmware |
 | **MENU** (inside a system) | that system's menu, below |
 | **MENU** (in `Cubic`) | always the main menu; B is the system's |
-| **MENU** (in game) | the in-game menu: Continue, Save, Load, Display, Cheats, RetroAchievements, Reset, Quit. It opens when you let go, so MENU can be held for fast forward |
-| **MENU+R1** (in game) | fast forward: 2x, 3x, 4x, then back to normal |
+| **MENU** (in game) | the in-game menu: Continue, Save, Load, Display, Cheats, RetroAchievements, Reset, Quit. It opens when you let go, so MENU can be held for its chords |
+| **F2** (in game) | fast forward: 2x, 3x, 4x, then back to normal |
+| **F1** (in game, held) | rewind, when it's on for the console |
+| **MENU+SELECT** (in game) | save and quit, back to the shelf |
 | **MENU** (inside any menu) | closes the whole menu, however deep in it you are. B goes back one screen |
 | **SELECT** | Muse, the music and audiobook player, from anywhere but a running game - the in-game menu included. Again to close it |
 | **POWER** | powers off. In a game, the game is saved first |
@@ -138,9 +140,9 @@ than any one console:
 | **Date & Time** (System Settings) | the clock, the time zone and 12- or 24-hour, set with left and right - see below |
 | **Show Clock** (System Settings) | `On` or `Off` - the time at the top of every menu |
 | **Show Battery** (System Settings) | `Icon`, `Percent`, `Icon and percent` or `Off` - the battery at the top of every menu |
-| **Battery Warnings** (System Settings) | when the low battery dot shows (5% to 30%, 10% to start) and when it starts to blink (Auto, which goes by the battery itself, or a percentage under the first), and whether each shows over your games too. At 2% ChaOS saves your game and turns off, whatever these say |
+| **Battery Warnings** (System Settings) | when the low battery dot shows (5% to 30%, 10% to start) and when it starts to blink (Auto, which goes by the battery itself, or a percentage under the first), and whether each shows over your games too, and when ChaOS saves your game and turns off: Auto (when the battery says it's empty, about the gauge's 2%) or 3% to 10% |
 | **Update Available Dot** (System Settings) | `On` or `Off` - a dot beside **Updates** while a newer ChaOS is waiting |
-| **Update Channels** (About ChaOS) | `Public Release` or `Pre-Release` (asked first) - on Pre-Release, **Updates** also offers test builds (`2.6.0-test1`), which come before a release and can have bugs. On Public Release, only releases. Switching back takes nothing back: the Brick keeps its test build until the next release |
+| **Update Channels** (About ChaOS) | `Public Release` or `Pre-Release` (asked first) - Pre-Release is the same as Public Release, plus the Brick Pro support still being tested, in builds numbered like `2.7.0-test13`. On Public Release, only releases. Switching back takes nothing back: the Brick keeps its test build until the next release |
 | **Auto Off** (System Settings) | how long without a button before the device powers itself down |
 | **Appearance** | the look settings on their own page: UI Theme, UI Direction, Transition Speed, Game List View and Menu Color |
 | **UI Theme** | `Plain Jane`, `Fancy Pants`, `ChaOS Pixel Cards` or `ChaOS Pixel Names` - which art the shelves wear. On the Appearance page |
@@ -306,7 +308,7 @@ on all nine rather than only on the one core that happens to implement turbo.
 emulator's own turbo rather than ChaOS's, so it is only there on Game Boy
 Advance; on Game Boy and Game Boy Color, which have no L and R, they do nothing.
 
-**Fast forward** is MENU+R1 in a game. Each press steps the speed to 2x, 3x,
+**Fast forward** is F2 in a game. Each press steps the speed to 2x, 3x,
 4x and back to normal, and says so at the bottom of the screen. The game is
 silent while it's fast, and the picture moves in steps rather than smoothly,
 because the Brick draws every other frame to give the game more time. Each
@@ -747,6 +749,9 @@ out by position as an Xbox pad is. What a port prints is in
 
 **Choosing a cover (ChaOS).** X on a game, then **Get Box Art** or **Replace
 Box Art**, offers **Find Automatically** (the fetch above, for that game),
+**Search LaunchBox** (the LaunchBox Games Database: type a name, choose the
+game, then its box front, 3D box, cartridge or title screen; it has romhacks
+and homebrew, and ChaOS Transfer has the same search under **Cover**),
 **Search itch.io** (most new homebrew is published there, and libretro's
 No-Intro-based collection has little of it: the console's itch.io list is read
 onto the card the first time, from its tag feeds, and caught up once a day) and

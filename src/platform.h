@@ -41,6 +41,8 @@ typedef enum {
 	IN_VOLUP, IN_VOLDN, IN_BRIGHTUP, IN_BRIGHTDN,
 	IN_POWER,
 	IN_L2, IN_R2,      /* ChaOS: the letter scrub on the shelves */
+	IN_F1, IN_F2,      /* ChaOS: the Brick's front keys - rewind and fast forward
+	                    * in games; with both held, Muse's pocket lock */
 	IN_COUNT,
 	IN_NONE = -1,
 } in_button;
@@ -158,12 +160,12 @@ int  plat_resident_wait(void);
 void plat_resident_on_unlock(void (*fn)(int id));
 
 /* Called from inside plat_resident_wait when Diatom reports its fast-forward
- * step, 1 to 4: on every MENU+R1, and again when a game resumes fast. A
+ * step, 1 to 4: on every F2, and again when a game resumes fast. A
  * callback for the unlock's reason. NULL to stop. */
 void plat_resident_on_speed(void (*fn)(int x));
 /* ChaOS: MENU+X in a game - Diatom wrote the frame to `path`, a BMP. */
 void plat_resident_on_shot(void (*fn)(const char *path));
-/* ChaOS: MENU+L1 held, rewinding - said as it starts and once a second. */
+/* ChaOS: F1 held, rewinding - said as it starts and once a second. */
 void plat_resident_on_rewind(void (*fn)(void));
 
 /* Called from inside plat_resident_wait roughly ten times a second, which is

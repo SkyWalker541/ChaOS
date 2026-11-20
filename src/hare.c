@@ -399,6 +399,18 @@ void hare_set_albums(char *(*wanted)(size_t *len, char *why, size_t wn),
 
 void hare_set_after_write(void (*fn)(const char *abs)) { g_after_write = fn; }
 
+/* ChaOS: LaunchBox, for the page's cover search (hare.h) */
+static char *(*g_lbox_search)(const char *game, const char *words, size_t *len, char *why, size_t wn);
+static char *(*g_lbox_images)(int id, size_t *len, char *why, size_t wn);
+
+void hare_set_lbox(char *(*search)(const char *game, const char *words,
+                                   size_t *len, char *why, size_t wn),
+                   char *(*images)(int id, size_t *len, char *why, size_t wn))
+{
+	g_lbox_search = search;
+	g_lbox_images = images;
+}
+
 #define COVER_TMP "/tmp/chaos-cover-upload"
 #define COVER_MAX (16L << 20)
 
@@ -1240,6 +1252,32 @@ static void on_request(httpd_req *r, bool done, void *ctx)
 		if (!done) httpd_want_body(r, HTTPD_BODY_NONE, NULL);
 		if (!g_albums_wanted) { httpd_reply_status(r, 404, "no album covers here"); return; }
 		reply_json(r, g_albums_wanted(&len, why, sizeof why), len, why, "could not look");
+		return;
+	}
+	/* ChaOS: LaunchBox searched for a game's cover (hare_set_lbox) */
+	if (!strcmp(path, "/api/lbox") && !strcmp(m, "GET")) {
+		char raw[512], words[256] = "", req[XFER_PATH_MAX] = "", idq[24] = "", why[128] = "";
+		size_t len = 0;
+		char *json;
+
+		if (!done) httpd_want_body(r, HTTPD_BODY_NONE, NULL);
+		if (!g_lbox_search || !g_lbox_images) { httpd_reply_status(r, 404, "no LaunchBox here"); return; }
+		httpd_query(r, "id", idq, sizeof idq);
+		if (idq[0]) {
+			json = g_lbox_images(atoi(idq), &len, why, sizeof why);
+		} else {
+			httpd_query(r, "q", raw, sizeof raw);
+			if (!xfer_decode(raw, words, sizeof words) || !words[0]) {
+				httpd_reply_status(r, 400, "what to search for, please");
+				return;
+			}
+			httpd_query(r, "p", raw, sizeof raw);
+			if (!xfer_decode(raw, req, sizeof req)) req[0] = '\0';
+			json = g_lbox_search(req, words, &len, why, sizeof why);
+		}
+		if (!json) { httpd_reply_status(r, 502, why[0] ? why : "couldn't reach LaunchBox"); return; }
+		httpd_reply(r, 200, "application/json", json, len, NULL);
+		free(json);
 		return;
 	}
 	/* ChaOS: a game's cover from the phone - a picture sent as the body, or

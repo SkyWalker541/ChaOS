@@ -9,7 +9,7 @@
         check check-cheevos check-hare check-httpd check-idle check-rahash \
         check-raset check-xfer check-menus check-artscrape check-artrun check-audioout \
         check-db check-stats check-sort check-bt check-ss check-update check-asan \
-        check-release check-updater check-chaos-names check-itch check-itchdl check-hbcat check-discset check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore check-gbsort
+        check-release check-updater check-chaos-names check-itch check-itchdl check-hbcat check-discset check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore check-gbsort check-lbox
 
 all: check
 
@@ -464,6 +464,12 @@ check-sevenz: build-native/7z.o
 	@mkdir -p build-native
 	$(CC) -std=gnu11 -Wall -Wextra -O1 -Ilib/7z -o build-native/sevenz-check tools/sevenz-check.c build-native/7z.o -lz
 	@build-native/sevenz-check
+
+# ChaOS: LaunchBox's pages read for box art (src/lbox.h), against saved copies
+check-lbox:
+	@mkdir -p build-native
+	$(CC) -std=gnu11 -Wall -Wextra -O1 -Isrc -o build-native/lbox-check tools/lbox-check.c src/lbox.c
+	@build-native/lbox-check
 
 # ChaOS: 7-Zip's C decoder, for .7z ROMs (lib/7z/sevenz.h)
 build-native/7z.o: lib/7z/chaos_7z.c lib/7z/sevenz.h

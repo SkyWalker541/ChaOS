@@ -462,6 +462,9 @@ int plat_run_port(char *const argv[], const char *const envkv[], const char *wor
 			if (paused) continue;   /* nothing else while it sleeps */
 			if (in_repeat(&in, IN_VOLUP)) plat_volume_nudge(+1);
 			if (in_repeat(&in, IN_VOLDN)) plat_volume_nudge(-1);
+			/* ChaOS: MENU and the volume keys, brightness, in ports too */
+			if (in_repeat(&in, IN_BRIGHTUP)) plat_brightness_nudge(+1);
+			if (in_repeat(&in, IN_BRIGHTDN)) plat_brightness_nudge(-1);
 			/* Select+Start: out to ChaOS, at once */
 			if (in.down[IN_SELECT] && in.down[IN_START]) {
 				*how = PORT_QUIT;
