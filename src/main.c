@@ -1016,10 +1016,14 @@ static bool g_muse_shelf = true;
  * maker, each maker's home consoles then its handhelds, so the Game Boys sit
  * together. Favorites, Recently Played and Muse keep their places, and Ports
  * is always last of the shelves of games. Aquilus's suggestion. */
-enum { SHELF_BY_RELEASE, SHELF_BY_NAME, SHELF_BY_MAKER, SHELF_ORDERS };
+enum { SHELF_BY_RELEASE, SHELF_BY_NAME, SHELF_BY_MAKER, SHELF_BY_CUSTOM, SHELF_ORDERS };
 static int g_shelf_order = SHELF_BY_RELEASE;
-static const char *const SHELF_ORDER_KEY[SHELF_ORDERS]   = { "release", "az", "maker" };
-static const char *const SHELF_ORDER_LABEL[SHELF_ORDERS] = { "Release Date", "A to Z", "By Maker" };
+static const char *const SHELF_ORDER_KEY[SHELF_ORDERS]   = { "release", "az", "maker", "custom" };
+static const char *const SHELF_ORDER_LABEL[SHELF_ORDERS] = { "Release Date", "A to Z", "By Maker", "Custom" };
+/* ChaOS: Custom's order, as Arrange Shelves left it (shelf_custom): tags,
+ * comma separated. A console not in it (one that had no games when it was
+ * arranged) goes after them, by release. Aquilus's suggestion too. */
+static char g_shelf_custom[1024];
 static bool g_muse_attach;          /* SELECT has Muse open with its shelf off */
 
 /* ChaOS: the status bar, the clock top left and the battery top right, each set
@@ -1028,6 +1032,10 @@ static bool g_muse_attach;          /* SELECT has Muse open with its shelf off *
  * key mapping alike, so the page's rows and the keys that act on them agree. */
 static bool g_appearance_page;
 static void appearance_screen(app *a);
+static void arrange_screen(app *a);   /* Appearance > Arrange Shelves */
+/* The virtual shelves' tags (vshelf_insert) */
+#define VSHELF_FAV "FAV"
+#define VSHELF_REC "REC"
 /* ChaOS: the ROM Management page, RomM and Syncthing (syncthing.h) */
 static bool g_rom_page;
 static void rom_page_screen(app *a);
@@ -6282,6 +6290,10 @@ typedef struct {
 	 * can be seen as it now looks. The backdrop leaves out its dimming
 	 * while Y is held too (gm_backdrop). */
 	bool     peek;
+	/* ChaOS: up or down, offered to the screen first: the row the cursor goes
+	 * to, or -1 for the usual step. Arrange Shelves carries the shelf it has
+	 * picked up along with the cursor this way. */
+	int    (*on_step)(void *ctx, int sel, int dir);
 } menu_style;
 
 /* SELECT: Muse, over whatever is on screen. Declared here, after menu_style,
@@ -6346,8 +6358,14 @@ static menu_exit menu_run_body(app *a, const menu_style *st,
 			continue;
 		}
 
-		if (in_repeat(&a->in, IN_UP))   sel = menu_step_sel(rows, n, sel, -1);
-		if (in_repeat(&a->in, IN_DOWN)) sel = menu_step_sel(rows, n, sel, +1);
+		if (in_repeat(&a->in, IN_UP)) {
+			int t = st->on_step ? st->on_step(ctx, sel, -1) : -1;
+			sel = t >= 0 ? t : menu_step_sel(rows, n, sel, -1);
+		}
+		if (in_repeat(&a->in, IN_DOWN)) {
+			int t = st->on_step ? st->on_step(ctx, sel, +1) : -1;
+			sel = t >= 0 ? t : menu_step_sel(rows, n, sel, +1);
+		}
 
 		/* Volume and brightness keep working here, as they do everywhere.
 		 *
@@ -10641,6 +10659,7 @@ static void battwarn_screen(app *a)
 
 static bool g_about_shot;   /* --about: one frame, drawn and not shown */
 static int  g_chan_shot;    /* --chan 1|2: Update Channels, on Public Release or Pre-Release */
+static int  g_arrange_shot; /* --arrange N: Arrange Shelves, row N-1 picked up */
 
 /* About ChaOS > Update Channels: where updates come from. Public Release is
  * every official ChaOS; Pre-Release adds the test builds that come before one
@@ -11393,6 +11412,10 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 		rescan_all(a);
 		return MENU_STAY;
 	}
+	if (sel == PM_SHELF_ARRANGE && key == IN_ACCEPT) {
+		arrange_screen(a);
+		return MENU_STAY;
+	}
 	if (sel == PM_SHELF_MUSE && (d || key == IN_ACCEPT)) {
 		g_muse_shelf = !g_muse_shelf;
 		db_set_str(db_dev(), "muse_shelf", g_muse_shelf ? "on" : "off");
@@ -11516,6 +11539,83 @@ static void tortos_menu_for(app *a, int screen)
 
 /* MENU > Appearance: the look rows on their own page, B back to the menu. The
  * same runner and keys as the menu; only the rows it lists are different. */
+/* ChaOS: Appearance > Arrange Shelves. The consoles that have games, in the
+ * order they're in now: A picks one up, up and down carry it, A puts it down.
+ * Leaving keeps the order as Custom, and the row is read again in it. Muse,
+ * Favorites and Recently Played keep their own places, so aren't listed. */
+#define ARRANGE_MAX 64
+
+typedef struct {
+	app *a;
+	int  idx[ARRANGE_MAX];   /* into a->sys.systems, in the new order */
+	int  n, held;            /* the row picked up, or -1 */
+	bool moved;
+} arrange_ctx;
+
+static int arrange_build(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	arrange_ctx *c = ctx;
+	int i, n = 0;
+
+	*heading = "Arrange Shelves";
+	for (i = 0; i < c->n && n < max - 2; i++) {
+		rows[n] = (menu_row){ c->a->sys.systems[c->idx[i]].name,
+		                      i == c->held ? "Moving" : NULL, true };
+		rows[n++].hint = i == c->held ? "Up and down to move it, A to put it down"
+		                              : "A picks a shelf up to move it";
+	}
+	if (!c->n) rows[n++] = MENU_NOTE("No consoles with games yet");
+	return n;
+}
+
+static int arrange_step(void *ctx, int sel, int dir)
+{
+	arrange_ctx *c = ctx;
+	int t = sel + dir, k;
+
+	if (c->held < 0 || sel != c->held) return -1;
+	if (t < 0 || t >= c->n) return sel;      /* at the end: stays */
+	k = c->idx[sel]; c->idx[sel] = c->idx[t]; c->idx[t] = k;
+	c->held = t;
+	c->moved = true;
+	return t;
+}
+
+static menu_result arrange_key(app *a, void *ctx, in_button key, int sel)
+{
+	arrange_ctx *c = ctx;
+
+	(void)a;
+	if (key == IN_ACCEPT && sel >= 0 && sel < c->n)
+		c->held = c->held == sel ? -1 : sel;
+	return MENU_STAY;
+}
+
+static void arrange_screen(app *a)
+{
+	arrange_ctx c = { .a = a, .held = -1 };
+	char line[sizeof g_shelf_custom] = "";
+	int i;
+
+	for (i = 0; i < a->sys.count && c.n < ARRANGE_MAX; i++) {
+		const system_cfg *s = &a->sys.systems[i];
+
+		if (is_muse(s) || !strcmp(s->tag, VSHELF_FAV) || !strcmp(s->tag, VSHELF_REC)) continue;
+		c.idx[c.n++] = i;
+	}
+	menu_run(a, &(menu_style){ .accent = MENU_ACCENT, .on_step = arrange_step },
+	         arrange_build, arrange_key, &c);
+	if (!c.moved) return;
+	for (i = 0; i < c.n; i++)
+		snprintf(line + strlen(line), sizeof line - strlen(line), "%s%s",
+		         i ? "," : "", a->sys.systems[c.idx[i]].tag);
+	snprintf(g_shelf_custom, sizeof g_shelf_custom, "%s", line);
+	db_set_str(db_dev(), "shelf_custom", g_shelf_custom);
+	g_shelf_order = SHELF_BY_CUSTOM;
+	db_set_str(db_dev(), "shelf_order", SHELF_ORDER_KEY[g_shelf_order]);
+	rescan_all(a);
+}
+
 static void appearance_screen(app *a)
 {
 	sysmenu_ctx c;
@@ -22486,12 +22586,33 @@ static int shelf_maker_rank(const char *tag)
 
 static int shelf_cmp_order;
 
+/* Where a tag is in Custom's list, or after all of them */
+static int shelf_custom_rank(const char *tag)
+{
+	const char *p = g_shelf_custom;
+	size_t tl = strlen(tag);
+	int i = 0;
+
+	while (*p) {
+		const char *e = strchr(p, ',');
+		size_t l = e ? (size_t)(e - p) : strlen(p);
+
+		if (l == tl && !strncasecmp(p, tag, l)) return i;
+		i++;
+		if (!e) break;
+		p = e + 1;
+	}
+	return 1000;
+}
+
 static int shelf_cmp(const void *x, const void *y)
 {
 	const system_cfg *a = x, *b = y;
 	bool pa = !strcmp(a->core, PORTS_CORE), pb = !strcmp(b->core, PORTS_CORE);
 	int d = 0;
 
+	if (shelf_cmp_order == SHELF_BY_CUSTOM)    /* yours, Ports too */
+		return shelf_custom_rank(a->tag) - shelf_custom_rank(b->tag);
 	if (pa != pb) return pa ? 1 : -1;          /* Ports last */
 	if (shelf_cmp_order == SHELF_BY_NAME) d = strcasecmp(a->name, b->name);
 	else if (shelf_cmp_order == SHELF_BY_MAKER) d = shelf_maker_rank(a->tag) - shelf_maker_rank(b->tag);
@@ -22566,8 +22687,7 @@ static void hide_empty_systems(app *a)
  *
  * Every change drops both and builds both again. The rebuild moves every
  * index, so the callers find their place by TAG afterwards, never by index. */
-#define VSHELF_FAV "FAV"
-#define VSHELF_REC "REC"
+/* VSHELF_FAV and VSHELF_REC: near the top, where Arrange Shelves needs them */
 #define RECENT_MAX 12             /* the games Recently Played lists, newest first */
 
 
@@ -24192,6 +24312,21 @@ static void take_shot(app *a)
 		SDL_RenderFillRect(a->r, NULL);
 		menu_draw(a, heading, rows, n, g_bw_shot - 1, 0, MENU_ACCENT);
 	}
+	if (g_arrange_shot) {
+		arrange_ctx c = { .a = a, .held = g_arrange_shot - 1 };
+		menu_row rows[ARRANGE_MAX];
+		const char *heading;
+		int i, n;
+
+		for (i = 0; i < a->sys.count && c.n < ARRANGE_MAX; i++)
+			if (!is_muse(&a->sys.systems[i]) && strcmp(a->sys.systems[i].tag, VSHELF_FAV) &&
+			    strcmp(a->sys.systems[i].tag, VSHELF_REC)) c.idx[c.n++] = i;
+		n = arrange_build(&c, rows, ARRANGE_MAX, &heading);
+		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
+		SDL_RenderFillRect(a->r, NULL);
+		menu_draw(a, heading, rows, n, c.held, 0, MENU_ACCENT);
+	}
 	if (g_chan_shot) {
 		menu_row rows[8];
 		const char *heading;
@@ -24597,6 +24732,7 @@ int main(int argc, char *argv[])
 		else if (!strcmp(argv[i], "--port-power") && i + 1 < argc) shot_port_power = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--about")) g_about_shot = true;
 		else if (!strcmp(argv[i], "--chan") && i + 1 < argc) g_chan_shot = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "--arrange") && i + 1 < argc) g_arrange_shot = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--battwarn") && i + 1 < argc) g_bw_shot = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--romm") && i + 1 < argc) {
 			shot_romm = argv[++i];
@@ -25208,6 +25344,7 @@ int main(int argc, char *argv[])
 		db_get_str(db_dev(), "muse_shelf", rs, sizeof rs, "on");
 		g_muse_shelf = strcmp(rs, "off") != 0;
 		db_get_str(db_dev(), "shelf_order", rs, sizeof rs, "release");
+		db_get_str(db_dev(), "shelf_custom", g_shelf_custom, sizeof g_shelf_custom, "");
 		for (g_shelf_order = SHELF_ORDERS - 1; g_shelf_order > 0; g_shelf_order--)
 			if (!strcmp(rs, SHELF_ORDER_KEY[g_shelf_order])) break;
 		g_status_clock   = db_get_int(db_dev(), "status.clock", 1) != 0;
