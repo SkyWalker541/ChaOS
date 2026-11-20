@@ -69,7 +69,7 @@ card is the thing to wipe before it goes to anyone else.
 |---|---|
 | **Left/Right** | move along the row, when the shelf runs horizontally. In `Cubic`, always the games |
 | **Up/Down** | move along the shelf when it runs vertically - **up advances**. In `Cubic`, always the systems |
-| **the other axis** | on a game shelf, the shelf before or after, panned across (Muse is passed over). Not in `Cubic`, where both axes are taken; L2 and R2 jump by letter |
+| **the other axis** | on a game shelf, the shelf before or after, panned across (Muse is passed over); in card view its name comes up for a moment. Not in `Cubic`, where both axes are taken; L2 and R2 jump by letter |
 | **L1/R1** | jump a screenful (games) |
 | **A** | open a system, or start a game. In `Cubic`, start it |
 | **B** | back to the systems row. In `Cubic`, this system's menu |
