@@ -1420,7 +1420,10 @@ static void look_rows(void)
 	look_format(&st, LP_GAME_SYSTEM, v, sizeof v);
 	ck(st.on && !strcmp(v, "Game Boy"), "on, and Game System reads Game Boy");
 	look_format(&st, LP_BACKING_COLOR, v, sizeof v);
-	ck(!strcmp(v, "Pocket"), "the Pocket's backing, as the README says");
+	ck(!strcmp(v, "Pocket"), "the Pocket's backing");
+	look_recommended(LOOK_GBC, &st);
+	look_format(&st, LP_BACKING_COLOR, v, sizeof v);
+	ck(!strcmp(v, "Grey"), "a Game Boy Color's is Grey");
 	look_recommended(LOOK_GBA, &st);
 	look_format(&st, LP_GAME_SYSTEM, v, sizeof v);
 	ck(!strcmp(v, "GBA"), "a GBA's is the original GBA");

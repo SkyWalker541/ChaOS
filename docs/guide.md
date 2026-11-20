@@ -255,12 +255,12 @@ the shelf's palette). A change in the in-game menu shows at once; nothing
 needs restarting.
 
 Game System **Game Boy** covers both the original Game Boy (DMG) and the
-Game Boy Pocket. The backing that goes with each, as PT recommends:
+Game Boy Pocket. The backing that goes with each:
 
 | Console | Game System | Backing Color |
 |---|---|---|
 | Game Boy (DMG) or Pocket | Game Boy | Pocket |
-| Game Boy Color | Game Boy Color | Pocket |
+| Game Boy Color | Game Boy Color | Grey |
 | Game Boy Advance SP (front-lit) | GBA SP | White |
 | Game Boy Advance | GBA | Grey |
 
