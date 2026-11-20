@@ -69,7 +69,7 @@ card is the thing to wipe before it goes to anyone else.
 |---|---|
 | **Left/Right** | move along the row, when the shelf runs horizontally. In `Cubic`, always the games |
 | **Up/Down** | move along the shelf when it runs vertically - **up advances**. In `Cubic`, always the systems |
-| **the other axis** | on a game shelf, the shelf before or after, panned across (Muse is passed over); in card view its name comes up for a moment (Shelves > Show Shelf Name turns it off). Not in `Cubic`, where both axes are taken; L2 and R2 jump by letter |
+| **the other axis** | on a game shelf, the shelf before or after, panned across (Muse is passed over); in card view its name comes up for a moment (Appearance > Shelves > Show Shelf Name turns it off). Not in `Cubic`, where both axes are taken; L2 and R2 jump by letter |
 | **L1/R1** | jump a screenful (games) |
 | **A** | open a system, or start a game. In `Cubic`, start it |
 | **B** | back to the systems row. In `Cubic`, this system's menu |
@@ -144,8 +144,8 @@ than any one console:
 | **Update Available Dot** (System Settings) | `On` or `Off` - a dot beside **Updates** while a newer ChaOS is waiting |
 | **Update Channels** (About ChaOS) | `Public Release` or `Pre-Release` (asked first) - Pre-Release is the same as Public Release, plus the Brick Pro support still being tested, in builds numbered like `2.7.0-test13`. On Public Release, only releases. Switching back takes nothing back: the Brick keeps its test build until the next release |
 | **Auto Off** (System Settings) | how long without a button before the device powers itself down |
-| **Appearance** | the look settings on their own page: UI Theme, UI Direction, Transition Speed and Menu Color |
-| **Shelves** | the shelf settings on their own page: Game List View, Show Shelf Name, Shelf Order, Arrange Shelves, Show Favorites, Show Recently Played and Show Muse |
+| **Appearance** | the look settings on their own page: UI Theme, UI Direction, Transition Speed, Menu Color, and Shelves |
+| **Shelves** (Appearance) | the shelf settings on their own page: Game List View, Show Shelf Name, Shelf Order, Arrange Shelves, Show Favorites, Show Recently Played and Show Muse |
 | **UI Theme** | `Plain Jane`, `Fancy Pants`, `ChaOS Pixel Cards` or `ChaOS Pixel Names` - which art the shelves wear. On the Appearance page |
 | **UI Direction** | `Horizontal`, `Vertical` or `Cubic` - see below |
 | **Show Favorites** (Shelves) | `On` or `Off` - whether the Favorites shelf appears on the systems row. Off, Y still marks favorites, and they come back when it's on |

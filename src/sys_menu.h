@@ -43,8 +43,8 @@ typedef enum {
 	PM_NETPAGE, PM_WIFI, PM_BT,
 	PM_SYSPAGE, PM_AUDIO, PM_CHANNELS, PM_NIGHT, PM_CLOCK, PM_SHOWCLOCK, PM_SHOWBATT, PM_BATTWARN, PM_UPDDOT,
 	PM_SLEEP, PM_APPEARANCE, PM_THEME, PM_DIR, PM_SPEED, PM_COLOR,
-	/* ChaOS: Shelves, a page of its own: how a shelf of games shows, and which
-	 * shelves there are and in what order */
+	/* ChaOS: Shelves, a page of its own under Appearance: how a shelf of games
+	 * shows, and which shelves there are and in what order */
 	PM_SHELVES, PM_LISTVIEW, PM_SHELF_NAME,
 	/* ChaOS: which of the shelves that aren't consoles are on the systems row */
 	PM_SHELF_FAV, PM_RECENT, PM_SHELF_MUSE, PM_SHELF_ORDER, PM_SHELF_ARRANGE,
