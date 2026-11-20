@@ -211,10 +211,10 @@ const char *look_param_hint(const look_settings *s, look_param p)
 	}
 	case LP_BACKING_COLOR: {
 		static const char *const H[] = {
-			"No tint: a plain grey behind the pixels",
-			"The Pocket's green-grey",
-			"A neutral grey, for the GBC and original GBA",
-			"White, for the GBA SP's front-lit screen",
+			"No color behind the pixels",
+			"Green-grey, behind DMG and Pocket pixels",
+			"Grey, behind GBC and original GBA pixels",
+			"White, behind the GBA SP's pixels",
 		};
 		return v >= 0 && v < 4 ? H[v] : "";
 	}
@@ -247,7 +247,7 @@ const char *look_param_hint(const look_settings *s, look_param p)
 const char *look_group_hint(look_group g)
 {
 	static const char *const H[LG_COUNT] = {
-		"The backing behind the pixels",
+		"The backing behind pixels on real hardware",
 		"Lines between the pixels",
 		"The pixels' shadow and the bezel's",
 		"A light on the screen: glare and sheen",
