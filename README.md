@@ -22,7 +22,7 @@ ChaOS is custom firmware for the **TrimUI Brick** and **Brick Hammer**. It runs 
 
 | Feature | What it does |
 |---|---|
-| **[Shaders and overlays](https://skywalker541.github.io/ChaOS/#shaders)** | CRT, LCD and PT SkyWalker541 looks you can tune, frames around the picture, overscan cropping, and a [speed check](https://skywalker541.github.io/ChaOS/#speed) that says whether a game keeps full speed |
+| **[Shaders and overlays](https://skywalker541.github.io/ChaOS/#shaders)** | CRT, LCD and PT SkyWalker541 looks you can tune, frames around the picture, every setting explained in the menu, overscan cropping, and a [speed check](https://skywalker541.github.io/ChaOS/#speed) that says whether a game keeps full speed |
 | **[Cheats](https://skywalker541.github.io/ChaOS/#cheats)** | Game Genie, Action Replay and GameShark codes from libretro's cheat database, switched on and off in the in-game menu |
 | **[Ports](https://skywalker541.github.io/ChaOS/#ports)** | PortMaster's catalog on the Brick, with runtimes and libraries fetched for you |
 | **[PICO-8](https://skywalker541.github.io/ChaOS/#pico8)** | Your own copy of PICO-8, with Splore for the carts people share |
@@ -30,7 +30,7 @@ ChaOS is custom firmware for the **TrimUI Brick** and **Brick Hammer**. It runs 
 | **[RomM and Syncthing](https://skywalker541.github.io/ChaOS/#sync)** | In ROM Management: games, saves and BIOS from your own RomM server, and saves, games and BIOS kept the same on all your devices |
 | **[Get Homebrew](https://skywalker541.github.io/ChaOS/#homebrew)** | New games from itch.io for ten consoles in one list you can filter, sort and search, with a page for each game, update checks, and free games and ones you bought onto their shelves with their covers |
 | **[Multi-disc games, combined](https://skywalker541.github.io/ChaOS/#multidisc)** | Discs copied in loose are found and made one game, with Disc in its menu |
-| **[A look of its own](https://skywalker541.github.io/ChaOS/#shelves)** | Pixel Names and Pixel Cards themes, Game List View, letter scrubbing, menu colors |
+| **[A look of its own](https://skywalker541.github.io/ChaOS/#shelves)** | Pixel Names and Pixel Cards themes, Game List View, letter scrubbing, menu colors, shelves in your order (release date, A to Z, by maker or your own) and the other d-pad direction to change shelf |
 | **[Rewind, mapping, screenshots](https://skywalker541.github.io/ChaOS/#playing)** | Hold F1 to rewind, F2 for fast forward, MENU+SELECT to save and quit, alongside TortOS's instant start, resume, turbo and RetroAchievements |
 | **[PlayStation](https://skywalker541.github.io/ChaOS/#playstation)** | On PCSX-ReARMed, with achievements, and a Disc page for games on more than one disc |
 | **[Transfer and Wire](https://skywalker541.github.io/ChaOS/#transfer)** | Add games and covers from any browser, over Wi-Fi or the USB cable, with box art searched on LaunchBox |
