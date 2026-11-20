@@ -22,7 +22,7 @@ CHECKS = check-cheevos check-hare check-httpd check-idle check-rahash \
          check-db check-stats check-sort check-bt check-ss \
          check-muselib check-musequeue check-museart check-controls check-logpack \
          check-clock check-update check-remap check-shots check-pixfont \
-         check-release check-updater check-chaos-names check-itch check-itchdl check-hbcat check-discset check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore check-gbsort
+         check-release check-updater check-chaos-names check-itch check-itchdl check-hbcat check-discset check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore check-gbsort check-menu-keys
 
 check: check-sevenz
 	@fail=0; for c in $(CHECKS); do \
@@ -147,6 +147,18 @@ build-native/pixfont-check: tools/pixfont-check.c src/pixfont.c src/pixfont.h FO
 	$(CC) -std=gnu11 -Wall -Wextra -O1 -g -o $@ tools/pixfont-check.c src/pixfont.c
 
 # ChaOS: screenshots, per game (src/shots.c)
+# ChaOS: the ChaOS menu's every page, in both Game List Views and every UI
+# Direction, built and keyed by the launcher itself: a key must land on the
+# row drawn (2.7.0's Shelves page didn't). Needs the native build; an empty
+# card in a scratch folder.
+check-menu-keys: native
+	@t=$$(mktemp -d) && mkdir -p $$t/root $$t/roms $$t/card $$t/ud && cp config/systems.cfg $$t/root/ && \
+	TORTOS_ROOT=$$t/root TORTOS_ROMS=$$t/roms TORTOS_CARD=$$t/card TORTOS_USERDATA=$$t/ud \
+	TORTOS_SHARED=$$t/root TORTOS_FONT=res/fonts/menu.ttf SDL_VIDEODRIVER=offscreen \
+	./build-native/tortos --shot $$t/x.png --menu-ids 2>/dev/null > $$t/out; r=$$?; \
+	grep -c "ok " $$t/out | sed 's/^/menu keys: pages checked: /'; grep FAIL $$t/out; rm -rf $$t; \
+	if [ $$r -ne 0 ]; then echo "menu keys: FAILED" >&2; exit 1; fi; echo "ok: every key lands on its row"
+
 check-shots: build-native/shots-check
 	@./build-native/shots-check
 
