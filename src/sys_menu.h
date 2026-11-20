@@ -42,7 +42,10 @@ typedef enum {
 	 * status line's clock and battery, Auto Off */
 	PM_NETPAGE, PM_WIFI, PM_BT,
 	PM_SYSPAGE, PM_AUDIO, PM_CHANNELS, PM_NIGHT, PM_CLOCK, PM_SHOWCLOCK, PM_SHOWBATT, PM_BATTWARN, PM_UPDDOT,
-	PM_SLEEP, PM_APPEARANCE, PM_THEME, PM_DIR, PM_SPEED, PM_LISTVIEW, PM_SHELF_NAME, PM_COLOR,
+	PM_SLEEP, PM_APPEARANCE, PM_THEME, PM_DIR, PM_SPEED, PM_COLOR,
+	/* ChaOS: Shelves, a page of its own: how a shelf of games shows, and which
+	 * shelves there are and in what order */
+	PM_SHELVES, PM_LISTVIEW, PM_SHELF_NAME,
 	/* ChaOS: which of the shelves that aren't consoles are on the systems row */
 	PM_SHELF_FAV, PM_RECENT, PM_SHELF_MUSE, PM_SHELF_ORDER, PM_SHELF_ARRANGE,
 	PM_SCRAPE, PM_ACHIEVEMENTS, PM_SS,
@@ -111,7 +114,7 @@ typedef enum { SMM_COUNT, SMM_SHOW, SMM_SORT, SMM_LOCK, SMM_ART, SMM_RESCAN } sm
  * two cannot disagree about what row 2 is. */
 int sys_menu_muse_rows(bool books, bool both, bool no_wifi, sm_muse_row *out);
 
-#define MENU_MAX_ROWS 40
+#define MENU_MAX_ROWS 41
 
 /* The array every caller declares must hold every row a build can produce, and
  * on 2026-09-16 it stopped: PM_ROWS went to 13 against a cap of 12 when the
@@ -204,6 +207,7 @@ typedef struct {
 	 * the menu holds Appearance in their place; the row list and the key
 	 * mapping read this the same way, so they cannot disagree. */
 	bool        appearance;
+	bool        shelf_page;    /* ChaOS: the Shelves page */
 	/* ChaOS: the ROM Management page, as appearance is the Appearance one */
 	bool        rom_page;
 	/* ChaOS: the Wi-Fi & Bluetooth page, and the System Settings page */

@@ -50,15 +50,15 @@ int sys_menu_tortos_rows(const sys_ui *u, pm_row *out)
 		if (!u->night_ok && r == PM_NIGHT) continue;
 		/* ChaOS: the Wi-Fi & Bluetooth page only where there is a radio */
 		if (r == PM_NETPAGE && u->no_wifi && u->no_bt) continue;
-		/* The look rows live on the Appearance page, and ChaOS's RomM and
+		/* The look rows live on the Appearance page, the shelf rows on Shelves, and ChaOS's RomM and
 		 * Syncthing on the ROM Management page, Wi-Fi and Bluetooth on theirs
 		 * and the device's own settings on System Settings; the menu has one
 		 * row for each page */
 		{
-			bool look = r == PM_THEME || r == PM_DIR || r == PM_SPEED ||
-			            r == PM_LISTVIEW || r == PM_COLOR || r == PM_SHELF_FAV ||
-			            r == PM_RECENT || r == PM_SHELF_MUSE || r == PM_SHELF_ORDER ||
-			            r == PM_SHELF_ARRANGE || r == PM_SHELF_NAME;
+			bool look = r == PM_THEME || r == PM_DIR || r == PM_SPEED || r == PM_COLOR;
+			bool shelf = r == PM_LISTVIEW || r == PM_SHELF_NAME || r == PM_SHELF_ORDER ||
+			             r == PM_SHELF_ARRANGE || r == PM_SHELF_FAV || r == PM_RECENT ||
+			             r == PM_SHELF_MUSE;
 			bool roms = r == PM_ROMM || r == PM_HOMEBREW || r == PM_SYNC || r == PM_GBSORT ||
 			            r == PM_DISCSETS;
 			bool net  = r == PM_WIFI || r == PM_BT;
@@ -66,9 +66,9 @@ int sys_menu_tortos_rows(const sys_ui *u, pm_row *out)
 			            r == PM_CLOCK || r == PM_SHOWCLOCK || r == PM_SHOWBATT || r == PM_BATTWARN ||
 			            r == PM_UPDDOT ||
 			            r == PM_SLEEP;
-			int page = look ? 1 : roms ? 2 : net ? 3 : sys ? 4 : 0;
+			int page = look ? 1 : roms ? 2 : net ? 3 : sys ? 4 : shelf ? 5 : 0;
 			int want = u->appearance ? 1 : u->rom_page ? 2 : u->net_page ? 3
-			         : u->sys_page ? 4 : 0;
+			         : u->sys_page ? 4 : u->shelf_page ? 5 : 0;
 
 			if (page != want) continue;
 		}
@@ -237,7 +237,8 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	menu_row full[PM_ROWS];
 
 	*heading = u->appearance ? "Appearance" : u->rom_page ? "ROM Management"
-	         : u->net_page ? "Wi-Fi & Bluetooth" : u->sys_page ? "System Settings" : "ChaOS";
+	         : u->net_page ? "Wi-Fi & Bluetooth" : u->sys_page ? "System Settings"
+	         : u->shelf_page ? "Shelves" : "ChaOS";
 	/* The network's name, not its address. A settings row should say what the
 	 * setting IS; the address is a fact about the machine and lives on the
 	 * About page with the other ones. */
@@ -311,6 +312,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	full[PM_SPEED]        = (menu_row){ "Transition Speed", u->name_speed, true };
 	full[PM_LISTVIEW]     = (menu_row){ "Game List View", u->list_view, true };
 	full[PM_APPEARANCE]   = (menu_row){ "Appearance", NULL, true };
+	full[PM_SHELVES]      = (menu_row){ "Shelves", NULL, true };
 	/* ChaOS: switches - whether each shelf that isn't a console shows on
 	 * the systems row (each still only while it has something on it). Off,
 	 * Muse is still on SELECT, and favorites are still kept. */
@@ -380,7 +382,8 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	full[PM_BATTWARN].hint     = "When the low battery dot shows, and in games";
 	full[PM_UPDDOT].hint       = "A dot on Updates when a new ChaOS is out";
 	full[PM_SLEEP].hint        = "Power off after this long with no buttons pressed";
-	full[PM_APPEARANCE].hint   = "Theme, layout, menu color and which shelves show";
+	full[PM_APPEARANCE].hint   = "Theme, layout and menu color";
+	full[PM_SHELVES].hint      = "Which shelves show, their order and their games";
 	full[PM_THEME].hint        = "The look of the cards on the shelf";
 	full[PM_DIR].hint          = "Which way the shelves move";
 	full[PM_SPEED].hint        = "How fast the pixel names come together";
@@ -413,7 +416,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	full[PM_UPDATE].opens = full[PM_PORTS].opens = full[PM_ROMM].opens = true;
 	full[PM_ROMMGMT].opens = full[PM_SYNC].opens = full[PM_GBSORT].opens = true;
 	full[PM_HOMEBREW].opens = full[PM_DISCSETS].opens = true;
-	full[PM_APPEARANCE].opens = true;
+	full[PM_APPEARANCE].opens = full[PM_SHELVES].opens = true;
 	full[PM_NETPAGE].opens = full[PM_SYSPAGE].opens = true;
 	/* ChaOS: the rows left and right go round (menu.h, cycles) */
 	full[PM_AUDIO].cycles = full[PM_CHANNELS].cycles = full[PM_SLEEP].cycles = true;
