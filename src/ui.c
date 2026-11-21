@@ -1122,9 +1122,20 @@ static SDL_Texture *make_card(SDL_Renderer *r, const char *title, unsigned rgb,
 	SDL_Surface *s;
 	SDL_Texture *t;
 
+	static TTF_Font *f_mark_px;   /* Pixel Burst's, kept like f_mark */
+	TTF_Font *tf = fonts[UI_F_CARD], *mk;
+
 	if (!f_mark && font_path_kept[0])
 		f_mark = TTF_OpenFont(font_path_kept, 560);
-	if (!(s = card_surface(fonts[UI_F_CARD], f_mark, title, rgb, cw, ch, round)))
+	mk = f_mark;
+	if (px_on && px_fonts[UI_F_CARD]) {
+		/* ChaOS Pixel Burst: a made-up cover is titled in the theme's
+		 * heading font, its big letter too */
+		if (!f_mark_px) f_mark_px = TTF_OpenFont(ui_font_path(true), 560);
+		tf = px_fonts[UI_F_CARD];
+		if (f_mark_px) mk = f_mark_px;
+	}
+	if (!(s = card_surface(tf, mk, title, rgb, cw, ch, round)))
 		return NULL;
 	t = SDL_CreateTextureFromSurface(r, s);
 	SDL_FreeSurface(s);
@@ -1161,9 +1172,18 @@ ui_card_fonts *ui_card_fonts_open(void)
 	ui_card_fonts *f;
 
 	if (!font_path_kept[0] || !(f = calloc(1, sizeof *f))) return NULL;
-	f->title = TTF_OpenFont(font_path_kept,
-	                        (int)(FONT_BASE * font_mul[UI_F_CARD] + 0.5f));
-	f->mark = TTF_OpenFont(font_path_kept, 560);
+	/* ChaOS Pixel Burst: the workers draw made-up covers in the theme's
+	 * heading font too; they are reopened when the theme changes */
+	if (px_on && px_fonts[UI_F_CARD]) {
+		f->title = TTF_OpenFont(ui_font_path(true), px_pt[UI_F_CARD]);
+		f->mark = TTF_OpenFont(ui_font_path(true), 560);
+	}
+	if (!f->title) {
+		if (f->mark) TTF_CloseFont(f->mark);
+		f->title = TTF_OpenFont(font_path_kept,
+		                        (int)(FONT_BASE * font_mul[UI_F_CARD] + 0.5f));
+		f->mark = TTF_OpenFont(font_path_kept, 560);
+	}
 	if (!f->title) {
 		ui_card_fonts_close(f);
 		return NULL;
