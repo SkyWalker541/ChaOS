@@ -1422,6 +1422,7 @@ static SDL_Texture *sys_get_tex(void *ctx, int i, int *w, int *h, float *cb)
 	 * move - toward its name under the cursor, away from it elsewhere */
 	if (CARDS_DRAWN(g_cards)) {
 		pn_speed(PN_SPEEDS[g_pn_speed[g_dir]].form);
+		pn_framed(CARDS_PIXEL_UI(g_cards));
 		a->sys_tex[i] = pn_card(a->r, a->sys_tex[i], a->sys.systems[i].name,
 		                        a->sys.systems[i].accent, i == a->sys_cursor);
 		*w = a->sys_tex[i] ? PN_W : 0;
@@ -4878,6 +4879,26 @@ static void draw_switch(SDL_Renderer *r, int right, float cy, int text_h, bool o
 	SDL_Color tc, kc;
 
 	if (!live) sel = 0.0f;
+	/* ChaOS Pixel Burst: a block switch: a dark slot in the logo's outline,
+	 * the knob cyan at the right when on, orange at the left when off
+	 * (SkyWalker541's call, 2026-11-20: orange is off) */
+	if (ui_pixel()) {
+		int u = h / 8 > 2 ? h / 8 : 2;
+		SDL_Rect in = { track.x + u, track.y + u, track.w - u * 2, track.h - u * 2 };
+		SDL_Rect kb = { on ? in.x + in.w - (in.h - u * 2) - u : in.x + u, in.y + u,
+		                in.h - u * 2, in.h - u * 2 };
+
+		(void)acc;
+		SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+		SDL_SetRenderDrawColor(r, 0x3A, 0x34, 0x46, live ? 255 : 150);
+		SDL_RenderFillRect(r, &track);
+		SDL_SetRenderDrawColor(r, 0x26, 0x32, 0x3C, live ? 255 : 150);
+		SDL_RenderFillRect(r, &in);
+		if (on) SDL_SetRenderDrawColor(r, 0x39, 0xC5, 0xD6, live ? 255 : 150);
+		else    SDL_SetRenderDrawColor(r, 0xFF, 0x7A, 0x2F, live ? 255 : 150);
+		SDL_RenderFillRect(r, &kb);
+		return;
+	}
 	if (on) {
 		tc = acc;
 		tc.a = (Uint8)((live ? 170 : 90) + (live ? 85 : 0) * sel);
@@ -4980,6 +5001,7 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
                          int n, int sel, int fixed_w, unsigned accent,
                          const unsigned *vcolors, bool visits_all, int loop_at)
 {
+	ui_set_pixel(CARDS_PIXEL_UI(g_cards));   /* ChaOS Pixel Burst: a theme changed in a menu */
 	TTF_Font *fm = ui_font(UI_F_MENU), *fh = ui_font(UI_F_LABEL);
 	int row_h = menu_row_h();
 	int pad = menu_pad();
@@ -5359,7 +5381,12 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 		int area_y = content_y, area_h = panel.y + panel.h - pad - content_y;
 		int max_w = panel.w * 42 / 100, aw, ah, lane;
 		float dt = art_last ? (float)(nowa - art_last) : 0.0f;
+		/* ChaOS Pixel Burst: room for the frame round the cover */
+		int fr_in = ui_pixel() ? 14 : 0;
 
+		area_y += fr_in;
+		area_h -= fr_in * 2;
+		max_w -= fr_in * 2;
 		art_last = nowa;
 		if (dt > 100.0f) dt = 100.0f;
 		if (art_side != g_menu_art.side) art_w_cur = -1.0f;
@@ -5376,7 +5403,7 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 			aw = ah = 0;
 			if (art_w_cur < 0.0f) art_w_cur = (float)(max_w * 3 / 4);
 		}
-		lane = (int)(art_w_cur + 0.5f) + pad;
+		lane = (int)(art_w_cur + 0.5f) + pad + fr_in * 2;
 		lane_w = panel.w - lane;
 		if (g_menu_art.side < 0) lane_x = panel.x + lane;
 		content_x = lane_x + pad;
@@ -5389,10 +5416,24 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 
 			if (dh > area_h) { dh = area_h; dw = (int)((long)dh * g_menu_art.w / g_menu_art.h); }
 			ar.w = dw; ar.h = dh;
-			ar.x = g_menu_art.side < 0 ? panel.x + pad + ((int)(art_w_cur + 0.5f) - dw) / 2
-			                           : panel.x + panel.w - pad - (int)(art_w_cur + 0.5f)
+			ar.x = g_menu_art.side < 0 ? panel.x + pad + fr_in + ((int)(art_w_cur + 0.5f) - dw) / 2
+			                           : panel.x + panel.w - pad - fr_in - (int)(art_w_cur + 0.5f)
 			                             + ((int)(art_w_cur + 0.5f) - dw) / 2;
 			ar.y = area_y + (area_h - dh) / 2;
+			/* ChaOS Pixel Burst: the theme's frame round the cover, at its
+			 * shape: cream rim, the logo's outline, a few pixels off a corner */
+			if (ui_pixel()) {
+				SDL_Rect fr = { ar.x - 10, ar.y - 10, ar.w + 20, ar.h + 20 };
+				SDL_Rect ol = { ar.x - 6, ar.y - 6, ar.w + 12, ar.h + 12 };
+				int bx = g_menu_art.side < 0 ? fr.x + fr.w : fr.x - 8;
+
+				ui_round_rect(a->r, &fr, 16, (SDL_Color){ 0xF4, 0xEA, 0xD5, 255 });
+				ui_round_rect(a->r, &ol, 16, (SDL_Color){ 0x3A, 0x34, 0x46, 255 });
+				SDL_SetRenderDrawColor(a->r, 0x39, 0xC5, 0xD6, 255);
+				SDL_RenderFillRect(a->r, &(SDL_Rect){ bx + (g_menu_art.side < 0 ? 6 : -10), fr.y - 14, 10, 10 });
+				SDL_SetRenderDrawColor(a->r, 0xFF, 0x7A, 0x2F, 255);
+				SDL_RenderFillRect(a->r, &(SDL_Rect){ bx + (g_menu_art.side < 0 ? 18 : -26), fr.y - 4, 10, 10 });
+			}
 			SDL_RenderCopy(a->r, g_menu_art.tex, NULL, &ar);
 		}
 	}
@@ -5543,6 +5584,31 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 		plate.y = (int)(pl_y + 0.5f);
 		plate.w = lane_w - pad;
 		plate.h = (int)(pl_h + 0.5f);
+		if (ui_pixel()) {
+			/* ChaOS Pixel Burst: a cream plate, solid, an orange edge at its
+			 * end, a pixel arrow at its start, and a few pixels breaking off
+			 * past the edge, like the logo's handheld. The row's text turns
+			 * dark on it (below). */
+			int u = row_h / 12 > 2 ? row_h / 12 : 2;      /* one "pixel" */
+			int au = u * 3 / 4 > 2 ? u * 3 / 4 : 2;       /* the arrow's */
+			int ax = plate.x + au, ay = plate.y + plate.h / 2;
+			int ex = plate.x + plate.w;
+
+			ui_round_rect(a->r, &plate, 8, (SDL_Color){ 0xF4, 0xEA, 0xD5, 255 });
+			SDL_SetRenderDrawColor(a->r, 0xFF, 0x7A, 0x2F, 255);
+			SDL_RenderFillRect(a->r, &(SDL_Rect){ ax, ay - au * 2, au, au * 5 });
+			SDL_RenderFillRect(a->r, &(SDL_Rect){ ax + au, ay - au, au, au * 3 });
+			SDL_RenderFillRect(a->r, &(SDL_Rect){ ax + au * 2, ay, au, au });
+			/* the burst, once the plate has arrived: in the margin past its
+			 * end, inside the panel's rim */
+			if (fabsf(pl_y - (float)ty_sel) < 1.0f) {
+				SDL_RenderFillRect(a->r, &(SDL_Rect){ ex + 2, plate.y + u, u * 2, u * 2 });
+				SDL_SetRenderDrawColor(a->r, 0x39, 0xC5, 0xD6, 255);
+				SDL_RenderFillRect(a->r, &(SDL_Rect){ ex + u + 2, plate.y - u, u, u });
+				SDL_SetRenderDrawColor(a->r, 0xF4, 0xEA, 0xD5, 255);
+				SDL_RenderFillRect(a->r, &(SDL_Rect){ ex + 4, plate.y + plate.h - u * 2, u, u });
+			}
+		} else
 		ui_round_rect(a->r, &plate, row_h / 4, (SDL_Color){ 255, 255, 255, 34 });
 
 		plate_y = pl_y;
@@ -5626,6 +5692,10 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 			lc = rows[i].live
 			     ? col_mix(UI_TEXT_SOFT, UI_TEXT, w)
 			     : col_mix(UI_TEXT_DIM, UI_TEXT_SOFT, w);
+			/* ChaOS Pixel Burst: dark on the cream plate */
+			if (ui_pixel())
+				lc = col_mix(rows[i].live ? UI_TEXT_SOFT : UI_TEXT_DIM,
+				             (SDL_Color){ 0x17, 0x15, 0x1C, 255 }, w);
 			sel_w = w;
 		}
 		/* The panel's own accent, not a->tint. These were the same value for
@@ -5645,6 +5715,10 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 			                            (Uint8)(accent >> 8),
 			                            (Uint8)accent, 255 }, sel_w)
 			     : UI_TEXT_DIM;
+		/* ChaOS Pixel Burst: a value on the cream plate goes dark too: the
+		 * theme's orange is too light to read on cream */
+		if (ui_pixel() && !(vcolors && vcolors[i]))
+			vc = col_mix(vc, (SDL_Color){ 0x17, 0x15, 0x1C, 255 }, sel_w);
 		/* ChaOS: a row that opens another screen, with a chevron in the
 		 * right margin: the value's color, so it brightens with the row */
 		if (rows[i].opens && rows[i].live && !ROW_IS_NOTE(rows[i]))
@@ -26166,6 +26240,7 @@ int main(int argc, char *argv[])
 	Uint32 last_pass = 0, last_render = 0;
 
 	while (a.running) {
+		ui_set_pixel(CARDS_PIXEL_UI(g_cards));   /* ChaOS Pixel Burst */
 		plat_input_poll(&a.in);
 		if (a.in.quit_requested || want_quit) break;
 

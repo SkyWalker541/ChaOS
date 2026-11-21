@@ -42,6 +42,17 @@ static const float font_mul[UI_F_COUNT] = {
 };
 
 static TTF_Font *fonts[UI_F_COUNT];
+/* ChaOS Pixel Burst: its own two pixel fonts (res/fonts: Pixelify Sans for
+ * reading, Silkscreen for titles, both OFL), beside the menu font on the card,
+ * opened the first time the theme is on and kept. Pixelify runs about 6%
+ * wider than the menu font, so a step smaller; Silkscreen half again wider, so
+ * smaller still: the same widths, so no menu outgrows the screen. */
+static TTF_Font *px_fonts[UI_F_COUNT];
+static bool px_on, px_tried;
+static const float px_mul[UI_F_COUNT] = {
+	[UI_F_TITLE] = 0.74f, [UI_F_MENU] = 0.93f, [UI_F_LABEL] = 0.74f,
+	[UI_F_META] = 0.93f, [UI_F_CARD] = 0.74f,
+};
 static TTF_Font *f_mark;
 static char font_path_kept[512];
 static SDL_Texture *glow_tex;
@@ -115,15 +126,47 @@ void ui_quit(void)
 	for (int i = 0; i < TEXT_CACHE; i++)
 		if (cache[i].tex) { SDL_DestroyTexture(cache[i].tex); cache[i].tex = NULL; }
 	if (glow_tex) { SDL_DestroyTexture(glow_tex); glow_tex = NULL; }
-	for (int i = 0; i < UI_F_COUNT; i++)
+	for (int i = 0; i < UI_F_COUNT; i++) {
 		if (fonts[i]) { TTF_CloseFont(fonts[i]); fonts[i] = NULL; }
+		if (px_fonts[i]) { TTF_CloseFont(px_fonts[i]); px_fonts[i] = NULL; }
+	}
+	px_tried = px_on = false;
 	if (f_mark) { TTF_CloseFont(f_mark); f_mark = NULL; }
 	TTF_Quit();
 }
 
+static void px_open(void)
+{
+	char dir[sizeof font_path_kept], path[sizeof font_path_kept + 32];
+	char *slash;
+	int i;
+
+	px_tried = true;
+	snprintf(dir, sizeof dir, "%s", font_path_kept);
+	slash = strrchr(dir, '/');
+	if (slash) *slash = 0; else snprintf(dir, sizeof dir, ".");
+	for (i = 0; i < UI_F_COUNT; i++) {
+		bool head = i == UI_F_TITLE || i == UI_F_LABEL || i == UI_F_CARD;
+		int pt = (int)(FONT_BASE * font_mul[i] * px_mul[i] + 0.5f);
+
+		snprintf(path, sizeof path, "%s/%s", dir, head ? "pixel-head.ttf" : "pixel.ttf");
+		px_fonts[i] = TTF_OpenFont(path, pt);
+		if (!px_fonts[i]) fprintf(stderr, "font %s @%d: %s\n", path, pt, TTF_GetError());
+	}
+}
+
+void ui_set_pixel(bool on)
+{
+	if (on && !px_tried) px_open();
+	px_on = on;
+}
+
+bool ui_pixel(void) { return px_on; }
+
 TTF_Font *ui_font(ui_font_role role)
 {
 	if (role < 0 || role >= UI_F_COUNT) return NULL;
+	if (px_on && px_fonts[role]) return px_fonts[role];
 	return fonts[role];
 }
 
@@ -787,6 +830,19 @@ void ui_round_rect(SDL_Renderer *r, const SDL_Rect *q, int radius, SDL_Color col
 
 	SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
 	SDL_SetRenderDrawColor(r, col.r, col.g, col.b, col.a);
+	/* ChaOS Pixel Burst: corners cut in steps of whole pixels, two steps at
+	 * most, rather than rounded: the logo's handheld's corners */
+	if (px_on) {
+		int s = radius >= 8 ? 4 : radius >= 2 ? 2 : 0;
+
+		if (!s) { SDL_RenderFillRect(r, q); return; }
+		SDL_RenderFillRect(r, &(SDL_Rect){ q->x + s * 2, q->y, q->w - s * 4, s });
+		SDL_RenderFillRect(r, &(SDL_Rect){ q->x + s, q->y + s, q->w - s * 2, s });
+		SDL_RenderFillRect(r, &(SDL_Rect){ q->x, q->y + s * 2, q->w, q->h - s * 4 });
+		SDL_RenderFillRect(r, &(SDL_Rect){ q->x + s, q->y + q->h - s * 2, q->w - s * 2, s });
+		SDL_RenderFillRect(r, &(SDL_Rect){ q->x + s * 2, q->y + q->h - s, q->w - s * 4, s });
+		return;
+	}
 	SDL_RenderFillRect(r, &(SDL_Rect){ q->x, q->y + radius, q->w, q->h - radius * 2 });
 	for (y = 0; y < radius; y++) {
 		int dy = radius - y;
@@ -810,6 +866,19 @@ void ui_panel(SDL_Renderer *r, const SDL_Rect *q, int radius, unsigned border)
 {
 	const int bw = UI_PANEL_BORDER;
 	SDL_Rect in = { q->x + bw, q->y + bw, q->w - bw * 2, q->h - bw * 2 };
+
+	/* ChaOS Pixel Burst: a cream rim, the logo's dark outline inside it, and
+	 * the logo's ground: the handheld's body, cut corners and all */
+	if (px_on) {
+		SDL_Rect o = { q->x + 4, q->y + 4, q->w - 8, q->h - 8 };
+		SDL_Rect f = { q->x + 10, q->y + 10, q->w - 20, q->h - 20 };
+
+		(void)border;
+		ui_round_rect(r, q, 16, (SDL_Color){ 0xF4, 0xEA, 0xD5, 255 });
+		ui_round_rect(r, &o, 16, (SDL_Color){ 0x3A, 0x34, 0x46, 255 });
+		ui_round_rect(r, &f, 8, (SDL_Color){ 0x17, 0x15, 0x1C, 252 });
+		return;
+	}
 
 	ui_round_rect(r, q, radius, (SDL_Color){
 		(Uint8)(border >> 16), (Uint8)(border >> 8), (Uint8)border, 255 });

@@ -41,6 +41,10 @@ static float g_fix = -2.0f;      /* -2: animate; -1: ends at once; else that t *
 void pn_fix(float t) { g_fix = t; }
 /* 0 is Static: nothing flies, a name or card is at its end at once. */
 static bool g_static;
+/* ChaOS Pixel Burst: the card in the theme's frame (pn_framed) */
+static bool g_framed;
+
+void pn_framed(bool on) { g_framed = on; }
 void pn_speed(int ms)
 {
 	if (ms <= 0) { g_static = true; return; }
@@ -160,9 +164,35 @@ static void draw(SDL_Renderer *r, pn_state *p, SDL_Color acc)
 		SDL_SetTextureBlendMode(g_ground, SDL_BLENDMODE_NONE);
 		SDL_RenderCopy(r, g_ground, NULL, NULL);
 	}
+	/* ChaOS Pixel Burst: a frame of cut corners, the logo's outline on a
+	 * screen-dark card, turning orange as the name assembles under the cursor */
+	if (g_framed) {
+		const int fw = 16;
+		int k;
+		SDL_Color oc = { 0x3A, 0x34, 0x46, 255 }, fc = { 0xFF, 0x7A, 0x2F, 255 }, c;
+
+		c.r = (Uint8)(oc.r + (fc.r - oc.r) * p->t);
+		c.g = (Uint8)(oc.g + (fc.g - oc.g) * p->t);
+		c.b = (Uint8)(oc.b + (fc.b - oc.b) * p->t);
+		SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_NONE);
+		SDL_SetRenderDrawColor(r, 0x26, 0x32, 0x3C, 255);
+		SDL_RenderFillRect(r, &(SDL_Rect){ fw, fw, PN_W - fw * 2, PN_H - fw * 2 });
+		SDL_SetRenderDrawColor(r, c.r, c.g, c.b, 255);
+		/* four sides, each stopping a step short of the corner */
+		SDL_RenderFillRect(r, &(SDL_Rect){ fw * 2, 0, PN_W - fw * 4, fw });
+		SDL_RenderFillRect(r, &(SDL_Rect){ fw * 2, PN_H - fw, PN_W - fw * 4, fw });
+		SDL_RenderFillRect(r, &(SDL_Rect){ 0, fw * 2, fw, PN_H - fw * 4 });
+		SDL_RenderFillRect(r, &(SDL_Rect){ PN_W - fw, fw * 2, fw, PN_H - fw * 4 });
+		for (k = 0; k < 4; k++) {   /* the corner steps */
+			int x = (k & 1) ? PN_W - fw * 2 : fw, y = (k & 2) ? PN_H - fw * 2 : fw;
+			SDL_RenderFillRect(r, &(SDL_Rect){ x, y, fw, fw });
+		}
+	}
 	pixels(r, p, acc, p->t, ox, oy, cell, PN_W, PN_H, 0.22f);
-	SDL_SetRenderDrawColor(r, acc.r, acc.g, acc.b, 255);
-	SDL_RenderFillRect(r, &bar);
+	if (!g_framed) {
+		SDL_SetRenderDrawColor(r, acc.r, acc.g, acc.b, 255);
+		SDL_RenderFillRect(r, &bar);
+	}
 }
 
 void pn_overlay(SDL_Renderer *r, const char *name, unsigned accent, float t,
