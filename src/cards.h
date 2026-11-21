@@ -73,7 +73,12 @@ static const card_set CARD_SETS[] = {
 	{ "pixel",   "",        "ChaOS Pixel Cards", true, 0.00f },
 	/* ChaOS: no cards at all - the name alone, large (pixname.h pn_big) */
 	{ "pixelbig", "",       "ChaOS Pixel Names", true, 0.00f },
+	/* ChaOS: Pixel Cards' cards, framed, and the whole OS in the logo's
+	 * pixel style: menus, lists, notices (ui_set_pixel) */
+	{ "pixelburst", "",     "ChaOS Pixel Burst", true, 0.00f },
 };
+/* The theme that restyles more than the shelf */
+#define CARDS_PIXEL_UI(i) (!strcmp(CARD_SETS[i].id, "pixelburst"))
 /* A set drawn by the launcher rather than loaded: no directory */
 #define CARDS_DRAWN(i) (!CARD_SETS[i].dir[0])
 /* The one with no cards: names alone, filling the screen */

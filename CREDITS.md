@@ -135,6 +135,10 @@ sold, put behind a paywall, or shipped with a device that is sold.
 
 - **Josefin Sans** by **Santiago Orozco**: the UI and wordmark font. SIL Open
   Font License 1.1; full text in `res/fonts/OFL.txt`.
+- **Pixelify Sans** (the Pixelify Sans Project Authors) and **Tiny5** (the
+  Tiny5 Project Authors, Stefan Schmidt): the ChaOS Pixel Burst theme's
+  fonts, `res/fonts/pixel.ttf` and `pixel-head.ttf`. SIL Open Font License 1.1;
+  notes in `res/fonts/PIXEL-FONTS.md`, full texts in `res/fonts/OFL-pixel-pixelify.txt` and `OFL-pixel-tiny5.txt`.
 - **Console photographs** by **Evan Amos** (Vanamo Online Game Museum,
   Wikimedia Commons): the "Fancy Pants" shelf cards. Public domain, released
   by the author. Console designs belong to their makers and appear here to

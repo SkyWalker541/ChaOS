@@ -58,6 +58,8 @@ fi
 cp "$ROOT/config/systems.cfg" "$P/"
 cp -R "$ROOT/res/cards/." "$P/cards/"     # the classic/ and fancy/ sets
 cp "$ROOT/res/fonts/menu.ttf" "$P/"       # the UI face, and the in-game menu's
+# ChaOS Pixel Burst's two pixel fonts, beside it (res/fonts/PIXEL-FONTS.md)
+cp "$ROOT/res/fonts/pixel.ttf" "$ROOT/res/fonts/pixel-head.ttf" "$P/"
 cp "$ROOT/res/singles.png" "$P/"          # Muse's cover for Singles, the loose songs
 cp -R "$ROOT/res/overlays" "$P/overlays"  # ChaOS: SkyWalker541's overlays, put in Overlays/ at boot
 # Over The Hare's page. The launcher serves these off the card at P_WEB, so a
@@ -82,6 +84,8 @@ cp "$ROOT/res/ssl/cacert.pem" "$P/"
 # folder of its own, where plastron puts its notices and Diatom's beside it
 mkdir -p "$OUT/Licenses"
 cp "$ROOT/THIRD-PARTY-LICENSES.md" "$OUT/Licenses/TortOS.md"
+cp "$ROOT/res/fonts/PIXEL-FONTS.md" "$OUT/Licenses/Pixel-fonts.md"
+cp "$ROOT/res/fonts/OFL-pixel-pixelify.txt" "$ROOT/res/fonts/OFL-pixel-tiny5.txt" "$OUT/Licenses/"
 cp "$DIATOM_ELF" "$P/diatom"
 cp "$VENDOR_DIR/cores/"*.so "$P/cores/"
 

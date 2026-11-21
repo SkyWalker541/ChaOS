@@ -42,6 +42,32 @@ static const float font_mul[UI_F_COUNT] = {
 };
 
 static TTF_Font *fonts[UI_F_COUNT];
+/* ChaOS Pixel Burst: its own two pixel fonts (res/fonts: Pixelify Sans for
+ * reading, Tiny5 SC for titles, both OFL), beside the menu font on the card,
+ * opened the first time the theme is on and kept. Pixelify runs about 6%
+ * wider than the menu font, so a step smaller; Tiny5 SC about as wide, so
+ * smaller still: the same widths, so no menu outgrows the screen. */
+static TTF_Font *px_fonts[UI_F_COUNT];
+/* The body face's stand-in: Pixelify Sans has every European accent and
+ * Cyrillic but not Vietnamese or a few rare letters, and Tiny5 has all of
+ * them. A string the body face cannot draw whole is drawn in Tiny5 instead,
+ * so it stays in the theme's look rather than showing boxes. Opened the
+ * first time one is needed, at the nearest size on Tiny5's eighth-em grid. */
+static TTF_Font *px_fb[UI_F_COUNT];
+static const int px_fb_pt[UI_F_COUNT] = {
+	[UI_F_TITLE] = 40, [UI_F_MENU] = 40, [UI_F_LABEL] = 40,
+	[UI_F_META] = 32, [UI_F_CARD] = 48,
+};
+static bool px_on, px_tried;
+/* Sizes on each font's own pixel grid, so every pixel of a letter lands on
+ * whole screen pixels and stays sharp: Tiny5's pixel is an eighth of its
+ * size (5 screen pixels at 40), Pixelify Sans's about a ninth of a size of 11
+ * (4 at 44, 3 at 33). Close to the menu font's sizes, the widths a little
+ * under them, so nothing that fits today stops fitting. */
+static const int px_pt[UI_F_COUNT] = {
+	[UI_F_TITLE] = 40, [UI_F_MENU] = 44, [UI_F_LABEL] = 40,
+	[UI_F_META] = 33, [UI_F_CARD] = 48,
+};
 static TTF_Font *f_mark;
 static char font_path_kept[512];
 static SDL_Texture *glow_tex;
@@ -115,15 +141,91 @@ void ui_quit(void)
 	for (int i = 0; i < TEXT_CACHE; i++)
 		if (cache[i].tex) { SDL_DestroyTexture(cache[i].tex); cache[i].tex = NULL; }
 	if (glow_tex) { SDL_DestroyTexture(glow_tex); glow_tex = NULL; }
-	for (int i = 0; i < UI_F_COUNT; i++)
+	for (int i = 0; i < UI_F_COUNT; i++) {
 		if (fonts[i]) { TTF_CloseFont(fonts[i]); fonts[i] = NULL; }
+		if (px_fonts[i]) { TTF_CloseFont(px_fonts[i]); px_fonts[i] = NULL; }
+		if (px_fb[i]) { TTF_CloseFont(px_fb[i]); px_fb[i] = NULL; }
+	}
+	px_tried = px_on = false;
 	if (f_mark) { TTF_CloseFont(f_mark); f_mark = NULL; }
 	TTF_Quit();
+}
+
+static void px_open(void)
+{
+	char dir[sizeof font_path_kept], path[sizeof font_path_kept + 32];
+	char *slash;
+	int i;
+
+	px_tried = true;
+	snprintf(dir, sizeof dir, "%s", font_path_kept);
+	slash = strrchr(dir, '/');
+	if (slash) *slash = 0; else snprintf(dir, sizeof dir, ".");
+	for (i = 0; i < UI_F_COUNT; i++) {
+		bool head = i == UI_F_TITLE || i == UI_F_LABEL || i == UI_F_CARD;
+		int pt = px_pt[i];
+
+		snprintf(path, sizeof path, "%s/%s", dir, head ? "pixel-head.ttf" : "pixel.ttf");
+		px_fonts[i] = TTF_OpenFont(path, pt);
+		if (!px_fonts[i]) fprintf(stderr, "font %s @%d: %s\n", path, pt, TTF_GetError());
+	}
+}
+
+const char *ui_font_path(bool head)
+{
+	static char path[sizeof font_path_kept + 32];
+	char *slash;
+
+	if (!px_on) return font_path_kept;
+	snprintf(path, sizeof path, "%s", font_path_kept);
+	slash = strrchr(path, '/');
+	snprintf(slash ? slash + 1 : path, sizeof path - (size_t)(slash ? slash + 1 - path : 0),
+	         "%s", head ? "pixel-head.ttf" : "pixel.ttf");
+	return path;
+}
+
+void ui_set_pixel(bool on)
+{
+	if (on && !px_tried) px_open();
+	px_on = on;
+}
+
+bool ui_pixel(void) { return px_on; }
+
+/* The font to draw `s` in: `f`, unless `f` is one of the theme's faces and is
+ * missing a letter of `s`, when it is Tiny5 at the same role. Width and
+ * drawing both ask, so a string is measured in the face it is drawn in. */
+TTF_Font *ui_font_for(TTF_Font *f, const char *s)
+{
+	const unsigned char *p = (const unsigned char *)s;
+	int i;
+
+	if (!px_on || !f || !s) return f;
+	for (i = 0; i < UI_F_COUNT; i++) if (px_fonts[i] == f) break;
+	if (i == UI_F_COUNT) return f;
+	while (*p) {
+		Uint32 cp;
+		int n;
+
+		if (*p < 0x80) { p++; continue; }         /* ASCII: both faces have it */
+		if ((*p & 0xE0) == 0xC0) { cp = *p & 0x1F; n = 1; }
+		else if ((*p & 0xF0) == 0xE0) { cp = *p & 0x0F; n = 2; }
+		else if ((*p & 0xF8) == 0xF0) { cp = *p & 0x07; n = 3; }
+		else { p++; continue; }
+		p++;
+		while (n-- && (*p & 0xC0) == 0x80) cp = (cp << 6) | (*p++ & 0x3F);
+		if (!TTF_GlyphIsProvided32(f, cp)) {
+			if (!px_fb[i]) px_fb[i] = TTF_OpenFont(ui_font_path(true), px_fb_pt[i]);
+			return px_fb[i] ? px_fb[i] : f;
+		}
+	}
+	return f;
 }
 
 TTF_Font *ui_font(ui_font_role role)
 {
 	if (role < 0 || role >= UI_F_COUNT) return NULL;
+	if (px_on && px_fonts[role]) return px_fonts[role];
 	return fonts[role];
 }
 
@@ -146,6 +248,7 @@ static struct text_entry *text_get(SDL_Renderer *r, TTF_Font *f, const char *s,
 	int i, oldest = 0;
 
 	if (!f || !s || !*s) return NULL;
+	f = ui_font_for(f, s);
 	for (i = 0; i < TEXT_CACHE; i++) {
 		if (cache[i].tex && cache[i].font == f && cache[i].rgb == rgb &&
 		    strcmp(cache[i].str, s) == 0) {
@@ -192,7 +295,7 @@ int ui_text(SDL_Renderer *r, TTF_Font *f, const char *s, int x, int y,
 int ui_text_width(TTF_Font *f, const char *s)
 {
 	int w = 0;
-	if (f && s) TTF_SizeUTF8(f, s, &w, NULL);
+	if (f && s) TTF_SizeUTF8(ui_font_for(f, s), s, &w, NULL);
 	return w;
 }
 
@@ -408,6 +511,16 @@ static bool clip_within(SDL_Renderer *r, const SDL_Rect *c, SDL_bool had, const 
 	return true;
 }
 
+/* TORTOS_FITSPY=1: every string cut to fit, or scrolled because it does not,
+ * on stderr - for comparing what two themes cut (the overflow sweep). */
+static void fit_spy(TTF_Font *f, const char *s, int room)
+{
+	static int on = -1;
+
+	if (on < 0) on = getenv("TORTOS_FITSPY") != NULL;
+	if (on) fprintf(stderr, "FIT %d>%d %s\n", ui_text_width(f, s), room, s);
+}
+
 void ui_text_marquee(SDL_Renderer *r, TTF_Font *f, const char *s,
                      int x, int y, int w, unsigned phase, SDL_Color col)
 {
@@ -418,6 +531,7 @@ void ui_text_marquee(SDL_Renderer *r, TTF_Font *f, const char *s,
 
 	if (!f || !s || w <= 0) return;
 	if (tw <= w) { ui_text(r, f, s, x, y, -1, col); return; }
+	fit_spy(f, s, w);
 
 	over = tw - w;
 	off  = ui_pingpong(over, phase);
@@ -497,6 +611,7 @@ void ui_fit_text(TTF_Font *f, const char *src, char *dst, size_t dstn,
 
 	snprintf(dst, dstn, "%s", src ? src : "");
 	if (!f || ui_text_width(f, dst) <= maxw) return;
+	fit_spy(f, dst, maxw);
 
 	n = strlen(dst);
 	while (n > 0) {
@@ -514,7 +629,7 @@ void ui_glow(SDL_Renderer *r, const SDL_Rect *rect, unsigned rgb, int alpha,
 {
 	SDL_Rect dst;
 	int gw, gh;
-	if (!glow_tex) return;
+	if (!glow_tex || px_on) return;      /* ChaOS Pixel Burst: no soft light */
 	gw = (int)(rect->w * spread);
 	gh = (int)(rect->h * spread);
 	dst.x = rect->x + rect->w / 2 - gw / 2;
@@ -621,6 +736,20 @@ static unsigned rail_hue_at(float x, int count, float blend,
  * Runs of one color are filled as one rectangle, so a rail nobody is moving -
  * and every rail whose items share a color, which is every games rail - still
  * costs the single fill it always did. */
+/* Pixel Burst's track: dashes of the outline colour, 8 on and 4 off. */
+static void px_track(SDL_Renderer *r, const SDL_Rect *t, bool vertical)
+{
+	int len = vertical ? t->h : t->w, k;
+
+	SDL_SetRenderDrawColor(r, 0x3A, 0x34, 0x46, 255);
+	for (k = 0; k < len; k += 12) {
+		int n = len - k < 8 ? len - k : 8;
+		SDL_Rect d = vertical ? (SDL_Rect){ t->x, t->y + k, t->w, n }
+		                      : (SDL_Rect){ t->x + k, t->y, n, t->h };
+		SDL_RenderFillRect(r, &d);
+	}
+}
+
 static void rail_seg(SDL_Renderer *r, const SDL_Rect *track, SDL_Rect seg,
                      bool vertical, float step, float blend, int count,
                      unsigned flat, ui_rail_hue hue, void *ctx)
@@ -630,6 +759,12 @@ static void rail_seg(SDL_Renderer *r, const SDL_Rect *track, SDL_Rect seg,
 	unsigned held = flat;
 
 	if (!SDL_IntersectRect(track, &seg, &q)) return;
+	if (px_on) {
+		/* Pixel Burst: one flat orange block, no hue run. */
+		SDL_SetRenderDrawColor(r, 0xFF, 0x7A, 0x2F, 255);
+		SDL_RenderFillRect(r, &q);
+		return;
+	}
 	len = vertical ? q.h : q.w;
 	for (k = 0; k <= len; k++) {
 		unsigned rgb = held;
@@ -723,8 +858,11 @@ void ui_rail(SDL_Renderer *r, int screen_w, int screen_h, float index, int count
 	/* The track carries twice the weight it used to, so it takes less alpha to
 	 * say the same thing; brighter than this and an empty rail reads as a
 	 * drawn element rather than as the absence of one. */
-	SDL_SetRenderDrawColor(r, 255, 255, 255, 16);
-	SDL_RenderFillRect(r, &track);
+	if (px_on) px_track(r, &track, false);
+	else {
+		SDL_SetRenderDrawColor(r, 255, 255, 255, 16);
+		SDL_RenderFillRect(r, &track);
+	}
 	rail_seg(r, &track, (SDL_Rect){ track_x + off, y, seg_w, h },
 	         false, step, blend, count, rgb, hue, ctx);
 	/* Only while the marker overhangs the far end, which is the only time the
@@ -767,8 +905,11 @@ void ui_rail_v(SDL_Renderer *r, int screen_w, int screen_h, float index, int cou
 	track = (SDL_Rect){ x, track_y, w, track_h };
 
 	SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
-	SDL_SetRenderDrawColor(r, 255, 255, 255, 16);
-	SDL_RenderFillRect(r, &track);
+	if (px_on) px_track(r, &track, true);
+	else {
+		SDL_SetRenderDrawColor(r, 255, 255, 255, 16);
+		SDL_RenderFillRect(r, &track);
+	}
 	rail_seg(r, &track, (SDL_Rect){ x, end - off, w, seg_h },
 	         true, step, blend, count, rgb, hue, ctx);
 	if (off > track_h - seg_h)
@@ -787,6 +928,19 @@ void ui_round_rect(SDL_Renderer *r, const SDL_Rect *q, int radius, SDL_Color col
 
 	SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
 	SDL_SetRenderDrawColor(r, col.r, col.g, col.b, col.a);
+	/* ChaOS Pixel Burst: corners cut in steps of whole pixels, two steps at
+	 * most, rather than rounded: the logo's handheld's corners */
+	if (px_on) {
+		int s = radius >= 8 ? 4 : radius >= 2 ? 2 : 0;
+
+		if (!s) { SDL_RenderFillRect(r, q); return; }
+		SDL_RenderFillRect(r, &(SDL_Rect){ q->x + s * 2, q->y, q->w - s * 4, s });
+		SDL_RenderFillRect(r, &(SDL_Rect){ q->x + s, q->y + s, q->w - s * 2, s });
+		SDL_RenderFillRect(r, &(SDL_Rect){ q->x, q->y + s * 2, q->w, q->h - s * 4 });
+		SDL_RenderFillRect(r, &(SDL_Rect){ q->x + s, q->y + q->h - s * 2, q->w - s * 2, s });
+		SDL_RenderFillRect(r, &(SDL_Rect){ q->x + s * 2, q->y + q->h - s, q->w - s * 4, s });
+		return;
+	}
 	SDL_RenderFillRect(r, &(SDL_Rect){ q->x, q->y + radius, q->w, q->h - radius * 2 });
 	for (y = 0; y < radius; y++) {
 		int dy = radius - y;
@@ -810,6 +964,19 @@ void ui_panel(SDL_Renderer *r, const SDL_Rect *q, int radius, unsigned border)
 {
 	const int bw = UI_PANEL_BORDER;
 	SDL_Rect in = { q->x + bw, q->y + bw, q->w - bw * 2, q->h - bw * 2 };
+
+	/* ChaOS Pixel Burst: a cream rim, the logo's dark outline inside it, and
+	 * the logo's ground: the handheld's body, cut corners and all */
+	if (px_on) {
+		SDL_Rect o = { q->x + 4, q->y + 4, q->w - 8, q->h - 8 };
+		SDL_Rect f = { q->x + 10, q->y + 10, q->w - 20, q->h - 20 };
+
+		(void)border;
+		ui_round_rect(r, q, 16, (SDL_Color){ 0xF4, 0xEA, 0xD5, 255 });
+		ui_round_rect(r, &o, 16, (SDL_Color){ 0x3A, 0x34, 0x46, 255 });
+		ui_round_rect(r, &f, 8, (SDL_Color){ 0x17, 0x15, 0x1C, 252 });
+		return;
+	}
 
 	ui_round_rect(r, q, radius, (SDL_Color){
 		(Uint8)(border >> 16), (Uint8)(border >> 8), (Uint8)border, 255 });
@@ -1009,9 +1176,20 @@ static SDL_Texture *make_card(SDL_Renderer *r, const char *title, unsigned rgb,
 	SDL_Surface *s;
 	SDL_Texture *t;
 
+	static TTF_Font *f_mark_px;   /* Pixel Burst's, kept like f_mark */
+	TTF_Font *tf = fonts[UI_F_CARD], *mk;
+
 	if (!f_mark && font_path_kept[0])
 		f_mark = TTF_OpenFont(font_path_kept, 560);
-	if (!(s = card_surface(fonts[UI_F_CARD], f_mark, title, rgb, cw, ch, round)))
+	mk = f_mark;
+	if (px_on && px_fonts[UI_F_CARD]) {
+		/* ChaOS Pixel Burst: a made-up cover is titled in the theme's
+		 * heading font, its big letter too */
+		if (!f_mark_px) f_mark_px = TTF_OpenFont(ui_font_path(true), 560);
+		tf = px_fonts[UI_F_CARD];
+		if (f_mark_px) mk = f_mark_px;
+	}
+	if (!(s = card_surface(tf, mk, title, rgb, cw, ch, round)))
 		return NULL;
 	t = SDL_CreateTextureFromSurface(r, s);
 	SDL_FreeSurface(s);
@@ -1048,9 +1226,18 @@ ui_card_fonts *ui_card_fonts_open(void)
 	ui_card_fonts *f;
 
 	if (!font_path_kept[0] || !(f = calloc(1, sizeof *f))) return NULL;
-	f->title = TTF_OpenFont(font_path_kept,
-	                        (int)(FONT_BASE * font_mul[UI_F_CARD] + 0.5f));
-	f->mark = TTF_OpenFont(font_path_kept, 560);
+	/* ChaOS Pixel Burst: the workers draw made-up covers in the theme's
+	 * heading font too; they are reopened when the theme changes */
+	if (px_on && px_fonts[UI_F_CARD]) {
+		f->title = TTF_OpenFont(ui_font_path(true), px_pt[UI_F_CARD]);
+		f->mark = TTF_OpenFont(ui_font_path(true), 560);
+	}
+	if (!f->title) {
+		if (f->mark) TTF_CloseFont(f->mark);
+		f->title = TTF_OpenFont(font_path_kept,
+		                        (int)(FONT_BASE * font_mul[UI_F_CARD] + 0.5f));
+		f->mark = TTF_OpenFont(font_path_kept, 560);
+	}
 	if (!f->title) {
 		ui_card_fonts_close(f);
 		return NULL;
@@ -1201,6 +1388,26 @@ static SDL_Texture *g_render(SDL_Renderer *r, ui_glyph g, int size)
 
 	if (!s) return NULL;
 	g_build(g, &shape);
+	/* ChaOS Pixel Burst: the mark on a coarse grid, each cell in or out,
+	 * so it reads as pixel art beside the pixel letters */
+	if (px_on) {
+		int cell = size / 10 > 2 ? size / 10 : 2;
+
+		for (y = 0; y < size; y++) {
+			Uint32 *row = (Uint32 *)((Uint8 *)s->pixels + (size_t)y * s->pitch);
+
+			for (x = 0; x < size; x++) {
+				float cx = ((float)(x / cell) + 0.5f) * cell / (float)size;
+				float cy = ((float)(y / cell) + 0.5f) * cell / (float)size;
+
+				row[x] = g_inside(&shape, cx, cy) ? 0xFFFFFFFFu : 0x00FFFFFFu;
+			}
+		}
+		t = SDL_CreateTextureFromSurface(r, s);
+		SDL_FreeSurface(s);
+		if (t) SDL_SetTextureBlendMode(t, SDL_BLENDMODE_BLEND);
+		return t;
+	}
 	for (y = 0; y < size; y++) {
 		Uint32 *row = (Uint32 *)((Uint8 *)s->pixels + (size_t)y * s->pitch);
 
@@ -1221,7 +1428,7 @@ static SDL_Texture *g_render(SDL_Renderer *r, ui_glyph g, int size)
 }
 
 /* A handful of (mark, size) pairs is all a screen asks for. */
-static struct { ui_glyph g; int size; SDL_Texture *tex; } g_cache[8];
+static struct { ui_glyph g; int size; bool px; SDL_Texture *tex; } g_cache[8];
 
 static void glyphs_free(void)
 {
@@ -1239,7 +1446,8 @@ void ui_glyph_draw(SDL_Renderer *r, ui_glyph g, int cx, int cy, int size,
 
 	if (g < 0 || g >= UI_GLYPH_COUNT || size <= 0) return;
 	for (i = 0; i < 8; i++) {
-		if (g_cache[i].tex && g_cache[i].g == g && g_cache[i].size == size) {
+		if (g_cache[i].tex && g_cache[i].g == g && g_cache[i].size == size &&
+		    g_cache[i].px == px_on) {
 			t = g_cache[i].tex;
 			break;
 		}
@@ -1251,6 +1459,7 @@ void ui_glyph_draw(SDL_Renderer *r, ui_glyph g, int cx, int cy, int size,
 		if (!t) return;
 		g_cache[free_slot].g = g;
 		g_cache[free_slot].size = size;
+		g_cache[free_slot].px = px_on;
 		g_cache[free_slot].tex = t;
 	}
 	SDL_SetTextureColorMod(t, col.r, col.g, col.b);

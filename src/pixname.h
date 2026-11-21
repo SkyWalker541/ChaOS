@@ -15,6 +15,9 @@
  * owns it like any other card texture (the app's sys_tex), and passes back
  * the one it holds; one it destroyed it passes as NULL. */
 
+/* ChaOS Pixel Burst: cards drawn in the theme's frame, or not */
+void pn_framed(bool on);
+
 #define PN_W 640
 #define PN_H 820
 
