@@ -66,10 +66,10 @@ scaled as above, longest side 96% of 384.
 
 ## PORTS.png
 
-Not a console: Ports' card, a beige early-90s all-in-one computer, its CRT
+Not a console: Ports' card, a warm grey early-90s all-in-one computer, its CRT
 over a base unit with a floppy drive, supplied by SkyWalker541 on 2026-11-21
 for this card
-(`source/ports-pc.png`, kept here). `tools/genportsphoto.py` cuts it from its
+(`source/ports-pc.jpg`, kept here). `tools/genportsphoto.py` cuts it from its
 white backdrop, cleans and white-balances it toward the set and frames it as
 above. It has no maker's name on it. It replaced a rendered arcade stick
 (`tools/genportsfancy.py`, kept).
