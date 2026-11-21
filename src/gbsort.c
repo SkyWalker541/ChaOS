@@ -210,8 +210,10 @@ bool gbs_move_files(const char *roms, const char *shared, const char *card, cons
 	snprintf(t, sizeof t, "%s/%s/.media", roms, m->to);
 	move_prefixed(f, t, m->name, true);
 	/* states and their pictures: <file>.<slot>.state / .bmp */
-	snprintf(f, sizeof f, "%s/.tortos/%s", shared, m->from);
-	snprintf(t, sizeof t, "%s/.tortos/%s", shared, m->to);
+	/* ChaOS 2.7.3: in Saves/States/<folder>/ */
+	(void)shared;
+	snprintf(f, sizeof f, "%s/Saves/States/%s", card, m->from);
+	snprintf(t, sizeof t, "%s/Saves/States/%s", card, m->to);
 	move_prefixed(f, t, m->file, false);
 	/* cheats */
 	snprintf(f, sizeof f, "%s/Cheats/%s/%s.cht", card, m->from, m->name);

@@ -60,7 +60,10 @@ void xfer_init(const char *roms_dir, const char *card_dir,
 	 * something a stray tap should be able to delete: no_cfg keeps every .cfg
 	 * under this root out of listings and out of every path that resolves. */
 	add_root("saves",  "Saves",       "%s/Saves", card_dir, false);
-	add_root("states", "Save States", "%s/.tortos", shared_dir, true);
+	/* ChaOS 2.7.3: the states moved into Saves/States/, so they sync with
+	 * the saves; the root stays, at its new place, with no_cfg as before */
+	(void)shared_dir;
+	add_root("states", "Save States", "%s/Saves/States", card_dir, true);
 	/* ChaOS: overlays, one folder per console as ROMs are, made by the
 	 * launcher at boot. Last, so the roots before it keep their places. */
 	add_root("overlays", "Overlays", "%s/Overlays", card_dir, false);

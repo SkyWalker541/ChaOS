@@ -21,7 +21,7 @@
  *
  * A move takes the game's things with it. The files are here (gbs_move_files):
  * the ROM, its box art (Roms/<folder>/.media/<name>.*), its states and their
- * pictures (.userdata/shared/.tortos/<folder>/<file>.*) and its cheats
+ * pictures (Saves/States/<folder>/<file>.*) and its cheats
  * (Cheats/<folder>/<name>.cht). The launcher moves what's in its databases:
  * favorites, play time (and with it Recently Played), scraped game info and
  * RomM's record of it. Saves need nothing: they are Saves/<name>.srm, one

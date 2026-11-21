@@ -27,7 +27,7 @@
  *
  * Moving a game takes its things too (ds_apply): the save (Saves/<name>.srm)
  * copied to the name the playlist plays under, the first disc's states
- * (.userdata/shared/.tortos/<console>/<file>.*) and its box art. The
+ * (Saves/States/<console>/<file>.*) and its box art. The
  * launcher moves what's in its databases: favorites, play time and the game's
  * scraped info (main.c). No SDL here; tools/discset-check.c checks it. */
 

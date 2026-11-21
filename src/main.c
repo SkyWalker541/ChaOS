@@ -1486,12 +1486,90 @@ static const char *slot_name(int slot)
 	return buf;
 }
 
+/* ChaOS 2.7.3: where save states and their pictures live, Saves/States/
+ * <console>/, beside the games' own saves, so syncing Saves (Syncthing's ChaOS
+ * Saves, a computer's copy of the card) carries them too. They were in
+ * .userdata/shared/.tortos/<console>/, beside the library database, which
+ * must never be synced; states_move moves them over once. */
+static const char *states_root(void)
+{
+	static char p[CFG_STR * 2];
+
+	if (!p[0]) snprintf(p, sizeof p, "%s/Saves/States", P_CARD);
+	return p;
+}
+
+/* Every file under from/ into to/, folders and all, by rename (one card, so
+ * each is a move of its name, never a copy). A file already at to/ is left
+ * where it was, so nothing is ever written over. True when from/ ended empty. */
+static bool states_move_dir(const char *from, const char *to)
+{
+	DIR *d = opendir(from);
+	struct dirent *e;
+	bool all = true;
+
+	if (!d) return true;
+	mkdir(to, 0755);
+	while ((e = readdir(d))) {
+		char f[LIB_PATH * 2], t[LIB_PATH * 2];
+		struct stat st;
+
+		if (e->d_name[0] == '.' && (!e->d_name[1] || (e->d_name[1] == '.' && !e->d_name[2])))
+			continue;
+		if (snprintf(f, sizeof f, "%s/%s", from, e->d_name) >= (int)sizeof f ||
+		    snprintf(t, sizeof t, "%s/%s", to, e->d_name) >= (int)sizeof t) { all = false; continue; }
+		if (stat(f, &st) != 0) { all = false; continue; }
+		if (S_ISDIR(st.st_mode)) {
+			if (!states_move_dir(f, t)) all = false;
+		} else if (access(t, F_OK) == 0 || rename(f, t) != 0) {
+			all = false;
+		}
+	}
+	closedir(d);
+	if (all) rmdir(from);
+	return all;
+}
+
+/* Once, at the first start of 2.7.3: each console's folder in .tortos/ into
+ * Saves/States/. The library database and anything else loose in .tortos/
+ * stay. Asked again at the next start if something couldn't move. */
+static void states_move(void)
+{
+	char top[LIB_PATH], f[LIB_PATH * 2], t[LIB_PATH * 2], saves[LIB_PATH];
+	DIR *d;
+	struct dirent *e;
+	bool all = true;
+	int moved = 0;
+
+	if (db_get_int(db_dev(), "states.in_saves", 0)) return;
+	snprintf(top, sizeof top, "%s/.tortos", P_SHARED);
+	snprintf(saves, sizeof saves, "%s/Saves", P_CARD);
+	mkdir(saves, 0755);
+	mkdir(states_root(), 0755);
+	if ((d = opendir(top))) {
+		while ((e = readdir(d))) {
+			struct stat st;
+
+			if (e->d_name[0] == '.') continue;
+			snprintf(f, sizeof f, "%s/%s", top, e->d_name);
+			if (stat(f, &st) != 0 || !S_ISDIR(st.st_mode)) continue;
+			snprintf(t, sizeof t, "%s/%s", states_root(), e->d_name);
+			if (states_move_dir(f, t)) moved++; else all = false;
+		}
+		closedir(d);
+	}
+	sync();
+	fprintf(stderr, "states: %d console folder%s moved to Saves/States%s\n", moved,
+	        moved == 1 ? "" : "s", all ? "" : ", some left where they were");
+	if (all) db_set_int(db_dev(), "states.in_saves", 1);
+}
+
 static void preview_path(app *a, int s, const game_entry *g, char *out, size_t n)
 {
 	const char *base = strrchr(g->file, '/');
 	base = base ? base + 1 : g->file;
-	snprintf(out, n, "%s/.tortos/%s/%s.%s.bmp",
-	         P_SHARED, a->sys.systems[s].folder, base, slot_name(SLOT_AUTO));
+	snprintf(out, n, "%s/%s/%s.%s.bmp",
+	         states_root(), a->sys.systems[s].folder, base, slot_name(SLOT_AUTO));
 }
 
 /* Where Diatom writes the frame it hands over, which is NOT the Auto card's
@@ -1527,8 +1605,8 @@ static void slot_state_path(app *a, int s, const game_entry *g, int slot,
 {
 	const char *base = strrchr(g->file, '/');
 	base = base ? base + 1 : g->file;
-	snprintf(out, n, "%s/.tortos/%s/%s.%s.state",
-	         P_SHARED, a->sys.systems[s].folder, base, slot_name(slot));
+	snprintf(out, n, "%s/%s/%s.%s.state",
+	         states_root(), a->sys.systems[s].folder, base, slot_name(slot));
 }
 
 static void slot_preview_path(app *a, int s, const game_entry *g, int slot,
@@ -1536,8 +1614,8 @@ static void slot_preview_path(app *a, int s, const game_entry *g, int slot,
 {
 	const char *base = strrchr(g->file, '/');
 	base = base ? base + 1 : g->file;
-	snprintf(out, n, "%s/.tortos/%s/%s.%s.bmp",
-	         P_SHARED, a->sys.systems[s].folder, base, slot_name(slot));
+	snprintf(out, n, "%s/%s/%s.%s.bmp",
+	         states_root(), a->sys.systems[s].folder, base, slot_name(slot));
 }
 
 static void state_path(app *a, int s, const game_entry *g, char *out, size_t n)
@@ -1573,9 +1651,10 @@ static bool db_paths_ready(char *dev, size_t ndev, char *lib, size_t nlib,
 static void persist_dir_ensure(app *a, int s)
 {
 	char d[LIB_PATH * 2];
-	snprintf(d, sizeof d, "%s/.tortos", P_SHARED);
+	snprintf(d, sizeof d, "%s/Saves", P_CARD);
 	mkdir(d, 0755);
-	snprintf(d, sizeof d, "%s/.tortos/%s", P_SHARED, a->sys.systems[s].folder);
+	mkdir(states_root(), 0755);
+	snprintf(d, sizeof d, "%s/%s", states_root(), a->sys.systems[s].folder);
 	mkdir(d, 0755);
 }
 
@@ -18970,7 +19049,7 @@ static void romm_systems_screen(app *a)
 typedef struct {
 	romm_local_save *s;
 	int n, cap;
-	struct { int rom_id; char stem[LIB_NAME]; } *games;
+	struct { int rom_id; char stem[LIB_NAME], base[LIB_NAME], folder[CFG_STR]; } *games;
 	int ng, capg;
 } romm_scan;
 
@@ -18981,7 +19060,6 @@ static bool romm_scan_one(int rom_id, const char *folder, const char *file, void
 	char stem[LIB_NAME], path[LIB_PATH * 2];
 	struct stat st;
 
-	(void)folder;
 	snprintf(stem, sizeof stem, "%s", base ? base + 1 : file);
 	if (strrchr(stem, '.')) *strrchr(stem, '.') = '\0';
 	if (sc->ng == sc->capg) {
@@ -18992,6 +19070,9 @@ static bool romm_scan_one(int rom_id, const char *folder, const char *file, void
 	}
 	sc->games[sc->ng].rom_id = rom_id;
 	snprintf(sc->games[sc->ng].stem, LIB_NAME, "%s", stem);
+	/* ChaOS 2.7.3: its states are Saves/States/<folder>/<file>.<slot>.state */
+	snprintf(sc->games[sc->ng].base, LIB_NAME, "%s", base ? base + 1 : file);
+	snprintf(sc->games[sc->ng].folder, CFG_STR, "%s", folder ? folder : "");
 	sc->ng++;
 	snprintf(path, sizeof path, "%s/Saves/%s.srm", P_CARD, stem);
 	if (stat(path, &st) != 0 || st.st_size <= 0) return true;
@@ -19017,6 +19098,190 @@ static const char *romm_stem_of(const romm_scan *sc, int rom_id)
 
 	for (i = 0; i < sc->ng; i++) if (sc->games[i].rom_id == rom_id) return sc->games[i].stem;
 	return NULL;
+}
+
+/* ChaOS 2.7.3: save states, which RomM keeps but plans no sync for, so this
+ * plans it. states-sync in RomM's folder remembers, per state, the server's
+ * id and time and this card's time as they were the last time they agreed:
+ * whichever side changed since goes to the other. Both changed, the newer
+ * wins and the other is kept first, in Saves/.romm-backup/States. A state
+ * only here goes up; one only on the server comes down, unless this card had
+ * it and the player deleted it since. */
+typedef struct { int rom_id, id; time_t srv, loc; char name[ROMM_STR]; } rstate_seen;
+
+static int rstate_load(const char *rdir, rstate_seen **out)
+{
+	char p[LIB_PATH + 16], line[ROMM_STR + 96];
+	FILE *f;
+	int n = 0, cap = 0;
+
+	*out = NULL;
+	snprintf(p, sizeof p, "%s/states-sync", rdir);
+	if (!(f = fopen(p, "r"))) return 0;
+	while (fgets(line, sizeof line, f)) {
+		rstate_seen r;
+		long long s1, l1;
+		char *tab;
+
+		if (sscanf(line, "%d %d %lld %lld", &r.rom_id, &r.id, &s1, &l1) != 4) continue;
+		if (!(tab = strchr(line, '\t'))) continue;
+		snprintf(r.name, sizeof r.name, "%s", tab + 1);
+		r.name[strcspn(r.name, "\r\n")] = '\0';
+		r.srv = (time_t)s1; r.loc = (time_t)l1;
+		if (n == cap) {
+			void *m = realloc(*out, (size_t)(cap = cap ? cap * 2 : 64) * sizeof **out);
+			if (!m) break;
+			*out = m;
+		}
+		(*out)[n++] = r;
+	}
+	fclose(f);
+	return n;
+}
+
+static void rstate_save(const char *rdir, const rstate_seen *r, int n)
+{
+	char p[LIB_PATH + 16], t[LIB_PATH + 24];
+	FILE *f;
+	int i;
+
+	snprintf(p, sizeof p, "%s/states-sync", rdir);
+	snprintf(t, sizeof t, "%s.part", p);
+	if (!(f = fopen(t, "w"))) return;
+	for (i = 0; i < n; i++)
+		if (r[i].rom_id)
+			fprintf(f, "%d %d %lld %lld\t%s\n", r[i].rom_id, r[i].id,
+			        (long long)r[i].srv, (long long)r[i].loc, r[i].name);
+	if (fclose(f) == 0) rename(t, p); else unlink(t);
+}
+
+static rstate_seen *rstate_find(rstate_seen *r, int n, int rom_id, const char *name)
+{
+	int i;
+
+	for (i = 0; i < n; i++) if (r[i].rom_id == rom_id && !strcmp(r[i].name, name)) return &r[i];
+	return NULL;
+}
+
+static void romm_sync_states(app *a, const romm_scan *sc, const char *rdir,
+                             int *up, int *down, int *failed)
+{
+	rstate_seen *seen = NULL;
+	int nseen = rstate_load(rdir, &seen), g;
+	char why[160], msg[200];
+
+	for (g = 0; g < sc->ng; g++) {
+		romm_state srv[64];
+		char dir[LIB_PATH * 2], local[64][ROMM_STR];
+		int ns, nl = 0, i, j;
+		size_t bl = strlen(sc->games[g].base);
+		DIR *d;
+		struct dirent *e;
+
+		if (!sc->games[g].folder[0]) continue;
+		snprintf(dir, sizeof dir, "%s/%s", states_root(), sc->games[g].folder);
+		/* this game's own: <file>.<slot>.state, its pictures stay here */
+		if ((d = opendir(dir))) {
+			while ((e = readdir(d)) && nl < 64) {
+				size_t L = strlen(e->d_name);
+
+				if (L > bl + 7 && !strncmp(e->d_name, sc->games[g].base, bl) &&
+				    e->d_name[bl] == '.' && !strcmp(e->d_name + L - 6, ".state"))
+					snprintf(local[nl++], ROMM_STR, "%s", e->d_name);
+			}
+			closedir(d);
+		}
+		ns = romm_states(&g_romm, sc->games[g].rom_id, srv, 64, why, sizeof why);
+		if (ns < 0) { (*failed)++; continue; }
+		if (!nl && !ns) continue;
+		snprintf(msg, sizeof msg, "Syncing %s's states", sc->games[g].stem);
+		romm_busy(a, msg);
+		/* each name either side has */
+		for (i = 0; i < nl + ns; i++) {
+			const char *name = i < nl ? local[i] : srv[i - nl].file_name;
+			romm_state *sv = NULL;
+			rstate_seen *was, add;
+			char path[LIB_PATH * 3];
+			struct stat st;
+			bool here, lch, sch, send = false, get = false;
+
+			if (i >= nl) {      /* a server name already met as a local one */
+				for (j = 0; j < nl; j++) if (!strcmp(local[j], name)) break;
+				if (j < nl) continue;
+			}
+			for (j = 0; j < ns; j++) if (!strcmp(srv[j].file_name, name)) { sv = &srv[j]; break; }
+			snprintf(path, sizeof path, "%s/%s", dir, name);
+			here = stat(path, &st) == 0 && st.st_size > 0;
+			was = rstate_find(seen, nseen, sc->games[g].rom_id, name);
+			if (here && !sv) send = true;
+			else if (!here && sv) get = !was;    /* deleted here since: left */
+			else if (here && sv) {
+				lch = !was || was->loc != st.st_mtime;
+				sch = !was || was->srv != sv->updated || was->id != sv->id;
+				if (lch && !sch) send = true;
+				else if (sch && !lch) get = true;
+				else if (lch && sch) {
+					if (st.st_mtime >= sv->updated) send = true; else get = true;
+				}
+			}
+			if (send) {
+				if (sv && was && was->srv != sv->updated) {
+					/* the server's changed too: kept here before it goes */
+					char bdir[LIB_PATH * 2], bk[LIB_PATH * 3];
+
+					snprintf(bdir, sizeof bdir, "%s/Saves/.romm-backup/States", P_CARD);
+					mkdir(bdir, 0755);
+					snprintf(bk, sizeof bk, "%s/%s.%ld.server", bdir, name, (long)time(NULL));
+					romm_state_download(&g_romm, sv->id, bk, why, sizeof why);
+				}
+				if (!romm_state_upload(&g_romm, sc->games[g].rom_id, sv ? sv->id : 0, path,
+				                       why, sizeof why)) { (*failed)++; continue; }
+				(*up)++;
+			} else if (get) {
+				char tmp[LIB_PATH * 3 + 8];
+
+				mkdir(dir, 0755);
+				snprintf(tmp, sizeof tmp, "%s.romm", path);
+				if (!romm_state_download(&g_romm, sv->id, tmp, why, sizeof why)) { (*failed)++; continue; }
+				if (here) {
+					char bdir[LIB_PATH * 2], bk[LIB_PATH * 3];
+
+					snprintf(bdir, sizeof bdir, "%s/Saves/.romm-backup/States", P_CARD);
+					mkdir(bdir, 0755);
+					snprintf(bk, sizeof bk, "%s/%s.%ld", bdir, name, (long)time(NULL));
+					rename(path, bk);
+				}
+				if (rename(tmp, path) != 0) { (*failed)++; continue; }
+				(*down)++;
+			} else if (was || !(here && sv)) {
+				continue;
+			}
+			/* as both sides are now: the server's time is asked for again on
+			 * the next sync, so an upload's new time counts as agreed then */
+			if (stat(path, &st) != 0) continue;
+			{
+				romm_state now[64];
+				int k, nn = romm_states(&g_romm, sc->games[g].rom_id, now, 64, why, sizeof why);
+
+				memset(&add, 0, sizeof add);
+				add.rom_id = sc->games[g].rom_id;
+				snprintf(add.name, sizeof add.name, "%s", name);
+				add.loc = st.st_mtime;
+				for (k = 0; k < nn; k++)
+					if (!strcmp(now[k].file_name, name)) { add.id = now[k].id; add.srv = now[k].updated; }
+				if (!add.id) continue;
+				if (was) *was = add;
+				else {
+					void *m = realloc(seen, (size_t)(nseen + 1) * sizeof *seen);
+					if (!m) continue;
+					seen = m;
+					seen[nseen++] = add;
+				}
+			}
+		}
+	}
+	rstate_save(rdir, seen, nseen);
+	free(seen);
 }
 
 /* Sync: what the server's plan says, for the games that came from RomM. A
@@ -19084,10 +19349,18 @@ static void romm_sync_screen(app *a)
 		}
 	}
 	romm_sync_complete(&g_romm, session, up + down, failed);
+	/* ChaOS 2.7.3: and their states */
+	{
+		int sup = 0, sdown = 0;
+
+		romm_sync_states(a, &sc, rdir, &sup, &sdown, &failed);
+		up += sup;
+		down += sdown;
+	}
 	sync();
 	fprintf(stderr, "romm: sync sent %d, got %d, %d failed\n", up, down, failed);
 	if (up + down + failed == 0) snprintf(msg, sizeof msg, "Everything is in sync");
-	else snprintf(msg, sizeof msg, "Sent %d save%s, got %d%s", up, up == 1 ? "" : "s", down,
+	else snprintf(msg, sizeof msg, "Saves and states: sent %d, got %d%s", up, down,
 	              failed ? "\nSome couldn't be synced" : "");
 	pick_say(a, "Sync Saves", msg, MENU_ACCENT);
 	{
@@ -19185,7 +19458,7 @@ static int romm_home_build(void *ctx, menu_row *rows, int max, const char **head
 		rows[n] = (menu_row){ "Games", NULL, net, true };
 		rows[n++].hint = "Download games from your library";
 		rows[n] = (menu_row){ "Sync Saves", c->when, net, true };
-		rows[n++].hint = "Saves of the games from RomM, both ways";
+		rows[n++].hint = "Saves and states of the games from RomM, both ways";
 		rows[n] = (menu_row){ "BIOS", NULL, net, true };
 		rows[n++].hint = "Get the BIOS files RomM has";
 	}
@@ -25613,6 +25886,7 @@ int main(int argc, char *argv[])
 		upd_set_testing(g_test_updates);
 		if (g_status_batt < 0 || g_status_batt >= STATUS_BATT_COUNT) g_status_batt = STATUS_BATT_ICON;
 	}
+	states_move();          /* ChaOS 2.7.3: before anything can load a state */
 	order_systems(&a);      /* ChaOS: Shelf Order, before the scan */
 	scan_all(&a);
 	t_mark("library scan");

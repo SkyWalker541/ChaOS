@@ -69,7 +69,7 @@ int main(void)
 		char cmd[1200];
 
 		snprintf(cmd, sizeof cmd, "mkdir -p '%s' '%s/roms/PlayStation/.media' '%s/card/Saves' "
-		         "'%s/shared/.tortos/PlayStation' '%s/roms/PlayStation/Done'", p, root, root, root, root);
+		         "'%s/card/Saves/States/PlayStation' '%s/roms/PlayStation/Done'", p, root, root, root, root);
 		if (system(cmd) != 0) return 1;
 	}
 #define R(f) (snprintf(p, sizeof p, "%s/roms/PlayStation/%s", root, f), p)
@@ -92,7 +92,7 @@ int main(void)
 	put(R(".media/Final Fantasy VII (USA) (Disc 1).png"), "art");
 	snprintf(p, sizeof p, "%s/card/Saves/Final Fantasy VII (USA) (Disc 1).srm", root);
 	put(p, "save");
-	snprintf(p, sizeof p, "%s/shared/.tortos/PlayStation/Final Fantasy VII (USA) (Disc 1).chd.1.state", root);
+	snprintf(p, sizeof p, "%s/card/Saves/States/PlayStation/Final Fantasy VII (USA) (Disc 1).chd.1.state", root);
 	put(p, "state");
 #undef R
 	{
@@ -129,7 +129,7 @@ int main(void)
 #undef R
 	snprintf(p, sizeof p, "%s/card/Saves/Final Fantasy VII (USA).srm", root);
 	CHECK(!strcmp(slurp(p), "save"), "the save, under the playlist's name");
-	snprintf(p, sizeof p, "%s/shared/.tortos/PlayStation/Final Fantasy VII (USA)/Final Fantasy VII (USA).m3u.1.state", root);
+	snprintf(p, sizeof p, "%s/card/Saves/States/PlayStation/Final Fantasy VII (USA)/Final Fantasy VII (USA).m3u.1.state", root);
 	CHECK(!strcmp(slurp(p), "state"), "disc 1's state, under the playlist's");
 	{
 		char roms[1024];

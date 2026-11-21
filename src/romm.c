@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* ChaOS: RomM - see romm.h */
+#define _DEFAULT_SOURCE   /* timegm */
 #include "romm.h"
 #include "net.h"
 #include "rajson.h"
@@ -12,6 +13,7 @@
 #include <strings.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 #define ROMM_REPLY (1 << 20)   /* a page of games, with their files, fits */
@@ -698,4 +700,103 @@ bool romm_sync_complete(const romm_conn *c, int session, int done, int failed)
 	call(c, "POST", path, body, buf, ROMM_REPLY, &http, 20);
 	free(buf);
 	return http >= 200 && http < 300;
+}
+
+/* ---- save states (ChaOS 2.7.3) ---------------------------------------------
+ *
+ * RomM keeps states as it keeps saves, by game (/api/states), but its sync
+ * plan is for saves only, so ChaOS plans states itself (main.c's Sync Saves)
+ * from these three: the list, up (new or over one), and down. */
+
+/* "2026-11-21T08:32:30.646Z", or with +00:00: as UTC seconds, 0 if not */
+static time_t iso_time(const char *s)
+{
+	struct tm tm;
+	int y, mo, d, h, mi, se;
+
+	if (sscanf(s, "%d-%d-%dT%d:%d:%d", &y, &mo, &d, &h, &mi, &se) != 6) return 0;
+	memset(&tm, 0, sizeof tm);
+	tm.tm_year = y - 1900; tm.tm_mon = mo - 1; tm.tm_mday = d;
+	tm.tm_hour = h; tm.tm_min = mi; tm.tm_sec = se;
+	return timegm(&tm);
+}
+
+int romm_states(const romm_conn *c, int rom_id, romm_state *out, int max, char *why, size_t wn)
+{
+	char path[64], *buf = reply_buf(), when[48];
+	int http = 0, k = 0;
+	long got;
+	jsv root, it = { 0 }, e;
+
+	if (!buf) return -1;
+	snprintf(path, sizeof path, "/api/states?rom_id=%d", rom_id);
+	got = call(c, NULL, path, NULL, buf, ROMM_REPLY, &http, 30);
+	if (got < 0 || http < 200 || http >= 300) { http_why(http, why, wn); free(buf); return -1; }
+	root = js_root(buf, (size_t)got);
+	while (k < max && js_next(root, &it, &e)) {
+		romm_state *st = &out[k];
+
+		memset(st, 0, sizeof *st);
+		st->id = (int)jint(e, "id");
+		jstr(e, "file_name", st->file_name, sizeof st->file_name);
+		jstr(e, "updated_at", when, sizeof when);
+		st->updated = iso_time(when);
+		st->size = jint(e, "file_size_bytes");
+		if (st->id && st->file_name[0]) k++;
+	}
+	free(buf);
+	return k;
+}
+
+bool romm_state_upload(const romm_conn *c, int rom_id, int id, const char *path, char *why, size_t wn)
+{
+	char url[600], *buf = reply_buf(), dev[200];
+	net_req r;
+	int http = 0;
+	long n;
+
+	if (!buf) return false;
+	seg(dev, sizeof dev, c->device_id);
+	if (id) snprintf(url, sizeof url, "%s/api/states/%d%s%s", c->url, id,
+	                 c->device_id[0] ? "?device_id=" : "", c->device_id[0] ? dev : "");
+	else snprintf(url, sizeof url, "%s/api/states?rom_id=%d%s%s", c->url, rom_id,
+	              c->device_id[0] ? "&device_id=" : "", c->device_id[0] ? dev : "");
+	memset(&r, 0, sizeof r);
+	r.method = id ? "PUT" : "POST";
+	r.url = url;
+	r.bearer = c->token;
+	r.form_name = "stateFile";
+	r.form_file = path;
+	r.timeout_s = 180;
+	n = net_request(&r, buf, ROMM_REPLY, &http);
+	free(buf);
+	if (n < 0 || http < 200 || http >= 300) { http_why(http, why, wn); return false; }
+	return true;
+}
+
+bool romm_state_download(const romm_conn *c, int id, const char *path, char *why, size_t wn)
+{
+	char url[400], part[600];
+	net_req r;
+	pid_t pid;
+	int st = 0;
+
+	snprintf(url, sizeof url, "%s/api/states/%d/content", c->url, id);
+	snprintf(part, sizeof part, "%s.part", path);
+	memset(&r, 0, sizeof r);
+	r.url = url;
+	r.bearer = c->token;
+	r.timeout_s = 180;
+	unlink(part);
+	pid = net_request_spawn(&r, part);
+	if (pid <= 0) { say(why, wn, "Couldn't start the download"); return false; }
+	waitpid(pid, &st, 0);
+	net_spawn_done(pid);
+	if (!WIFEXITED(st) || WEXITSTATUS(st) != 0) {
+		unlink(part);
+		say(why, wn, "Couldn't download the state");
+		return false;
+	}
+	if (rename(part, path) != 0) { unlink(part); say(why, wn, "Couldn't write the state"); return false; }
+	return true;
 }
