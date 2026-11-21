@@ -43,30 +43,32 @@ SS = 4
 
 
 def mark(d, cx, cy, fill, cut, scale=1.0):
-    """A monitor in flat shapes, about 300x330 at scale 1, ink centred on
-    (cx, cy): the case with its screen knocked out, a prompt and a cursor on
-    the screen, a drive slot in the chin, the neck and the foot."""
+    """The monitor in flat shapes, about 300x300 at scale 1, ink centred on
+    (cx, cy): the IBM 5151's box (no stand: it sat on the PC), its screen
+    knocked out of the upper bezel with a prompt and cursor on it, its two
+    knobs knocked out of the chin at the right, and its two feet."""
     k = SS * scale
-    bw, bh = 300 * k, 236 * k
-    x0, y0 = cx - bw / 2, cy - 165 * k
-    d.rounded_rectangle([x0, y0, x0 + bw, y0 + bh], radius=30 * k, fill=fill)
-    # the screen, knocked out
-    sx0, sy0, sx1, sy1 = x0 + 30 * k, y0 + 28 * k, x0 + bw - 30 * k, y0 + bh - 62 * k
-    d.rounded_rectangle([sx0, sy0, sx1, sy1], radius=18 * k, fill=cut)
+    bw, bh = 310 * k, 262 * k
+    x0, y0 = cx - bw / 2, cy - 150 * k
+    d.rounded_rectangle([x0, y0, x0 + bw, y0 + bh], radius=22 * k, fill=fill)
+    # the screen, knocked out, a deep chin under it
+    sx0, sy0, sx1, sy1 = x0 + 34 * k, y0 + 30 * k, x0 + bw - 34 * k, y0 + bh - 70 * k
+    d.rounded_rectangle([sx0, sy0, sx1, sy1], radius=26 * k, fill=cut)
     # a prompt: a chevron, then a cursor block
     px, py = sx0 + 34 * k, sy0 + 40 * k
     t = 13 * k
     d.polygon([(px, py), (px + 30 * k, py + 26 * k), (px, py + 52 * k),
                (px, py + 52 * k - t * 1.4), (px + 30 * k - t * 1.1, py + 26 * k), (px, py + t * 1.4)], fill=fill)
     d.rectangle([px + 48 * k, py + 38 * k, px + 92 * k, py + 52 * k], fill=fill)
-    # a drive slot in the chin, knocked out
-    d.rounded_rectangle([x0 + bw - 132 * k, y0 + bh - 38 * k, x0 + bw - 40 * k, y0 + bh - 26 * k],
-                        radius=6 * k, fill=cut)
-    # the neck and the foot
-    ny = y0 + bh
-    d.polygon([(cx - 52 * k, ny - 2 * k), (cx + 52 * k, ny - 2 * k), (cx + 36 * k, ny + 44 * k),
-               (cx - 36 * k, ny + 44 * k)], fill=fill)
-    d.rounded_rectangle([cx - 118 * k, ny + 40 * k, cx + 118 * k, ny + 70 * k], radius=14 * k, fill=fill)
+    # brightness and contrast, two knobs at the chin's right
+    for dx in (78, 38):
+        r = 13 * k
+        kx, ky = x0 + bw - dx * k, y0 + bh - 35 * k
+        d.ellipse([kx - r, ky - r, kx + r, ky + r], fill=cut)
+    # the feet
+    for fx in (0.16, 0.84):
+        d.rounded_rectangle([x0 + bw * fx - 34 * k, y0 + bh - 4 * k, x0 + bw * fx + 34 * k, y0 + bh + 16 * k],
+                            radius=6 * k, fill=fill)
 
 
 def classic():
@@ -77,10 +79,23 @@ def classic():
 
 
 # ---- fancy ----------------------------------------------------------------
+#
+# The IBM 5151, the Personal Computer Display (1981), as photographs of it
+# show it: the monochrome monitor that sat on top of the IBM PC, showing the
+# Monochrome Display Adapter's text in green P39 phosphor - where a DOS prompt
+# in green belongs. A wide box in IBM's pale warm grey, its front edges
+# deeply rounded; a broad frame round a recessed panel a shade darker, the
+# tube set into its left and, at its right, a strip with the nameplate and
+# two black knobs (brightness, contrast), each with its white mark; a field of
+# small vent holes across the top behind the front; small dark feet. The
+# nameplate is blank: the shelf names no maker. Lit as AMOS lights (raymarch).
 
-M = rm.rot(4, -26, 0)
-BEIGE = (212, 204, 182)
-SW, SH = 1.46, 1.08          # the tube's face, half sizes
+M = rm.rot(6, -30, 0)
+PEARL = (222, 218, 203)
+PANEL = (203, 198, 181)
+SW, SH = 1.24, 0.96          # the tube's face, half sizes
+SX, SY = -0.30, 0.02         # its middle, left of the case's
+FZ = 0.78                    # the case's front
 
 
 def screen_picture():
@@ -109,42 +124,67 @@ def screen_picture():
     return Image.fromarray(np.clip(a, 0, 255).astype(np.uint8))
 
 
-SCREEN = rm.Tex(screen_picture(), -SW, SW, -SH + 0.42, SH + 0.42, base=(14, 22, 16))
+SCREEN = rm.Tex(screen_picture(), SX - SW, SX + SW, SY - SH, SY + SH, base=(14, 22, 16))
 
 
 def frame(p):
     return rm.local(p, (0, 0, 0), M)
 
 
-MATS = [rm.Mat(BEIGE, gloss=0.38, spec=0.5),                                 # 0 case
-        rm.Mat(lambda p: SCREEN(frame(p)), gloss=0.82, spec=0.6, emit=0.9),  # 1 the tube's glass
-        rm.Mat((34, 34, 38), gloss=0.3, spec=0.3),                           # 2 drive slot, vents
-        rm.Mat((90, 220, 110), gloss=0.4, spec=0.4, emit=1.0)]               # 3 power light
+def knob_face(q):
+    """black, with a white mark at one o'clock, as the 5151's knobs have"""
+    out = np.broadcast_to((np.array([24, 24, 26], np.float64) / 255.0) ** 2.2, q.shape).copy()
+    for ky in (-0.36, -0.76):
+        dx, dy = q[:, 0] - 1.36, q[:, 1] - ky
+        mark = (np.abs(dx * 0.5 - dy * 0.866) < 0.02) & (dx * 0.866 + dy * 0.5 > 0.03) & \
+               (dx * 0.866 + dy * 0.5 < 0.11) & (q[:, 2] > FZ - 0.2)
+        out[mark] = (np.array([235, 235, 230]) / 255.0) ** 2.2
+    return out
+
+
+MATS = [rm.Mat(PEARL, gloss=0.30, spec=0.4),                                 # 0 case
+        rm.Mat(lambda p: SCREEN(frame(p)), gloss=0.85, spec=0.5, emit=0.9),  # 1 the tube's glass
+        rm.Mat((48, 50, 48), gloss=0.25, spec=0.3),                          # 2 the step round the tube, vent holes
+        rm.Mat(lambda p: knob_face(frame(p)), gloss=0.45, spec=0.5),         # 3 knobs
+        rm.Mat(PANEL, gloss=0.28, spec=0.35),                                # 4 the recessed panel
+        rm.Mat((178, 176, 168), gloss=0.5, spec=0.6),                        # 5 nameplate
+        rm.Mat((40, 40, 42), gloss=0.2, spec=0.2)]                           # 6 feet
 
 
 def scene(p):
     q = frame(p)
-    # the front: a deep rounded box; the back tapers like a tube's
-    front = rm.box(q - [0, 0.2, 0.25], (1.85, 1.62, 0.42), 0.16)
-    t = np.clip((0.0 - q[..., 2]) / 1.4, 0, 1)
-    qb = q - [0, 0.28, -0.75]
-    hb = np.stack([1.85 - 0.55 * t - 0.22, 1.5 - 0.45 * t - 0.22, np.full_like(t, 0.62 - 0.22)], -1)
-    db = np.abs(qb) - hb
-    back = (np.linalg.norm(np.maximum(db, 0), axis=-1) + np.minimum(db.max(-1), 0)) - 0.22
-    case = rm.smin(front, back, 0.12)
-    # the bezel's opening, and the tube's face a little inside, bulging
-    win = rm.box(q - [0, 0.42, 0.68], (SW + 0.04, SH + 0.04, 0.12), 0.1)
-    case = np.maximum(case, -win)
-    bulge = 0.06 * (1 - ((q[..., 0] / SW) ** 2 + ((q[..., 1] - 0.42) / SH) ** 2) * 0.5)
-    tube = rm.box(q - [0, 0.42, 0.56], (SW + 0.02, SH + 0.02, 0.03), 0.08) - bulge
-    # the chin: a drive slot and a power light
-    slot = rm.box(q - [0.85, -1.12, 0.67], (0.46, 0.035, 0.02), 0.01)
-    led = rm.sphere(q - [-1.38, -1.12, 0.66], 0.055)
-    # neck and foot
-    neck = rm.box(q - [0, -1.62, -0.25], (0.55, 0.22, 0.5), 0.08)
-    foot = rm.box(q - [0, -1.9, -0.2], (1.25, 0.09, 0.95), 0.08)
-    case = np.minimum(case, np.minimum(neck, foot))
-    d = np.stack([case, tube, slot, led], -1)
+    # the case: wide and deep, its front edges deeply rounded
+    case = rm.box(q - [0, 0, -0.75], (2.05, 1.42, 1.53), 0.32)
+    # the frame's opening, and the panel set back in it
+    hole = rm.box(q - [0.0, -0.02, FZ], (1.74, 1.12, 0.16), 0.2)
+    case = np.maximum(case, -hole)
+    panel = rm.box(q - [0.0, -0.02, FZ - 0.2], (1.76, 1.14, 0.06), 0.2)
+    # the tube's opening in the panel, a dark step, and the bulging glass
+    tw = rm.box(q - [SX, SY, FZ - 0.14], (SW + 0.06, SH + 0.06, 0.3), 0.2)
+    panel = np.maximum(panel, -tw)
+    case = np.maximum(case, -tw)
+    step = rm.box(q - [SX, SY, FZ - 0.3], (SW + 0.1, SH + 0.1, 0.03), 0.22)
+    step = np.maximum(step, -rm.box(q - [SX, SY, FZ - 0.3], (SW - 0.02, SH - 0.02, 0.2), 0.2))
+    bulge = 0.06 * (1 - (((q[..., 0] - SX) / SW) ** 2 + ((q[..., 1] - SY) / SH) ** 2) * 0.5)
+    tube = rm.box(q - [SX, SY, FZ - 0.32], (SW + 0.02, SH + 0.02, 0.03), 0.2) - bulge
+    # the strip at the right: nameplate and two knobs
+    plate = rm.box(q - [1.36, 0.62, FZ - 0.13], (0.17, 0.12, 0.012), 0.01)
+    knobs = np.minimum(rm.cyl(q - [1.36, -0.36, FZ - 0.08], 0.11, 0.07, 0.025, axis=2),
+                       rm.cyl(q - [1.36, -0.76, FZ - 0.08], 0.11, 0.07, 0.025, axis=2))
+    # vent holes across the top, behind the front
+    gx = ((q[..., 0] + 4) % 0.1) - 0.05
+    gz = ((q[..., 2] + 4) % 0.1) - 0.05
+    holes = np.maximum(np.hypot(gx, gz) - 0.022,
+                       np.maximum(np.abs(q[..., 0]) - 1.55, np.abs(q[..., 2] - 0.0) - 0.42))
+    holes = np.maximum(holes, np.abs(q[..., 1] - 1.42) - 0.03)
+    case = np.maximum(case, -holes)
+    # small dark feet at the front corners and back
+    feet = np.full(q.shape[:-1], 1e9)
+    for fx in (-1.6, 1.6):
+        for fz in (0.35, -1.9):
+            feet = np.minimum(feet, rm.cyl(q - [fx, -1.47, fz], 0.14, 0.05, 0.02, axis=1))
+    d = np.stack([case, tube, step,
+                  knobs, panel, plate, feet], -1)
     return d.min(-1), d.argmin(-1)
 
 
@@ -152,4 +192,4 @@ scene.mats = MATS
 
 if __name__ == "__main__":
     classic()
-    rm.render(scene, FANCY, cam=(0.0, 1.2, 9.5), look=(0, -0.05, 0), fov=28)
+    rm.render(scene, FANCY, cam=(0.0, 2.6, 9.6), look=(0, -0.15, -0.5), fov=29)

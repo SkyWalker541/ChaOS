@@ -12,6 +12,8 @@ is: longest side 96% of a 384 frame, centred.
 
 Everything is numpy over all the camera's rays at once.
 """
+import os
+
 import numpy as np
 from PIL import Image
 
@@ -105,6 +107,26 @@ FILL = norm(np.array([0.8, 0.15, 0.6]))
 RIM = norm(np.array([0.3, 0.5, -0.8]))
 
 
+# How the studio lights a card. The set's first renders had a strong key, a
+# rim and a dark room: drama no photograph in the set has. AMOS lights them as
+# Evan Amos lights the consoles they sit beside (res/cards/fancy/SOURCE.md):
+# big soft even light, high key, shadows that only just say where the floor
+# is, no rim, and a bright room for anything glossy to show. RM_LIGHT=studio
+# in the environment draws a card the old way, to compare.
+STUDIO = dict(key=1.15, fill=0.30, amb=0.22, rim=0.35, shadow=0.0, spec=1.0, room=0.0)
+AMOS = dict(key=0.80, fill=0.55, amb=0.62, rim=0.0, shadow=0.55, spec=0.55, room=1.0)
+LIGHT = STUDIO if os.environ.get("RM_LIGHT") == "studio" else AMOS
+
+
+def amos_room(d):
+    """A white sweep: bright above and behind, a soft grey floor, the key's
+    softbox wide and gentle"""
+    y = d[..., 1]
+    base = np.where(y > 0, 0.85 + 0.25 * y, 0.45 + 0.25 * (1 + y))
+    sb = np.clip((np.sum(d * KEY, -1) - 0.70) / 0.25, 0, 1) * 0.9
+    return (base + sb)[..., None] * np.array([1.0, 1.0, 1.01])
+
+
 def studio(d):
     """What a glossy surface reflects: a dim ceiling and a dark floor, a big
     softbox up and to the left, a strip light to the right."""
@@ -113,6 +135,9 @@ def studio(d):
     sb = np.clip((np.sum(d * KEY, -1) - 0.86) / 0.06, 0, 1) * 3.2
     strip = np.clip((np.sum(d * FILL, -1) - 0.93) / 0.04, 0, 1) * 1.1
     return (base + sb + strip)[..., None] * np.array([1.0, 1.0, 1.02])
+
+
+_studio0 = studio      # a card that sets its own room keeps it
 
 
 # ---- rendering -----------------------------------------------------------------
@@ -166,6 +191,8 @@ def render(scene, out, size=384, ss=3, cam=(0, 0.6, 9.0), look=(0, 0, 0), fov=26
         sh = np.minimum(sh, 10 * h / tt)
         tt += np.clip(h, 0.01, 0.25)
     sh = np.clip(sh, 0, 1) ** 1.5
+    # AMOS: shadows lifted, as a big soft source leaves them
+    sh = LIGHT["shadow"] + (1 - LIGHT["shadow"]) * sh
 
     # ambient occlusion along the normal
     ao = np.zeros(len(p))
@@ -187,14 +214,14 @@ def render(scene, out, size=384, ss=3, cam=(0, 0.6, 9.0), look=(0, 0, 0), fov=26
         f0 = alb if m.metal else np.full_like(alb, 0.04)
         fres = f0 + (1 - f0) * ((1 - ndv) ** 5)[:, None]
         rough = 1 - m.gloss
-        diff = (np.clip(np.sum(nn * KEY, -1), 0, 1) * sh[s] * 1.15
-                + np.clip(np.sum(nn * FILL, -1), 0, 1) * 0.30
-                + (0.5 + 0.5 * nn[:, 1]) * 0.22 * ao[s])
+        diff = (np.clip(np.sum(nn * KEY, -1), 0, 1) * sh[s] * LIGHT["key"]
+                + np.clip(np.sum(nn * FILL, -1), 0, 1) * LIGHT["fill"]
+                + (0.5 + 0.5 * nn[:, 1]) * LIGHT["amb"] * ao[s])
         hk = norm(KEY + vv)
         shin = 2 + 600 * m.gloss ** 3
-        spk = np.clip(np.sum(nn * hk, -1), 0, 1) ** shin * (shin + 8) / 60 * sh[s]
-        rim = np.clip(np.sum(nn * RIM, -1), 0, 1) ** 2 * 0.35
-        env = studio(refl)
+        spk = np.clip(np.sum(nn * hk, -1), 0, 1) ** shin * (shin + 8) / 60 * sh[s] * LIGHT["spec"]
+        rim = np.clip(np.sum(nn * RIM, -1), 0, 1) ** 2 * LIGHT["rim"]
+        env = amos_room(refl) if LIGHT["room"] and studio is _studio0 else studio(refl)
         # rougher surfaces see a blurred, dimmer studio
         env = env * (1 - rough * 0.65) + rough * 0.65 * 0.25
         dcol = alb * (diff + rim)[:, None] * (0.0 if m.metal else 1.0)
