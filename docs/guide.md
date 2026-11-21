@@ -127,7 +127,7 @@ than any one console:
 | | |
 |---|---|
 | **Play Time** | per game or per system, by day, week, month, year or all time |
-| **ChaOS Transfer** | the file server; needs Wi-Fi and says so when there is none. While a computer is on the USB cable it is **ChaOS Wire** instead, always at `10.55.0.2` on the Brick and `10.42.0.1` on the Pixel 2. Everything on the card stays yours to change, but before you delete or rename something ChaOS relies on (a console's folder, PortMaster, or Save States' `library.db`, which holds play time and your games' details) it says what it's for and asks first. Over Wi-Fi its first page also says when a ChaOS update is out, on your Update Channel, and can download and install it: **Install and Restart** asks on the device before it restarts. |
+| **ChaOS Transfer** | the file server; needs Wi-Fi and says so when there is none. While a computer is on the USB cable it is **ChaOS Wire** instead, always at `10.55.0.2` on the Brick and `10.42.0.1` on the Pixel 2. Everything on the card stays yours to change, but before you delete or rename something ChaOS relies on (a console's folder or PortMaster) it says what it's for and asks first. Over Wi-Fi its first page also says when a ChaOS update is out, on your Update Channel, and can download and install it: **Install and Restart** asks on the device before it restarts. |
 | **Wi-Fi & Bluetooth** | a page with both, each showing its own state there |
 | **Wi-Fi** (Wi-Fi & Bluetooth) | the network's name when connected, or why it is not. WPA2 and WPA3 networks both join, whatever is in the name |
 | **Bluetooth** (Wi-Fi & Bluetooth) | the connected headset, or `not connected` - pair, connect and forget |
@@ -144,7 +144,7 @@ than any one console:
 | **Auto Off** (System Settings) | how long without a button before the device powers itself down |
 | **Appearance** | the look settings on their own page: UI Theme, UI Direction, Transition Speed, Menu Color, and Shelves |
 | **Shelves** (Appearance) | the shelf settings on their own page: Game List View, Show Shelf Name, Shelf Order, Arrange Shelves, Show Favorites, Show Recently Played and Show Muse |
-| **UI Theme** | `Plain Jane`, `Fancy Pants`, `ChaOS Pixel Cards` or `ChaOS Pixel Names` - which art the shelves wear. On the Appearance page |
+| **UI Theme** | `Plain Jane`, `Fancy Pants`, `ChaOS Pixel Cards`, `ChaOS Pixel Names` or `ChaOS Pixel Burst` - which art the shelves wear, and with Pixel Burst the look of every screen. On the Appearance page |
 | **UI Direction** | `Horizontal`, `Vertical` or `Cubic` - see below |
 | **Show Favorites** (Shelves) | `On` or `Off` - whether the Favorites shelf appears on the systems row. Off, Y still marks favorites, and they come back when it's on |
 | **Show Recently Played** (Shelves) | `On` or `Off` - whether the Recently Played shelf appears on the systems row. It lists the last twelve games played, across every system, and is hidden until something has been played |
@@ -558,7 +558,13 @@ name underneath. `ChaOS Pixel Cards` (ChaOS) is each system's name in the
 logo's pixel letters, its last word in the system's colour; the name under
 the cursor flies together pixel by pixel, and the one you leave scatters. `ChaOS Pixel Names` (ChaOS) is the same name with no card at all, large
 in the middle of the screen with a glow and drop shadow in the system's
-colour.
+colour. `ChaOS Pixel Burst` (ChaOS) takes the logo's look to the whole of
+ChaOS: the consoles are their names on framed cards, and every menu, list and
+notice is drawn in pixel fonts (Pixelify Sans, and Tiny5 for headings, which
+between them have every accented, Greek and Cyrillic letter) with cut
+corners, a cream bar on what you've picked that sheds a few orange and cyan
+pixels, block switches (orange off, cyan on), a block battery and dashed
+lines. It is drawn like Pixel Cards, so it has no Cubic.
 
 **UI Direction** picks how you move. `Horizontal` is the row above.
 
@@ -804,7 +810,9 @@ Boy Games and Multi-Disc Games. RomM, Get Homebrew and Syncthing need Wi-Fi.
 
 **RomM** is a game library you run on your own computer or NAS
 (https://romm.app): sign in, browse its games by console and download them onto
-their shelves with RomM's covers, sync saves for the games you got from it, and
+their shelves with RomM's covers, sync saves and save states for the games you
+got from it (a state either side changed goes to the other; when both did, the
+newer wins and the other is kept in `Saves/.romm-backup/States`), and
 fetch BIOS files. It runs only when you choose something.
 
 ### Get Homebrew
@@ -950,7 +958,12 @@ pick it and save. The Brick shows *"<computer> wants to pair"* - A, then Pair.
 The computer is then offered the Brick's folders and asks where to keep each.
 ChaOS's saves are `Saves/<game>.srm`, one folder for every console, which is
 how RetroArch keeps them when it isn't sorting saves into a folder per core;
-to share them with RetroArch, point the Saves folder there.
+to share them with RetroArch, point the Saves folder there. Save states are in
+`Saves/States/<console>/` with their pictures, so they go with the saves, to
+another ChaOS device ready to load (a state loads only in the emulator that
+made it, so RetroArch can't use them, and leaves them be). Until 2.7.3 they
+were in `.userdata/shared/.tortos/`; the first start of 2.7.3 moved them,
+never over a file already there.
 
 Turning on **Games** shares all of `Roms/`, which can be many gigabytes, and
 ChaOS asks first. Games that arrive are on their shelves after **Rescan
