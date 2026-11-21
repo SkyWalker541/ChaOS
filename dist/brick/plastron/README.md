@@ -12,6 +12,7 @@ the Brick and the Brick Pro, as fast as before:
 | `boot.scr` | `source/boot.cmd` made with mkimage: loads `brickpro.dtb` when the SPL left "PRO!", else `brick.dtb` | the boot partition |
 | `brickpro.dtb` | `source/sun50iw10p1-trimui-brickpro.dts`: the Brick's tree with the Pro's screen timings, backlight pin and TWI3 | the boot partition |
 | `brick-pad.ko` | the Brick's buttons, with `source/0046-...patch`: on the Pro also L3, R3 and both sticks (ABS_X/Y, ABS_RX/RY) | the root, /usr/lib/brick |
+| `ImagePro.lz4` | the Brick Pro's kernel: TortOS 2.2.0's (plastron b897f7c, brick_defconfig, gcc 10) with `source/0047-ChaOS-the-Brick-Pro-s-panel-a-gh7003.patch`, the Pro's panel (it reads 70 03 0a; TrimUI's Pro U-Boot calls it gh7003, and without it the Pro's screen stays white). Version 4.9.191+, so TortOS's modules load as they are | the boot partition; `boot.scr` loads it only on a Brick Pro |
 
-On a Brick, all of it does what TortOS's does. GPL-2.0 (U-Boot, Linux), as
+On a Brick, all of it does what TortOS's does, and it boots TortOS's own kernel. GPL-2.0 (U-Boot, Linux), as
 the files they change.

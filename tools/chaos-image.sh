@@ -84,14 +84,15 @@ install -m 755 "$DIATOM" "$C/TortOS/diatom"
 # ChaOS's changes for the Brick Pro: dist/brick/plastron/README.md): its boot
 # loader, which tells the Brick Pro from the Brick and sets up the Pro's DRAM;
 # its boot script, which loads the Pro's device tree on a Pro; that tree; and
-# the button driver, which reads the Pro's L3, R3 and sticks. TortOS's kernel,
-# its brick.dtb and every other module stay as they are: a Brick boots what it
-# did. The boot partition is FAT, written with mtools; the boot loader goes
+# the button driver, which reads the Pro's L3, R3 and sticks; and the Pro's
+# own kernel, ImagePro.lz4, TortOS's with the Pro's panel added, which only a
+# Pro boots. TortOS's kernel, its brick.dtb and every other module stay as they
+# are: a Brick boots what it did. The boot partition is FAT, written with mtools; the boot loader goes
 # 128 KiB into the card, ahead of the partitions.
 # Only where PLASTRON_REV says this release carries them (from 2.6.0)
 if [ -f "$ROOT/PLASTRON_REV" ]; then
 	P=$ROOT/dist/brick/plastron
-	for f in boot.scr brickpro.dtb u-boot-sunxi-with-spl.bin brick-pad.ko; do
+	for f in boot.scr brickpro.dtb u-boot-sunxi-with-spl.bin brick-pad.ko ImagePro.lz4; do
 		[ -f "$P/$f" ] || { echo "no $f in dist/brick/plastron" >&2; exit 1; }
 	done
 	[ -f "$W/root/usr/lib/brick/brick-pad.ko" ] || { echo "no brick-pad.ko in the root: check plastron" >&2; exit 1; }
@@ -109,7 +110,7 @@ if [ -f "$ROOT/PLASTRON_REV" ]; then
 	BOOT_AT=$(($1 * 512))
 	[ "$BOOT_AT" -gt 0 ] || { echo "no boot partition in $IN" >&2; exit 1; }
 	mdir -i "$W/card.img@@$BOOT_AT" ::/brick.dtb > /dev/null || { echo "no brick.dtb on the boot partition" >&2; exit 1; }
-	mcopy -o -i "$W/card.img@@$BOOT_AT" "$P/boot.scr" "$P/brickpro.dtb" ::/
+	mcopy -o -i "$W/card.img@@$BOOT_AT" "$P/boot.scr" "$P/brickpro.dtb" "$P/ImagePro.lz4" ::/
 	[ "$(stat -c%s "$P/u-boot-sunxi-with-spl.bin")" -le $(( (8192 - 256) * 512 )) ] || { echo "the boot loader is too big" >&2; exit 1; }
 	dd if="$P/u-boot-sunxi-with-spl.bin" of="$W/card.img" bs=1024 seek=128 conv=notrunc status=none
 fi
