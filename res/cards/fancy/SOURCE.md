@@ -66,6 +66,9 @@ scaled as above, longest side 96% of 384.
 
 ## PORTS.png
 
-Not a console: Ports' card, a retro PC monitor rendered (`tools/genportscard.py`)
-from no images, in matte beige plastic, a real MS-DOS session on its screen. It
-replaced the rendered arcade stick (`tools/genportsfancy.py`, kept) in 2.7.4.
+Not a console: Ports' card, a mid-90s beige PC, its CRT monitor on its
+desktop case, supplied by SkyWalker541 on 2026-11-21 for this card
+(`source/ports-pc.png`, kept here). `tools/genportsphoto.py` cuts it from its
+white backdrop, cleans and white-balances it toward the set and frames it as
+above. It has no maker's name on it. It replaced a rendered arcade stick
+(`tools/genportsfancy.py`, kept).
