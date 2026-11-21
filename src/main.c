@@ -22560,7 +22560,7 @@ static void draw_letter_popup(app *a)
 		if (made_for != a->r) { layer = NULL; big = big_px = NULL; drawn = 0; made_for = a->r; }
 	}
 	if (!big) big = TTF_OpenFont(P_FONT, 150);
-	/* ChaOS Pixel Burst: Silkscreen at 152, on its 19-pixel grid */
+	/* ChaOS Pixel Burst: Tiny5 at 152, on its 19-pixel grid */
 	if (ui_pixel() && !big_px) big_px = TTF_OpenFont(ui_font_path(true), 152);
 	if (drawn_px != ui_pixel()) { drawn = 0; drawn_px = ui_pixel(); }
 	if (!layer) {
@@ -22864,7 +22864,7 @@ static void draw_shelf_note(app *a)
 
 	if (made_for != a->r) { f0 = f_px = NULL; made_for = a->r; }
 	if (!f0) f0 = TTF_OpenFont(P_FONT, 56);
-	/* ChaOS Pixel Burst: Silkscreen at 56, on its 7-pixel grid */
+	/* ChaOS Pixel Burst: Tiny5 at 56, on its 7-pixel grid */
 	if (ui_pixel() && !f_px) f_px = TTF_OpenFont(ui_font_path(true), 56);
 	f = ui_pixel() && f_px ? f_px : f0;
 	if (!f) return;
