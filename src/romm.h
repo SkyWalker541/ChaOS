@@ -147,4 +147,20 @@ bool romm_save_upload(const romm_conn *c, int rom_id, const char *path, char *wh
 bool romm_save_download(const romm_conn *c, int save_id, const char *path, char *why, size_t wn);
 bool romm_sync_complete(const romm_conn *c, int session, int done, int failed);
 
+/* ---- save states (ChaOS 2.7.3) ------------------------------------------ */
+
+typedef struct {
+	int    id;
+	char   file_name[ROMM_STR];  /* "Zelda.gba.1.state" */
+	time_t updated;              /* the server's updated_at */
+	long   size;
+} romm_state;
+
+/* A game's states on the server, up to `max`; -1 on failure */
+int  romm_states(const romm_conn *c, int rom_id, romm_state *out, int max, char *why, size_t wn);
+/* Up as a new state (id 0) or over the server's state `id` */
+bool romm_state_upload(const romm_conn *c, int rom_id, int id, const char *path, char *why, size_t wn);
+/* A state's content into `path`, through path.part */
+bool romm_state_download(const romm_conn *c, int id, const char *path, char *why, size_t wn);
+
 #endif

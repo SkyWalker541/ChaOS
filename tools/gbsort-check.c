@@ -69,9 +69,9 @@ int main(void)
 	/* its things */
 	put("Roms/Game Boy/.media/Quest Color.png", 0);
 	put("Roms/Game Boy/.media/Quest Color.Extra.png", 0); /* another name's: stays */
-	put("shared/.tortos/Game Boy/Quest Color.gb.auto.state", 0);
-	put("shared/.tortos/Game Boy/Quest Color.gb.auto.bmp", 0);
-	put("shared/.tortos/Game Boy/Quest Color.gb.1.state", 0);
+	put("Saves/States/Game Boy/Quest Color.gb.auto.state", 0);
+	put("Saves/States/Game Boy/Quest Color.gb.auto.bmp", 0);
+	put("Saves/States/Game Boy/Quest Color.gb.1.state", 0);
 	put("Cheats/Game Boy/Quest Color.cht", 0);
 
 	n = gbs_scan(roms, cache, m, 64);
@@ -89,10 +89,10 @@ int main(void)
 	CK(there("Roms/Game Boy Color/Quest Color.gb") && !there("Roms/Game Boy/Quest Color.gb"), "the game");
 	CK(there("Roms/Game Boy Color/.media/Quest Color.png") && there("Roms/Game Boy/.media/Quest Color.Extra.png"),
 	   "its box art, and not another name's");
-	CK(there("shared/.tortos/Game Boy Color/Quest Color.gb.auto.state") &&
-	   there("shared/.tortos/Game Boy Color/Quest Color.gb.auto.bmp") &&
-	   there("shared/.tortos/Game Boy Color/Quest Color.gb.1.state") &&
-	   !there("shared/.tortos/Game Boy/Quest Color.gb.auto.state"), "its states and their pictures");
+	CK(there("Saves/States/Game Boy Color/Quest Color.gb.auto.state") &&
+	   there("Saves/States/Game Boy Color/Quest Color.gb.auto.bmp") &&
+	   there("Saves/States/Game Boy Color/Quest Color.gb.1.state") &&
+	   !there("Saves/States/Game Boy/Quest Color.gb.auto.state"), "its states and their pictures");
 	CK(there("Cheats/Game Boy Color/Quest Color.cht") && !there("Cheats/Game Boy/Quest Color.cht"), "its cheats");
 	x = find(m, n, "Twin.gb");
 	CK(x && !gbs_move_files(roms, shared, base, x) && there("Roms/Game Boy Color/Twin.gb"), "a clash isn't moved");

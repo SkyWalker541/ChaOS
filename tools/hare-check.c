@@ -251,12 +251,14 @@ static void build_tree(void)
 	mkdir(g_roms, 0777);
 	mkdir(g_web, 0777);
 	mkdir(g_shared, 0777);
-	snprintf(p, sizeof p, "%s/.tortos", g_shared);      mkdir(p, 0777);
-	snprintf(p, sizeof p, "%s/.tortos/NES", g_shared);  mkdir(p, 0777);
-	snprintf(p, sizeof p, "%s/.tortos/NES/Contra.state", g_shared);
+	/* ChaOS 2.7.3: states in Saves/States/ */
+	snprintf(p, sizeof p, "%s/Saves", g_card);              mkdir(p, 0777);
+	snprintf(p, sizeof p, "%s/Saves/States", g_card);       mkdir(p, 0777);
+	snprintf(p, sizeof p, "%s/Saves/States/NES", g_card);   mkdir(p, 0777);
+	snprintf(p, sizeof p, "%s/Saves/States/NES/Contra.state", g_card);
 	mkfile(p, "STATEDATA");
-	/* The launcher's own, in the same directory as the states. */
-	snprintf(p, sizeof p, "%s/.tortos/cheevos.cfg", g_shared);
+	/* A .cfg in among the states: no_cfg still keeps it out. */
+	snprintf(p, sizeof p, "%s/Saves/States/cheevos.cfg", g_card);
 	mkfile(p, "1447\t6850\ts\n");
 	snprintf(p, sizeof p, "%s/Bios", g_card);   mkdir(p, 0777);
 	snprintf(p, sizeof p, "%s/Saves", g_card);  mkdir(p, 0777);
@@ -507,7 +509,7 @@ int main(void)
 		{
 			char p[512];
 			struct stat st;
-			snprintf(p, sizeof p, "%s/.tortos/cheevos.cfg", g_shared);
+			snprintf(p, sizeof p, "%s/Saves/States/cheevos.cfg", g_card);
 			CHECK(stat(p, &st) == 0, "cheevos.cfg was deleted");
 		}
 	}

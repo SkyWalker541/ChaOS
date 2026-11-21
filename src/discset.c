@@ -468,8 +468,10 @@ bool ds_apply(const char *roms, const char *shared, const char *card, const ds_s
 
 		split_path(s->was, wd, sizeof wd, &wn);
 		split_path(s->now, nd, sizeof nd, &nn);
-		snprintf(fd, sizeof fd, "%s/.tortos/%s%s%s", shared, s->folder, wd[0] ? "/" : "", wd);
-		snprintf(td, sizeof td, "%s/.tortos/%s%s%s", shared, s->folder, nd[0] ? "/" : "", nd);
+		/* ChaOS 2.7.3: states live in Saves/States/<console>/ */
+		(void)shared;
+		snprintf(fd, sizeof fd, "%s/Saves/States/%s%s%s", card, s->folder, wd[0] ? "/" : "", wd);
+		snprintf(td, sizeof td, "%s/Saves/States/%s%s%s", card, s->folder, nd[0] ? "/" : "", nd);
 		move_renamed(fd, wn, td, nn);
 	}
 	/* box art: a loose first disc's picture is the game's now */

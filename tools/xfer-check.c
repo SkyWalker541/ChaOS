@@ -86,7 +86,7 @@ int main(void)
 	CHECK(xfer_root_at(4) && !strcmp(xfer_root_at(4)->path, "/mnt/SDCARD/Saves"),
 	      "saves root wrong: %s", xfer_root_at(4) ? xfer_root_at(4)->path : "(none)");
 	CHECK(xfer_root_at(5) &&
-	      !strcmp(xfer_root_at(5)->path, "/mnt/SDCARD/.userdata/shared/.tortos"),
+	      !strcmp(xfer_root_at(5)->path, "/mnt/SDCARD/Saves/States"),
 	      "states root wrong: %s", xfer_root_at(5) ? xfer_root_at(5)->path : "(none)");
 	CHECK(xfer_root_at(6) && !strcmp(xfer_root_at(6)->path, "/mnt/SDCARD/Overlays"),
 	      "overlays root wrong: %s", xfer_root_at(6) ? xfer_root_at(6)->path : "(none)");
@@ -150,7 +150,7 @@ int main(void)
 			{ "/mnt/SDCARD/Music",                            XFER_DEL_NO },
 			{ "/mnt/SDCARD/Audiobooks",                       XFER_DEL_NO },
 			{ "/mnt/SDCARD/Bios",                             XFER_DEL_NO },
-			{ "/mnt/SDCARD/.userdata/shared/.tortos",         XFER_DEL_NO },
+			{ "/mnt/SDCARD/Saves/States",         XFER_DEL_NO },
 			{ "/mnt/SDCARD/Roms/NES",                         XFER_DEL_EMPTY },
 			{ "/mnt/SDCARD/Roms/NES/Some Disc Game",          XFER_DEL_ALL },
 			{ "/mnt/SDCARD/Roms/NES/.media",                  XFER_DEL_ALL },
@@ -159,7 +159,7 @@ int main(void)
 			{ "/mnt/SDCARD/Audiobooks/Some Book",             XFER_DEL_ALL },
 			{ "/mnt/SDCARD/Saves/NES",                        XFER_DEL_EMPTY },
 			{ "/mnt/SDCARD/Bios/sub",                         XFER_DEL_EMPTY },
-			{ "/mnt/SDCARD/.userdata/shared/.tortos/NES",     XFER_DEL_EMPTY },
+			{ "/mnt/SDCARD/Saves/States/NES",     XFER_DEL_EMPTY },
 			{ "/mnt/SDCARD/Roms/",                            XFER_DEL_NO },
 			{ "/mnt/SDCARD/TortOS",                           XFER_DEL_NO },
 			{ "/mnt/SDCARD/Musical",                          XFER_DEL_NO },
@@ -227,7 +227,7 @@ int main(void)
 		 * cheevos.cfg is the only record of an unlock the account has not
 		 * seen, so it must not be reachable by a route that deletes. */
 		allow("states/NES/Contra%20(USA).zip.auto.state",
-		      "/mnt/SDCARD/.userdata/shared/.tortos/NES/Contra (USA).zip.auto.state");
+		      "/mnt/SDCARD/Saves/States/NES/Contra (USA).zip.auto.state");
 		deny("states/cheevos.cfg", "unlocks the account has not seen yet");
 		deny("states/favorites.cfg", "the favorites list");
 		deny("states/NES/anything.cfg", "a config anywhere under the root");

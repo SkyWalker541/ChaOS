@@ -19,6 +19,20 @@ state = {'polls': 0, 'saves': {}, 'next_save': 1, 'uploads': [], 'downloaded': [
          'devices': []}
 # a server save for rom 2, newer than anything the device has
 state['saves'][41] = {'id': 41, 'rom_id': 2, 'file_name': 'Tetris.srm', 'content': b'SERVER-SAVE'}
+# ChaOS 2.7.3: states, by id, as /api/states keeps them
+state['states'] = {60: {'id': 60, 'rom_id': 2, 'file_name': 'Tetris.gb.1.state', 'content': b'SERVER-STATE',
+                        'updated_at': '2026-11-20T10:00:00.123456+00:00'}}
+state['next_state'] = 61
+
+
+def part_of(raw, name):
+    # the file in a multipart body under form field `name`
+    i = raw.find(b'name="' + name + b'"')
+    if i < 0:
+        return None
+    j = raw.find(b'\r\n\r\n', i)
+    k = raw.find(b'\r\n--', j)
+    return raw[j + 4:k] if j >= 0 and k >= 0 else None
 
 PLATFORMS = [
     {'id': 1, 'slug': 'gb', 'fs_slug': 'gb', 'name': 'Game Boy', 'custom_name': '', 'rom_count': 2, 'firmware_count': 1},
@@ -97,6 +111,16 @@ class H(BaseHTTPRequestHandler):
             return self.send(200, [])
         if p.startswith('/api/firmware/') and '/content/' in p:
             return self.send(200, raw=b'BIOS', ctype='application/octet-stream')
+        if p == '/api/states':
+            rid = int(q.get('rom_id', ['0'])[0])
+            return self.send(200, [{'id': v['id'], 'rom_id': v['rom_id'], 'file_name': v['file_name'],
+                                    'updated_at': v['updated_at'], 'file_size_bytes': len(v['content'])}
+                                   for v in state['states'].values() if v['rom_id'] == rid])
+        if p.startswith('/api/states/') and p.endswith('/content'):
+            v = state['states'].get(int(p.split('/')[3]))
+            if not v:
+                return self.send(404, {'detail': 'Not Found'})
+            return self.send(200, raw=v['content'], ctype='application/octet-stream')
         if p.startswith('/api/saves/') and p.endswith('/content'):
             sid = int(p.split('/')[3])
             return self.send(200, raw=state['saves'][sid]['content'], ctype='application/octet-stream')
@@ -111,6 +135,8 @@ class H(BaseHTTPRequestHandler):
             s = dict(state)
             s['saves'] = {k: {kk: (vv.decode() if isinstance(vv, bytes) else vv) for kk, vv in v.items()}
                           for k, v in state['saves'].items()}
+            s['states'] = {k: {kk: (vv.decode() if isinstance(vv, bytes) else vv) for kk, vv in v.items()}
+                           for k, v in state['states'].items()}
             return self.send(200, s)
         if p == '/api/auth/device/init':
             if OLD:
@@ -155,12 +181,39 @@ class H(BaseHTTPRequestHandler):
             state['uploads'].append({'rom_id': q.get('rom_id', [''])[0], 'device_id': q.get('device_id', [''])[0],
                                      'ok': ok, 'has': raw.count(b'LOCAL-SAVE') > 0})
             return self.send(201 if ok else 400, {'id': 50})
+        if p == '/api/states':
+            data = part_of(raw, b'stateFile')
+            fn = raw.split(b'filename="', 1)[1].split(b'"', 1)[0].decode() if b'filename="' in raw else ''
+            if data is None or not fn:
+                return self.send(400, {'detail': 'no stateFile'})
+            sid = state['next_state']
+            state['next_state'] += 1
+            state['states'][sid] = {'id': sid, 'rom_id': int(q.get('rom_id', ['0'])[0]), 'file_name': fn,
+                                    'content': data, 'updated_at': '2026-11-21T09:00:00+00:00'}
+            return self.send(201, {'id': sid})
         if p.startswith('/api/saves/') and p.endswith('/downloaded'):
             state['downloaded'].append(int(p.split('/')[3]))
             return self.send(200, {})
         if p.startswith('/api/sync/sessions/') and p.endswith('/complete'):
             state['completed'].append(json.loads(raw))
             return self.send(200, {'session': {'id': 77}})
+        self.send(404, {'detail': 'Not Found'})
+
+
+    def do_PUT(self):
+        u = urlparse(self.path)
+        p = u.path
+        raw = self.body()
+        if not self.authed():
+            return
+        if p.startswith('/api/states/'):
+            v = state['states'].get(int(p.split('/')[3]))
+            data = part_of(raw, b'stateFile')
+            if not v or data is None:
+                return self.send(404 if not v else 400, {'detail': 'no'})
+            v['content'] = data
+            v['updated_at'] = '2026-11-21T09:30:00+00:00'
+            return self.send(200, {'id': v['id']})
         self.send(404, {'detail': 'Not Found'})
 
 

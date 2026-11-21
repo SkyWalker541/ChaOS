@@ -168,6 +168,35 @@ int main(void)
 		}
 		CHECK(romm_sync_complete(&c, session, 2, 0), "session completed");
 	}
+	printf("save states (ChaOS 2.7.3)\n");
+	{
+		romm_state st[8];
+		char sp[512], got[64] = "";
+		int n, k, mine = 0;
+		FILE *f;
+
+		n = romm_states(&c, 2, st, 8, why, sizeof why);
+		CHECK(n == 1 && st[0].id == 60 && !strcmp(st[0].file_name, "Tetris.gb.1.state") &&
+		      st[0].updated == 1795168800 && st[0].size == 12, "the server's one: %d", n);
+		snprintf(sp, sizeof sp, "%s/Tetris.gb.1.state", dir);
+		CHECK(romm_state_download(&c, 60, sp, why, sizeof why), "down: %s", why);
+		if ((f = fopen(sp, "r"))) { if (!fgets(got, sizeof got, f)) got[0] = 0; fclose(f); }
+		CHECK(!strcmp(got, "SERVER-STATE"), "its content: %s", got);
+		snprintf(sp, sizeof sp, "%s/Tetris.gb.auto.state", dir);
+		if ((f = fopen(sp, "w"))) { fputs("LOCAL-STATE", f); fclose(f); }
+		CHECK(romm_state_upload(&c, 2, 0, sp, why, sizeof why), "up, new: %s", why);
+		n = romm_states(&c, 2, st, 8, why, sizeof why);
+		for (k = 0; k < n; k++) if (!strcmp(st[k].file_name, "Tetris.gb.auto.state")) mine = st[k].id;
+		CHECK(n == 2 && mine == 61, "listed with its name: %d, %d", n, mine);
+		if ((f = fopen(sp, "w"))) { fputs("NEWER-STATE", f); fclose(f); }
+		CHECK(romm_state_upload(&c, 2, 61, sp, why, sizeof why), "up, over it: %s", why);
+		snprintf(sp, sizeof sp, "%s/back.state", dir);
+		CHECK(romm_state_download(&c, 61, sp, why, sizeof why), "and back: %s", why);
+		got[0] = 0;
+		if ((f = fopen(sp, "r"))) { if (!fgets(got, sizeof got, f)) got[0] = 0; fclose(f); }
+		CHECK(!strcmp(got, "NEWER-STATE"), "replaced, not added: %s", got);
+		CHECK(romm_states(&c, 2, st, 8, why, sizeof why) == 2, "still two");
+	}
 	{
 		net_req q;
 		int http;
