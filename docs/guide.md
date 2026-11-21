@@ -150,6 +150,7 @@ than any one console:
 | **Show Recently Played** (Shelves) | `On` or `Off` - whether the Recently Played shelf appears on the systems row. It lists the last twelve games played, across every system, and is hidden until something has been played |
 | **Show Muse** (Shelves) | `On` or `Off` - whether Muse's shelf appears on the systems row. SELECT opens Muse either way |
 | **Shelf Order** (Shelves) | `Release Date` (as `systems.cfg` lists them), `A to Z`, or `By Maker` (NEC, Nintendo, Sega, SNK, Sony; each maker's home consoles, then its handhelds, so the Game Boys sit together), or `Custom`. Favorites, Recently Played and Muse keep their places, and Ports is last unless Custom puts it elsewhere |
+| **Game List View** (Shelves) | `Normal` (the cards), `List`, `List + Art Left` or `List + Art Right`: the list beside the selected game's cover, as big as the list's height allows and at most 42% of the screen wide, keeping its shape; the names take the rest, with a gap before the art. A name too long for its room is cut with an ellipsis, and the selected one slides |
 | **Show Shelf Name** (Shelves, under Game List View, with Normal only) | On: in card view, the console's name comes up for a moment after the other axis turns to its shelf. Off: just the pan |
 | **Arrange Shelves** (Shelves) | Your own order: A picks a console up, up and down move it, A puts it down. Leaving sets Shelf Order to `Custom`. A console that gets its first games later goes at the end |
 | **Box Art** | fetch what the whole library is missing |

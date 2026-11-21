@@ -345,13 +345,13 @@
         <li><b>Four UI Themes</b>: <b>Plain Jane</b> (a drawn card per console), <b>Fancy Pants</b> (the consoles themselves, rendered in 3D), and ChaOS's own <b>Pixel Cards</b> and <b>Pixel Names</b> <span class="tag">ChaOS</span>, where each console is its name in the logo's pixel letters, last word in the console's colour.</li>
         <li><b>Pixel animation</b> <span class="tag">ChaOS</span>: the name you land on flies together pixel by pixel. <b>Transition Speed</b> sets how fast (Slow, Normal, Fast, or <b>Static</b> for none), separately for each direction.</li>
         <li><b>Three UI Directions</b>: Horizontal, Vertical, or <b>Cubic</b>, a cube where up and down change console and left and right change game. Pixel Cards has no Cubic; Pixel Names is Horizontal only.</li>
-        <li><b>Game List View</b> <span class="tag">ChaOS</span>: a console's games as a scrolling list in the menus' style instead of cards.</li>
+        <li><b>Game List View</b> <span class="tag">ChaOS</span>: a console's games as a scrolling list in the menus' style instead of cards, or <b>List + Art Left</b> or <b>List + Art Right</b>: the list beside the selected game's cover, sized to fit whatever shape the art is.</li>
         <li><b>Favorites</b> (<kbd>Y</kbd> on a game, and it says so) and <b>Recently Played</b> <span class="tag">ChaOS</span> (your last twelve games, every console) are shelves at the front, either one hideable. Up to 20 shelves.</li>
         <li><b>Letter scrubbing</b> <span class="tag">ChaOS</span>: <kbd>L2</kbd>/<kbd>R2</kbd> jump to the previous or next letter on any game shelf, in every theme, list and Cubic, with the letter shown big. Hold the d-pad and after two seconds it shows the letter you're passing.</li>
         <li><b>Sort By</b> per console: Name, Play Time, Last Played or Recently Added. <b>Game info</b> on <kbd>X</kbd>: synopsis, year, genre and achievements.</li>
       </ul>
     </div>
-    <figure class="device" data-screens='[["home-pixelnames","Pixel Names"],["home-pixelcards","Pixel Cards"],["games-pixelcards","Pixel Cards: games"],["home-plainjane","Plain Jane"],["home-fancy","Fancy Pants"],["home-vertical","Vertical"],["home-cubic","Cubic"],["listview","Game List View"],["listview-letter","Letter jump"],["info","Game info"]]'>
+    <figure class="device" data-screens='[["home-pixelnames","Pixel Names"],["home-pixelcards","Pixel Cards"],["games-pixelcards","Pixel Cards: games"],["home-plainjane","Plain Jane"],["home-fancy","Fancy Pants"],["home-vertical","Vertical"],["home-cubic","Cubic"],["listview","Game List View"],["listview-art-left","List + Art Left"],["listview-art-right","List + Art Right"],["listview-letter","Letter jump"],["info","Game info"]]'>
       <div class="bezel"><img src="img/home-pixelnames.webp" alt="" loading="lazy" width="1024" height="768"></div>
       <figcaption class="chips"></figcaption>
     </figure>
@@ -690,6 +690,7 @@
   </div>
   <div class="releases">
     <h3>Recent releases</h3>
+    <div class="rel"><span class="ver">2.7.2</span><p>Two new <b>Game List View</b> choices, <b>List + Art Left</b> and <b>List + Art Right</b>: the list beside the selected game's cover, which fits itself to the art's shape. Only the selected name scrolls when it's too long.</p></div>
     <div class="rel"><span class="ver">2.7.1</span><p>Fixed: on the <b>Shelves</b> page in the normal game view, each row did the one above's, so Shelf Order opened Arrange Shelves. Every row does what it says again.</p></div>
     <div class="rel"><span class="ver">2.7.0</span><p><b>Shelves</b>, under Appearance: <b>Shelf Order</b> (release date, A to Z, by maker, or your own with <b>Arrange Shelves</b>), and the d-pad's other direction to change shelf with a slide and the console's name. Every shader setting explained in the menu, PT's backings named for their consoles, Hold Y showing the game as it will look, and rewind no longer freezing at its oldest point.</p></div>
     <div class="rel"><span class="ver">2.6.10</span><p><a href="#pico8">PICO-8</a> overlays: put your own PNG in <code>Overlays/PICO-8</code> and choose it in the PICO-8 shelf's menu under <b>Overlay</b>.</p></div>
