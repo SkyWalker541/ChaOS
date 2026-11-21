@@ -74,8 +74,12 @@ def mark(d, cx, cy, fill, cut, scale=1.0):
     d.rounded_rectangle([u0 + 16 * k, uy + 30 * k, u0 + 74 * k, uy + 52 * k], radius=10 * k, fill=cut)
     for ly in (34, 48):
         d.rectangle([u0 + 100 * k, uy + ly * k, u0 + 108 * k, uy + (ly + 4) * k], fill=cut)
-    d.rounded_rectangle([u0 + 146 * k, uy + 36 * k, u0 + 236 * k, uy + 44 * k], radius=2 * k, fill=cut)
-    d.rounded_rectangle([u0 + 208 * k, uy + 54 * k, u0 + 228 * k, uy + 62 * k], radius=3 * k, fill=cut)
+    # the floppy drive's panel: its slot, its light, its eject button
+    d.rounded_rectangle([u0 + 140 * k, uy + 22 * k, u0 + 248 * k, uy + 66 * k], radius=4 * k, fill=cut)
+    d.rounded_rectangle([u0 + 144 * k, uy + 26 * k, u0 + 244 * k, uy + 62 * k], radius=3 * k, fill=fill)
+    d.rounded_rectangle([u0 + 152 * k, uy + 34 * k, u0 + 236 * k, uy + 41 * k], radius=2 * k, fill=cut)
+    d.rectangle([u0 + 160 * k, uy + 50 * k, u0 + 167 * k, uy + 53 * k], fill=cut)
+    d.rounded_rectangle([u0 + 208 * k, uy + 49 * k, u0 + 228 * k, uy + 57 * k], radius=4 * k, fill=cut)
     # the line where the drive's panel sits
     d.rectangle([u0 + 8 * k, uy + 70 * k, u0 + uw - 8 * k, uy + 72 * k], fill=cut)
 
