@@ -162,6 +162,7 @@ mkdir -p "$C/TortOS/pico8/bin"
 install -m 755 "$ROOT/res/pico8/run.sh" "$C/TortOS/pico8/run.sh"
 install -m 755 "$ROOT/res/pico8/bin/wget" "$C/TortOS/pico8/bin/wget"
 install -m 644 "$ROOT/res/pico8/README.txt" "$C/TortOS/pico8/README.txt"
+install -m 644 "$ROOT/res/pico8/splore.png" "$C/TortOS/pico8/splore.png"   # Splore's label (tools/gensplore.py)
 # and the overlay over it, when its console has one (res/pico8/overlay.c)
 mkdir -p "$C/TortOS/pico8/lib"
 install -m 755 "$ROOT/dist/brick/pico8-overlay.so" "$C/TortOS/pico8/lib/overlay.so"

@@ -1696,7 +1696,14 @@ static int shelf_owner(app *a, int sysidx, int item)
  * and draw another. */
 static void box_art_path(const char *folder, const char *name, char *out, size_t n)
 {
+	struct stat st;
+
 	snprintf(out, n, "%s/%s/.media/%s.png", P_ROMS, folder, name);
+	/* ChaOS: Splore, the PICO-8 shelf's first card, has a label ChaOS ships
+	 * (tools/gensplore.py) - unless the player has put one of their own */
+	if (!strcmp(name, PICO8_SPLORE_NAME) && !strcmp(folder, "PICO-8") &&
+	    !(stat(out, &st) == 0 && st.st_size > 0))
+		snprintf(out, n, "%s/pico8/splore.png", P_ROOT);
 }
 
 /* Whether it is there. An empty file is not art - the rule the info screen
@@ -8571,7 +8578,8 @@ static bool cover_save(app *a, const char *src, const char *folder, const char *
 		fprintf(stderr, "cover: couldn't read %s: %s\n", src, IMG_GetError());
 		return false;
 	}
-	box_art_path(folder, stem, dest, sizeof dest);
+	/* always the player's own file, never ChaOS's shipped Splore label */
+	snprintf(dest, sizeof dest, "%s/%s/.media/%s.png", P_ROMS, folder, stem);
 	snprintf(dir, sizeof dir, "%s", dest);
 	if ((slash = strrchr(dir, '/'))) { *slash = '\0'; mkdir(dir, 0755); }
 	snprintf(tmp, sizeof tmp, "%s.new", dest);
