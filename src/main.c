@@ -16911,6 +16911,9 @@ static void pm_frame_end(app *a)
  * sticks.cfg, which the menus and Diatom's games both read (plat_sticks).
  * B goes back a step, and out from the first. */
 enum { STK_REST, STK_LUP, STK_LRIGHT, STK_RUP, STK_RRIGHT, STK_EDGES, STK_DONE };
+/* Raw counts from rest that are a push, not the stick settling: rest wanders
+ * by tens, and a full push is hundreds at least (about 850 on a Brick Pro) */
+#define STK_PUSHED 300
 
 static const char *const STK_SAY[] = {
 	"Let go of both sticks,\nthen press A",
@@ -17046,7 +17049,22 @@ static void sticks_screen(app *a)
 			d0 = abs(raw[base] - mid[base]);
 			d1 = abs(raw[base + 1] - mid[base + 1]);
 			if (d1 > d0) best = base + 1;
-			if ((d1 > d0 ? d1 : d0) > 900) {
+			/* Pushed: well clear of where it rests, and held there. How far
+			 * a stick goes is the device's own (a Brick Pro's went about 850
+			 * either way, under the 900 this once asked for, and the step
+			 * never moved on), so no distance is asked for but this, and
+			 * held means not moving: within an eighth of how far it is out,
+			 * from the reading the hold began at. */
+			{
+				static int at_start;
+				int far = d1 > d0 ? d1 : d0;
+
+				if (far > STK_PUSHED && held_since &&
+				    abs(raw[best] - at_start) > far / 8 + 24)
+					held_since = 0;   /* still moving: start the hold again */
+				if (far > STK_PUSHED && !held_since) at_start = raw[best];
+			}
+			if ((d1 > d0 ? d1 : d0) > STK_PUSHED) {
 				if (!held_since) held_since = plat_now_ms();
 				hold = (float)(plat_now_ms() - held_since) / 600.0f;
 				if (hold >= 1) {
@@ -17080,7 +17098,7 @@ static void sticks_screen(app *a)
 					bool push_low = push[i] < m;
 					int toward = push_low ? lo[r0] : hi[r0], away = push_low ? hi[r0] : lo[r0];
 
-					if (abs(toward - m) < 600 || abs(away - m) < 600) ok = false;
+					if (abs(toward - m) < STK_PUSHED || abs(away - m) < STK_PUSHED) ok = false;
 					if (i == 1 || i == 3) { live[i].neg = toward; live[i].pos = away; }
 					else { live[i].pos = toward; live[i].neg = away; }
 					live[i].mid = m;
@@ -23980,6 +23998,28 @@ static void scan_all(app *a)
 			        a->sys.systems[i].folder, v->list.skipped,
 			        a->sys.systems[i].exts[0] ? a->sys.systems[i].exts : "anything",
 			        names, v->list.skipped > shown ? ", and more" : "");
+		}
+	}
+	/* ChaOS: a console with no games and no folder gets its folder, so a
+	 * player knows where its games go: cards made from 2.7.3-test2's image
+	 * or older had none for the PlayStation or PICO-8. One stat each, and only
+	 * for an empty shelf, so it costs the boot nothing it notices. */
+	{
+		int k;
+
+		for (k = 0; k < a->sys.count; k++) {
+			char d[LIB_PATH * 2];
+			struct stat st;
+
+			if (a->view[k].list.count || is_muse(&a->sys.systems[k]) ||
+			    !a->sys.systems[k].folder[0]) continue;
+			snprintf(d, sizeof d, "%s/%s", P_ROMS, a->sys.systems[k].folder);
+			if (stat(d, &st) == 0) continue;
+			if (mkdir(d, 0755) == 0) {
+				snprintf(d, sizeof d, "%s/%s/.media", P_ROMS, a->sys.systems[k].folder);
+				mkdir(d, 0755);
+				fprintf(stderr, "scan: made Roms/%s\n", a->sys.systems[k].folder);
+			}
 		}
 	}
 	hide_empty_systems(a);

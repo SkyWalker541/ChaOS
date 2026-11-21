@@ -178,7 +178,14 @@ for set in classic fancy; do
 		install -m 644 "$ROOT/res/cards/$set/$card.png" "$C/TortOS/cards/$set/$card.png"
 	done
 done
-mkdir -p "$C/Roms/Ports"
+# One ROM folder per console, with the .media folder box art goes in, as
+# mk/payload.sh makes them: TortOS's image has only TortOS's consoles, so
+# without this a fresh card had no PlayStation folder (seen on 2.7.3-test2).
+# Read from systems.cfg (awk, not sed: folder names contain spaces).
+awk -F'|' '$1=="sys"{gsub(/^[ \t]+|[ \t]+$/,"",$3); print $3}' "$ROOT/config/systems.cfg" |
+while IFS= read -r folder; do
+	mkdir -p "$C/Roms/$folder/.media"
+done
 # bash's license beside the others; its source is in the sources archive
 # (tools/chaos-sources.sh)
 tar -xJOf "$ROOT/dist/brick/bash-source.tar.xz" bash-5.1.16/COPYING > "$C/Licenses/bash.txt"

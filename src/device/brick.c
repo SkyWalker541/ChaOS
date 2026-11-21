@@ -293,7 +293,8 @@ void plat_input_quit(void) { }
  * let go below a third, so a stick resting near the line doesn't flicker.
  * Calibrate Sticks (main.c) learns the device's own ends, middles and which
  * way is which into sticks.cfg; Diatom reads the same file for the games.
- * Without it each axis is its own, at rest where it was when ChaOS started. */
+ * Without it each axis is its own, at rest where it was when ChaOS started,
+ * 900 each way. */
 #ifdef __linux__
 static const int stick_abs[4] = { ABS_X, ABS_Y, ABS_RX, ABS_RY };
 #endif
@@ -316,8 +317,10 @@ static void sticks_load(void)
 #endif
 		g_cal[i].idx = i;
 		g_cal[i].mid = g_raw[i];
-		g_cal[i].neg = g_raw[i] - 1700;
-		g_cal[i].pos = g_raw[i] + 1700;
+		/* ChaOS: a Brick Pro's stick went about 850 either way, so 1700
+		 * left the menus needing it pushed past its end before calibrating */
+		g_cal[i].neg = g_raw[i] - 900;
+		g_cal[i].pos = g_raw[i] + 900;
 	}
 	snprintf(path, sizeof path, "%s/sticks.cfg", P_USERDATA);
 	if (!(f = fopen(path, "r"))) return;
