@@ -5457,7 +5457,7 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 		int max_w = panel.w * 42 / 100, aw, ah, lane;
 		float dt = art_last ? (float)(nowa - art_last) : 0.0f;
 		/* ChaOS Pixel Burst: room for the frame round the cover */
-		int fr_in = ui_pixel() ? 14 : 0;
+		int fr_in = ui_pixel() ? 11 : 0;
 
 		area_y += fr_in;
 		area_h -= fr_in * 2;
@@ -5478,7 +5478,9 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 			aw = ah = 0;
 			if (art_w_cur < 0.0f) art_w_cur = (float)(max_w * 3 / 4);
 		}
-		lane = (int)(art_w_cur + 0.5f) + pad + fr_in * 2;
+		/* Pixel Burst: the frame takes fr_in each side, so the gap after it
+		 * is half a pad, and the list keeps the room it has without one */
+		lane = (int)(art_w_cur + 0.5f) + (fr_in ? pad / 2 : pad) + fr_in * 2;
 		lane_w = panel.w - lane;
 		if (g_menu_art.side < 0) lane_x = panel.x + lane;
 		content_x = lane_x + pad;
