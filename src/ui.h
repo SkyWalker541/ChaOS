@@ -77,6 +77,10 @@ typedef enum {
 /* The font for a role. One size: the Text Size setting is gone, and src/ui.c
  * says why. */
 TTF_Font *ui_font(ui_font_role role);
+/* ChaOS Pixel Burst: the theme's pixel fonts and cut corners, on or off. The
+ * fonts open the first time it's on. ui_pixel says which is in use. */
+void ui_set_pixel(bool on);
+bool ui_pixel(void);
 /* Baseline-to-baseline distance for a role, the unit menu rows are laid out in. */
 int ui_font_line(ui_font_role role);
 
