@@ -81,6 +81,19 @@ static double round_cover(int x, int y, int x0, int y0, int w, int h, int rad)
 	return d > 0.5 ? 0.0 : d > -0.5 ? 0.5 - d : 1.0;
 }
 
+/* Pixel Burst: the same test with the corners cut in two 4px steps, the
+ * way ui_round_rect cuts them, and no antialiasing anywhere. */
+static double step_cover(int x, int y, int x0, int y0, int w, int h, int c)
+{
+	int lx = x - x0, ly = y - y0, ex, ey;
+
+	if (lx < 0 || ly < 0 || lx >= w || ly >= h) return 0.0;
+	ex = lx < w - 1 - lx ? lx : w - 1 - lx;
+	ey = ly < h - 1 - ly ? ly : h - 1 - ly;
+	if ((ex < c * 2 && ey < c) || (ex < c && ey < c * 2)) return 0.0;
+	return 1.0;
+}
+
 bool notice_render(const char *heading, const char *body, const char *path)
 {
 	/* The NAME is the line worth reading, so it gets the larger face and the
@@ -157,14 +170,20 @@ bool notice_render(const char *heading, const char *body, const char *path)
 	corner = 20;
 	for (y = 0; y < h; y++) {
 		for (x = 0; x < w; x++) {
-			double out = round_cover(x, y, 0, 0, w, h, corner);
-			double in = round_cover(x, y, bw, bw, w - bw * 2, h - bw * 2, corner - bw);
+			bool px8 = ui_pixel();
+			double out = px8 ? step_cover(x, y, 0, 0, w, h, 4)
+			                 : round_cover(x, y, 0, 0, w, h, corner);
+			double in = px8 ? step_cover(x, y, bw, bw, w - bw * 2, h - bw * 2, 4)
+			                : round_cover(x, y, bw, bw, w - bw * 2, h - bw * 2, corner - bw);
 			uint8_t *d = px + ((size_t)y * w + x) * 4;
 
 			if (out <= 0.0) continue;
 			blend(d, g_accent & 255, (g_accent >> 8) & 255, (g_accent >> 16) & 255,
 			      (unsigned)(255 * out));
-			if (in > 0.0) blend(d, 32, 24, 22, (unsigned)(250 * in));
+			if (in > 0.0) {
+				if (px8) blend(d, 0x1C, 0x15, 0x17, 252);   /* ground #17151C */
+				else blend(d, 32, 24, 22, (unsigned)(250 * in));
+			}
 		}
 	}
 

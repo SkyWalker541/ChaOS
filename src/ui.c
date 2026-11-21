@@ -49,9 +49,14 @@ static TTF_Font *fonts[UI_F_COUNT];
  * smaller still: the same widths, so no menu outgrows the screen. */
 static TTF_Font *px_fonts[UI_F_COUNT];
 static bool px_on, px_tried;
-static const float px_mul[UI_F_COUNT] = {
-	[UI_F_TITLE] = 0.74f, [UI_F_MENU] = 0.93f, [UI_F_LABEL] = 0.74f,
-	[UI_F_META] = 0.93f, [UI_F_CARD] = 0.74f,
+/* Sizes on each font's own pixel grid, so every pixel of a letter lands on
+ * whole screen pixels and stays sharp: Silkscreen's pixel is an eighth of its
+ * size (5 screen pixels at 40), Pixelify Sans's about a ninth of a size of 11
+ * (4 at 44, 3 at 33). Close to the menu font's sizes, the widths a little
+ * under them, so nothing that fits today stops fitting. */
+static const int px_pt[UI_F_COUNT] = {
+	[UI_F_TITLE] = 40, [UI_F_MENU] = 44, [UI_F_LABEL] = 40,
+	[UI_F_META] = 33, [UI_F_CARD] = 48,
 };
 static TTF_Font *f_mark;
 static char font_path_kept[512];
@@ -147,12 +152,25 @@ static void px_open(void)
 	if (slash) *slash = 0; else snprintf(dir, sizeof dir, ".");
 	for (i = 0; i < UI_F_COUNT; i++) {
 		bool head = i == UI_F_TITLE || i == UI_F_LABEL || i == UI_F_CARD;
-		int pt = (int)(FONT_BASE * font_mul[i] * px_mul[i] + 0.5f);
+		int pt = px_pt[i];
 
 		snprintf(path, sizeof path, "%s/%s", dir, head ? "pixel-head.ttf" : "pixel.ttf");
 		px_fonts[i] = TTF_OpenFont(path, pt);
 		if (!px_fonts[i]) fprintf(stderr, "font %s @%d: %s\n", path, pt, TTF_GetError());
 	}
+}
+
+const char *ui_font_path(bool head)
+{
+	static char path[sizeof font_path_kept + 32];
+	char *slash;
+
+	if (!px_on) return font_path_kept;
+	snprintf(path, sizeof path, "%s", font_path_kept);
+	slash = strrchr(path, '/');
+	snprintf(slash ? slash + 1 : path, sizeof path - (size_t)(slash ? slash + 1 - path : 0),
+	         "%s", head ? "pixel-head.ttf" : "pixel.ttf");
+	return path;
 }
 
 void ui_set_pixel(bool on)
@@ -557,7 +575,7 @@ void ui_glow(SDL_Renderer *r, const SDL_Rect *rect, unsigned rgb, int alpha,
 {
 	SDL_Rect dst;
 	int gw, gh;
-	if (!glow_tex) return;
+	if (!glow_tex || px_on) return;      /* ChaOS Pixel Burst: no soft light */
 	gw = (int)(rect->w * spread);
 	gh = (int)(rect->h * spread);
 	dst.x = rect->x + rect->w / 2 - gw / 2;
@@ -664,6 +682,20 @@ static unsigned rail_hue_at(float x, int count, float blend,
  * Runs of one color are filled as one rectangle, so a rail nobody is moving -
  * and every rail whose items share a color, which is every games rail - still
  * costs the single fill it always did. */
+/* Pixel Burst's track: dashes of the outline colour, 8 on and 4 off. */
+static void px_track(SDL_Renderer *r, const SDL_Rect *t, bool vertical)
+{
+	int len = vertical ? t->h : t->w, k;
+
+	SDL_SetRenderDrawColor(r, 0x3A, 0x34, 0x46, 255);
+	for (k = 0; k < len; k += 12) {
+		int n = len - k < 8 ? len - k : 8;
+		SDL_Rect d = vertical ? (SDL_Rect){ t->x, t->y + k, t->w, n }
+		                      : (SDL_Rect){ t->x + k, t->y, n, t->h };
+		SDL_RenderFillRect(r, &d);
+	}
+}
+
 static void rail_seg(SDL_Renderer *r, const SDL_Rect *track, SDL_Rect seg,
                      bool vertical, float step, float blend, int count,
                      unsigned flat, ui_rail_hue hue, void *ctx)
@@ -673,6 +705,12 @@ static void rail_seg(SDL_Renderer *r, const SDL_Rect *track, SDL_Rect seg,
 	unsigned held = flat;
 
 	if (!SDL_IntersectRect(track, &seg, &q)) return;
+	if (px_on) {
+		/* Pixel Burst: one flat orange block, no hue run. */
+		SDL_SetRenderDrawColor(r, 0xFF, 0x7A, 0x2F, 255);
+		SDL_RenderFillRect(r, &q);
+		return;
+	}
 	len = vertical ? q.h : q.w;
 	for (k = 0; k <= len; k++) {
 		unsigned rgb = held;
@@ -766,8 +804,11 @@ void ui_rail(SDL_Renderer *r, int screen_w, int screen_h, float index, int count
 	/* The track carries twice the weight it used to, so it takes less alpha to
 	 * say the same thing; brighter than this and an empty rail reads as a
 	 * drawn element rather than as the absence of one. */
-	SDL_SetRenderDrawColor(r, 255, 255, 255, 16);
-	SDL_RenderFillRect(r, &track);
+	if (px_on) px_track(r, &track, false);
+	else {
+		SDL_SetRenderDrawColor(r, 255, 255, 255, 16);
+		SDL_RenderFillRect(r, &track);
+	}
 	rail_seg(r, &track, (SDL_Rect){ track_x + off, y, seg_w, h },
 	         false, step, blend, count, rgb, hue, ctx);
 	/* Only while the marker overhangs the far end, which is the only time the
@@ -810,8 +851,11 @@ void ui_rail_v(SDL_Renderer *r, int screen_w, int screen_h, float index, int cou
 	track = (SDL_Rect){ x, track_y, w, track_h };
 
 	SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
-	SDL_SetRenderDrawColor(r, 255, 255, 255, 16);
-	SDL_RenderFillRect(r, &track);
+	if (px_on) px_track(r, &track, true);
+	else {
+		SDL_SetRenderDrawColor(r, 255, 255, 255, 16);
+		SDL_RenderFillRect(r, &track);
+	}
 	rail_seg(r, &track, (SDL_Rect){ x, end - off, w, seg_h },
 	         true, step, blend, count, rgb, hue, ctx);
 	if (off > track_h - seg_h)
@@ -1270,6 +1314,26 @@ static SDL_Texture *g_render(SDL_Renderer *r, ui_glyph g, int size)
 
 	if (!s) return NULL;
 	g_build(g, &shape);
+	/* ChaOS Pixel Burst: the mark on a coarse grid, each cell in or out,
+	 * so it reads as pixel art beside the pixel letters */
+	if (px_on) {
+		int cell = size / 10 > 2 ? size / 10 : 2;
+
+		for (y = 0; y < size; y++) {
+			Uint32 *row = (Uint32 *)((Uint8 *)s->pixels + (size_t)y * s->pitch);
+
+			for (x = 0; x < size; x++) {
+				float cx = ((float)(x / cell) + 0.5f) * cell / (float)size;
+				float cy = ((float)(y / cell) + 0.5f) * cell / (float)size;
+
+				row[x] = g_inside(&shape, cx, cy) ? 0xFFFFFFFFu : 0x00FFFFFFu;
+			}
+		}
+		t = SDL_CreateTextureFromSurface(r, s);
+		SDL_FreeSurface(s);
+		if (t) SDL_SetTextureBlendMode(t, SDL_BLENDMODE_BLEND);
+		return t;
+	}
 	for (y = 0; y < size; y++) {
 		Uint32 *row = (Uint32 *)((Uint8 *)s->pixels + (size_t)y * s->pitch);
 
@@ -1290,7 +1354,7 @@ static SDL_Texture *g_render(SDL_Renderer *r, ui_glyph g, int size)
 }
 
 /* A handful of (mark, size) pairs is all a screen asks for. */
-static struct { ui_glyph g; int size; SDL_Texture *tex; } g_cache[8];
+static struct { ui_glyph g; int size; bool px; SDL_Texture *tex; } g_cache[8];
 
 static void glyphs_free(void)
 {
@@ -1308,7 +1372,8 @@ void ui_glyph_draw(SDL_Renderer *r, ui_glyph g, int cx, int cy, int size,
 
 	if (g < 0 || g >= UI_GLYPH_COUNT || size <= 0) return;
 	for (i = 0; i < 8; i++) {
-		if (g_cache[i].tex && g_cache[i].g == g && g_cache[i].size == size) {
+		if (g_cache[i].tex && g_cache[i].g == g && g_cache[i].size == size &&
+		    g_cache[i].px == px_on) {
 			t = g_cache[i].tex;
 			break;
 		}
@@ -1320,6 +1385,7 @@ void ui_glyph_draw(SDL_Renderer *r, ui_glyph g, int cx, int cy, int size,
 		if (!t) return;
 		g_cache[free_slot].g = g;
 		g_cache[free_slot].size = size;
+		g_cache[free_slot].px = px_on;
 		g_cache[free_slot].tex = t;
 	}
 	SDL_SetTextureColorMod(t, col.r, col.g, col.b);
