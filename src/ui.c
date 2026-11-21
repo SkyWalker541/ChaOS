@@ -43,14 +43,24 @@ static const float font_mul[UI_F_COUNT] = {
 
 static TTF_Font *fonts[UI_F_COUNT];
 /* ChaOS Pixel Burst: its own two pixel fonts (res/fonts: Pixelify Sans for
- * reading, Silkscreen for titles, both OFL), beside the menu font on the card,
+ * reading, Tiny5 SC for titles, both OFL), beside the menu font on the card,
  * opened the first time the theme is on and kept. Pixelify runs about 6%
- * wider than the menu font, so a step smaller; Silkscreen half again wider, so
+ * wider than the menu font, so a step smaller; Tiny5 SC about as wide, so
  * smaller still: the same widths, so no menu outgrows the screen. */
 static TTF_Font *px_fonts[UI_F_COUNT];
+/* The body face's stand-in: Pixelify Sans has every European accent and
+ * Cyrillic but not Vietnamese or a few rare letters, and Tiny5 has all of
+ * them. A string the body face cannot draw whole is drawn in Tiny5 instead,
+ * so it stays in the theme's look rather than showing boxes. Opened the
+ * first time one is needed, at the nearest size on Tiny5's eighth-em grid. */
+static TTF_Font *px_fb[UI_F_COUNT];
+static const int px_fb_pt[UI_F_COUNT] = {
+	[UI_F_TITLE] = 40, [UI_F_MENU] = 40, [UI_F_LABEL] = 40,
+	[UI_F_META] = 32, [UI_F_CARD] = 48,
+};
 static bool px_on, px_tried;
 /* Sizes on each font's own pixel grid, so every pixel of a letter lands on
- * whole screen pixels and stays sharp: Silkscreen's pixel is an eighth of its
+ * whole screen pixels and stays sharp: Tiny5's pixel is an eighth of its
  * size (5 screen pixels at 40), Pixelify Sans's about a ninth of a size of 11
  * (4 at 44, 3 at 33). Close to the menu font's sizes, the widths a little
  * under them, so nothing that fits today stops fitting. */
@@ -134,6 +144,7 @@ void ui_quit(void)
 	for (int i = 0; i < UI_F_COUNT; i++) {
 		if (fonts[i]) { TTF_CloseFont(fonts[i]); fonts[i] = NULL; }
 		if (px_fonts[i]) { TTF_CloseFont(px_fonts[i]); px_fonts[i] = NULL; }
+		if (px_fb[i]) { TTF_CloseFont(px_fb[i]); px_fb[i] = NULL; }
 	}
 	px_tried = px_on = false;
 	if (f_mark) { TTF_CloseFont(f_mark); f_mark = NULL; }
@@ -181,6 +192,36 @@ void ui_set_pixel(bool on)
 
 bool ui_pixel(void) { return px_on; }
 
+/* The font to draw `s` in: `f`, unless `f` is one of the theme's faces and is
+ * missing a letter of `s`, when it is Tiny5 at the same role. Width and
+ * drawing both ask, so a string is measured in the face it is drawn in. */
+TTF_Font *ui_font_for(TTF_Font *f, const char *s)
+{
+	const unsigned char *p = (const unsigned char *)s;
+	int i;
+
+	if (!px_on || !f || !s) return f;
+	for (i = 0; i < UI_F_COUNT; i++) if (px_fonts[i] == f) break;
+	if (i == UI_F_COUNT) return f;
+	while (*p) {
+		Uint32 cp;
+		int n;
+
+		if (*p < 0x80) { p++; continue; }         /* ASCII: both faces have it */
+		if ((*p & 0xE0) == 0xC0) { cp = *p & 0x1F; n = 1; }
+		else if ((*p & 0xF0) == 0xE0) { cp = *p & 0x0F; n = 2; }
+		else if ((*p & 0xF8) == 0xF0) { cp = *p & 0x07; n = 3; }
+		else { p++; continue; }
+		p++;
+		while (n-- && (*p & 0xC0) == 0x80) cp = (cp << 6) | (*p++ & 0x3F);
+		if (!TTF_GlyphIsProvided32(f, cp)) {
+			if (!px_fb[i]) px_fb[i] = TTF_OpenFont(ui_font_path(true), px_fb_pt[i]);
+			return px_fb[i] ? px_fb[i] : f;
+		}
+	}
+	return f;
+}
+
 TTF_Font *ui_font(ui_font_role role)
 {
 	if (role < 0 || role >= UI_F_COUNT) return NULL;
@@ -207,6 +248,7 @@ static struct text_entry *text_get(SDL_Renderer *r, TTF_Font *f, const char *s,
 	int i, oldest = 0;
 
 	if (!f || !s || !*s) return NULL;
+	f = ui_font_for(f, s);
 	for (i = 0; i < TEXT_CACHE; i++) {
 		if (cache[i].tex && cache[i].font == f && cache[i].rgb == rgb &&
 		    strcmp(cache[i].str, s) == 0) {
@@ -253,7 +295,7 @@ int ui_text(SDL_Renderer *r, TTF_Font *f, const char *s, int x, int y,
 int ui_text_width(TTF_Font *f, const char *s)
 {
 	int w = 0;
-	if (f && s) TTF_SizeUTF8(f, s, &w, NULL);
+	if (f && s) TTF_SizeUTF8(ui_font_for(f, s), s, &w, NULL);
 	return w;
 }
 
@@ -469,6 +511,16 @@ static bool clip_within(SDL_Renderer *r, const SDL_Rect *c, SDL_bool had, const 
 	return true;
 }
 
+/* TORTOS_FITSPY=1: every string cut to fit, or scrolled because it does not,
+ * on stderr - for comparing what two themes cut (the overflow sweep). */
+static void fit_spy(TTF_Font *f, const char *s, int room)
+{
+	static int on = -1;
+
+	if (on < 0) on = getenv("TORTOS_FITSPY") != NULL;
+	if (on) fprintf(stderr, "FIT %d>%d %s\n", ui_text_width(f, s), room, s);
+}
+
 void ui_text_marquee(SDL_Renderer *r, TTF_Font *f, const char *s,
                      int x, int y, int w, unsigned phase, SDL_Color col)
 {
@@ -479,6 +531,7 @@ void ui_text_marquee(SDL_Renderer *r, TTF_Font *f, const char *s,
 
 	if (!f || !s || w <= 0) return;
 	if (tw <= w) { ui_text(r, f, s, x, y, -1, col); return; }
+	fit_spy(f, s, w);
 
 	over = tw - w;
 	off  = ui_pingpong(over, phase);
@@ -558,6 +611,7 @@ void ui_fit_text(TTF_Font *f, const char *src, char *dst, size_t dstn,
 
 	snprintf(dst, dstn, "%s", src ? src : "");
 	if (!f || ui_text_width(f, dst) <= maxw) return;
+	fit_spy(f, dst, maxw);
 
 	n = strlen(dst);
 	while (n > 0) {

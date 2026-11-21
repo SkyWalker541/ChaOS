@@ -39,7 +39,7 @@ static void draw_text(uint8_t *out, int ow, int oh, TTF_Font *f,
 	int sx, sy;
 
 	if (!f || !s || !*s) return;
-	t = TTF_RenderUTF8_Blended(f, s, col);
+	t = TTF_RenderUTF8_Blended(ui_font_for(f, s), s, col);
 	if (!t) return;
 
 	/* Blended gives ARGB8888 with per-pixel alpha - the antialiasing is IN

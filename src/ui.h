@@ -81,6 +81,9 @@ TTF_Font *ui_font(ui_font_role role);
  * fonts open the first time it's on. ui_pixel says which is in use. */
 void ui_set_pixel(bool on);
 bool ui_pixel(void);
+/* The face to draw s in with f: f, or the theme's stand-in when f lacks a
+ * letter of it (ui.c) */
+TTF_Font *ui_font_for(TTF_Font *f, const char *s);
 /* The font file for text that opens its own size (a heading-like one if
  * `head`): the theme's pixel fonts while it's on, else the menu font. */
 const char *ui_font_path(bool head);

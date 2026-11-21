@@ -85,7 +85,7 @@ cp "$ROOT/res/ssl/cacert.pem" "$P/"
 mkdir -p "$OUT/Licenses"
 cp "$ROOT/THIRD-PARTY-LICENSES.md" "$OUT/Licenses/TortOS.md"
 cp "$ROOT/res/fonts/PIXEL-FONTS.md" "$OUT/Licenses/Pixel-fonts.md"
-cp "$ROOT/res/fonts/OFL-pixel-pixelify.txt" "$ROOT/res/fonts/OFL-pixel-silkscreen.txt" "$OUT/Licenses/"
+cp "$ROOT/res/fonts/OFL-pixel-pixelify.txt" "$ROOT/res/fonts/OFL-pixel-tiny5.txt" "$OUT/Licenses/"
 cp "$DIATOM_ELF" "$P/diatom"
 cp "$VENDOR_DIR/cores/"*.so "$P/cores/"
 
