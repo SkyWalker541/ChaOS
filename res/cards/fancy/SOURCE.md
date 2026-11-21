@@ -28,8 +28,10 @@ codes (FC, SFC, MD) that describe the code, not the photograph.
 
 FAVORITES.png is not one of these photographs, and nothing above applies to
 it. Favorites is a shelf rather than a console, so there is no hardware to
-photograph and it carries a heart instead. It was generated rather than shot,
-carries no attribution requirement, and no rights are claimed in it.
+photograph and it carries a heart instead. Since ChaOS 2.7.4 it is rendered
+(`tools/genfavfancy.py`) from no images, in matte red plastic to match the
+set's finish, where it was a glossy generated heart. It carries no
+attribution requirement, and no rights are claimed in it.
 
 ## MUSE.png
 
@@ -48,7 +50,8 @@ to the project on 2026-11-14; its source is `source/recent-watch.jpg`, kept
 here. `tools/genrecentwatch.py` lays its dial and inner ring on a modelled
 steel case and crown and renders it (`tools/raymarch.py`), so it turns as the
 other rendered cards do, with the case's side showing, framed as above. It
-replaces the rendered alarm clock (`tools/genrecentfancy.py`), which is kept.
+replaces the rendered alarm clock (`tools/genrecentfancy.py`), which is kept. Since 2.7.4 its case is satin rather than polished,
+to sit with the set's matte plastics.
 
 ## PS.png
 
@@ -60,3 +63,9 @@ Commons, released by him into the public domain, as the consoles above are.
 The checkerboard was taken off by filling from the edges over near-white,
 neutral pixels only - the console's own grey is darker - then trimmed and
 scaled as above, longest side 96% of 384.
+
+## PORTS.png
+
+Not a console: Ports' card, a retro PC monitor rendered (`tools/genportscard.py`)
+from no images, in matte beige plastic, a real MS-DOS session on its screen. It
+replaced the rendered arcade stick (`tools/genportsfancy.py`, kept) in 2.7.4.

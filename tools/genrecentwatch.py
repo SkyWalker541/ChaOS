@@ -69,12 +69,14 @@ def watch_studio(d):
     return (env + sb + strip)[..., None] * np.array([0.99, 1.0, 1.03])
 
 
-rm.studio = watch_studio
+# ChaOS 2.7.4: satin, under the set's own studio (watch_studio was for the
+# polished case, kept for it)
+SATIN = (206, 208, 212)
 
 
-MATS = [rm.Mat(STEEL, gloss=0.96, metal=True),                               # 0 case
+MATS = [rm.Mat(SATIN, gloss=0.42, metal=True),                               # 0 case
         rm.Mat(lambda p: FACE(frame(p)), gloss=0.55, spec=0.3, emit=0.95),  # 1 face, under glass
-        rm.Mat((242, 243, 245), gloss=0.98, metal=True)]                     # 2 polished rim and crown
+        rm.Mat((222, 224, 228), gloss=0.5, metal=True)]                       # 2 rim and crown
 
 
 def scene(p):
