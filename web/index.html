@@ -343,7 +343,7 @@
     <div class="feature-text">
       <h3>Shelves and themes</h3>
       <ul>
-        <li><b>Four UI Themes</b>: <b>Plain Jane</b> (a drawn card per console), <b>Fancy Pants</b> (the consoles themselves, rendered in 3D), and ChaOS's own <b>Pixel Cards</b> and <b>Pixel Names</b> <span class="tag">ChaOS</span>, where each console is its name in the logo's pixel letters, last word in the console's colour.</li>
+        <li><b>Five UI Themes</b>: <b>Plain Jane</b> (a drawn card per console), <b>Fancy Pants</b> (the consoles themselves, rendered in 3D), and ChaOS's own <b>Pixel Cards</b> and <b>Pixel Names</b> <span class="tag">ChaOS</span>, where each console is its name in the logo's pixel letters, last word in the console's colour, and <b>Pixel Burst</b> <span class="tag">ChaOS</span>, the logo's look on every screen: pixel fonts, cut corners, block switches, and a picked row that sheds orange and cyan pixels.</li>
         <li><b>Pixel animation</b> <span class="tag">ChaOS</span>: the name you land on flies together pixel by pixel. <b>Transition Speed</b> sets how fast (Slow, Normal, Fast, or <b>Static</b> for none), separately for each direction.</li>
         <li><b>Three UI Directions</b>: Horizontal, Vertical, or <b>Cubic</b>, a cube where up and down change console and left and right change game. Pixel Cards has no Cubic; Pixel Names is Horizontal only.</li>
         <li><b>Game List View</b> <span class="tag">ChaOS</span>: a console's games as a scrolling list in the menus' style instead of cards, or <b>List + Art Left</b> or <b>List + Art Right</b>: the list beside the selected game's cover, sized to fit whatever shape the art is.</li>
@@ -352,7 +352,7 @@
         <li><b>Sort By</b> per console: Name, Play Time, Last Played or Recently Added. <b>Game info</b> on <kbd>X</kbd>: synopsis, year, genre and achievements.</li>
       </ul>
     </div>
-    <figure class="device" data-screens='[["home-pixelnames","Pixel Names"],["home-pixelcards","Pixel Cards"],["games-pixelcards","Pixel Cards: games"],["home-plainjane","Plain Jane"],["home-fancy","Fancy Pants"],["home-vertical","Vertical"],["home-cubic","Cubic"],["listview","Game List View"],["listview-art-left","List + Art Left"],["listview-art-right","List + Art Right"],["listview-letter","Letter jump"],["info","Game info"]]'>
+    <figure class="device" data-screens='[["home-pixelnames","Pixel Names"],["home-pixelcards","Pixel Cards"],["home-pixelburst","Pixel Burst"],["menu-pixelburst","Pixel Burst: menu"],["games-pixelburst","Pixel Burst: List + Art"],["games-pixelcards","Pixel Cards: games"],["home-plainjane","Plain Jane"],["home-fancy","Fancy Pants"],["home-vertical","Vertical"],["home-cubic","Cubic"],["listview","Game List View"],["listview-art-left","List + Art Left"],["listview-art-right","List + Art Right"],["listview-letter","Letter jump"],["info","Game info"]]'>
       <div class="bezel"><img src="img/home-pixelnames.webp" alt="" loading="lazy" width="1024" height="768"></div>
       <figcaption class="chips"></figcaption>
     </figure>
@@ -461,7 +461,7 @@
       <ul>
         <li><b>Sign in</b>: set <b>Server</b> to its address, like <code>nas.local:8080</code>, then <b>Sign In</b>. On RomM 5 the Brick shows a short code to approve in RomM's web page; on RomM 4, make a pairing code in RomM (your profile, Client API Tokens) and type it in. Only a device token is kept, never a password.</li>
         <li><b>Games</b>: your library by console, with covers. <kbd>A</kbd> downloads a game onto its shelf with RomM's cover as its box art. A game in several files comes as a folder.</li>
-        <li><b>Sync Saves</b>: RomM's own save sync for the games you got from it. A save the server replaces is backed up first to <code>Saves/.romm-backup</code>; when both changed, yours goes up beside the server's, so nothing is lost. It runs only when you choose it.</li>
+        <li><b>Sync Saves</b>: RomM's own save sync for the games you got from it, and their save states too. A save the server replaces is backed up first to <code>Saves/.romm-backup</code>; when both changed, yours goes up beside the server's, so nothing is lost. A state either side changed goes to the other, and when both did, the newer wins and the other is kept. It runs only when you choose it.</li>
         <li><b>BIOS</b>: the firmware RomM keeps for ChaOS's consoles, into <code>Bios/</code>.</li>
       </ul>
     </div>
@@ -503,7 +503,7 @@
         <li>The computer is offered the Brick's shared folders and asks where to keep each.</li>
       </ol>
       <ul>
-        <li><b>Saves</b> (saves and save states), <b>Games</b> (all of <code>Roms/</code>) and <b>BIOS</b> each switch on and off, and say <b>Up to date</b> or how far along they are. Saves is on to begin with. A folder that's on goes to every paired device, and two Bricks share the same folders with no setting up.</li>
+        <li><b>Saves</b> (saves, and save states in <code>Saves/States</code>, ready for another ChaOS device), <b>Games</b> (all of <code>Roms/</code>) and <b>BIOS</b> each switch on and off, and say <b>Up to date</b> or how far along they are. Saves is on to begin with. A folder that's on goes to every paired device, and two Bricks share the same folders with no setting up.</li>
         <li><b>Nothing runs while you play.</b> Syncthing is stopped outright for every game, port and PICO-8 cart, and catches up when you're back on the shelf. There it runs at low priority.</li>
         <li><b>Web Page</b> shows the Brick's address and password for Syncthing's own page in a browser, for everything else: ignore patterns, file versions, folders of your own.</li>
         <li>Its keys, settings and database stay in ChaOS's userdata, so updates keep your pairings.</li>
@@ -692,6 +692,7 @@
   </div>
   <div class="releases">
     <h3>Recent releases</h3>
+    <div class="rel"><span class="ver">2.7.3</span><p>A new UI Theme, <b>ChaOS Pixel Burst</b>: the logo's pixel look on every screen. <b>Save states sync</b>: they now live in <code>Saves/States</code>, so Syncthing's Saves folder carries them, and RomM's Sync Saves syncs them too. Fixed: a new card now has a folder for every console, PlayStation and PICO-8 included.</p></div>
     <div class="rel"><span class="ver">2.7.2</span><p>Two new <b>Game List View</b> choices, <b>List + Art Left</b> and <b>List + Art Right</b>: the list beside the selected game's cover, which fits itself to the art's shape. Only the selected name scrolls when it's too long.</p></div>
     <div class="rel"><span class="ver">2.7.1</span><p>Fixed: on the <b>Shelves</b> page in the normal game view, each row did the one above's, so Shelf Order opened Arrange Shelves. Every row does what it says again.</p></div>
     <div class="rel"><span class="ver">2.7.0</span><p><b>Shelves</b>, under Appearance: <b>Shelf Order</b> (release date, A to Z, by maker, or your own with <b>Arrange Shelves</b>), and the d-pad's other direction to change shelf with a slide and the console's name. Every shader setting explained in the menu, PT's backings named for their consoles, Hold Y showing the game as it will look, and rewind no longer freezing at its oldest point.</p></div>

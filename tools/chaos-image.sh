@@ -172,6 +172,11 @@ install -m 755 "$ROOT/dist/brick/pico8-overlay.so" "$C/TortOS/pico8/lib/overlay.
 # tools/gen*fancy.py); ChaOS's own two sets are drawn by the launcher)
 [ -d "$C/TortOS/cards/classic" ] && [ -d "$C/TortOS/cards/fancy" ] || { echo "no cards in the image: check ports" >&2; exit 1; }
 install -m 644 "$ROOT/config/systems.cfg" "$C/TortOS/systems.cfg"
+# ChaOS Pixel Burst's two pixel fonts, beside the menu font, and their
+# licenses (res/fonts/PIXEL-FONTS.md); mk/payload.sh does the same
+install -m 644 "$ROOT/res/fonts/pixel.ttf" "$ROOT/res/fonts/pixel-head.ttf" "$C/TortOS/"
+install -m 644 "$ROOT/res/fonts/OFL-pixel-pixelify.txt" "$ROOT/res/fonts/OFL-pixel-tiny5.txt" "$C/Licenses/"
+install -m 644 "$ROOT/res/fonts/PIXEL-FONTS.md" "$C/Licenses/Pixel-fonts.md"
 for set in classic fancy; do
 	for card in FAVORITES MUSE PORTS RECENT PICO8 PS; do
 		install -m 644 "$ROOT/res/cards/$set/$card.png" "$C/TortOS/cards/$set/$card.png"
