@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Cut res/cards/fancy/PORTS.png, Ports' card in Fancy Pants, from
-res/cards/fancy/source/ports-pc.png: a mid-90s beige PC, its monitor on its
-desktop case, on a white studio backdrop (res/cards/fancy/SOURCE.md).
+res/cards/fancy/source/ports-pc.png: a beige early-90s all-in-one, its CRT
+over a base unit, on a white studio backdrop (res/cards/fancy/SOURCE.md).
 
 The object is told from the backdrop by colour, not brightness: the beige
-plastic is warm (red well over blue) and the screen and vents are dark, while
-the backdrop and its soft floor shadow are neutral. Its outline is smoothed,
+plastic is warm (red over blue by more than 22) and the vents are dark, while
+the backdrop and its soft floor shadow are near neutral; the screen, enclosed
+by the bezel, is filled in. Its outline is smoothed,
 pulled in a pixel so no backdrop rims it, and feathered a pixel. The plastic
 is cleaned of the picture's speckle (a 3x3 median), a fifth of the yellow
 cast comes out of the beige, as a white-balanced studio shot shows it, and
@@ -28,7 +29,7 @@ OUT = os.path.join(ROOT, "res", "cards", "fancy", "PORTS.png")
 def main():
     src = Image.open(SRC).convert("RGB")
     a = np.asarray(src).astype(np.float64)
-    obj = ((a[..., 0] - a[..., 2]) > 11) | (a.mean(-1) < 190)
+    obj = ((a[..., 0] - a[..., 2]) > 22) | (a.mean(-1) < 100)
     obj = ndimage.binary_opening(obj, iterations=2)
     lab, n = ndimage.label(obj)
     obj = lab == 1 + np.argmax(ndimage.sum(obj, lab, range(1, n + 1)))
