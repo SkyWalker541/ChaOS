@@ -4868,6 +4868,25 @@ static bool g_menu_bare;
 
 /* A chevron: `dir` +1 points right, -1 left; `h` its height; at (cx, cy). Two
  * strokes of a few px, as SDL has no thick line. */
+/* A menu's rule: a 2px bar in the panel's accent, faint. ChaOS Pixel Burst
+ * draws it as the theme's dashed line instead, 8 on and 4 off in the outline
+ * colour, 4px tall and centred on the same place. */
+static void menu_rule(SDL_Renderer *r, int x, int y, int w, unsigned accent)
+{
+	SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+	if (ui_pixel()) {
+		int k;
+
+		SDL_SetRenderDrawColor(r, 0x3A, 0x34, 0x46, 255);
+		for (k = 0; k < w; k += 12)
+			SDL_RenderFillRect(r, &(SDL_Rect){ x + k, y - 1, w - k < 8 ? w - k : 8, 4 });
+		return;
+	}
+	SDL_SetRenderDrawColor(r, (Uint8)(accent >> 16), (Uint8)(accent >> 8),
+	                       (Uint8)accent, 70);
+	SDL_RenderFillRect(r, &(SDL_Rect){ x, y, w, 2 });
+}
+
 static void draw_chevron(SDL_Renderer *r, float cx, float cy, float h, int dir,
                          SDL_Color c)
 {
@@ -5400,11 +5419,7 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 				}
 			}
 		}
-		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
-		SDL_SetRenderDrawColor(a->r, (Uint8)(accent >> 16),
-		                       (Uint8)(accent >> 8), (Uint8)accent, 70);
-		SDL_RenderFillRect(a->r, &(SDL_Rect){ content_x, panel.y + head_h,
-		                                      content_w, 2 });
+		menu_rule(a->r, content_x, panel.y + head_h, content_w, accent);
 		/* ChaOS: the clock and the battery, in the heading's band, so every
 		 * menu shows them with no screen of its own. A submenu's back chevron
 		 * takes the left, so its clock starts a step further in. */
@@ -5726,13 +5741,9 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 		/* The same bar as the heading's, at the same alpha and width. If one
 		 * is ever retuned the other follows, which is the point. */
 		if (!rows[i].label) {
-			SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
-			SDL_SetRenderDrawColor(a->r, (Uint8)(accent >> 16),
-			                       (Uint8)(accent >> 8), (Uint8)accent, 70);
-			SDL_RenderFillRect(a->r, &(SDL_Rect){ content_x,
-			                                      y + (ROW_IS_HR(rows[i]) ? pad / 2
-			                                                              : rule_h - 2),
-			                                      content_w, 2 });
+			menu_rule(a->r, content_x,
+			          y + (ROW_IS_HR(rows[i]) ? pad / 2 : rule_h - 2),
+			          content_w, accent);
 			continue;
 		}
 
@@ -5787,7 +5798,7 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 		/* ChaOS: a row that opens another screen, with a chevron in the
 		 * right margin: the value's color, so it brightens with the row */
 		if (rows[i].opens && rows[i].live && !ROW_IS_NOTE(rows[i]))
-			draw_chevron(a->r, (float)(content_x + content_w + (ui_pixel() ? pad / 4 : pad / 2)),
+			draw_chevron(a->r, (float)(content_x + content_w) + (ui_pixel() ? (float)text_h * 0.25f + 6.0f : (float)(pad / 2)),
 			             y + ROW_H(rows[i]) / 2.0f, (float)text_h * 0.5f, +1,
 			             rows[i].value ? vc : lc);
 		/* ChaOS: a dot after the label, in the panel's color: something new
@@ -5936,7 +5947,7 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 					draw_chevron(a->r, (float)(content_x + content_w - vw) - ah * 1.2f,
 					             cy, ah, -1, ac);
 					if (!rows[i].opens)
-						draw_chevron(a->r, (float)(content_x + content_w + (ui_pixel() ? pad / 4 : pad / 2)),
+						draw_chevron(a->r, (float)(content_x + content_w) + (ui_pixel() ? (float)text_h * 0.25f + 6.0f : (float)(pad / 2)),
 						             cy, ah, +1, ac);
 				}
 			} else if (vw > lw) {
@@ -6051,10 +6062,7 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 		const char *h = sel >= 0 && sel < n ? rows[sel].hint : NULL;
 
 		SDL_RenderSetClipRect(a->r, NULL);
-		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
-		SDL_SetRenderDrawColor(a->r, (Uint8)(accent >> 16), (Uint8)(accent >> 8),
-		                       (Uint8)accent, 70);
-		SDL_RenderFillRect(a->r, &(SDL_Rect){ content_x, fy + rule_h - 2, content_w, 2 });
+		menu_rule(a->r, content_x, fy + rule_h - 2, content_w, accent);
 		if (h && h[0] && df) {
 			if (ui_text_width(df, h) <= content_w) {
 				ui_text(a->r, df, h, cx, dy, 0, UI_TEXT_DIM);
@@ -11610,6 +11618,11 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 				g_dir = fit;
 				db_set_str(db_dev(), "cards_dir", CARD_DIRS[g_dir].id);
 			}
+			/* Pixel Burst titles made-up covers in its own font, so the
+			 * loader's fonts follow the theme */
+			ui_set_pixel(CARDS_PIXEL_UI(g_cards));
+			texload_fonts(false);
+			texload_fonts(true);
 			free_all_textures(a);
 			prime_sys_window(a);
 			db_set_str(db_dev(), "cards", CARD_SETS[g_cards].id);
@@ -15911,6 +15924,7 @@ static void port_launch(app *a, int o, const char *romfile, const char *title)
 	if (!plat_video_init() || !plat_input_init()) { a->running = false; return; }
 	a->r = plat_renderer();
 	ui_init(a->r, P_FONT);
+	ui_set_pixel(CARDS_PIXEL_UI(g_cards));   /* before the workers pick fonts */
 	texload_fonts(true);
 	a->menu_w = 0;
 	prime_sys_window(a);
@@ -16059,6 +16073,7 @@ static void p8_launch(app *a, int o, const char *file, const char *title)
 	if (!plat_video_init() || !plat_input_init()) { a->running = false; return; }
 	a->r = plat_renderer();
 	ui_init(a->r, P_FONT);
+	ui_set_pixel(CARDS_PIXEL_UI(g_cards));   /* before the workers pick fonts */
 	texload_fonts(true);
 	a->menu_w = 0;
 	prime_sys_window(a);
@@ -16975,8 +16990,7 @@ static void pm_frame_begin(app *a, unsigned accent, const char *heading, const c
 	if (meta && meta[0])
 		ui_text(a->r, fs, meta, panel.x + panel.w - 36,
 		        panel.y + (band - ui_font_line(UI_F_META)) / 2 - TTF_FontDescent(fs), 1, UI_TEXT_DIM);
-	SDL_SetRenderDrawColor(a->r, (Uint8)(accent >> 16), (Uint8)(accent >> 8), (Uint8)accent, 70);
-	SDL_RenderFillRect(a->r, &(SDL_Rect){ panel.x + 32, panel.y + band, panel.w - 64, 2 });
+	menu_rule(a->r, panel.x + 32, panel.y + band, panel.w - 64, accent);
 }
 
 static void pm_footer(app *a, const char *keys)
@@ -22103,6 +22117,7 @@ static void launch_game(app *a)
 		if (!plat_video_init() || !plat_input_init()) { a->running = false; return; }
 		a->r = plat_renderer();
 		ui_init(a->r, P_FONT);
+		ui_set_pixel(CARDS_PIXEL_UI(g_cards));   /* before the workers pick fonts */
 		texload_fonts(true);
 		a->menu_w = 0;   /* fonts reopened: remeasure the panel */
 		prime_sys_window(a);
@@ -25837,6 +25852,7 @@ int main(int argc, char *argv[])
 	 * saved brightness does. Read before ui_init, which is when the scale is
 	 * applied. */
 	if (!ui_init(a.r, P_FONT)) fprintf(stderr, "font init failed\n");
+	ui_set_pixel(CARDS_PIXEL_UI(g_cards));   /* before the workers pick fonts */
 	texload_fonts(true);
 	t_mark("font+settings");
 
