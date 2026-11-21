@@ -389,7 +389,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	full[PM_THEME].hint        = "The look of the cards on the shelf";
 	full[PM_DIR].hint          = "Which way the shelves move";
 	full[PM_SPEED].hint        = "How fast the pixel names come together";
-	full[PM_LISTVIEW].hint     = "A console's games as cards, or as a list";
+	full[PM_LISTVIEW].hint     = "Cards, a list, or a list with the game's art";
 	full[PM_COLOR].hint        = "The color of the menus";
 	full[PM_SHELF_FAV].hint    = "Favorites on the systems row. Y still marks games";
 	full[PM_RECENT].hint       = "Your last 12 games, as a shelf on the systems row";

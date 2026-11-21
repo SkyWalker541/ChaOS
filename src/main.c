@@ -1002,7 +1002,12 @@ static int g_pn_speed[8];
  * draw it, or List, a system's games as a menu: up and down, left and right
  * by letter, L1 and R1 by a screenful as on the shelf. "game_view" in the
  * device database. Cubic never opens a system, so it has no list. */
-static bool g_list_view;
+static int g_list_view;
+/* ChaOS: Game List View's choices: the shelf, the list, and the list with the
+ * game's cover beside it, on the left or the right (g_menu_art) */
+enum { GLV_NORMAL, GLV_LIST, GLV_ART_LEFT, GLV_ART_RIGHT, GLV_COUNT };
+static const char *const GLV_KEY[GLV_COUNT]   = { "normal", "list", "list-art-left", "list-art-right" };
+static const char *const GLV_LABEL[GLV_COUNT] = { "Normal", "List", "List + Art Left", "List + Art Right" };
 /* The menu's Recently Played switch, from the device database. On by default. */
 static bool g_recent_shelf = true;
 /* ChaOS: Appearance's other two shelf switches, Favorites and Muse, on by
@@ -1087,11 +1092,20 @@ static const char *const STATUS_BATT_NAMES[STATUS_BATT_COUNT] = {
  * hidden by it is hidden the same way in the build and in the keys. */
 static const char *list_view_label(void)
 {
-	return CARD_DIRS[g_dir].both ? NULL : g_list_view ? "List" : "Normal";
+	return CARD_DIRS[g_dir].both ? NULL : GLV_LABEL[g_list_view];
 }
 /* ChaOS: a menu drawn to fill the screen, this far from its edges, for the
  * one draw it is set around (the game List); -1 for the usual */
 static int g_menu_fill = -1;
+/* ChaOS: Game List View's List + Art: the cover drawn beside the names, on the
+ * panel that menu_draw fills. Set by draw_game_list for the one call; side 0
+ * is none, -1 left, +1 right. The tex can be NULL while it loads: the space
+ * stays as the last cover left it. */
+static struct { int side; SDL_Texture *tex; int w, h; } g_menu_art;
+/* Where the last panel drew its heading (centered on head_x), a row's value
+ * (right-aligned to value_x) and its bar: --updater-art hands these to the
+ * updater, which puts its own version, percentage and fill there. */
+static struct { int head_x, head_y, value_x, value_y, bar_x, bar_y, bar_w, bar_h, row_w; } g_menu_seen;
 
 /* ChaOS: the letter popup, with the letter jumps, further down */
 static void letter_note(sysview *v);
@@ -4492,7 +4506,16 @@ static void draw_game_list(app *a, sysview *v, const system_cfg *s)
 	         n > 0 ? v->cursor + 1 : 0, n);
 	/* the whole screen, its border and rounded corners kept a little in */
 	g_menu_fill = 10;
+	memset(&g_menu_art, 0, sizeof g_menu_art);
+	if ((g_list_view == GLV_ART_LEFT || g_list_view == GLV_ART_RIGHT) && n > 0) {
+		float cb;
+
+		g_menu_art.side = g_list_view == GLV_ART_LEFT ? -1 : 1;
+		g_menu_art.tex = game_get_tex(a, v->cursor, &g_menu_art.w, &g_menu_art.h, &cb);
+		if (!g_menu_art.tex) redraw_at(now + 33);     /* while it loads */
+	}
 	menu_draw(a, count, rows, n, v->cursor, 4096, menu_accent());
+	memset(&g_menu_art, 0, sizeof g_menu_art);
 	g_menu_fill = -1;
 
 	/* frames while the plate and the list ease to a new row, and while a
@@ -4503,7 +4526,10 @@ static void draw_game_list(app *a, sysview *v, const system_cfg *s)
 		moved_at = now;
 	}
 	if (now - moved_at < 500) redraw_now();
-	else if (n > 0 && ui_text_width(ui_font(UI_F_MENU), v->list.items[v->cursor].title) > 700)
+	/* the selected name slides when it's wider than the names' room, which
+	 * the art makes narrower; the others are cut with an ellipsis */
+	else if (n > 0 && ui_text_width(ui_font(UI_F_MENU), v->list.items[v->cursor].title) >
+	                  (g_menu_seen.row_w > 0 ? g_menu_seen.row_w - 40 : 700))
 		redraw_at(now + 33);
 }
 
@@ -4949,10 +4975,6 @@ static int menu_notes_fit(void)
 static float g_menu_bar;
 static void menu_bar_fill(float f) { g_menu_bar = f < 0.0f ? 0.0f : f > 1.0f ? 1.0f : f; }
 
-/* Where the last panel drew its heading (centered on head_x), a row's value
- * (right-aligned to value_x) and its bar: --updater-art hands these to the
- * updater, which puts its own version, percentage and fill there. */
-static struct { int head_x, head_y, value_x, value_y, bar_x, bar_y, bar_w, bar_h; } g_menu_seen;
 
 static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
                          int n, int sel, int fixed_w, unsigned accent,
@@ -5323,6 +5345,60 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 			                          (Uint8)accent, 220 });
 	}
 
+	/* ChaOS: List + Art. The names keep to a lane beside the cover: the cover
+	 * fits the rows' height and at most 42% of the panel's width, whatever its
+	 * shape, with the panel's own pad round it and a pad between it and the
+	 * names (the plate stops half a pad short). The lane eases to a new
+	 * cover's width rather than jumping, as the plate eases to a row. */
+	int lane_x = panel.x, lane_w = panel.w;
+	if (g_menu_fill >= 0 && g_menu_art.side) {
+		static float art_w_cur = -1.0f;
+		static unsigned art_last;
+		static int art_side;
+		unsigned nowa = plat_now_ms();
+		int area_y = content_y, area_h = panel.y + panel.h - pad - content_y;
+		int max_w = panel.w * 42 / 100, aw, ah, lane;
+		float dt = art_last ? (float)(nowa - art_last) : 0.0f;
+
+		art_last = nowa;
+		if (dt > 100.0f) dt = 100.0f;
+		if (art_side != g_menu_art.side) art_w_cur = -1.0f;
+		art_side = g_menu_art.side;
+		if (g_menu_art.tex && g_menu_art.w > 0 && g_menu_art.h > 0) {
+			aw = max_w;
+			ah = (int)((long)aw * g_menu_art.h / g_menu_art.w);
+			if (ah > area_h) { ah = area_h; aw = (int)((long)ah * g_menu_art.w / g_menu_art.h); }
+			if (art_w_cur < 0.0f) art_w_cur = (float)aw;
+			else art_w_cur += ((float)aw - art_w_cur) * (1.0f - expf(-dt / 45.0f));
+			if (fabsf(art_w_cur - (float)aw) > 0.5f) redraw_now();
+			else art_w_cur = (float)aw;
+		} else {
+			aw = ah = 0;
+			if (art_w_cur < 0.0f) art_w_cur = (float)(max_w * 3 / 4);
+		}
+		lane = (int)(art_w_cur + 0.5f) + pad;
+		lane_w = panel.w - lane;
+		if (g_menu_art.side < 0) lane_x = panel.x + lane;
+		content_x = lane_x + pad;
+		content_w = lane_w - pad * 2;
+		if (aw > 0) {
+			/* drawn at the eased width, its shape kept */
+			int dw = (int)(art_w_cur + 0.5f);
+			int dh = (int)((long)dw * g_menu_art.h / g_menu_art.w);
+			SDL_Rect ar;
+
+			if (dh > area_h) { dh = area_h; dw = (int)((long)dh * g_menu_art.w / g_menu_art.h); }
+			ar.w = dw; ar.h = dh;
+			ar.x = g_menu_art.side < 0 ? panel.x + pad + ((int)(art_w_cur + 0.5f) - dw) / 2
+			                           : panel.x + panel.w - pad - (int)(art_w_cur + 0.5f)
+			                             + ((int)(art_w_cur + 0.5f) - dw) / 2;
+			ar.y = area_y + (area_h - dh) / 2;
+			SDL_RenderCopy(a->r, g_menu_art.tex, NULL, &ar);
+		}
+	}
+
+	g_menu_seen.row_w = content_w;       /* where a list's names start to slide */
+
 	/* THE HIGHLIGHT SLIDES. It used to be drawn inside the row loop at
 	 * i == sel, which put it wherever the cursor was that frame and made it
 	 * snap. Here it is a rect of its own, eased from where it was toward
@@ -5463,9 +5539,9 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 		 * row's midpoint and fell off toward both ends, which put a soft blob
 		 * behind the middle of every highlighted row and read as a smudge
 		 * rather than as a selection. */
-		plate.x = panel.x + pad / 2;
+		plate.x = lane_x + pad / 2;
 		plate.y = (int)(pl_y + 0.5f);
-		plate.w = panel.w - pad;
+		plate.w = lane_w - pad;
 		plate.h = (int)(pl_h + 0.5f);
 		ui_round_rect(a->r, &plate, row_h / 4, (SDL_Color){ 255, 255, 255, 34 });
 
@@ -5475,16 +5551,16 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 
 	notes_drawn = 0;
 	if (scroll_h)
-		SDL_RenderSetClipRect(a->r, &(SDL_Rect){ panel.x, content_y,
-		                                         panel.w, scroll_h });
+		SDL_RenderSetClipRect(a->r, &(SDL_Rect){ lane_x, content_y,
+		                                         lane_w, scroll_h });
 	/* Clipped to the panel, and ONE ROW BEYOND THE WINDOW at each end.
 	 * Offsetting the rows opens a gap at one edge and pushes the far row past
 	 * the other; without the extra row the gap is empty, and without the clip
 	 * the overflow draws outside the panel. Leaving either out is what made
 	 * the first attempt at this look like the list was wrapping. */
 	if (vis < n) {
-		SDL_Rect rc = { panel.x + UI_PANEL_BORDER, content_y,
-		                panel.w - UI_PANEL_BORDER * 2,
+		SDL_Rect rc = { lane_x + (lane_x == panel.x ? UI_PANEL_BORDER : 0), content_y,
+		                lane_w - UI_PANEL_BORDER * (g_menu_art.side ? 1 : 2),
 		                panel.y + panel.h - pad - desc_h - content_y };
 		/* ChaOS: a panel stretched to the screen is taller than its rows;
 		 * the clip stays at the rows, or the row past the window shows */
@@ -11412,10 +11488,10 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 		return MENU_STAY;
 	}
 
-	/* ChaOS: Game List View, Normal or List */
+	/* ChaOS: Game List View, Normal, List, or List with art left or right */
 	if (sel == PM_LISTVIEW && (d || key == IN_ACCEPT)) {
-		g_list_view = !g_list_view;
-		db_set_str(db_dev(), "game_view", g_list_view ? "list" : "normal");
+		g_list_view = (g_list_view + (d ? d : 1) + GLV_COUNT) % GLV_COUNT;
+		db_set_str(db_dev(), "game_view", GLV_KEY[g_list_view]);
 		return MENU_STAY;
 	}
 
@@ -24296,10 +24372,10 @@ static int menu_ids_check(app *a)
 	static const char *const names[] = { "ChaOS", "Appearance", "Shelves", "ROM Management",
 	                                     "Wi-Fi & Bluetooth", "System Settings" };
 	int bad = 0, p, lv, d, was_dir = g_dir;
-	bool was_lv = g_list_view;
+	int was_lv = g_list_view;
 
 	for (d = 0; d < (int)(sizeof CARD_DIRS / sizeof CARD_DIRS[0]); d++)
-		for (lv = 0; lv < 2; lv++)
+		for (lv = 0; lv < GLV_COUNT; lv++)
 			for (p = 0; p < (int)(sizeof pages / sizeof pages[0]); p++) {
 				menu_row rows[MENU_MAX_ROWS];
 				menu_bufs b;
@@ -24315,8 +24391,8 @@ static int menu_ids_check(app *a)
 				nk = sysmenu_ids(ids);
 				if (pages[p]) *pages[p] = false;
 				if (p == 2) g_appearance_page = false;
-				printf("%s %-18s %s, %-10s built %2d, keyed %2d\n", nb == nk ? "ok  " : "FAIL",
-				       names[p], lv ? "List  " : "Normal", CARD_DIRS[d].name, nb, nk);
+				printf("%s %-18s %-16s %-10s built %2d, keyed %2d\n", nb == nk ? "ok  " : "FAIL",
+				       names[p], GLV_LABEL[lv], CARD_DIRS[d].name, nb, nk);
 				if (nb != nk) bad++;
 			}
 	g_dir = was_dir;
@@ -25540,7 +25616,8 @@ int main(int argc, char *argv[])
 		notice_set_accent(MENU_ACCENT);
 		pn_speed_load();
 		db_get_str(db_dev(), "game_view", set, sizeof set, "normal");
-		g_list_view = !strcmp(set, "list");
+		for (g_list_view = GLV_COUNT - 1; g_list_view > 0; g_list_view--)
+			if (!strcmp(set, GLV_KEY[g_list_view])) break;
 	}
 	a.sys_cursor = 0;
 	db_get_str(db_lib(), "startup_system", startup, sizeof startup, "");
