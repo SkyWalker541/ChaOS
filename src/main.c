@@ -23722,6 +23722,28 @@ static void scan_all(app *a)
 			        names, v->list.skipped > shown ? ", and more" : "");
 		}
 	}
+	/* ChaOS: a console with no games and no folder gets its folder, so a
+	 * player knows where its games go: cards made from ChaOS 2.7.2's image
+	 * or older had none for the PlayStation or PICO-8. One stat each, and only
+	 * for an empty shelf, so it costs the boot nothing it notices. */
+	{
+		int k;
+
+		for (k = 0; k < a->sys.count; k++) {
+			char d[LIB_PATH * 2];
+			struct stat st;
+
+			if (a->view[k].list.count || is_muse(&a->sys.systems[k]) ||
+			    !a->sys.systems[k].folder[0]) continue;
+			snprintf(d, sizeof d, "%s/%s", P_ROMS, a->sys.systems[k].folder);
+			if (stat(d, &st) == 0) continue;
+			if (mkdir(d, 0755) == 0) {
+				snprintf(d, sizeof d, "%s/%s/.media", P_ROMS, a->sys.systems[k].folder);
+				mkdir(d, 0755);
+				fprintf(stderr, "scan: made Roms/%s\n", a->sys.systems[k].folder);
+			}
+		}
+	}
 	hide_empty_systems(a);
 	build_virtual_shelves(a);
 	build_muse_shelf(a);
