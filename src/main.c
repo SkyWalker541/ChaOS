@@ -3349,6 +3349,22 @@ static void draw_heart(SDL_Renderer *r, float cx, float cy, float rad,
 	SDL_Vertex v[HEART_N + 1];
 	int idx[HEART_N * 3], i;
 
+	/* ChaOS Pixel Burst: a pixel-art heart, 7 by 6, as wide as the curve */
+	if (ui_pixel()) {
+		static const char *const H[6] = { ".XX.XX.", "XXXXXXX", "XXXXXXX",
+		                                  ".XXXXX.", "..XXX..", "...X..." };
+		int c = (int)(rad * 2.0f / 7.0f + 0.5f), x, y;
+		int ox = (int)(cx - c * 3.5f), oy = (int)(cy - c * 3.0f);
+
+		if (c < 1) c = 1;
+		SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+		SDL_SetRenderDrawColor(r, col.r, col.g, col.b, col.a);
+		for (y = 0; y < 6; y++)
+			for (x = 0; x < 7; x++)
+				if (H[y][x] == 'X')
+					SDL_RenderFillRect(r, &(SDL_Rect){ ox + x * c, oy + y * c, c, c });
+		return;
+	}
 	v[0].position.x = cx;
 	v[0].position.y = cy + rad * 0.25f;
 	for (i = 0; i < HEART_N; i++) {
@@ -3676,8 +3692,25 @@ static void draw_menu_status(SDL_Renderer *r, int left, int right, int y,
 					SDL_SetRenderDrawColor(r, UI_TEXT_DIM.r, UI_TEXT_DIM.g, UI_TEXT_DIM.b, 255);
 					SDL_RenderDrawRect(r, &body);
 					SDL_RenderDrawRect(r, &body2);
+					if (ui_pixel()) {   /* square corners cut, a pixel each */
+						SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_NONE);
+						SDL_SetRenderDrawColor(r, 0x17, 0x15, 0x1C, 255);
+						SDL_RenderDrawPoint(r, body.x, body.y);
+						SDL_RenderDrawPoint(r, body.x + body.w - 1, body.y);
+						SDL_RenderDrawPoint(r, body.x, body.y + body.h - 1);
+						SDL_RenderDrawPoint(r, body.x + body.w - 1, body.y + body.h - 1);
+						SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+						SDL_SetRenderDrawColor(r, UI_TEXT_DIM.r, UI_TEXT_DIM.g, UI_TEXT_DIM.b, 255);
+					}
 					SDL_RenderFillRect(r, &cap);
 					SDL_SetRenderDrawColor(r, fill.r, fill.g, fill.b, 255);
+					/* ChaOS Pixel Burst: the charge in four blocks */
+					if (ui_pixel()) {
+						int seg = (inner - 6) / 4, nb = (pct + 24) / 25, q;
+
+						for (q = 0; q < nb && q < 4; q++)
+							SDL_RenderFillRect(r, &(SDL_Rect){ bx + 4 + q * (seg + 2), in.y, seg, in.h });
+					} else
 					if (w > 0) SDL_RenderFillRect(r, &in);
 					dot_x = bx - 18;
 				} else {
@@ -3695,6 +3728,12 @@ static void draw_low_battery_dot(SDL_Renderer *r, int cx, int cy)
 {
 	int rad = 9;
 	SDL_SetRenderDrawColor(r, 224, 72, 72, 255);
+	/* ChaOS Pixel Burst: a square pixel, with one breaking off */
+	if (ui_pixel()) {
+		SDL_RenderFillRect(r, &(SDL_Rect){ cx - 8, cy - 6, 14, 14 });
+		SDL_RenderFillRect(r, &(SDL_Rect){ cx + 8, cy - 12, 5, 5 });
+		return;
+	}
 	for (int dy = -rad; dy <= rad; dy++) {
 		int dx = (int)(sqrt((double)(rad * rad - dy * dy)) + 0.5);
 		SDL_RenderDrawLine(r, cx - dx, cy + dy, cx + dx, cy + dy);
@@ -4837,6 +4876,27 @@ static void draw_chevron(SDL_Renderer *r, float cx, float cy, float h, int dir,
 	SDL_Vertex v[6];
 	int idx[12] = { 0, 1, 2, 1, 3, 2,  2, 3, 4, 3, 5, 4 }, i;
 
+	/* ChaOS Pixel Burst: a stepped arrowhead, two cells thick, on a grid of
+	 * about a seventh of its height */
+	if (ui_pixel()) {
+		int cs = (int)(h / 7.0f) > 2 ? (int)(h / 7.0f) : 2, k = (int)(h / 2.0f / cs), j;
+		int x_tip = (int)cx + dir * (k * cs) / 2;     /* the point's column */
+		int y_mid = (int)cy - cs / 2;
+
+		SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+		SDL_SetRenderDrawColor(r, c.r, c.g, c.b, c.a);
+		for (j = 0; j <= k; j++) {
+			/* row j above and below the middle, j cells back from the tip */
+			int x = x_tip - dir * j * cs - (dir > 0 ? cs : 0);
+			int xl = dir > 0 ? x - cs : x;
+
+			SDL_RenderFillRect(r, &(SDL_Rect){ xl, y_mid - j * cs, cs * 2, cs });
+			if (j) SDL_RenderFillRect(r, &(SDL_Rect){ xl, y_mid + j * cs, cs * 2, cs });
+		}
+		(void)x0; (void)x1; (void)t; (void)v; (void)idx; (void)i;
+		return;
+	}
+
 	/* top arm then bottom arm, each a quad of thickness t */
 	v[0].position = (SDL_FPoint){ x0, cy - h / 2 };
 	v[1].position = (SDL_FPoint){ x0 - dir * t, cy - h / 2 + t * 0.6f };
@@ -5593,6 +5653,11 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 			int au = u * 3 / 4 > 2 ? u * 3 / 4 : 2;       /* the arrow's */
 			int ax = plate.x + au, ay = plate.y + plate.h / 2;
 			int ex = plate.x + plate.w;
+			/* where the panel's rim starts: a narrow panel (the in-game
+			 * menu) has less margin than the burst wants, so it slides back
+			 * over the plate's corner rather than onto the rim */
+			int inner = lane_x + lane_w - UI_PANEL_BORDER - 2;
+			if (ex + u * 3 + 4 > inner) ex = inner - u * 3 - 4;
 
 			ui_round_rect(a->r, &plate, 8, (SDL_Color){ 0xF4, 0xEA, 0xD5, 255 });
 			SDL_SetRenderDrawColor(a->r, 0xFF, 0x7A, 0x2F, 255);
@@ -5722,7 +5787,7 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 		/* ChaOS: a row that opens another screen, with a chevron in the
 		 * right margin: the value's color, so it brightens with the row */
 		if (rows[i].opens && rows[i].live && !ROW_IS_NOTE(rows[i]))
-			draw_chevron(a->r, (float)(content_x + content_w + pad / 2),
+			draw_chevron(a->r, (float)(content_x + content_w + (ui_pixel() ? pad / 4 : pad / 2)),
 			             y + ROW_H(rows[i]) / 2.0f, (float)text_h * 0.5f, +1,
 			             rows[i].value ? vc : lc);
 		/* ChaOS: a dot after the label, in the panel's color: something new
@@ -5871,7 +5936,7 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 					draw_chevron(a->r, (float)(content_x + content_w - vw) - ah * 1.2f,
 					             cy, ah, -1, ac);
 					if (!rows[i].opens)
-						draw_chevron(a->r, (float)(content_x + content_w + pad / 2),
+						draw_chevron(a->r, (float)(content_x + content_w + (ui_pixel() ? pad / 4 : pad / 2)),
 						             cy, ah, +1, ac);
 				}
 			} else if (vw > lw) {
@@ -22731,8 +22796,9 @@ static void letter_hold(sysview *v, bool held)
 static void draw_letter_popup(app *a)
 {
 	static SDL_Texture *layer;
-	static TTF_Font *big;
+	static TTF_Font *big, *big_px;
 	static char drawn;
+	static bool drawn_px;
 	const int S = 220;
 	Uint32 now = plat_now_ms(), el;
 	float al;
@@ -22754,9 +22820,12 @@ static void draw_letter_popup(app *a)
 	{
 		static SDL_Renderer *made_for;
 
-		if (made_for != a->r) { layer = NULL; big = NULL; drawn = 0; made_for = a->r; }
+		if (made_for != a->r) { layer = NULL; big = big_px = NULL; drawn = 0; made_for = a->r; }
 	}
 	if (!big) big = TTF_OpenFont(P_FONT, 150);
+	/* ChaOS Pixel Burst: Silkscreen at 152, on its 19-pixel grid */
+	if (ui_pixel() && !big_px) big_px = TTF_OpenFont(ui_font_path(true), 152);
+	if (drawn_px != ui_pixel()) { drawn = 0; drawn_px = ui_pixel(); }
 	if (!layer) {
 		layer = SDL_CreateTexture(a->r, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, S, S);
 		if (!layer) return;
@@ -22774,18 +22843,21 @@ static void draw_letter_popup(app *a)
 			SDL_RenderClear(a->r);
 			SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
 			ui_panel(a->r, &q, 28, menu_accent());
-			if (big) {
-				SDL_Surface *ts = TTF_RenderUTF8_Blended(big, t, UI_TEXT);
+			{
+				TTF_Font *bf = ui_pixel() && big_px ? big_px : big;
+			if (bf) {
+				SDL_Surface *ts = TTF_RenderUTF8_Blended(bf, t, UI_TEXT);
 				if (ts) {
 					SDL_Texture *tt = SDL_CreateTextureFromSurface(a->r, ts);
 					/* centred on the ink: a capital's top to its baseline */
-					int mnx, mxx, mny, mxy, adv, asc = TTF_FontAscent(big);
-					int cap = TTF_GlyphMetrics(big, (Uint16)g_lp_letter, &mnx, &mxx, &mny,
+					int mnx, mxx, mny, mxy, adv, asc = TTF_FontAscent(bf);
+					int cap = TTF_GlyphMetrics(bf, (Uint16)g_lp_letter, &mnx, &mxx, &mny,
 					                           &mxy, &adv) == 0 ? mxy : asc;
 					SDL_Rect d = { (S - ts->w) / 2, (S - cap) / 2 - (asc - cap), ts->w, ts->h };
 					if (tt) { SDL_RenderCopy(a->r, tt, NULL, &d); SDL_DestroyTexture(tt); }
 					SDL_FreeSurface(ts);
 				}
+			}
 			}
 			drawn = g_lp_letter;
 		}
@@ -23034,7 +23106,8 @@ static void shelf_pan(app *a, int to, int dir)
  * cards only; the List's heading already names it. */
 static void draw_shelf_note(app *a)
 {
-	static TTF_Font *f;
+	static TTF_Font *f0, *f_px;
+	TTF_Font *f;
 	static SDL_Renderer *made_for;
 	const system_cfg *sy;
 	Uint32 now = plat_now_ms(), el;
@@ -23052,8 +23125,11 @@ static void draw_shelf_note(app *a)
 	sy = &a->sys.systems[a->sys_cursor];
 	al = el < 120 ? (float)el / 120.0f : el < 900 ? 1.0f : 1.0f - (float)(el - 900) / 400.0f;
 
-	if (made_for != a->r) { f = NULL; made_for = a->r; }
-	if (!f) f = TTF_OpenFont(P_FONT, 56);
+	if (made_for != a->r) { f0 = f_px = NULL; made_for = a->r; }
+	if (!f0) f0 = TTF_OpenFont(P_FONT, 56);
+	/* ChaOS Pixel Burst: Silkscreen at 56, on its 7-pixel grid */
+	if (ui_pixel() && !f_px) f_px = TTF_OpenFont(ui_font_path(true), 56);
+	f = ui_pixel() && f_px ? f_px : f0;
 	if (!f) return;
 	{
 		SDL_Surface *ts = TTF_RenderUTF8_Blended(f, sy->name, UI_TEXT);
@@ -24776,6 +24852,7 @@ static int menu_ids_check(app *a)
 
 static void take_shot(app *a)
 {
+	ui_set_pixel(CARDS_PIXEL_UI(g_cards));   /* as the main loop does */
 	if (g_menu_ids) exit(menu_ids_check(a));
 	SDL_Surface *out = SDL_CreateRGBSurfaceWithFormat(0, TORTOS_SCREEN_W,
 	                                                  TORTOS_SCREEN_H, 32,
