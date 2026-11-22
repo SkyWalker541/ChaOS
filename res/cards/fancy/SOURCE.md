@@ -35,12 +35,16 @@ attribution requirement, and no rights are claimed in it.
 
 ## MUSE.png
 
-Not a console, and not one of the photographs above. A green iPod nano (4th
-generation) at the same 3/4 angle as the set, supplied by Eric on 2026-09-18
-for Muse's card; where the photograph came from is not recorded here. The
-original is kept outside the repository in `cards_backup_photos/muse.png`, and
-`tools/genmusecard.py` cuts this card from it: trimmed to its alpha, longest
-side 96% of 384 and centred, in the 384 canvas because it is taller than wide.
+Not a console: Muse's card, a first-generation iPod (2001) at the set's 3/4
+angle on a white studio backdrop, supplied by SkyWalker541 on 2026-11-22 for
+this card, generated with Gemini (`source/muse-ipod.jpg`, kept here).
+`tools/genmusephoto.py` cuts it from its backdrop and frames it as above, and
+blanks its screen: the picture showed a menu, and the card shows the LCD with
+nothing on it, the menu, icons and rule filled with the screen's own surface
+and grain and the bezel's shading on the screen kept. The wheel's printed
+labels are the device's own and stay. It replaced the green iPod nano cut by
+`tools/genmusecard.py` from a photograph whose source was never recorded (the
+rendered player of `tools/genmusefancy.py` before that; both kept).
 
 ## RECENT.png
 
