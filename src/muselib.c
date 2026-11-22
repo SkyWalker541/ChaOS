@@ -283,12 +283,27 @@ static void list_dir(const char *dir, names *dirs, names *files)
 	while ((e = readdir(d))) {
 		char full[LIB_PATH * 2];
 		struct stat st;
+		bool is_dir;
 
 		if (e->d_name[0] == '.') continue;
 		if (snprintf(full, sizeof full, "%s/%s", dir, e->d_name) >= (int)sizeof full)
 			continue;
-		if (stat(full, &st) != 0) continue;
-		if (S_ISDIR(st.st_mode)) { if (dirs) names_add(dirs, e->d_name); }
+		/* The listing says what each entry is, on the card's exFAT and FAT32
+		 * as on ext4, and a stat is asked only when it does not. It was asked
+		 * for every entry: 33,000 songs were 36,300 stats before the first
+		 * frame, and on exFAT each one looks its name up in the folder again.
+		 * Flintz's card took about ten seconds to start (2026-11-22). A link
+		 * is stat'ed, since only its target says which it is. */
+#ifdef DT_DIR
+		if (e->d_type == DT_DIR || e->d_type == DT_REG)
+			is_dir = e->d_type == DT_DIR;
+		else
+#endif
+		{
+			if (stat(full, &st) != 0) continue;
+			is_dir = S_ISDIR(st.st_mode);
+		}
+		if (is_dir) { if (dirs) names_add(dirs, e->d_name); }
 		else if (files && ml_is_audio(e->d_name)) names_add(files, e->d_name);
 	}
 	closedir(d);
