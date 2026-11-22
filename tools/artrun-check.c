@@ -62,6 +62,8 @@ static const char *g_serve_dat;      /* the No-Intro list, or NULL for a 404 */
 static const char *INDEX_OTHER =
 	"<a href=\"Unrelated%20Title%20%28USA%29.png\">x</a>\n";
 static const char *g_index = NULL;   /* the catalog; INDEX_OTHER when NULL */
+static const char *g_serve_link;     /* this is served as a link's text, or NULL */
+static const char *g_link_text;      /* and that text */
 static char g_pend_url[2048], g_pend_path[2048];
 static bool g_pending;
 static char g_urls[4096];            /* every URL asked for, one per line */
@@ -119,12 +121,14 @@ int net_async_poll(void)
 	if (!g_pending) return -1;
 	g_pending = false;
 
-	if (n && g_pend_url[n - 1] == '/') {
+	if ((n && g_pend_url[n - 1] == '/') || strstr(g_pend_url, "/git/trees/")) {
 		/* The catalog: by default other games only, so a fuzzy pass finds
 		 * nothing. */
 		body = g_index ? g_index : INDEX_OTHER;
 	} else if (n > 4 && !strcmp(g_pend_url + n - 4, ".dat")) {
 		body = g_serve_dat;
+	} else if (g_serve_link && strstr(g_pend_url, g_serve_link)) {
+		body = g_link_text;             /* what GitHub's raw file of a link is */
 	} else if ((g_serve_image && strstr(g_pend_url, g_serve_image)) ||
 	           (g_serve_also && strstr(g_pend_url, g_serve_also))) {
 		body = "NEW";
@@ -565,6 +569,84 @@ int main(void)
 
 		g_ss_on = false;
 		g_ss_left = -1;
+	}
+
+	/* ---- libretro's GitHub repositories -------------------------------
+	 *
+	 * thumbnails.libretro.com went empty on 2026-11-22 and every cover asked
+	 * of it was a 404. The repositories it was built from are asked instead:
+	 * a cover is a raw file, a catalog is GitHub's JSON listing of the
+	 * folder, and a duplicate cover is a link whose raw file is the name of
+	 * the cover it points at. */
+	{
+		char p[512];
+		const char *TREE =
+			"{\"sha\":\"x\",\"url\":\"https://api.github.com/x\",\"tree\":["
+			"{\"path\":\"Unrelated (USA).png\",\"mode\":\"100644\",\"type\":\"blob\","
+			"\"sha\":\"0123456789abcdef0123456789abcdef01234567\",\"size\":1,"
+			"\"url\":\"https://api.github.com/repos/libretro-thumbnails/x/git/blobs/0123456789abcdef\"},"
+			"{\"path\":\"Other Game (USA) [100%].png\",\"mode\":\"100644\",\"type\":\"blob\","
+			"\"sha\":\"0123456789abcdef0123456789abcdef01234567\",\"size\":1,"
+			"\"url\":\"https://api.github.com/repos/libretro-thumbnails/x/git/blobs/0123456789abcdef\"}"
+			"],\"truncated\":false}";
+
+		snprintf(p, sizeof p, "%s/Hit Game.png", g_media);  remove(p);
+		snprintf(p, sizeof p, "%s/Other Game.png", g_media); remove(p);
+
+		printf("  covers come from the repository, by its name:\n");
+		g_serve_image = "Hit%20Game";
+		CHECK(run("Hit Game", &st) == 0, "the run did not finish");
+		CHECK(strstr(g_urls, "https://raw.githubusercontent.com/libretro-thumbnails/"
+		                     "Nintendo_-_Game_Boy/master/Named_Boxarts/Hit%20Game.png") != NULL,
+		      "the cover was not asked of the repository:\n%s", g_urls);
+		CHECK(!strcmp(cover(), "NEW"), "the cover reads \"%s\", wanted NEW", cover());
+
+		printf("  the catalog is GitHub's listing, read exactly:\n");
+		g_index = TREE;
+		g_serve_image = "Other%20Game%20%28USA%29%20%5B100%25%5D.png";
+		CHECK(run(NULL, &st) == 0, "the run did not finish");
+		CHECK(strstr(g_urls, "https://api.github.com/repos/libretro-thumbnails/"
+		                     "Nintendo_-_Game_Boy/git/trees/master:Named_Boxarts") != NULL,
+		      "the catalog was not asked of GitHub:\n%s", g_urls);
+		CHECK(!strcmp(cover_of("Other Game"), "NEW"),
+		      "a name from the listing was not fetched: \"%s\"\n%s",
+		      cover_of("Other Game"), g_urls);
+
+		printf("  a listing GitHub cut short is refused, not half-matched:\n");
+		snprintf(p, sizeof p, "%s/Other Game.png", g_media); remove(p);
+		g_index = "{\"tree\":[{\"path\":\"Other Game (USA) [100%].png\","
+		          "\"url\":\"https://api.github.com/repos/libretro-thumbnails/x/git/blobs/0\"}],"
+		          "\"truncated\":true}";
+		CHECK(run(NULL, &st) == 0, "the run did not finish");
+		CHECK(!strcmp(cover_of("Other Game"), "(none)"),
+		      "a truncated listing was matched against");
+
+		printf("  a link is followed to the cover it names:\n");
+		g_index = NULL;
+		snprintf(p, sizeof p, "%s/Hit Game.png", g_media); remove(p);
+		g_serve_link = "Hit%20Game.png";
+		g_link_text = "Real Game (USA).png";
+		g_serve_image = "Real%20Game%20%28USA%29.png";
+		CHECK(run("Hit Game", &st) == 0, "the run did not finish");
+		CHECK(!strcmp(cover(), "NEW"),
+		      "the link was not followed: \"%s\"\n%s", cover(), g_urls);
+		CHECK(st.found == 1, "found %d, wanted 1", st.found);
+
+		printf("  a link to nothing leaves no cover and no text behind:\n");
+		remove(p);
+		g_serve_image = NULL;
+		CHECK(run("Hit Game", &st) == 0, "the run did not finish");
+		CHECK(!strcmp(cover(), "(gone)"), "something was left as the cover: \"%s\"", cover());
+		CHECK(st.found == 0, "found %d, wanted 0", st.found);
+
+		printf("  a link to a link is not followed further:\n");
+		g_serve_link = "Named_Boxarts/";       /* every request answers as a link */
+		g_link_text = "Hit Game.png";
+		CHECK(run("Hit Game", &st) == 0, "the run did not finish");
+		CHECK(!strcmp(cover(), "(gone)"), "a loop of links left \"%s\"", cover());
+		CHECK(g_nreq <= 6, "%d requests for one game", g_nreq);
+		g_serve_link = NULL;
+		g_link_text = NULL;
 	}
 
 	{
