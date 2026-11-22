@@ -22,7 +22,21 @@
 #include "ss.h"
 #include "ssrun.h"
 
-#define BASE "https://thumbnails.libretro.com"
+/* libretro's covers, from the GitHub repositories they are kept in.
+ *
+ * thumbnails.libretro.com used to serve them, and stopped: on 2026-11-22 its
+ * root listing was empty and every cover in every collection answered 404 -
+ * Metroid Fusion and Super Metroid included. Flintz's run that day asked for
+ * 211 TurboGrafx-16 games and got 211 404s, which reads exactly like "libretro
+ * has no art for any of these". The repositories are what that server was
+ * built from, one per collection, named as the collection with its spaces as
+ * underscores ("NEC_-_PC_Engine_-_TurboGrafx_16"); every collection in MAP
+ * below was checked there the same day.
+ *
+ * A cover is a raw file; a collection's catalog is GitHub's listing of the
+ * folder, read by parse_index. */
+#define BASE     "https://raw.githubusercontent.com/libretro-thumbnails"
+#define API_BASE "https://api.github.com/repos/libretro-thumbnails"
 
 /* No-Intro's list for a collection, as libretro-database carries it: every dump
  * with its CRC32, under the name libretro files its covers by. Fetched when a
@@ -660,13 +674,78 @@ static void read_roms(const char *dir, const char *exts)
  * listing, not a document. */
 #define INDEX_TMP "/tmp/tortos-artindex"
 
+/* A collection's repository: its name with the spaces as underscores, the
+ * rest as it is ("Sega - Mega-CD - Sega CD" is "Sega_-_Mega-CD_-_Sega_CD"),
+ * then encoded like any other path segment. */
+static void repo_of(const char *remote, char *out, size_t outn)
+{
+	char r[256];
+	size_t i;
+
+	snprintf(r, sizeof r, "%s", remote);
+	for (i = 0; r[i]; i++)
+		if (r[i] == ' ') r[i] = '_';
+	urlenc(r, out, outn);
+}
+
 static bool start_index(const char *remote)
 {
 	char url[ARTURL_MAX], enc[384];
 
-	urlenc(remote, enc, sizeof enc);
-	snprintf(url, sizeof url, BASE "/%s/Named_Boxarts/", enc);
+	repo_of(remote, enc, sizeof enc);
+	/* The folder's own tree, not the repository's: NES's is 13,896 names
+	 * in about 5 MB, where the whole repository with its Snaps and Titles
+	 * would be truncated by GitHub. */
+	snprintf(url, sizeof url, API_BASE "/%s/git/trees/master:Named_Boxarts", enc);
 	return net_get_async(url, INDEX_TMP, 60);
+}
+
+/* GitHub's listing turned into the form the matchers read: one href="..." per
+ * .png, its name with % and " encoded so urldec gives it back exactly.
+ *
+ * In place, front to back. Each entry's JSON carries a mode, a sha, a size and
+ * a 150-byte URL beside its path, so what is written never catches up with
+ * what is still to be read; the check below says so rather than trusts it.
+ * False for a listing GitHub cut short or one with nothing in it. */
+static bool index_from_tree(size_t n)
+{
+	static const char KEY[] = "\"path\":\"";
+	char *w = g_html;
+	const char *p = g_html, *end = g_html + n;
+
+	/* Cut short means games at the end of the alphabet "not at libretro". */
+	if (strstr(g_html, "\"truncated\":true")) return false;
+
+	while ((p = strstr(p, KEY))) {
+		const char *q;
+		char name[NAME_MAX_ * 2];
+		size_t len, o = 0, i;
+
+		p += sizeof KEY - 1;
+		q = strchr(p, '"');
+		if (!q || q > end) break;
+		len = (size_t)(q - p);
+		/* A backslash is a JSON escape this does not undo; no cover name
+		 * in any collection here has one. Skipped, not misread. */
+		if (len < 5 || memchr(p, '\\', len) || strncmp(q - 4, ".png", 4)) {
+			p = q;
+			continue;
+		}
+		for (i = 0; i < len && o + 4 < sizeof name; i++) {
+			if (p[i] == '%' || p[i] == '"') {
+				o += (size_t)snprintf(name + o, sizeof name - o, "%%%02X",
+				                      (unsigned char)p[i]);
+			} else {
+				name[o++] = p[i];
+			}
+		}
+		name[o] = '\0';
+		if (w + o + 9 > p) return false;        /* would overrun the unread */
+		w += sprintf(w, "href=\"%s\"\n", name);
+		p = q;
+	}
+	*w = '\0';
+	return w > g_html;
 }
 
 /* Every .png href in one directory listing.
@@ -692,6 +771,9 @@ static bool parse_index(void)
 	 * against a fraction of the catalog and report the difference as
 	 * missing art. */
 	if (n >= INDEX_MAX - 1) return false;
+	/* GitHub's JSON listing; anything else is read as a page of links, as
+	 * libretro's server sent and the checks' stub still does. */
+	if (n && g_html[0] == '{' && !index_from_tree(n)) return false;
 
 	for (p = g_html; (p = strstr(p, "href=\"")); ) {
 		const char *q;
@@ -1308,16 +1390,63 @@ static bool art_paths(const char *dir, const char *stem,
 /* Ask for one image by the name libretro would file it under. Used by both
  * passes: pass one guesses the card's own name, pass two passes the name the
  * catalog gave. */
+static char g_remote_now[256];   /* the collection the image in flight is from */
+static bool g_followed;          /* and it is the target of a link already */
+
 static bool start_image(const char *remote, const char *name, const char *dest)
 {
 	char url[ARTURL_MAX], er[384], en[NAME_MAX_ * 3 + 1];
 
-	urlenc(remote, er, sizeof er);
+	repo_of(remote, er, sizeof er);
 	urlenc(name, en, sizeof en);
-	snprintf(url, sizeof url, BASE "/%s/Named_Boxarts/%s.png", er, en);
-	snprintf(g_pending, sizeof g_pending, "%s", dest);
-	snprintf(g_asked, sizeof g_asked, "%s", name);
+	snprintf(url, sizeof url, BASE "/%s/master/Named_Boxarts/%s.png", er, en);
+	if (dest != g_pending) snprintf(g_pending, sizeof g_pending, "%s", dest);
+	if (name != g_asked) snprintf(g_asked, sizeof g_asked, "%s", name);
+	if (remote != g_remote_now) snprintf(g_remote_now, sizeof g_remote_now, "%s", remote);
+	g_followed = false;
 	return net_get_async(url, g_pending, 60);
+}
+
+/* How an image request ended, past what the network says: 1 for a cover, -1
+ * for none, 0 while it is still on its way.
+ *
+ * A duplicate cover is a symbolic link in the repository - 474 of NES's 13,896
+ * - and its raw file is the link's text, the name of the cover it points at.
+ * That is followed, once: the text becomes the next request, into the same
+ * file. Anything else that is not a picture is thrown away rather than left
+ * where it would be taken for a cover. */
+static int image_done(int r)
+{
+	char t[NAME_MAX_ + 8];
+	const char *base;
+	FILE *f;
+	size_t n;
+
+	if (r <= 0) return r;
+	if (is_cover(g_pending)) return 1;
+
+	n = 0;
+	if (!g_followed && (f = fopen(g_pending, "rb"))) {
+		n = fread(t, 1, sizeof t - 1, f);
+		fclose(f);
+	}
+	remove(g_pending);
+	if (n == 0 || n >= sizeof t - 1) return -1;
+	t[n] = '\0';
+	t[strcspn(t, "\r\n")] = '\0';
+	base = strrchr(t, '/');
+	base = base ? base + 1 : t;
+	n = strlen(base);
+	if (n < 5 || strcmp(base + n - 4, ".png") || memchr(base, '\0', n)) return -1;
+	{
+		char target[NAME_MAX_];
+
+		snprintf(target, sizeof target, "%.*s", (int)(n - 4), base);
+		say("art: \"%s\" is a link to \"%s\"\n", g_asked, target);
+		if (!start_image(g_remote_now, target, g_pending)) return -1;
+	}
+	g_followed = true;
+	return 0;
 }
 
 /* Finish with this system and move to the next, saying why.
@@ -1518,7 +1647,7 @@ int art_step(void)
 		return 1;
 
 	case P_TRY_WAIT: {
-		int r = net_async_poll();
+		int r = image_done(net_async_poll());
 
 		if (r == 0) return 1;
 		say("art: %s from libretro by its own name: %s, %s\n", g_roms[g_ri],
@@ -1616,7 +1745,7 @@ int art_step(void)
 		return 1;
 
 	case P_FUZZY_WAIT: {
-		int r = net_async_poll();
+		int r = image_done(net_async_poll());
 
 		if (r == 0) return 1;
 		say("art: %s from libretro as \"%s\": %s, %s\n", g_roms[g_retry[g_qi]],
@@ -1690,7 +1819,7 @@ int art_step(void)
 	}
 
 	case P_CRC_WAIT: {
-		int r = net_async_poll();
+		int r = image_done(net_async_poll());
 
 		if (r == 0) return 1;
 		say("art: %s from libretro as \"%s\": %s, %s\n", g_roms[g_retry[g_qi]],
