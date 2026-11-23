@@ -63,6 +63,7 @@ static char g_dl[300];           /* the download, compressed */
 static char g_dl_part[310];
 static char g_root_upd[300];     /* what rootswitch looks for */
 static char g_stamp[300];        /* which version that is */
+static char g_repair[300];       /* there when it was downloaded as a repair */
 static char g_version[32];       /* running */
 static bool g_testing;           /* the testing channel (upd_set_testing) */
 static bool g_asking_test;       /* the check's second question, the testing channel's */
@@ -277,9 +278,16 @@ static void look_on_card(void)
 		trim(v);
 		snprintf(elf, sizeof elf, "%s/ChaOS/tortos.elf", g_app_dir);
 		/* A full install of the version running is a repair, and still
-		 * waiting while its root is (rootswitch removes it once written) */
+		 * waiting while its root is (rootswitch removes it once written).
+		 * Only one downloaded AS a repair: an update downloaded here and
+		 * then installed another way - ChaOS Installer, or a card written
+		 * from the image - is the version running too, and offering it
+		 * again told a tester to update to what he had just installed
+		 * (2.7.3-test1 to test2, 2026-11-23). */
+		bool repair = full && access(g_repair, F_OK) == 0;
+
 		if ((small ? stat(elf, &st) : stat(g_root_upd, &st)) == 0 && version_ok(v) &&
-		    (ota_vercmp(v, g_version) > 0 || (full && ota_vercmp(v, g_version) == 0))) {
+		    (ota_vercmp(v, g_version) > 0 || (repair && ota_vercmp(v, g_version) == 0))) {
 			snprintf(g_latest.version, sizeof g_latest.version, "%s", v);
 			snprintf(g_latest.base, sizeof g_latest.base, "%s", g_base);
 			g_latest.small = small;
@@ -287,8 +295,12 @@ static void look_on_card(void)
 			return;
 		}
 		/* Installed (rootswitch removed the root), or older than this */
+		if (ota_vercmp(v, g_version) <= 0)
+			fprintf(stderr, "update: %s waiting from before, but %s is running: removed\n",
+			        v, g_version);
 		unlink(g_root_upd);
 		unlink(g_stamp);
+		unlink(g_repair);
 	}
 	rm_tree(g_app_dir);
 	unlink(g_dl);
@@ -308,6 +320,7 @@ void upd_init(const char *card, const char *root, const char *version,
 	snprintf(g_dl_part, sizeof g_dl_part, "%s.part", g_dl);
 	snprintf(g_root_upd, sizeof g_root_upd, "%s/root-update.squashfs", g_dev);
 	snprintf(g_stamp, sizeof g_stamp, "%s/chaos-update.version", g_dev);
+	snprintf(g_repair, sizeof g_repair, "%s/chaos-update.repair", g_dev);
 	snprintf(g_app_dir, sizeof g_app_dir, "%s/chaos-app", g_dev);
 	snprintf(g_app_mark, sizeof g_app_mark, "%s/chaos-app.installing", g_dev);
 	snprintf(g_card, sizeof g_card, "%s", card);
@@ -322,6 +335,7 @@ void upd_init(const char *card, const char *root, const char *version,
 		if (code == 0) {
 			rm_tree(g_app_dir);
 			unlink(g_stamp);
+			unlink(g_repair);
 			unlink(g_app_mark);
 			sync();
 		}
@@ -442,6 +456,14 @@ bool upd_download(bool small)
 		return false;
 	}
 	unlink(g_dl_part);
+	/* A repair says so, for look_on_card after a restart */
+	if (g_state == UPD_CURRENT) {
+		FILE *f = fopen(g_repair, "w");
+
+		if (f) fclose(f);
+	} else {
+		unlink(g_repair);
+	}
 	snprintf(url, sizeof url, DL_URL, g_latest.version,
 	         g_latest.small ? g_latest.app : g_latest.root);
 	g_pid = net_get_spawn(url, g_dl_part, 1800);
@@ -589,6 +611,7 @@ bool upd_remove(void)
 	unlink(g_root_upd);
 	rm_tree(g_app_dir);
 	unlink(g_stamp);
+	unlink(g_repair);
 	g_state = g_latest.root[0] ? UPD_AVAILABLE : UPD_IDLE;
 	return true;
 }
@@ -754,6 +777,7 @@ bool upd_arm(void)
 		}
 		rm_tree(g_app_dir);
 		unlink(g_stamp);
+		unlink(g_repair);
 		unlink(g_app_mark);
 		sync();
 		fprintf(stderr, "update: %s's files in place\n", g_latest.version);
@@ -762,6 +786,7 @@ bool upd_arm(void)
 	if (stat(g_root_upd, &st) != 0 || !(f = fopen(g_root_upd, "rb"))) {
 		fail("The download is gone");
 		unlink(g_stamp);
+		unlink(g_repair);
 		g_state = UPD_FAILED;
 		return false;
 	}
