@@ -19,6 +19,9 @@
 #define ROMM_REPLY (1 << 20)   /* a page of games, with their files, fits */
 #define CLIENT "ChaOS"
 
+/* The last refusal's reason, as RomM gave it, for the message on screen */
+static char g_reason[160];
+
 static void say(char *why, size_t wn, const char *s) { if (why && wn) snprintf(why, wn, "%s", s); }
 
 /* A reply's status, as a person would read it */
@@ -28,9 +31,10 @@ static void http_why(int http, char *why, size_t wn)
 	else if (http == 401 || http == 403) say(why, wn, "The server said no: sign in again");
 	else if (http == 404) say(why, wn, "The server doesn't have that");
 	else {
-		char m[64];
+		char m[220];
 
-		snprintf(m, sizeof m, "The server answered %d", http);
+		if (g_reason[0]) snprintf(m, sizeof m, "RomM refused it (%d): %s", http, g_reason);
+		else snprintf(m, sizeof m, "The server answered %d", http);
 		say(why, wn, m);
 	}
 }
@@ -73,6 +77,7 @@ bool romm_load(romm_conn *c, const char *dir)
 	snprintf(p, sizeof p, "%s/token", dir);   read_line(p, c->token, sizeof c->token);
 	snprintf(p, sizeof p, "%s/device", dir);  read_line(p, c->device_id, sizeof c->device_id);
 	snprintf(p, sizeof p, "%s/user", dir);    read_line(p, c->user, sizeof c->user);
+	snprintf(p, sizeof p, "%s/identifier", dir); read_line(p, c->ident, sizeof c->ident);
 	return c->url[0] && c->token[0];
 }
 
@@ -89,6 +94,10 @@ bool romm_save(const romm_conn *c, const char *dir)
 	if (c->device_id[0]) ok &= write_line(p, c->device_id, 0644); else unlink(p);
 	snprintf(p, sizeof p, "%s/user", dir);
 	if (c->user[0]) ok &= write_line(p, c->user, 0644); else unlink(p);
+	if (c->ident[0]) {
+		snprintf(p, sizeof p, "%s/identifier", dir);
+		ok &= write_line(p, c->ident, 0644);
+	}
 	return ok;
 }
 
@@ -112,6 +121,12 @@ bool romm_set_url(romm_conn *c, const char *typed)
 		snprintf(u, sizeof u, "%s", p);
 	l = strlen(u);
 	while (l > 0 && (u[l - 1] == '/' || u[l - 1] == ' ')) u[--l] = '\0';
+	/* RomM's API is at <server>/api: an address typed with it on the end
+	 * would ask for /api/api/... and be told 404 */
+	if (l > 4 && !strcasecmp(u + l - 4, "/api") && strstr(u, "://") + 3 < u + l - 4) {
+		u[l -= 4] = '\0';
+		while (l > 0 && u[l - 1] == '/') u[--l] = '\0';
+	}
 	if (strchr(u, ' ') || strlen(u) < 10) return false;
 	if (strcmp(c->url, u)) {
 		/* another server: none of this one's sign-in is any good there */
@@ -130,6 +145,7 @@ static long call(const romm_conn *c, const char *method, const char *path, const
 {
 	char url[1024];
 	net_req r;
+	long n;
 
 	memset(&r, 0, sizeof r);
 	snprintf(url, sizeof url, "%s%s", c->url, path);
@@ -138,7 +154,48 @@ static long call(const romm_conn *c, const char *method, const char *path, const
 	r.bearer = c->token[0] ? c->token : NULL;
 	r.json = json;
 	r.timeout_s = timeout;
-	return net_request(&r, out, outn, http);
+	n = net_request(&r, out, outn, http);
+	g_reason[0] = '\0';
+	/* A refusal goes in the log, so a report of one can be read there: the
+	 * request's path without its query, its status, and for a refusal
+	 * RomM's own reason. Never the server's address, the token or what was
+	 * sent, which can carry a username; a 422's reason names a field and
+	 * says what is wrong with it, never its value (2026-11-23: a 422 reached
+	 * a user's screen and no log). */
+	if (n < 0 || *http < 200 || *http >= 300) {
+		size_t pl = strcspn(path, "?"), i;
+
+		if (n > 0 && *http >= 400 && *http < 500 && outn) {
+			jsv d;
+
+			if ((size_t)n >= outn) n = (long)outn - 1;
+			if (js_member(js_root(out, (size_t)n), "detail", &d) &&
+			    !js_str(d, g_reason, sizeof g_reason)) {
+				/* FastAPI's validation answer is a list; its first entry's
+				 * field (the last of its "loc") and "msg" say enough */
+				jsv it = {0}, e, loc, msg, lit = {0}, part;
+				char m[120] = "", f[64] = "";
+
+				if (js_next(d, &it, &e)) {
+					if (js_member(e, "msg", &msg)) js_str(msg, m, sizeof m);
+					if (js_member(e, "loc", &loc))
+						while (js_next(loc, &lit, &part)) js_str(part, f, sizeof f);
+				}
+				snprintf(g_reason, sizeof g_reason, "%s%s%s", f, f[0] && m[0] ? ": " : "", m);
+			}
+			for (i = 0; g_reason[i]; i++)
+				if ((unsigned char)g_reason[i] < 0x20) g_reason[i] = ' ';
+		}
+		/* pairing's polls answer "not yet" every few seconds by design */
+		if (!strcmp(g_reason, "authorization_pending") || !strcmp(g_reason, "slow_down"))
+			;
+		else if (*http)
+			fprintf(stderr, "romm: %s %.*s answered %d%s%s\n", method ? method : "GET",
+			        (int)pl, path, *http, g_reason[0] ? ": " : "", g_reason);
+		else
+			fprintf(stderr, "romm: %s %.*s: no answer\n", method ? method : "GET", (int)pl, path);
+	}
+	return n;
 }
 
 /* A string as JSON wants it, quotes and all */
@@ -176,6 +233,27 @@ static long jint(jsv v, const char *k)
 
 /* ---- signing in ----------------------------------------------------------- */
 
+/* "chaos-" and 32 random hex digits; from the clock and pid if /dev/urandom
+ * can't be read, which on a Brick it always can */
+void romm_new_ident(char *out, size_t n)
+{
+	unsigned char b[16];
+	FILE *f = fopen("/dev/urandom", "rb");
+	size_t got = f ? fread(b, 1, sizeof b, f) : 0, i, o;
+
+	if (f) fclose(f);
+	if (got != sizeof b) {
+		unsigned long x = (unsigned long)time(NULL) ^ ((unsigned long)getpid() << 16);
+
+		for (i = 0; i < sizeof b; i++) {
+			x = x * 6364136223846793005UL + 1442695040888963407UL;
+			b[i] = (unsigned char)(x >> 56);
+		}
+	}
+	o = (size_t)snprintf(out, n, "chaos-");
+	for (i = 0; i < sizeof b && o + 2 < n; i++) o += (size_t)snprintf(out + o, n - o, "%02x", b[i]);
+}
+
 int romm_pair_begin(romm_conn *c, const char *device_name, romm_pair *p, char *why, size_t wn)
 {
 	static const char *const scopes =
@@ -189,17 +267,24 @@ int romm_pair_begin(romm_conn *c, const char *device_name, romm_pair *p, char *w
 	memset(p, 0, sizeof *p);
 	if (!buf) return -1;
 	jesc(name, sizeof name, device_name);
-	if (c->device_id[0]) {
-		char id[120];
+	/* RomM requires client_device_identifier (RomM 5.4.1 and 5.5's beta both
+	 * answer 422 without it) and finds this Brick's device record by it when
+	 * it pairs again. A Brick already paired keeps sending the id it always
+	 * has, RomM's own id for it; a new one names itself with a random id,
+	 * kept on the card, which says nothing about the Brick or its owner. */
+	if (!c->ident[0]) {
+		if (c->device_id[0]) snprintf(c->ident, sizeof c->ident, "%s", c->device_id);
+		else romm_new_ident(c->ident, sizeof c->ident);
+	}
+	{
+		char id[120], ver[64];
 
-		jesc(id, sizeof id, c->device_id);
+		jesc(id, sizeof id, c->ident);
+		jesc(ver, sizeof ver, CHAOS_VERSION);
 		snprintf(body, sizeof body,
 		         "{\"client_device_identifier\":%s,\"name\":%s,\"client\":\"" CLIENT "\","
-		         "\"platform\":\"TrimUI Brick\",\"requested_scopes\":%s}", id, name, scopes);
-	} else {
-		snprintf(body, sizeof body,
-		         "{\"name\":%s,\"client\":\"" CLIENT "\",\"platform\":\"TrimUI Brick\","
-		         "\"requested_scopes\":%s}", name, scopes);
+		         "\"client_version\":%s,\"platform\":\"TrimUI Brick\",\"requested_scopes\":%s}",
+		         id, name, ver, scopes);
 	}
 	n = call(c, "POST", "/api/auth/device/init", body, buf, ROMM_REPLY, &http, 20);
 	if (http == 404 || http == 405) { free(buf); return 0; }
