@@ -1,0 +1,70 @@
+From: SkyWalker541 <178531074+SkyWalker541@users.noreply.github.com>
+Subject: [PATCH] ChaOS: brick-pad sends the Brick Pro's keys as the Brick's
+
+---
+--- a/drivers/input/joystick/brick-pad.c	2026-11-23 07:42:45.194451768 -0800
++++ b/drivers/input/joystick/brick-pad.c	2026-11-23 07:42:45.219271402 -0800
+@@ -84,6 +84,37 @@
+ #define BRICK_BUTTONS	19
+ static int nbuttons = BRICK_BUTTONS;
+ 
++/* What each pin reports: the table's code, or on the Brick Pro the code its
++ * key has on the Brick. The Pro wires the five keys on PH12 to PH16 in
++ * another order: Menu, Select and Start along its bottom edge on PH12, PH13
++ * and PH14, and the two keys under its screen on PH15 and PH16. Read as the
++ * Brick's, its Start opened the menu, its M1 and M2 were Select and Start,
++ * and its Menu and Select were F1 and F2 (testers on the Pro, 2026-11-23).
++ * Reported by what the key is, everything above - ChaOS, Diatom, the
++ * emulators - sees a Pro press as the same press on a Brick. */
++static unsigned int codes[ARRAY_SIZE(buttons)];
++static const struct { int gpio; unsigned int code; } pro_codes[] = {
++	{ PH(12), BTN_MODE },     /* Menu */
++	{ PH(13), BTN_SELECT },   /* Select */
++	{ PH(14), BTN_START },    /* Start */
++	{ PH(15), BTN_THUMBL },   /* M1, the Brick's F1 */
++	{ PH(16), BTN_THUMBR },   /* M2, the Brick's F2 */
++};
++
++static void brick_pad_codes(bool pro)
++{
++	int i, k;
++
++	for (i = 0; i < ARRAY_SIZE(buttons); i++) {
++		codes[i] = buttons[i].code;
++		if (!pro)
++			continue;
++		for (k = 0; k < ARRAY_SIZE(pro_codes); k++)
++			if (pro_codes[k].gpio == buttons[i].gpio)
++				codes[i] = pro_codes[k].code;
++	}
++}
++
+ /* The Brick Pro's sticks */
+ #define STICK_BUS	3
+ #define STICK_REG	0xb0
+@@ -140,7 +171,7 @@
+ 	int i;
+ 
+ 	for (i = 0; i < nbuttons; i++)
+-		input_report_key(pad, buttons[i].code, !gpio_get_value(buttons[i].gpio));
++		input_report_key(pad, codes[i], !gpio_get_value(buttons[i].gpio));
+ 	if (stick[0] || stick[1])
+ 		brick_pad_sticks();
+ 	input_sync(pad);
+@@ -179,6 +210,7 @@
+ 
+ 	if (pro)
+ 		nbuttons = ARRAY_SIZE(buttons);
++	brick_pad_codes(pro);
+ 	for (i = 0; i < nbuttons; i++) {
+ 		err = gpio_request_one(buttons[i].gpio, GPIOF_IN, buttons[i].name);
+ 		if (err) {
+@@ -198,7 +230,7 @@
+ 	pad->phys = "brick-pad/input0";
+ 	pad->id.bustype = BUS_HOST;
+ 	for (i = 0; i < nbuttons; i++)
+-		input_set_capability(pad, EV_KEY, buttons[i].code);
++		input_set_capability(pad, EV_KEY, codes[i]);
+ 	if (pro) {
+ 		int s;
+ 
