@@ -7,6 +7,7 @@
 #include "net.h"
 
 #include <signal.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -68,9 +69,50 @@ int main(void)
 	snprintf(p, sizeof p, "http://127.0.0.1:%d", port);
 	CHECK(!strcmp(c.url, p), "http:// added, slash gone: %s", c.url);
 
-	/* RomM 5's pairing */
+	/* "/api" typed on the end is RomM's, not the server's address */
+	{
+		romm_conn t;
+
+		memset(&t, 0, sizeof t);
+		CHECK(romm_set_url(&t, "https://romm.example.com/api/") &&
+		      !strcmp(t.url, "https://romm.example.com"), "/api dropped: %s", t.url);
+		CHECK(romm_set_url(&t, "https://example.com/romm/API") &&
+		      !strcmp(t.url, "https://example.com/romm"), "under a path too: %s", t.url);
+		CHECK(romm_set_url(&t, "https://api.example.com") &&
+		      !strcmp(t.url, "https://api.example.com"), "a host named api kept: %s", t.url);
+	}
+
+	/* RomM 5's pairing. RomM 5.4 requires client_device_identifier and
+	 * refuses a body without it with 422, as the mock now does; ChaOS left it
+	 * out on a first pairing (a user's 422, 2026-11-23). */
 	r = romm_pair_begin(&c, "Luke's Brick", &pair, why, sizeof why);
 	CHECK(r == 1 && !strcmp(pair.user_code, "WXYZ-1234"), "pairing begun: %d %s", r, why);
+	{
+		size_t i;
+		bool hex = strlen(c.ident) == 6 + 32 && !strncmp(c.ident, "chaos-", 6);
+
+		for (i = 6; hex && c.ident[i]; i++) hex = isxdigit((unsigned char)c.ident[i]) != 0;
+		CHECK(hex, "a new Brick names itself at random: \"%s\"", c.ident);
+	}
+	{
+		romm_conn t;
+		romm_pair tp;
+		char saved[80];
+
+		snprintf(saved, sizeof saved, "%s", c.ident);
+		memset(&t, 0, sizeof t);
+		snprintf(t.url, sizeof t.url, "%s", c.url);
+		snprintf(t.device_id, sizeof t.device_id, "dev-paired-before");
+		CHECK(romm_pair_begin(&t, "b", &tp, why, sizeof why) == 1 &&
+		      !strcmp(t.ident, "dev-paired-before"),
+		      "a Brick paired before keeps the id RomM knows it by: \"%s\"", t.ident);
+		memset(&t, 0, sizeof t);
+		snprintf(t.url, sizeof t.url, "%s", c.url);
+		CHECK(romm_pair_begin(&t, "", &tp, why, sizeof why) == -1 &&
+		      strstr(why, "422") && strstr(why, "name: Field required"),
+		      "a refusal says what RomM said: \"%s\"", why);
+		CHECK(!strcmp(c.ident, saved), "pairing again keeps the name");
+	}
 	snprintf(p, sizeof p, "http://127.0.0.1:%d/pair/device?user_code=WXYZ-1234", port);
 	CHECK(!strcmp(pair.verify, p), "where to approve it: %s", pair.verify);
 	CHECK(romm_pair_poll(&c, &pair, why, sizeof why) == ROMM_PAIR_WAIT, "waits first");
@@ -80,6 +122,15 @@ int main(void)
 	CHECK(romm_register(&c, "x", why, sizeof why), "already a device: nothing to do");
 	CHECK(romm_save(&c, dir), "kept");
 	CHECK(romm_load(&again, dir) && !strcmp(again.token, c.token) && !strcmp(again.user, "player"), "read back");
+	CHECK(!strcmp(again.ident, c.ident), "the Brick's name for itself read back: %s", again.ident);
+	{
+		romm_conn t = again;
+
+		romm_forget(&t, dir);
+		CHECK(romm_load(&t, dir) == false && !strcmp(t.ident, c.ident),
+		      "signing out keeps it, so pairing again finds the same device");
+		CHECK(romm_save(&c, dir), "kept again");
+	}
 	snprintf(p, sizeof p, "%s/token", dir);
 	{
 		struct stat st;

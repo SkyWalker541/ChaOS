@@ -141,7 +141,16 @@ class H(BaseHTTPRequestHandler):
         if p == '/api/auth/device/init':
             if OLD:
                 return self.send(404, {'detail': 'Not Found'})
-            return self.send(200, {'device_code': 'dc-1', 'user_code': 'WXYZ-1234',
+            # RomM 5.4's DeviceAuthInitPayload: client_device_identifier,
+            # name, client and requested_scopes are required, refused as
+            # FastAPI refuses a body (a user's 422, 2026-11-23)
+            body = json.loads(raw)
+            state['init'] = body
+            for need in ('client_device_identifier', 'name', 'client', 'requested_scopes'):
+                if not body.get(need):
+                    return self.send(422, {'detail': [{'type': 'missing', 'loc': ['body', need],
+                                                       'msg': 'Field required', 'input': None}]})
+            return self.send(201, {'device_code': 'dc-1', 'user_code': 'WXYZ-1234',
                                    'verification_path': '/pair/device',
                                    'verification_path_complete': '/pair/device?user_code=WXYZ-1234',
                                    'expires_in': 600, 'interval': 1})

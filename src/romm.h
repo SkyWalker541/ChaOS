@@ -32,6 +32,8 @@ typedef struct {
 	char url[ROMM_STR];        /* the server: "http://nas.local:8080", no trailing / */
 	char token[600];           /* the client token, "" when not signed in */
 	char device_id[80];        /* this Brick as RomM knows it */
+	char ident[80];            /* this Brick as it names itself to RomM: random,
+	                            * kept across sign-outs and servers */
 	char user[64];             /* whose library */
 } romm_conn;
 
@@ -65,6 +67,9 @@ typedef struct {
 } romm_firmware;
 
 /* Where it all is: `dir` is .userdata/<device>/romm */
+/* A new identifier for this Brick to give RomM: random, nothing about it */
+void romm_new_ident(char *out, size_t n);
+
 bool romm_load(romm_conn *c, const char *dir);
 bool romm_save(const romm_conn *c, const char *dir);
 /* Signed out: the token and the device forgotten, the server kept */
