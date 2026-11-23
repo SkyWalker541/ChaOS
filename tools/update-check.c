@@ -125,13 +125,38 @@ int main(void)
 	ck(upd_get() != UPD_READY && access(p, F_OK) != 0 && access(q, F_OK) != 0,
 	   "one already installed is cleared away");
 	printf("a full install of the version running, a repair:\n");
-	snprintf(p, sizeof p, "%s/.dev/root-update.squashfs", dir); put(p, "hsqs....");
-	put(q, "0.8.0\nfull\n");
-	upd_init(dir, dir, "0.8.0", "2.1.1");
-	ck(upd_get() == UPD_READY && !upd_latest()->small, "waits while its root does");
-	unlink(p);
-	upd_init(dir, dir, "0.8.0", "2.1.1");
-	ck(upd_get() != UPD_READY && access(q, F_OK) != 0, "and is done once the boot has written it");
+	{
+		char r[300];
+
+		snprintf(r, sizeof r, "%s/.dev/chaos-update.repair", dir);
+		snprintf(p, sizeof p, "%s/.dev/root-update.squashfs", dir); put(p, "hsqs....");
+		put(q, "0.8.0\nfull\n");
+		put(r, "");
+		upd_init(dir, dir, "0.8.0", "2.1.1");
+		ck(upd_get() == UPD_READY && !upd_latest()->small, "waits while its root does");
+		unlink(p);
+		upd_init(dir, dir, "0.8.0", "2.1.1");
+		ck(upd_get() != UPD_READY && access(q, F_OK) != 0 && access(r, F_OK) != 0,
+		   "and is done once the boot has written it");
+
+		/* 2026-11-23: an update downloaded here, then the same version put on
+		 * with ChaOS Installer, asked to be installed again */
+		printf("an update downloaded, then installed another way:\n");
+		put(p, "hsqs....");
+		put(q, "0.8.0\nfull\n");
+		upd_init(dir, dir, "0.8.0", "2.1.1");
+		ck(upd_get() != UPD_READY, "isn't offered: the version running is it");
+		ck(access(p, F_OK) != 0 && access(q, F_OK) != 0, "and is cleared away");
+		put(p, "hsqs....");
+		put(q, "0.8.0-test2\nfull\n");
+		upd_init(dir, dir, "0.8.0-test2", "2.1.1");
+		ck(upd_get() != UPD_READY && access(p, F_OK) != 0, "a test build the same");
+		put(p, "hsqs....");
+		put(q, "0.8.0-test2\nfull\n");
+		upd_init(dir, dir, "0.8.0", "2.1.1");
+		ck(upd_get() != UPD_READY && access(p, F_OK) != 0,
+		   "and an older one than the version running, the release after a test");
+	}
 
 	snprintf(p, sizeof p, "%s/BASE", dir); put(p, "2.2.0\n");
 	upd_init(dir, dir, "0.8.0", "2.1.1");
