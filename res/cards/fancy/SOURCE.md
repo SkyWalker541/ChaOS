@@ -26,12 +26,14 @@ NES.png is an NES and not a Famicom, SNES.png a SNES, GENESIS.png a Genesis
 Model 2, PCE.png a TurboGrafx-16. They were imported under Japanese short
 codes (FC, SFC, MD) that describe the code, not the photograph.
 
-FAVORITES.png is not one of these photographs, and nothing above applies to
-it. Favorites is a shelf rather than a console, so there is no hardware to
-photograph and it carries a heart instead. Since ChaOS 2.7.4 it is rendered
-(`tools/genfavfancy.py`) from no images, in matte red plastic to match the
-set's finish, where it was a glossy generated heart. It carries no
-attribution requirement, and no rights are claimed in it.
+FAVORITES.png is not one of these photographs. Favorites is a shelf rather
+than a console, so there is no hardware to photograph and it carries a heart
+instead. Since ChaOS 2.7.7 it is a matte red heart on a white studio backdrop,
+supplied by SkyWalker541 on 2026-11-23 for this card, generated with Gemini
+(`source/favorites-heart.jpg`, kept here; the picture's caption tag is left
+out). `tools/genfavrecentphoto.py` cuts it from its backdrop and its shadow
+and frames it as above. It replaced the heart rendered by
+`tools/genfavfancy.py` (2.7.4 to 2.7.6), which is kept.
 
 ## MUSE.png
 
@@ -48,14 +50,14 @@ rendered player of `tools/genmusefancy.py` before that; both kept).
 
 ## RECENT.png
 
-Not a console: Recently Played's card, a steel watch with ChaOS on its dial.
-The dial is SkyWalker541's, made for ChaOS (generated with Gemini) and given
-to the project on 2026-11-14; its source is `source/recent-watch.jpg`, kept
-here. `tools/genrecentwatch.py` lays its dial and inner ring on a modelled
-steel case and crown and renders it (`tools/raymarch.py`), so it turns as the
-other rendered cards do, with the case's side showing, framed as above. It
-replaces the rendered alarm clock (`tools/genrecentfancy.py`), which is kept. Since 2.7.4 its case is satin rather than polished,
-to sit with the set's matte plastics.
+Not a console: Recently Played's card, a mid-century wall clock, its cream
+case round a brushed-steel bezel, at 10:10. Supplied by SkyWalker541 on
+2026-11-23 for this card, generated with Gemini (`source/recent-clock.jpg`,
+kept here); `tools/genfavrecentphoto.py` cuts it from its white backdrop and
+frames it as above. It replaced the satin watch with ChaOS on its dial
+(2.7.3 to 2.7.6, `tools/genrecentwatch.py`, its dial `source/recent-watch.jpg`),
+which is kept, as is the rendered alarm clock before it
+(`tools/genrecentfancy.py`).
 
 ## PS.png
 

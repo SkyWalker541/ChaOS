@@ -10,9 +10,10 @@ it to drift.
 
 On tools/cardstyle.py (ChaOS, 2026-11-13): the drawn set's own stock, rule
 and tracked name, where it was a flat slab matched by measurement before.
-One mark: a bookmark ribbon with markdef.heart() knocked out of it, in the
-same cyan as the rule. Three ascending stars before 2026-08-30, then three
-hearts for about an hour.
+One mark: markdef.heart(), solid, in the same cyan as the rule - the Fancy
+Pants card's heart (a photograph since 2.7.7) drawn flat, front on. A
+bookmark ribbon with the heart knocked out of it until 2.7.6; three ascending
+stars before 2026-08-30, then three hearts for about an hour.
 
 KNOCKED OUT RATHER THAN OUTLINED, and that is the whole reason it fits. The
 other nine cards are flat shapes - no strokes anywhere in the deck - and this
@@ -38,25 +39,15 @@ OUT = os.path.join(ROOT, "res", "cards", "classic", "FAVORITES.png")
 
 
 
-def bookmark(cx, cy, w, h, notch):
-    """A ribbon: square shoulders, two points at the bottom with a V between."""
-    x0, x1 = cx - w / 2.0, cx + w / 2.0
-    y0, y1 = cy - h / 2.0, cy + h / 2.0
-    return [(x0, y0), (x1, y0), (x1, y1), (cx, y1 - notch), (x0, y1)]
-
-
-def mark(d, cx, cy, k, ribbon, cut, scale=0.95):
-    """The ribbon, then the heart punched through it to the stock.
-
-    The heart sits above the notch rather than centered in the ribbon: centered,
-    its point crowds the V and the two shapes argue about where the middle is.
-    At 0.95, 314px tall, as the tallest console marks are.
-    """
+def mark(d, cx, cy, k, fill, cut, scale=0.95):
+    """The heart, 300px across at 0.95, centred: the size the round marks are."""
     k = k * scale
-    d.polygon(bookmark(cx, cy, 232 * k, 330 * k, 68 * k), fill=ribbon)
-    hr, hy = 78 * k, cy - 28 * k
-    d.polygon([(cx + x * 2 * hr, hy + y * 2 * hr) for x, y in heart(96)],
-              fill=cut)
+    pts = heart(240)
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    s = 300 * k / (max(xs) - min(xs))
+    mx, my = (max(xs) + min(xs)) / 2, (max(ys) + min(ys)) / 2
+    d.polygon([(cx + (x - mx) * s, cy + (y - my) * s) for x, y in pts], fill=fill)
 
 
 def main():
