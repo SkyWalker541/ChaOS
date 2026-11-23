@@ -7213,11 +7213,13 @@ void hare_preview(app *a, const char *addr, const char *pin, const char *who,
  * names. about.txt carries the first questions asked about any report. */
 static app *g_logs_app;
 
+static romm_conn g_romm;   /* RomM's connection, kept with its code below */
+
 static bool pack_logs(char *path, size_t pn, char *name, size_t nn)
 {
 	wifi_net   nets[WIFI_MAX_NETS];
 	bt_device  bt[BT_MAX];
-	const char *secrets[WIFI_MAX_NETS + BT_MAX + 4];
+	const char *secrets[WIFI_MAX_NETS + BT_MAX + 6];
 	char       now_ssid[WIFI_SSID_MAX] = "", ip[64], logs[CFG_STR * 2];
 	char       folder[64], about[4096], err[128], stamp[32];
 	int        n = 0, saved, nb, i;
@@ -7236,6 +7238,16 @@ static bool pack_logs(char *path, size_t pn, char *name, size_t nn)
 	for (i = 0; i < nb; i++) secrets[n++] = bt[i].name;
 	if (ra_signed_in() && ra_user()) secrets[n++] = ra_user();
 	if (ss_signed_in() && ss_user()) secrets[n++] = ss_user();
+	/* RomM: the account, and the server's name, which can be its owner's */
+	{
+		static char host[ROMM_STR];
+		const char *h = strstr(g_romm.url, "://");
+
+		if (g_romm.user[0]) secrets[n++] = g_romm.user;
+		snprintf(host, sizeof host, "%s", h ? h + 3 : g_romm.url);
+		host[strcspn(host, ":/")] = '\0';
+		if (host[0]) secrets[n++] = host;
+	}
 
 	localtime_r(&t, &tm);
 	strftime(stamp, sizeof stamp, "%Y-%m-%d %H:%M", &tm);
@@ -18972,7 +18984,8 @@ static void romm_signed_in(app *a)
 	if (!romm_register(&g_romm, name, why, sizeof why))
 		fprintf(stderr, "romm: no device for save sync: %s\n", why);
 	romm_keep();
-	fprintf(stderr, "romm: signed in to %s as %s\n", g_romm.url, g_romm.user);
+	/* which server and whose account stay out of the log */
+	fprintf(stderr, "romm: signed in\n");
 }
 
 /* RomM 5: a code on the screen, approved in RomM's web page */

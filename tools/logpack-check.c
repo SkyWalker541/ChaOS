@@ -65,6 +65,48 @@ static void lines(void)
 	masked("", "");
 }
 
+/* What no list names, found by its shape (2026-11-23) */
+static void shapes(void)
+{
+	printf("what is found by its shape\n");
+	masked("itch: signed in as luke.walker@example.com",
+	       "itch: signed in as (email)");
+	masked("romm: GET https://luke:hunter2@nas.example.net:8080/api/users/me answered 401",
+	       "romm: GET https://(hidden)@nas.example.net:8080/api/users/me answered 401");
+	masked("GET /dorequest.php?r=login2&u=Somebody&p=secretpw&y=AbC123",
+	       "GET /dorequest.php?r=login2&u=(hidden)&p=(hidden)&y=(hidden)");
+	masked("GET /api/thing?platform_id=4&token=abc123&offset=0",
+	       "GET /api/thing?platform_id=4&token=(hidden)&offset=0");
+	masked("net: Authorization: Bearer eyJhbGciOiJIUzI1NiJ9 sent",
+	       "net: Authorization: Bearer (hidden) sent");
+	masked("config: password=letmein, port 22", "config: password=(hidden), port 22");
+	masked("syncthing: My ID: P56IOI7-MZJNU2Y-IQGDREY-DM2MGTI-MGL3BXN-PQ6W5BM-TBBZ4TJ-XZWICQ2",
+	       "syncthing: My ID: (device ID)");
+	masked("syncthing: connected to 203.0.113.45:22000 and 192.168.1.20:22000",
+	       "syncthing: connected to (public IP):22000 and 192.168.1.20:22000");
+	masked("key 7Hq2mX9pL4vR8sT1wK6nB3cF5jD0gY2zQ end", "key 7Hq2(hidden) end");
+
+	printf("and what is left as it is\n");
+	masked("diatom: ChaOS-diatom 0.9.8.10, from diatom 85f43e2",
+	       "diatom: ChaOS-diatom 0.9.8.10, from diatom 85f43e2");
+	masked("transfer: at http://192.168.1.100:8080 and 10.0.0.5, 127.0.0.1",
+	       "transfer: at http://192.168.1.100:8080 and 10.0.0.5, 127.0.0.1");
+	masked("sha1 3f786850e387550fdab836ed7e6dc881de23001b matches",
+	       "sha1 3f786850e387550fdab836ed7e6dc881de23001b matches");
+	masked("ss: Pokemon_Mystery_Dungeon_Red_Rescue_Team_USA.gba by crc",
+	       "ss: Pokemon_Mystery_Dungeon_Red_Rescue_Team_USA.gba by crc");
+	masked("itchdl: no csrf_token on the game's page", "itchdl: no csrf_token on the game's page");
+	masked("romm: POST /api/auth/device/init answered 422: client_device_identifier: Field required",
+	       "romm: POST /api/auth/device/init answered 422: client_device_identifier: Field required");
+	masked("update: downloading https://github.com/SkyWalker541/ChaOS/releases/download/v2.7.6/ChaOS-v2.7.6-brick-app.tar.xz",
+	       "update: downloading https://github.com/SkyWalker541/ChaOS/releases/download/v2.7.6/ChaOS-v2.7.6-brick-app.tar.xz");
+	masked("[    0.264422] get androidboot.mode fail", "[    0.264422] get androidboot.mode fail");
+	masked("setting: theme.cards = fancy", "setting: theme.cards = fancy");
+	masked("PVR_K:  722: Read BVNC 22.102.54.38 from HW device registers",
+	       "PVR_K:  722: Read BVNC 22.102.54.38 from HW device registers");
+	masked("firmware version 5.12.3.4 and v6.1.2.3", "firmware version 5.12.3.4 and v6.1.2.3");
+}
+
 static void pack(void)
 {
 	char dir[] = "/tmp/logpack-check.XXXXXX", p[600], out[600], cmd[1400], line[512];
@@ -160,6 +202,7 @@ int main(void)
 	printf("logpack: the logs, masked and packed\n");
 	words();
 	lines();
+	shapes();
 	pack();
 	pack_more();
 	if (failures) {

@@ -15,8 +15,12 @@
  * knows (every saved network, every paired headset, both account names) and
  * each is cut to its first and last character, "ReinFi" to "R...i". Bluetooth
  * addresses are found by their shape instead, since a log can name a device
- * nobody paired, and keep only their last byte. The files on the card are
- * copied, not touched: they are what the device's owner reads.
+ * nobody paired, and keep only their last byte. So are the things no list can
+ * name: emails, a password in an address, an address's key, token, password
+ * and account parameters, "Bearer" and "password:" values, Syncthing device
+ * IDs, public IP addresses (the home network's stay) and long random keys -
+ * each replaced by what it was, "(email)", "(hidden)". The files on the card
+ * are copied, not touched: they are what the device's owner reads.
  *
  * No SDL, so tools/logpack-check.c can hand it a folder and look. */
 
