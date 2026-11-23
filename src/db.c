@@ -258,7 +258,8 @@ bool db_set_str(db *d, const char *key, const char *val)
 			sqlite3_finalize(q);
 		}
 		if (!same) {
-			static const char *const secret[] = { "pass", "token", "key", "secret", "user", "login", NULL };
+			static const char *const secret[] = { "pass", "token", "key", "secret", "user", "login",
+			                                      "mail", "url", "server", "host", "account", NULL };
 			bool hide = false;
 			int k;
 

@@ -1,5 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* See logpack.h. */
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE   /* strcasestr */
+#endif
 #include "logpack.h"
 
 #include <ctype.h>
@@ -8,9 +11,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
+
+static void mask_shapes(char *line, size_t cap);
 
 void logpack_mask_word(const char *word, char *out, size_t n)
 {
@@ -89,6 +95,226 @@ void logpack_mask_line(char *line, size_t cap, const char *const *secrets, int n
 		}
 		p += 16;
 	}
+	mask_shapes(line, cap);
+}
+
+/* ---- what is masked by its shape ------------------------------------------
+ *
+ * The names above are the ones the device knows. These are found by what they
+ * look like, so one in a line nobody thought of - a port's own log, Syncthing's,
+ * a server's answer - is caught too (2026-11-23: logs are for finding faults,
+ * and nothing in one should identify its owner or open an account). Each is
+ * replaced by what it was, in brackets, so the line still reads. */
+
+static bool word_ch(char c) { return isalnum((unsigned char)c) || c == '_' || c == '-'; }
+
+/* user:password@ in an address */
+static void mask_userinfo(char *line, size_t cap)
+{
+	char *p = line;
+
+	while ((p = strstr(p, "://"))) {
+		char *h = p + 3, *q = h;
+
+		while (*q && !strchr("/?#@ \t\r\n\"'<>", *q)) q++;
+		if (*q == '@' && q > h) {
+			splice(line, cap, h, (size_t)(q - h), "(hidden)");
+			q = h + 8;
+		}
+		p = q;
+	}
+}
+
+/* An address's parameters that carry a key, a token, a password or an
+ * account: their values. RetroAchievements' API names them u, p, t and y. */
+static void mask_query(char *line, size_t cap)
+{
+	static const char *const names[] = {
+		"token", "access_token", "refresh_token", "id_token", "key", "apikey", "api_key",
+		"password", "passwd", "pass", "pwd", "secret", "auth", "signature", "sig", "code",
+		"user", "username", "login", "email", "u", "p", "t", "y", NULL
+	};
+	char *p;
+
+	for (p = line; *p; p++) {
+		char *n, *v, *e;
+		size_t nl;
+		int k;
+
+		if (*p != '?' && *p != '&') continue;
+		n = p + 1;
+		for (v = n; isalnum((unsigned char)*v) || *v == '_'; v++) ;
+		if (*v != '=' || v == n) continue;
+		nl = (size_t)(v - n);
+		for (k = 0; names[k]; k++)
+			if (strlen(names[k]) == nl && !strncasecmp(n, names[k], nl)) break;
+		if (!names[k]) continue;
+		v++;
+		for (e = v; *e && !strchr("&# \t\r\n\"'<>", *e); e++) ;
+		if (e > v) splice(line, cap, v, (size_t)(e - v), "(hidden)");
+	}
+}
+
+/* "Bearer x", "Authorization: x", "password=x", "token: x" in prose */
+static void mask_labelled(char *line, size_t cap)
+{
+	static const char *const labels[] = {
+		"bearer ", "authorization:", "authorization=", "password:", "password=",
+		"passwd=", "token:", "token=", "api_key=", "apikey=", "api-key:", "secret=", "secret:",
+		NULL
+	};
+	int k;
+
+	for (k = 0; labels[k]; k++) {
+		char *p = line;
+		size_t ll = strlen(labels[k]);
+
+		while ((p = strcasestr(p, labels[k]))) {
+			char *v = p + ll, *e;
+
+			/* the end of a longer word ("csrf_token=") is still a token's
+			 * label; the middle of one ("tokens:") is not */
+			while (*v == ' ' || *v == '"') v++;
+			/* "Authorization: Bearer x": the scheme stays, x goes */
+			if (!strncasecmp(v, "bearer ", 7)) v += 7;
+			else if (!strncasecmp(v, "basic ", 6)) v += 6;
+			for (e = v; *e && !strchr(" \t\r\n\"',;&)", *e); e++) ;
+			if (e > v && strncmp(v, "(hidden)", 8))
+				splice(line, cap, v, (size_t)(e - v), "(hidden)");
+			p = v;
+			if (!*p) break;
+			p++;
+		}
+	}
+}
+
+static void mask_emails(char *line, size_t cap)
+{
+	char *at;
+
+	for (at = strchr(line, '@'); at; at = strchr(at + 1, '@')) {
+		char *a = at, *b = at + 1;
+		bool dot = false;
+
+		while (a > line && (isalnum((unsigned char)a[-1]) || strchr("._%+-", a[-1]))) a--;
+		while (isalnum((unsigned char)*b) || *b == '.' || *b == '-') { if (*b == '.') dot = true; b++; }
+		while (b > at + 1 && b[-1] == '.') b--;
+		if (a == at || b == at + 1 || !dot) continue;
+		splice(line, cap, a, (size_t)(b - a), "(email)");
+		at = a + 6;
+	}
+}
+
+/* Syncthing's device IDs: eight groups of seven, A-Z and 2-7, joined by - */
+static void mask_syncthing_ids(char *line, size_t cap)
+{
+	char *p;
+
+	for (p = line; strlen(p) >= 63; p++) {
+		int g, i;
+		bool ok = !(p > line && word_ch(p[-1]));
+
+		for (g = 0; ok && g < 8; g++) {
+			for (i = 0; ok && i < 7; i++) {
+				char c = p[g * 8 + i];
+
+				ok = (c >= 'A' && c <= 'Z') || (c >= '2' && c <= '7');
+			}
+			if (ok && g < 7) ok = p[g * 8 + 7] == '-';
+		}
+		if (ok && !word_ch(p[63])) splice(line, cap, p, 63, "(device ID)");
+	}
+}
+
+/* An IPv4 address on the internet. One on the home network (10., 172.16-31.,
+ * 192.168.), the device itself, link-local, carrier NAT and 0.x (a version
+ * number, more likely: "0.9.8.10") stay, since they say how the Brick was
+ * reached and nothing about who has it. */
+static void mask_public_ips(char *line, size_t cap)
+{
+	char *p;
+
+	for (p = line; *p; p++) {
+		int o[4], k, len = 0;
+		char *q = p;
+
+		if (!isdigit((unsigned char)*p) || (p > line && (isalnum((unsigned char)p[-1]) || p[-1] == '.')))
+			continue;
+		for (k = 0; k < 4; k++) {
+			int v = 0, d = 0;
+
+			while (isdigit((unsigned char)*q) && d < 4) { v = v * 10 + (*q - '0'); q++; d++; }
+			if (!d || d > 3 || v > 255) break;
+			o[k] = v;
+			if (k < 3) { if (*q != '.') break; q++; }
+		}
+		if (k < 4 || isalnum((unsigned char)*q) || (*q == '.' && isdigit((unsigned char)q[1])))
+			continue;
+		len = (int)(q - p);
+		/* a version, by the word before it: the GPU's "BVNC 22.102.54.38" */
+		{
+			const char *w = p;
+
+			while (w > line && w[-1] == ' ') w--;
+			if ((w - line >= 4 && !strncasecmp(w - 4, "BVNC", 4)) ||
+			    (w - line >= 7 && !strncasecmp(w - 7, "version", 7)) ||
+			    (w > line && (w[-1] == 'v' || w[-1] == 'V') && w == p)) {
+				p = q - 1;
+				continue;
+			}
+		}
+		if (o[0] == 0 || o[0] == 10 || o[0] == 127 || o[0] >= 224 ||
+		    (o[0] == 169 && o[1] == 254) || (o[0] == 172 && o[1] >= 16 && o[1] <= 31) ||
+		    (o[0] == 192 && o[1] == 168) || (o[0] == 100 && o[1] >= 64 && o[1] <= 127)) {
+			p = q - 1;
+			continue;
+		}
+		splice(line, cap, p, (size_t)len, "(public IP)");
+		p += 10;
+	}
+}
+
+/* A key or token nobody named: 32 or more letters, digits, - and _, with
+ * letters and at least one digit in six, and not all hex - a checksum or a
+ * hash is something to compare, not a secret. A file name has words in it and
+ * too few digits to be taken for one. */
+static void mask_long_tokens(char *line, size_t cap)
+{
+	char *p = line;
+
+	while (*p) {
+		char *e = p;
+		size_t len, digits = 0, alpha = 0, i;
+		bool hex = true;
+
+		if (!word_ch(*p)) { p++; continue; }
+		while (word_ch(*e)) e++;
+		len = (size_t)(e - p);
+		for (i = 0; i < len; i++) {
+			if (isdigit((unsigned char)p[i])) digits++;
+			else if (isalpha((unsigned char)p[i])) alpha++;
+			if (!isxdigit((unsigned char)p[i])) hex = false;
+		}
+		if (len >= 32 && !hex && alpha && digits * 6 >= len) {
+			char with[24];
+
+			snprintf(with, sizeof with, "%.4s(hidden)", p);
+			splice(line, cap, p, len, with);
+			e = p + strlen(with);
+		}
+		p = e;
+	}
+}
+
+static void mask_shapes(char *line, size_t cap)
+{
+	mask_userinfo(line, cap);
+	mask_query(line, cap);
+	mask_labelled(line, cap);
+	mask_emails(line, cap);
+	mask_syncthing_ids(line, cap);
+	mask_public_ips(line, cap);
+	mask_long_tokens(line, cap);
 }
 
 /* ---- the pack ------------------------------------------------------------- */
