@@ -17,7 +17,7 @@ all: check
 # had to be remembered by name, which is a suite in the same sense that a list
 # of good intentions is a plan. A check nobody runs is a check that does not
 # exist, and check-menus was about to join eight others in that state.
-CHECKS = check-cheevos check-hare check-httpd check-idle check-rahash \
+CHECKS = check-display check-cheevos check-hare check-httpd check-idle check-rahash \
          check-raset check-xfer check-menus check-artscrape check-artrun check-audioout \
          check-db check-stats check-sort check-bt check-ss \
          check-muselib check-musequeue check-museart check-controls check-logpack \
@@ -158,6 +158,17 @@ check-menu-keys: native
 	./build-native/tortos --shot $$t/x.png --menu-ids 2>/dev/null > $$t/out; r=$$?; \
 	grep -c "ok " $$t/out | sed 's/^/menu keys: pages checked: /'; grep FAIL $$t/out; rm -rf $$t; \
 	if [ $$r -ne 0 ]; then echo "menu keys: FAILED" >&2; exit 1; fi; echo "ok: every key lands on its row"
+
+# Each console's Display Mode before a choice (TV consoles Aspect, handhelds
+# Integer, since 2026-11-25), and a choice kept or forgotten as it should be.
+check-display: native
+	@t=$$(mktemp -d) && mkdir -p $$t/root $$t/roms $$t/card $$t/ud && cp config/systems.cfg $$t/root/ && \
+	grep '^sys|' config/systems.cfg | while IFS='|' read -r _ _ dir _ _ _ _ ext; do \
+		mkdir -p "$$t/roms/$$dir" && : > "$$t/roms/$$dir/Game.$${ext%%,*}"; done && \
+	TORTOS_ROOT=$$t/root TORTOS_ROMS=$$t/roms TORTOS_CARD=$$t/card TORTOS_USERDATA=$$t/ud \
+	TORTOS_SHARED=$$t/root TORTOS_FONT=res/fonts/menu.ttf SDL_VIDEODRIVER=offscreen \
+	./build-native/tortos --shot $$t/x.png --display-check 2>/dev/null; r=$$?; rm -rf $$t; \
+	if [ $$r -ne 0 ]; then echo "display modes: FAILED" >&2; exit 1; fi
 
 check-shots: build-native/shots-check
 	@./build-native/shots-check

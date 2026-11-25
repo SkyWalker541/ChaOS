@@ -328,14 +328,31 @@ static const struct { const char *name, *label; } DMODES[] = {
 };
 #define DMODE_COUNT ((int)(sizeof DMODES / sizeof DMODES[0]))
 
+/* A console's Display Mode until the player picks one: Aspect for the ones
+ * made for a TV, Integer for the handhelds and PICO-8, where whole-number
+ * scaling is the point. Integer was everyone's until 2026-11-25; on a TV
+ * console it leaves the 1024x768 panel's edges empty (SNES 3x is 768x672)
+ * and ignores the console's non-square pixels, and players found Aspect
+ * themselves. The stored key says only how a console differs from this, so
+ * a player on the old default moves with it, and a choice of Stretch stays. */
+static int dmode_default(const char *tag)
+{
+	static const char *const tv[] = { "NES", "SMS", "MD", "PCE", "SFC", "PS", NULL };
+	int k;
+
+	for (k = 0; tv[k]; k++)
+		if (!strcmp(tag, tv[k])) return 1;   /* DMODES[1], aspect */
+	return 0;
+}
+
 static void display_load_one(app *a, int i)
 {
 	char key[CFG_STR + 32], name[16];
-	int k;
+	int k, def = dmode_default(a->sys.systems[i].tag);
 
-	a->view[i].dmode = 0;
+	a->view[i].dmode = def;
 	snprintf(key, sizeof key, "chaos.display.%s", a->sys.systems[i].tag);
-	db_get_str(db_dev(), key, name, sizeof name, DMODES[0].name);
+	db_get_str(db_dev(), key, name, sizeof name, DMODES[def].name);
 	for (k = 0; k < DMODE_COUNT; k++)
 		if (!strcmp(DMODES[k].name, name)) a->view[i].dmode = k;
 }
@@ -345,7 +362,7 @@ static void display_save(app *a, int i)
 	char key[CFG_STR + 32];
 
 	snprintf(key, sizeof key, "chaos.display.%s", a->sys.systems[i].tag);
-	if (a->view[i].dmode == 0) db_del(db_dev(), key);
+	if (a->view[i].dmode == dmode_default(a->sys.systems[i].tag)) db_del(db_dev(), key);
 	else db_set_str(db_dev(), key, DMODES[a->view[i].dmode].name);
 }
 
@@ -25210,6 +25227,67 @@ static void pm_shot(app *a)
  * keys go by must be the same number, or a key lands on the wrong row.
  * Prints each and exits 1 on a difference. */
 static bool g_menu_ids;
+/* ChaOS --display-check: each console's Display Mode before a choice, and a
+ * choice kept or forgotten as it should be. TV consoles came to Aspect on
+ * 2026-11-25, and the stored key says only how a console differs from its
+ * default: this says both still hold. */
+static bool g_display_check;
+
+static int display_check(app *a)
+{
+	static const struct { const char *tag, *want; } expect[] = {
+		{ "NES", "aspect" }, { "SMS", "aspect" }, { "MD", "aspect" }, { "PCE", "aspect" },
+		{ "SFC", "aspect" }, { "PS", "aspect" }, { "GB", "integer" }, { "GBC", "integer" },
+		{ "GBA", "integer" }, { "GG", "integer" }, { "NGP", "integer" },
+		{ "NGPC", "integer" },
+		/* PICO-8's shelf shows only with PICO-8 installed; it takes the
+		 * same not-a-TV branch as the handhelds above */
+	};
+	char key[CFG_STR + 32], got[16];
+	int i, k, bad = 0, seen = 0;
+
+	for (i = 0; i < a->sys.count; i++) {
+		const char *tag = a->sys.systems[i].tag;
+
+		for (k = 0; k < (int)(sizeof expect / sizeof *expect); k++) {
+			if (strcmp(tag, expect[k].tag)) continue;
+			seen++;
+			snprintf(key, sizeof key, "chaos.display.%s", tag);
+			db_del(db_dev(), key);
+			display_load_one(a, i);
+			if (strcmp(DMODES[a->view[i].dmode].name, expect[k].want)) {
+				printf("FAIL %s defaults to %s, wanted %s\n", tag,
+				       DMODES[a->view[i].dmode].name, expect[k].want);
+				bad++;
+			}
+			/* the other two are kept, the default forgotten */
+			for (int m = 0; m < DMODE_COUNT; m++) {
+				a->view[i].dmode = m;
+				display_save(a, i);
+				db_get_str(db_dev(), key, got, sizeof got, "");
+				if (!strcmp(DMODES[m].name, expect[k].want) ? got[0] != '\0'
+				                                          : strcmp(got, DMODES[m].name)) {
+					printf("FAIL %s saving %s stored \"%s\"\n", tag, DMODES[m].name, got);
+					bad++;
+				}
+				display_load_one(a, i);
+				if (a->view[i].dmode != m) {
+					printf("FAIL %s saved %s, read back %s\n", tag, DMODES[m].name,
+					       DMODES[a->view[i].dmode].name);
+					bad++;
+				}
+			}
+			db_del(db_dev(), key);
+			display_load_one(a, i);
+		}
+	}
+	if (seen != (int)(sizeof expect / sizeof *expect)) {
+		printf("FAIL %d of %d consoles found\n", seen, (int)(sizeof expect / sizeof *expect));
+		bad++;
+	}
+	printf("%s: %d consoles\n", bad ? "FAILED" : "ok", seen);
+	return bad ? 1 : 0;
+}
 
 static int menu_ids_check(app *a)
 {
@@ -25249,6 +25327,7 @@ static void take_shot(app *a)
 {
 	ui_set_pixel(CARDS_PIXEL_UI(g_cards));   /* as the main loop does */
 	if (g_menu_ids) exit(menu_ids_check(a));
+	if (g_display_check) exit(display_check(a));
 	SDL_Surface *out = SDL_CreateRGBSurfaceWithFormat(0, TORTOS_SCREEN_W,
 	                                                  TORTOS_SCREEN_H, 32,
 	                                                  SDL_PIXELFORMAT_RGBA32);
@@ -25811,6 +25890,7 @@ int main(int argc, char *argv[])
 		else if (!strcmp(argv[i], "--arrange") && i + 1 < argc) g_arrange_shot = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--shelfnote") && i + 1 < argc) shot_shelfnote = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--menu-ids")) g_menu_ids = true;
+		else if (!strcmp(argv[i], "--display-check")) g_display_check = true;
 		else if (!strcmp(argv[i], "--battwarn") && i + 1 < argc) g_bw_shot = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--romm") && i + 1 < argc) {
 			shot_romm = argv[++i];
