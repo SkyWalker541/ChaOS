@@ -8611,6 +8611,40 @@ static bool cover_save(app *a, const char *src, const char *folder, const char *
 	return true;
 }
 
+/* How much of s[0..len), one word too wide for `w`, goes on this line: the
+ * most that fits, then back to the last place it reads well - before a / that
+ * starts a path (never inside "://"), or after . - ? & = _ - if that keeps at
+ * least half the line; otherwise where it fits. Never in the middle of a
+ * character, and always at least one, so the caller always gets further. */
+static size_t pick_break(TTF_Font *fm, const char *s, size_t len, int w)
+{
+	char try[160];
+	size_t fit = 0, k, next;
+
+	if (len > sizeof try - 1) len = sizeof try - 1;
+	for (k = 0; k < len; k = next) {
+		next = k + 1;
+		while (next < len && ((unsigned char)s[next] & 0xC0) == 0x80) next++;
+		memcpy(try, s, next);
+		try[next] = '\0';
+		if (ui_text_width(fm, try) > w) break;
+		fit = next;
+	}
+	if (fit == 0) {
+		fit = 1;
+		while (fit < len && ((unsigned char)s[fit] & 0xC0) == 0x80) fit++;
+		return fit;
+	}
+	if (fit >= len) return len;
+	for (k = fit; k > fit / 2; k--) {
+		char c = s[k];
+
+		if (c == '/' && s[k - 1] != '/' && s[k - 1] != ':' && s[k + 1] != '/') return k;
+		if (strchr(".-?&=_", s[k - 1]) && k < len) return k;
+	}
+	return fit;
+}
+
 static void pick_draw(app *a, const char *title, pick_item *it, int n, int sel,
                       SDL_Texture *tex, int tw, int th, const char *note, unsigned accent)
 {
@@ -8674,6 +8708,13 @@ static void pick_draw(app *a, const char *title, pick_item *it, int n, int sel,
 					if (ui_text_width(fm, try) > area.w) break;
 				}
 				if (!best) best = (size_t)(e - p) < sizeof try - 1 ? (size_t)(e - p) : sizeof try - 1;
+				/* One word wider than the panel - an address, a path - was
+				 * taken whole and cut with "...", losing the end that
+				 * mattered (a RomM pairing address, 2026-11-25). It goes on
+				 * over lines instead, unchanged, broken where it reads best. */
+				memcpy(try, p, best);
+				try[best] = '\0';
+				if (ui_text_width(fm, try) > area.w) best = pick_break(fm, p, best, area.w);
 				first_para[nl] = para_no == 0;
 				snprintf(lines[nl++], sizeof lines[0], "%.*s", (int)best, p);
 				p += best;
@@ -11421,7 +11462,7 @@ static int clock_build(void *ctx, menu_row *rows, int max, const char **heading)
 		rows[n++] = MENU_NOTE("Left/right: change");
 		/* Only where it is true: the Brick's ntpd sets the clock again once
 		 * Wi-Fi connects, so a time set here lasts until then */
-		if (plat_has_wifi()) rows[n++] = MENU_NOTE("Wi-Fi sets the clock when connected");
+		if (plat_has_wifi()) rows[n++] = MENU_NOTE("Wi-Fi sets the clock")   /* when connected, as Wi-Fi must be; the longer note sat within pixels of the panel */;
 	}
 	return n;
 }
