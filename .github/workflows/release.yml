@@ -17,7 +17,12 @@ permissions:
   actions: write     # to start pages.yml once the release is out
 
 jobs:
+  # Nothing is built unless every check passes (checks.yml)
+  checks:
+    uses: ./.github/workflows/checks.yml
+
   release:
+    needs: checks
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
