@@ -1575,7 +1575,11 @@ async function selfDraw() {
 		return;
 	}
 	selfDev = d;
-	if (d.state === 'idle' && d.online && !selfChecked) {
+	/* A check that failed before this page asked (one made in the background
+	 * as Wi-Fi came up, say) is asked again rather than shown: the device
+	 * keeps it for fifteen minutes, and it read as "The update didn't work"
+	 * for an update no one had started (2026-11-25) */
+	if ((d.state === 'idle' || (d.state === 'failed' && d.checkFailed)) && d.online && !selfChecked) {
 		selfChecked = true;
 		selfAct('check');
 		return;
@@ -1642,6 +1646,8 @@ function selfShow(d) {
 		bad = d.ask === 'refused';
 		break;
 	case 'failed':
+		/* Only a check: said on the version line, not as a failed update */
+		if (d.checkFailed) break;
 		html = '<h2>The update didn\'t work</h2><p>' + esc(d.error || 'Something went wrong') + '. Nothing was changed.</p>' +
 			'<div class="acts">' + btn('check', 'Try again') + '</div>';
 		bad = true;
@@ -1657,6 +1663,11 @@ function selfShow(d) {
 		return;
 	}
 	box.hidden = true;
+	if (d.state === 'failed' && d.checkFailed) {
+		line.innerHTML = 'ChaOS ' + esc(d.version) + ' &middot; couldn\'t check for updates &middot; <a href="#" data-self="check">Try again</a>';
+		line.hidden = false;
+		return;
+	}
 	line.textContent = d.state === 'checking' ? 'ChaOS ' + d.version + ', checking for updates...' :
 		d.state === 'current' ? 'ChaOS ' + d.version + chan + ', up to date' : 'ChaOS ' + d.version;
 	line.hidden = false;
@@ -1671,6 +1682,7 @@ $('upd').addEventListener('click', (e) => {
 	selfAct(act);
 });
 $('verline').addEventListener('click', (e) => {
+	if (e.target.dataset && e.target.dataset.self === 'check') { e.preventDefault(); selfAct('check'); return; }
 	if (!(e.target.dataset && e.target.dataset.self === 'again')) return;
 	e.preventDefault();
 	selfSkip('');

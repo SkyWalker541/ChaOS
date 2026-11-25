@@ -7668,6 +7668,7 @@ static char *self_up_status(size_t *len, char *why, size_t wn)
 	       upd_size_of(true), upd_size_of(false), upd_percent());
 	jw_raw(&j, upd_receiving() ? ",\"receiving\":true" : ",\"receiving\":false");
 	jw_raw(&j, ",\"error\":");        su_json_str(&j, upd_error());
+	jw_raw(&j, upd_check_failed() ? ",\"checkFailed\":true" : ",\"checkFailed\":false");
 	jw_raw(&j, ",\"battery\":");      su_json_str(&j, batt);
 	jw_raw(&j, ",\"ask\":");
 	su_json_str(&j, g_su == SU_ASK ? "asking" : g_su == SU_NOTNOW ? "notnow" :

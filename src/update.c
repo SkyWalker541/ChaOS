@@ -704,6 +704,8 @@ bool upd_tick(bool online)
 	return g_state != was || notes;
 }
 
+bool upd_check_failed(void) { return g_state == UPD_FAILED && g_check_failed; }
+
 void upd_offline(bool radio_off)
 {
 	if (g_pid > 0) return;

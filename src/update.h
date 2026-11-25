@@ -96,6 +96,10 @@ bool upd_tick(bool online);
 upd_state   upd_get(void);
 const ota_info *upd_latest(void);   /* valid from UPD_AVAILABLE on */
 const char *upd_error(void);
+/* The last FAILED was a check's (no answer from GitHub), not a download's or
+ * an install's: for ChaOS Transfer, which asks again rather than reporting an
+ * update that was never started as one that didn't work */
+bool upd_check_failed(void);
 const char *upd_base(void);         /* the base this card is on */
 /* The bytes the update to the latest downloads: the small one's or the
  * whole system's */
