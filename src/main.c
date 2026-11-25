@@ -4949,6 +4949,11 @@ static bool g_menu_root;
  * the updater's pictures (--updater-art): drawn once, ahead of time, and shown
  * while nothing runs, so a clock would be frozen and B means nothing. */
 static bool g_menu_bare;
+/* ChaOS: the menu being drawn shows the clock and battery (menu_style.status),
+ * set around the draw by menu_run, as g_menu_root is. Off for popups, since
+ * 2026-11-25: they had them, and an update window or a confirmation looked
+ * busy with them. */
+static bool g_menu_status;
 
 /* A chevron: `dir` +1 points right, -1 left; `h` its height; at (cx, cy). Two
  * strokes of a few px, as SDL has no thick line. */
@@ -5507,7 +5512,7 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 		/* ChaOS: the clock and the battery, in the heading's band, so every
 		 * menu shows them with no screen of its own. A submenu's back chevron
 		 * takes the left, so its clock starts a step further in. */
-		if (!g_menu_bare) {
+		if (!g_menu_bare && g_menu_status) {
 			int hw = ui_text_width(fh, head1);
 			int left = panel.x + pad * (g_menu_root ? 1 : 2);
 			int right = panel.x + panel.w - pad;
@@ -6618,6 +6623,11 @@ typedef struct {
 	menu_result (*on_power)(app *a, void *ctx);
 	/* ChaOS: a first menu, not a submenu: no back chevron (g_menu_root). */
 	bool     root;
+	/* ChaOS: a main menu - the system menus, their pages, the in-game menu -
+	 * which shows the clock and the battery in its heading. A popup (one that
+	 * asks, tells or offers a pick) leaves it false and shows neither, so a
+	 * new screen is clean unless it says otherwise (g_menu_status). */
+	bool     status;
 	/* ChaOS: holding Y hides the panel, so the game behind an in-game menu
 	 * can be seen as it now looks. The backdrop leaves out its dimming
 	 * while Y is held too (gm_backdrop). */
@@ -6754,9 +6764,11 @@ static menu_exit menu_run_body(app *a, const menu_style *st,
 		}
 		if (!(st->peek && a->in.down[PEEK_KEY])) {
 			g_menu_root = st->root;
+			g_menu_status = st->status;
 			menu_draw(a, heading, rows, n, sel, st->fixed_w,
 			          st->follow_tint ? a->tint : st->accent);
 			g_menu_root = false;
+			g_menu_status = false;
 		}
 		plat_draw_osd(a->r);
 		plat_present();
@@ -6918,7 +6930,7 @@ static void wifi_screen(app *a)
 	w.on = wifi_status(NULL, 0, NULL, 0) != WIFI_OFF;
 	if (w.on) wifi_begin_scan(&w);
 
-	menu_run(a, &(menu_style){ .accent = MENU_ACCENT,
+	menu_run(a, &(menu_style){ .status = true, .accent = MENU_ACCENT,
 	                           .fixed_w = menu_std_width(a) },
 	         wifi_build, wifi_key, &w);
 }
@@ -7123,7 +7135,7 @@ static void ss_screen(app *a)
 	if (!ss_have_dev()) return;     /* the row is shut then; this is belt and braces */
 	memset(&c, 0, sizeof c);
 	c.a = a;
-	menu_run(a, &(menu_style){ .accent = MENU_ACCENT, .fixed_w = 0 }, ssm_build, ssm_key, &c);
+	menu_run(a, &(menu_style){ .status = true, .accent = MENU_ACCENT, .fixed_w = 0 }, ssm_build, ssm_key, &c);
 }
 
 /* Over The Hare: the address, the PIN, and what is happening.
@@ -9121,7 +9133,7 @@ static void boxart_screen(app *a, info_ctx *ic)
 	c.shots = shots_list(dir, names, PICK_MAX);
 	if (c.shots < 0) c.shots = 0;
 	c.itch = itch_slugs(folder) != NULL;
-	menu_run(a, &(menu_style){ .accent = a->sys.systems[ic->owner].accent },
+	menu_run(a, &(menu_style){ .status = true, .accent = a->sys.systems[ic->owner].accent },
 	         boxart_build, boxart_key, &c);
 }
 
@@ -9442,7 +9454,9 @@ static void bt_screen(app *a)
 		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
 		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
 		SDL_RenderFillRect(a->r, NULL);
+		g_menu_status = true;   /* a main page: the clock and battery */
 		menu_draw(a, "Bluetooth", rows, nrows, sel, menu_std_width(a), MENU_ACCENT);
+		g_menu_status = false;
 		plat_draw_osd(a->r);
 		plat_present();
 		SDL_Delay(8);
@@ -9698,9 +9712,11 @@ static bool stats_screen(app *a)
 		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
 		SDL_RenderFillRect(a->r, NULL);
 		/* +1 because the total is row 0 and the games start under it. */
+		g_menu_status = true;   /* a main page: the clock and battery */
 		menu_draw(a, "Play Time", rows, shown,
 		          ngames ? cursor - top + 1 : -1, menu_std_width(a),
 		          MENU_ACCENT);
+		g_menu_status = false;
 		plat_draw_osd(a->r);
 		plat_present();
 		SDL_Delay(8);
@@ -9897,6 +9913,7 @@ static void remap_screen(app *a, int sys, const char *file, void *game,
 	}
 	st.root = false;
 	rm_load(&c);
+	st.status = true;   /* a main menu: the clock and battery (g_menu_status) */
 	menu_run(a, &st, rm_build, rm_key, &c);
 }
 
@@ -9981,6 +9998,7 @@ static void console_controls_screen(app *a, int sys, const char *file, void *gam
 		st.backdrop = cc_backdrop;
 	}
 	st.root = false;
+	st.status = true;   /* a main menu: the clock and battery (g_menu_status) */
 	menu_run(a, &st, cc_build, cc_key, &c);
 }
 
@@ -11056,7 +11074,7 @@ static menu_result bw_key(app *a, void *ctx, in_button key, int sel)
 
 static void battwarn_screen(app *a)
 {
-	menu_run(a, &(menu_style){ .accent = MENU_ACCENT, .fixed_w = 0 }, bw_build, bw_key, NULL);
+	menu_run(a, &(menu_style){ .status = true, .accent = MENU_ACCENT, .fixed_w = 0 }, bw_build, bw_key, NULL);
 }
 
 static bool g_about_shot;   /* --about: one frame, drawn and not shown */
@@ -11110,7 +11128,7 @@ static void chan_screen(app *a)
 {
 	chan_ctx c = { 0 };
 
-	menu_run(a, &(menu_style){ .accent = MENU_ACCENT, .fixed_w = 0 }, chan_build, chan_key, &c);
+	menu_run(a, &(menu_style){ .status = true, .accent = MENU_ACCENT, .fixed_w = 0 }, chan_build, chan_key, &c);
 }
 
 static void about_screen(app *a)
@@ -11199,7 +11217,9 @@ static void about_screen(app *a)
 		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
 		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
 		SDL_RenderFillRect(a->r, NULL);
+		g_menu_status = true;   /* a main page: the clock and battery */
 		menu_draw(a, "About ChaOS", rows, 7, 6, menu_std_width(a), MENU_ACCENT);
+		g_menu_status = false;
 		if (g_about_shot) return;
 		plat_draw_osd(a->r);
 		plat_present();
@@ -11258,7 +11278,9 @@ static void controls_screen(app *a)
 		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
 		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
 		SDL_RenderFillRect(a->r, NULL);
+		g_menu_status = true;   /* a main page: the clock and battery */
 		menu_draw(a, head, rows, n, -1, menu_std_width(a), MENU_ACCENT);
+		g_menu_status = false;
 		plat_draw_osd(a->r);
 		plat_present();
 		SDL_Delay(8);
@@ -11503,6 +11525,7 @@ static void clock_screen(app *a)
 	};
 
 	memset(&c, 0, sizeof c);
+	st.status = true;   /* a main menu: the clock and battery (g_menu_status) */
 	menu_run(a, &st, clock_build, clock_key, &c);
 }
 
@@ -11520,8 +11543,10 @@ static void tortos_menu_draw(app *a, int sel)
 	 * a game list, which is where it gains rows that belong to that system. */
 	g_menu_root = !g_appearance_page && !g_rom_page &&   /* ChaOS: those are submenus */
 	              !g_net_page && !g_sys_page && !g_shelf_page;
+	g_menu_status = true;   /* a main page: the clock and battery */
 	menu_draw(a, heading, rows, n, sel, menu_shelf_width(a),
 	          a->screen == SCREEN_SYSTEMS ? MENU_ACCENT : a->tint);
+	g_menu_status = false;
 	g_menu_root = false;
 }
 
@@ -11963,6 +11988,7 @@ static void tortos_menu_for(app *a, int screen)
 		.root        = true,
 	};
 
+	st.status = true;   /* a main menu: the clock and battery (g_menu_status) */
 	menu_run(a, &st, sysmenu_build, sysmenu_key, &c);
 }
 
@@ -12032,7 +12058,7 @@ static void arrange_screen(app *a)
 		if (is_muse(s) || !strcmp(s->tag, VSHELF_FAV) || !strcmp(s->tag, VSHELF_REC)) continue;
 		c.idx[c.n++] = i;
 	}
-	menu_run(a, &(menu_style){ .accent = MENU_ACCENT, .on_step = arrange_step },
+	menu_run(a, &(menu_style){ .status = true, .accent = MENU_ACCENT, .on_step = arrange_step },
 	         arrange_build, arrange_key, &c);
 	if (!c.moved) return;
 	for (i = 0; i < c.n; i++)
@@ -12058,6 +12084,7 @@ static void appearance_screen(app *a)
 	c.a = a;
 	c.screen = a->screen;
 	g_appearance_page = true;
+	st.status = true;   /* a main menu: the clock and battery (g_menu_status) */
 	menu_run(a, &st, sysmenu_build, sysmenu_key, &c);
 	g_appearance_page = false;
 }
@@ -12077,6 +12104,7 @@ static void rom_page_screen(app *a)
 	c.a = a;
 	c.screen = a->screen;
 	g_rom_page = true;
+	st.status = true;   /* a main menu: the clock and battery (g_menu_status) */
 	menu_run(a, &st, sysmenu_build, sysmenu_key, &c);
 	g_rom_page = false;
 }
@@ -12096,6 +12124,7 @@ static void page_screen(app *a, bool *flag)
 	c.a = a;
 	c.screen = a->screen;
 	*flag = true;
+	st.status = true;   /* a main menu: the clock and battery (g_menu_status) */
 	menu_run(a, &st, sysmenu_build, sysmenu_key, &c);
 	*flag = false;
 }
@@ -14256,8 +14285,10 @@ static void cheevos_screen(app *a, SDL_Texture *bg, bool over_shelf)
 		chv_backdrop(a, bg, over_shelf);
 		/* visits_all: every achievement can be opened, earned or not, so
 		 * `live` here is about color and not about reach. */
+		g_menu_status = true;   /* a main page: the clock and battery */
 		menu_draw_ex(a, heading, rows, n, sel, menu_std_width(a), a->tint,
 		             vcols, true, 0);
+		g_menu_status = false;
 		plat_present();
 		SDL_Delay(8);
 	}
@@ -14725,7 +14756,9 @@ static void cht_apply(cht_ui *u)
 static void cht_frame(app *a, gm_ctx *g, const char *heading, const menu_row *rows, int n, int sel)
 {
 	gm_backdrop(a, g);
+	g_menu_status = true;   /* a main page: the clock and battery */
 	menu_draw(a, heading, rows, n, sel, g->st.fixed_w, a->tint);
+	g_menu_status = false;
 	draw_letter_popup(a);
 	plat_draw_osd(a->r);
 	plat_present();
@@ -15554,6 +15587,7 @@ static void shader_screen(app *a, int sys, void *game)
 		c->st.fixed_w = shader_width(a, sys, menu_shelf_width(a));
 		c->st.follow_tint = true;
 	}
+	c->st.status = true;   /* a main menu: the clock and battery (g_menu_status) */
 	menu_run(a, &c->st, shader_build, shader_key, c);
 	free(c);
 }
@@ -15644,6 +15678,7 @@ static void game_menu(app *a)
 	 * screen this menu opened - the save slots, Achievements - comes back as
 	 * MENU_LEFT_BACK too, so it is Continue from there as well. */
 	g_menu_closing = false;
+	c.st.status = true;   /* a main menu: the clock and battery (g_menu_status) */
 	if (menu_run(a, &c.st, gm_menu_build, gm_key, &c) == MENU_LEFT_BACK)
 		c.resume = true;
 	g_menu_closing = false;
@@ -18023,6 +18058,7 @@ static void pm_screen(app *a, unsigned accent)
 	pm_home_counts(&c);
 	st.accent = accent;
 	st.fixed_w = menu_std_width(a);
+	st.status = true;   /* a main menu: the clock and battery (g_menu_status) */
 	menu_run(a, &st, pm_home_build, pm_home_key, &c);
 	/* 2.5 MB is a lot to keep for a screen nobody is on */
 	if (g_pmc_loaded) { pmcat_free(&g_pmc); g_pmc_loaded = false; }
@@ -18335,6 +18371,7 @@ static void sth_screen(app *a)
 			SDL_Delay(300);
 		}
 	}
+	st.status = true;   /* a main menu: the clock and battery (g_menu_status) */
 	menu_run(a, &st, sth_build, sth_key, &c);
 }
 
@@ -18767,6 +18804,7 @@ static void ds_screen(app *a)
 	ds_refresh(c);
 	st.accent = MENU_ACCENT;
 	st.fixed_w = menu_std_width(a);
+	st.status = true;   /* a main menu: the clock and battery (g_menu_status) */
 	menu_run(a, &st, ds_build, ds_key, c);
 	free(c);
 }
@@ -18940,6 +18978,7 @@ static void gbs_screen(app *a)
 	db_set_int(db_dev(), "gbsort_last", (int)time(NULL));
 	st.accent = MENU_ACCENT;
 	st.fixed_w = menu_std_width(a);
+	st.status = true;   /* a main menu: the clock and battery (g_menu_status) */
 	menu_run(a, &st, gbs_build, gbs_key, &c);
 }
 
@@ -19531,6 +19570,7 @@ static void romm_systems_screen(app *a)
 	}
 	st.accent = MENU_ACCENT;
 	st.fixed_w = menu_std_width(a);
+	st.status = true;   /* a main menu: the clock and battery (g_menu_status) */
 	menu_run(a, &st, romm_sys_build, romm_sys_key, c);
 	free(c);
 }
@@ -20023,6 +20063,7 @@ static void romm_screen(app *a)
 	romm_home_refresh(&c);
 	st.accent = MENU_ACCENT;
 	st.fixed_w = menu_std_width(a);
+	st.status = true;   /* a main menu: the clock and battery (g_menu_status) */
 	menu_run(a, &st, romm_home_build, romm_home_key, &c);
 }
 
@@ -21248,6 +21289,7 @@ static void hb_filter_screen(app *a, hb_cat *c)
 	f.ncons = hb_consoles(a, f.cons, 32);
 	st.accent = MENU_ACCENT;
 	st.fixed_w = menu_std_width(a);
+	st.status = true;   /* a main menu: the clock and battery (g_menu_status) */
 	menu_run(a, &st, hb_flt_build, hb_flt_key, &f);
 }
 
@@ -22023,6 +22065,7 @@ static void hb_manage_screen(app *a)
 	hb_mgr_load(m);
 	st.accent = MENU_ACCENT;
 	st.fixed_w = menu_std_width(a);
+	st.status = true;   /* a main menu: the clock and battery (g_menu_status) */
 	menu_run(a, &st, hb_mgr_build, hb_mgr_key, m);
 	free(m->r);
 	free(m);
@@ -22079,6 +22122,7 @@ static void hb_cw_page(app *a, int cat)
 
 	st.accent = MENU_ACCENT;
 	st.fixed_w = menu_std_width(a);
+	st.status = true;   /* a main menu: the clock and battery (g_menu_status) */
 	menu_run(a, &st, hb_cw_build, hb_cw_key, &w);
 }
 
@@ -22291,6 +22335,7 @@ static void hb_screen(app *a)
 	hb_refresh(a, &c);
 	st.accent = MENU_ACCENT;
 	st.fixed_w = menu_std_width(a);
+	st.status = true;   /* a main menu: the clock and battery (g_menu_status) */
 	menu_run(a, &st, hb_build, hb_menu_key, &c);
 }
 
