@@ -4924,6 +4924,23 @@ static void log_kernel_at_off(void)
 	if (system(cmd) != 0) fprintf(stderr, "logs: the kernel's log could not be kept\n");
 }
 
+/* ChaOS: the last thing on the panel, after the animation: what the Brick
+ * is still doing. The system goes on after the launcher (the card synced,
+ * the emulator stopped, the card unmounted) and the panel went dark for all
+ * of it, so a Brick that looked off wasn't, and a quick press of power to
+ * start it again did nothing (Aquilus, 2026-11-25). The frame stays on the
+ * panel after ChaOS exits, as the lit shell did before 2026-10-02, until the
+ * power goes. */
+static void draw_off_note(app *a, bool restart)
+{
+	TTF_Font *f = ui_font(UI_F_MENU);
+
+	SDL_SetRenderDrawColor(a->r, CHAOS_GROUND_R, CHAOS_GROUND_G, CHAOS_GROUND_B, 255);
+	SDL_RenderClear(a->r);
+	if (f) ui_text(a->r, f, restart ? "Restarting..." : "Shutting down...", TORTOS_SCREEN_W / 2,
+	               (TORTOS_SCREEN_H - TTF_FontHeight(f)) / 2, 0, UI_TEXT_SOFT);
+}
+
 static void power_off(app *a)
 {
 	fprintf(stderr, "power: turning off\n");
@@ -4932,11 +4949,15 @@ static void power_off(app *a)
 	book_keep(true);
 	plat_request_poweroff();
 	anim_poweroff(a);
-	/* And dark the moment it ends. The rest of the shutdown is not instant -
-	 * on the GKD Pixel 2 it waits for the programs on the card to go before
-	 * unmounting it - and the shell stayed lit through all of it. Eric's
-	 * call, 2026-10-02, for both devices. */
-	plat_backlight(false);
+	/* TortOS went dark here (Eric's call, 2026-10-02): the rest of the
+	 * shutdown is not instant, and the shell stayed lit through it. ChaOS
+	 * says so instead, and the power going takes the light. */
+	draw_off_note(a, access(CHAOS_REBOOT_FLAG, F_OK) == 0);
+	plat_present();
+	/* The card's writes flushed here, under the note, rather than after
+	 * ChaOS has gone: the longest part of what follows, and so said on the
+	 * panel whether or not the frame outlives this process. */
+	sync();
 	a->running = false;
 }
 
@@ -10986,6 +11007,7 @@ static void update_after_start(app *a)
  * step a percentage, A too; the two switches flip. The blinking one never
  * sits at or above the low one: it is the last of the two. */
 static int g_bw_shot;   /* --battwarn: the page, one frame */
+static int g_off_shot;  /* --offnote 1|2: shutting down, restarting */
 
 static int bw_build(void *ctx, menu_row *rows, int max, const char **heading)
 {
@@ -25775,6 +25797,7 @@ static void take_shot(app *a)
 		menu_draw(a, heading, rows, n, shot_menu_sel, menu_std_width(a), MENU_ACCENT);
 	}
 	if (g_about_shot) about_screen(a);
+	if (g_off_shot) draw_off_note(a, g_off_shot == 2);
 	if (g_bw_shot) {
 		menu_row rows[10];
 		const char *heading;
@@ -26219,6 +26242,7 @@ int main(int argc, char *argv[])
 		else if (!strcmp(argv[i], "--menu-ids")) g_menu_ids = true;
 		else if (!strcmp(argv[i], "--display-check")) g_display_check = true;
 		else if (!strcmp(argv[i], "--battwarn") && i + 1 < argc) g_bw_shot = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "--offnote") && i + 1 < argc) g_off_shot = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--romm") && i + 1 < argc) {
 			shot_romm = argv[++i];
 			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9') shot_romm_a = atoi(argv[++i]);
