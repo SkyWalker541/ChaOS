@@ -458,6 +458,19 @@ int romm_platforms(const romm_conn *c, romm_platform *out, int max, char *why, s
 	return k;
 }
 
+/* RomM's file categories that aren't the game itself */
+static bool file_extra(jsv f)
+{
+	static const char *const extra[] = { "manual", "walkthrough", "soundtrack", "screenshot",
+	                                     "cheat", "patch", "update", "dlc", NULL };
+	char cat[32];
+	int i;
+
+	jstr(f, "category", cat, sizeof cat);
+	for (i = 0; extra[i]; i++) if (!strcasecmp(cat, extra[i])) return true;
+	return false;
+}
+
 static void parse_rom(jsv e, romm_rom *r)
 {
 	jsv files, x, it = { 0 }, f;
@@ -473,26 +486,53 @@ static void parse_rom(jsv e, romm_rom *r)
 	r->multi = js_member(e, "has_multiple_files", &x) && js_is_true(x);
 	jstr(e, "path_cover_small", r->cover, sizeof r->cover);
 	if (!r->cover[0]) jstr(e, "url_cover", r->cover, sizeof r->cover);
-	if (!r->multi && js_member(e, "files", &files)) {
-		/* the first playable one: RomM can list a manual ahead of the game */
-		static const char *const extra[] = { "manual", "walkthrough", "soundtrack", "screenshot",
-		                                     "cheat", "patch", "update", "dlc", NULL };
-		while (js_next(files, &it, &f)) {
-			char cat[32];
-			int i;
-			bool skip = false;
+	if (js_member(e, "files", &files)) {
+		bool chosen = false;
 
-			jstr(f, "category", cat, sizeof cat);
-			for (i = 0; extra[i]; i++) if (!strcasecmp(cat, extra[i])) skip = true;
-			if (skip && r->file_id) continue;
-			if (!r->file_id || !skip) {
-				r->file_id = (int)jint(f, "id");
-				jstr(f, "file_name", r->file_name, sizeof r->file_name);
-				if (!skip) break;
-			}
+		/* the first playable one: RomM can list a manual ahead of the game;
+		 * and how many there are, for the file picker */
+		while (js_next(files, &it, &f)) {
+			bool skip = file_extra(f);
+
+			if (!skip) r->nplay++;
+			if (r->multi || chosen || (skip && r->file_id)) continue;
+			r->file_id = (int)jint(f, "id");
+			jstr(f, "file_name", r->file_name, sizeof r->file_name);
+			chosen = !skip;
 		}
+		if (r->multi) { r->file_id = 0; r->file_name[0] = '\0'; }
 	}
 	if (!r->file_name[0]) snprintf(r->file_name, sizeof r->file_name, "%s", r->fs_name);
+}
+
+int romm_rom_files(const romm_conn *c, int rom_id, romm_file *out, int max, char *why, size_t wn)
+{
+	char path[64], *buf = reply_buf();
+	int http = 0, k = 0;
+	long n;
+	jsv root, files, it = { 0 }, f;
+
+	if (!buf) { snprintf(why, wn, "Not enough memory"); return -1; }
+	snprintf(path, sizeof path, "/api/roms/%d", rom_id);
+	n = call(c, NULL, path, NULL, buf, ROMM_REPLY, &http, 30);
+	if (n < 0 || http < 200 || http >= 300) { http_why(http, why, wn); free(buf); return -1; }
+	if (n >= ROMM_REPLY - 1) { snprintf(why, wn, "RomM's answer was too long to read"); free(buf); return -1; }
+	root = js_root(buf, (size_t)n);
+	if (js_member(root, "files", &files))
+		while (js_next(files, &it, &f) && k < max) {
+			romm_file *o = &out[k];
+
+			if (file_extra(f)) continue;
+			memset(o, 0, sizeof *o);
+			o->id = (int)jint(f, "id");
+			jstr(f, "file_name", o->name, sizeof o->name);
+			o->size = jint(f, "file_size_bytes");
+			/* a name that could leave the shelf folder isn't offered */
+			if (o->id && o->name[0] && !strchr(o->name, '/') && strcmp(o->name, ".") && strcmp(o->name, ".."))
+				k++;
+		}
+	free(buf);
+	return k;
 }
 
 int romm_roms(const romm_conn *c, int platform_id, int offset, int limit, romm_rom *out,
@@ -510,17 +550,76 @@ int romm_roms(const romm_conn *c, int platform_id, int offset, int limit, romm_r
 	         platform_id, platform_id, offset, limit);
 	n = call(c, NULL, path, NULL, buf, ROMM_REPLY, &http, 60);
 	if (n < 0 || http < 200 || http >= 300) { http_why(http, why, wn); free(buf); return -1; }
+	/* A page that filled the buffer was cut off, and with it the "total"
+	 * after the list: 42 of a PlayStation library's 282 games, each listing
+	 * every disc's file, filled it, and the list ended there with nothing
+	 * said (2026-11-25). Said, so the caller asks for a smaller page. */
+	if (n >= ROMM_REPLY - 1) {
+		snprintf(why, wn, "RomM's list was too long to read");
+		free(buf);
+		return ROMM_PAGE_TOO_BIG;
+	}
 	root = js_root(buf, (size_t)n);
-	/* a page ({items, total}), or before RomM 3.5, the list itself */
-	if (js_member(root, "items", &items)) *total = (int)jint(root, "total");
-	else items = root;
+	/* a page ({items, total}), or before RomM 3.5, the list itself, whole */
+	if (js_member(root, "items", &items)) {
+		jsv t;
+
+		*total = js_member(root, "total", &t) ? (int)jint(root, "total") : -1;
+	} else {
+		items = root;
+		*total = -2;
+	}
 	while (js_next(items, &it, &e) && k < max) {
 		parse_rom(e, &out[k]);
 		if (out[k].id) k++;
 	}
-	if (!*total) *total = offset + k;
+	if (*total == -2) *total = offset + k;
 	free(buf);
 	return k;
+}
+
+int romm_roms_all(const romm_conn *c, int platform_id, int expect, romm_rom **out, int *n,
+                  bool (*progress)(void *ctx, int have, int total), void *ctx,
+                  char *why, size_t wn)
+{
+	int limit = 100, total = 0, cap = 0, got;
+	/* far past any library, so a server that never says it has finished
+	 * can't keep this asking */
+	int ceiling = (expect > 0 ? expect : 0) + 20000;
+
+	*out = NULL;
+	*n = 0;
+	for (;;) {
+		if (*n + limit > cap) {
+			romm_rom *more;
+
+			cap = cap ? cap * 2 : 256;
+			while (cap < *n + limit) cap *= 2;
+			more = realloc(*out, (size_t)cap * sizeof **out);
+			if (!more) { snprintf(why, wn, "Not enough memory for the list"); return -1; }
+			*out = more;
+		}
+		if (progress && !progress(ctx, *n, total > 0 ? total : expect)) return ROMM_LIST_PARTIAL;
+		got = romm_roms(c, platform_id, *n, limit, *out + *n, limit, &total, why, wn);
+		if (got == ROMM_PAGE_TOO_BIG && limit > 5) { limit /= 2; continue; }
+		/* a page that fails after others came: keep what came, and say so */
+		if (got < 0) {
+			if (!*n) return -1;
+			snprintf(why, wn, "RomM stopped after %d of %d games", *n, total > 0 ? total : expect);
+			return ROMM_LIST_PARTIAL;
+		}
+		*n += got;
+		if (got == 0) break;                        /* the server's end */
+		if (total > 0 && *n >= total) break;        /* all it said it had */
+		if (total < 0 && got < limit) break;        /* no total: a short page ends it */
+		if (*n >= ceiling) break;
+	}
+	/* fewer than the server said: it stopped answering part-way */
+	if (total > 0 && *n < total) {
+		snprintf(why, wn, "RomM sent %d of its %d games", *n, total);
+		return ROMM_LIST_PARTIAL;
+	}
+	return 0;
 }
 
 int romm_firmware_list(const romm_conn *c, int platform_id, romm_firmware *out, int max,
@@ -600,6 +699,49 @@ void romm_firmware_url(const romm_conn *c, const romm_firmware *f, char *out, si
 }
 
 /* ---- games.tsv ------------------------------------------------------------ */
+
+/* A name as matching sees it: no extension (a short one, without spaces),
+ * lower case, letters and digits only. "Zelda (USA).gb" and "zelda_usa.GB"
+ * agree; "Zelda (Europe)" doesn't, as its saves may not be the same game's. */
+static void match_key(const char *name, char *out, size_t n)
+{
+	const char *dot = strrchr(name, '.'), *end = name + strlen(name);
+	size_t k = 0;
+
+	if (dot && dot != name && end - dot <= 6 && !strchr(dot, ' ')) end = dot;
+	for (; name < end && k + 1 < n; name++)
+		if (isalnum((unsigned char)*name)) out[k++] = (char)tolower((unsigned char)*name);
+	out[k] = '\0';
+}
+
+int romm_match_file(const romm_rom *g, int n, const char *file)
+{
+	char want[ROMM_STR], key[ROMM_STR];
+	int i, hit = -1;
+
+	/* exactly the name RomM has: what a download would have written */
+	for (i = 0; i < n; i++)
+		if (!strcmp(file, g[i].multi ? g[i].fs_name : g[i].file_name)) return i;
+	for (i = 0; i < n; i++)
+		if (!strcmp(file, g[i].fs_name) || !strcmp(file, g[i].file_name)) return i;
+	/* then loosely, only when one game answers */
+	match_key(file, want, sizeof want);
+	if (!want[0]) return -1;
+	for (i = 0; i < n; i++) {
+		bool same;
+
+		match_key(g[i].fs_name, key, sizeof key);
+		same = !strcmp(key, want);
+		if (!same) {
+			match_key(g[i].file_name, key, sizeof key);
+			same = !strcmp(key, want);
+		}
+		if (!same) continue;
+		if (hit >= 0 && g[hit].id != g[i].id) return -1;
+		hit = i;
+	}
+	return hit;
+}
 
 bool romm_map_add(const char *dir, int rom_id, const char *folder, const char *file)
 {

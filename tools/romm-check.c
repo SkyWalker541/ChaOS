@@ -47,6 +47,14 @@ static bool lists(int rom_id, const char *folder, const char *file, void *ctx)
 	return true;
 }
 
+/* romm_roms_all's progress: stops once a page has come */
+static bool stop_after_one(void *ctx, int have, int total)
+{
+	(void)total;
+	++*(int *)ctx;
+	return have == 0;
+}
+
 int main(void)
 {
 	char dir[] = "/tmp/romm-check-XXXXXX", why[160], url[700], p[600], state[8192];
@@ -156,8 +164,21 @@ int main(void)
 	CHECK(strstr(url, "/assets/romm/resources/roms/1/1/cover/small.png") == url + strlen(c.url), "cover %s", url);
 	romm_cover_url(&c, &roms[1], url, sizeof url);
 	CHECK(!strcmp(url, "https://images.igdb.com/t.jpg"), "an outside cover as it is");
+	CHECK(roms[0].nplay == 1, "a game and its manual: no choice to ask (%d)", roms[0].nplay);
 	n = romm_roms(&c, 2, 0, 50, roms, 8, &total, why, sizeof why);
 	CHECK(n == 1 && roms[0].multi, "a multi-file game");
+	CHECK(n == 1 && roms[0].nplay == 2 && !roms[0].file_id, "its two files counted, none chosen: %d", roms[0].nplay);
+	{
+		/* the file picker's list (ChaOS 2.7.8): the game's files, not its manual */
+		romm_file fl[ROMM_FILES_MAX];
+		int nf = romm_rom_files(&c, 3, fl, ROMM_FILES_MAX, why, sizeof why);
+
+		CHECK(nf == 2 && fl[0].id == 10 && !strcmp(fl[1].name, "Ys.bin") && fl[1].size == 1536,
+		      "a game's files: %d %s", nf, why);
+		nf = romm_rom_files(&c, 1, fl, ROMM_FILES_MAX, why, sizeof why);
+		CHECK(nf == 1 && fl[0].id == 8, "the manual left out: %d", nf);
+		CHECK(romm_rom_files(&c, 999, fl, ROMM_FILES_MAX, why, sizeof why) < 0, "an unknown game: said");
+	}
 	romm_rom_url(&c, &roms[0], url, sizeof url);
 	CHECK(strstr(url, "/api/roms/3/content/Ys%20I%20%26%20II") && !strchr(url, '?'), "its zip: %s", url);
 	{
@@ -179,6 +200,60 @@ int main(void)
 	CHECK(n == 1 && !strcmp(fw[0].file_name, "gb_bios.bin"), "firmware, a path-y name refused: %d", n);
 	romm_firmware_url(&c, &fw[0], url, sizeof url);
 	CHECK(strstr(url, "/api/firmware/5/content/gb_bios.bin") != NULL, "firmware URL %s", url);
+
+	/* The whole list, paged (ChaOS 2.7.8). A PlayStation library's pages,
+	 * each game listing every disc's tracks, passed the 1 MB reply: the page
+	 * was cut off, its total with it, and the list ended at 42 of 282 with
+	 * nothing said. */
+	{
+		romm_rom *all = NULL;
+		int got = 0, r, seen = 0;
+		bool dup = false;
+
+		r = romm_roms(&c, 4, 0, 100, roms, 8, &total, why, sizeof why);
+		CHECK(r == ROMM_PAGE_TOO_BIG, "a page too long to read is said, not half-read: %d", r);
+		r = romm_roms_all(&c, 4, 282, &all, &got, NULL, NULL, why, sizeof why);
+		CHECK(r == 0 && got == 282, "all 282 big games, in smaller pages: %d %d %s", r, got, why);
+		for (int i = 1; i < got; i++) dup |= all[i].id == all[i - 1].id;
+		CHECK(got == 282 && !dup && all[0].id == 1000 && all[281].id == 1281, "each once, in order");
+		free(all);
+		all = NULL;
+		r = romm_roms_all(&c, 5, 75, &all, &got, NULL, NULL, why, sizeof why);
+		CHECK(r == 0 && got == 75 && all && all[74].id == 5074, "a server's smaller pages followed: %d %d", r, got);
+		free(all);
+		all = NULL;
+		r = romm_roms_all(&c, 6, 0, &all, &got, NULL, NULL, why, sizeof why);
+		CHECK(r == 0 && got == 130, "no total: on to a short page: %d %d", r, got);
+		free(all);
+		all = NULL;
+		r = romm_roms_all(&c, 1, 2, &all, &got, NULL, NULL, why, sizeof why);
+		CHECK(r == 0 && got == 2, "a small platform, one page: %d %d", r, got);
+		free(all);
+		all = NULL;
+		r = romm_roms_all(&c, 4, 282, &all, &got, stop_after_one, &seen, why, sizeof why);
+		CHECK(r == ROMM_LIST_PARTIAL && seen >= 2 && got > 0 && got < 282, "stopped by the player: %d %d", r, got);
+		free(all);
+	}
+
+	/* Games put on the card without RomM, matched by name so their saves
+	 * sync (ChaOS 2.7.8): sync saw only games RomM had downloaded. */
+	{
+		romm_rom g[4];
+
+		memset(g, 0, sizeof g);
+		g[0].id = 1; snprintf(g[0].fs_name, ROMM_STR, "Zelda (USA).gb"); snprintf(g[0].file_name, ROMM_STR, "Zelda (USA).gb");
+		g[1].id = 2; snprintf(g[1].fs_name, ROMM_STR, "Tetris.gb"); snprintf(g[1].file_name, ROMM_STR, "Tetris.gb");
+		g[2].id = 3; g[2].multi = true; snprintf(g[2].fs_name, ROMM_STR, "Ys I & II");
+		snprintf(g[2].file_name, ROMM_STR, "Ys.cue");
+		g[3].id = 4; snprintf(g[3].fs_name, ROMM_STR, "tetris.GB"); snprintf(g[3].file_name, ROMM_STR, "tetris.GB");
+		CHECK(romm_match_file(g, 4, "Zelda (USA).gb") == 0, "RomM's own name");
+		CHECK(romm_match_file(g, 4, "Ys I & II") == 2, "a multi-file game's folder");
+		CHECK(romm_match_file(g, 4, "zelda_usa.GBC") == 0, "the same name, loosely");
+		CHECK(romm_match_file(g, 4, "Zelda (Europe).gb") == -1, "another region isn't the same game");
+		CHECK(romm_match_file(g, 4, "TETRIS.gb") == -1, "two games answer: neither taken");
+		CHECK(romm_match_file(g, 4, "Tetris.gb") == 1, "but the exact name still is");
+		CHECK(romm_match_file(g, 4, "...") == -1 && romm_match_file(g, 0, "Tetris.gb") == -1, "nothing to go on");
+	}
 
 	/* games.tsv */
 	CHECK(romm_map_add(dir, 1, "Game Boy", "Zelda (USA).gb"), "mapped");

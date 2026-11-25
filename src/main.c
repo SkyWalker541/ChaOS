@@ -19174,6 +19174,9 @@ static bool romm_fetch(app *a, const char *title, const char *what, const char *
 }
 
 /* The first file in `dir` with one of `exts` (a disc's .m3u or .cue) */
+/* what a multi-file game starts from, in its folder */
+static const char *const romm_firsts[] = { "m3u", "cue", "ccd", "chd", "toc", NULL };
+
 static bool romm_first_of(const char *dir, const char *const *exts, char *out, size_t n)
 {
 	DIR *d = opendir(dir);
@@ -19220,7 +19223,6 @@ static bool romm_download_game(app *a, const romm_rom *g, const char *folder, co
 		snprintf(stem, sizeof stem, "%s", g->file_name);
 		if (strrchr(stem, '.')) *strrchr(stem, '.') = '\0';
 	} else {
-		static const char *const firsts[] = { "m3u", "cue", "ccd", "chd", "toc", NULL };
 		char zip[LIB_PATH * 2], to[LIB_PATH * 2], disc[LIB_NAME];
 
 		snprintf(zip, sizeof zip, "%s/.romm-%d.zip", dir, g->id);
@@ -19237,7 +19239,7 @@ static bool romm_download_game(app *a, const romm_rom *g, const char *folder, co
 			unlink(zip);
 			if (rc != 0) { pick_say(a, g->name, "Couldn't unpack it", MENU_ACCENT); return false; }
 		}
-		if (!romm_first_of(to, firsts, disc, sizeof disc)) disc[0] = '\0';
+		if (!romm_first_of(to, romm_firsts, disc, sizeof disc)) disc[0] = '\0';
 		snprintf(file, sizeof file, "%s%s%s", g->fs_name, disc[0] ? "/" : "", disc);
 		snprintf(stem, sizeof stem, "%s", g->fs_name);
 	}
@@ -19274,8 +19276,20 @@ typedef struct {
 	unsigned since;
 	SDL_Texture *tex;
 	int tw, th;
-	bool failed;
+	bool failed;                  /* given up on this one: "No cover" */
+	int tries;                    /* misses so far, for this selection */
+	unsigned retry_at;
 } romm_pic;
+
+/* A cover that didn't come: tried again, 2 s apart, before "No cover". One
+ * miss used to stand for the whole visit, so a server slow for a moment left
+ * games without art (2026-11-25). */
+#define ROMM_PIC_TRIES 3
+static void romm_pic_miss(romm_pic *pp)
+{
+	if (++pp->tries >= ROMM_PIC_TRIES) pp->failed = true;
+	else pp->retry_at = plat_now_ms() + 2000;
+}
 
 static void romm_cover_path(int id, char *out, size_t n)
 {
@@ -19297,7 +19311,7 @@ static void romm_pic_step(app *a, romm_pic *pp, const romm_rom *list)
 			romm_cover_path(list[pp->fetching].id, path, sizeof path);
 			snprintf(part, sizeof part, "%s.part", path);
 			if (r == pp->pid && WIFEXITED(st) && WEXITSTATUS(st) == 0) rename(part, path);
-			else { unlink(part); if (pp->fetching == pp->want) pp->failed = true; }
+			else { unlink(part); if (pp->fetching == pp->want) romm_pic_miss(pp); }
 			pp->pid = 0;
 		}
 	}
@@ -19314,12 +19328,16 @@ static void romm_pic_step(app *a, romm_pic *pp, const romm_rom *list)
 			SDL_FreeSurface(s);
 			if (pp->tex) SDL_SetTextureScaleMode(pp->tex, SDL_ScaleModeLinear);
 		} else {
-			pp->failed = true;
+			/* a cover that won't open: fetched again rather than kept */
+			unlink(path);
+			romm_pic_miss(pp);
+			if (!pp->failed) return;
 		}
 		pp->shown = pp->want;
 		return;
 	}
-	if (pp->pid <= 0 && !pp->failed && plat_now_ms() - pp->since > 180 && net_online()) {
+	if (pp->pid <= 0 && !pp->failed && plat_now_ms() - pp->since > 180 && net_online() &&
+	    (!pp->tries || (int)(plat_now_ms() - pp->retry_at) >= 0)) {
 		char dir[LIB_PATH], part[LIB_PATH + 8];
 		net_req r;
 		bool own;
@@ -19336,7 +19354,7 @@ static void romm_pic_step(app *a, romm_pic *pp, const romm_rom *list)
 		r.timeout_s = 20;
 		pp->pid = net_request_spawn(&r, part);
 		pp->fetching = pp->want;
-		if (pp->pid <= 0) { pp->pid = 0; pp->failed = true; }
+		if (pp->pid <= 0) { pp->pid = 0; romm_pic_miss(pp); }
 	}
 }
 
@@ -19419,6 +19437,76 @@ static void romm_list_draw(app *a, const char *heading, const romm_list *l, int 
 	pm_frame_end(a);
 }
 
+/* Which of a game's files to download, when it has more than one that is
+ * the game: the whole game first (a multi-file game's zip, or the file RomM
+ * would give), then each file alone. `out` is the game as it is to be
+ * downloaded. False when the player backed out or the files couldn't be had. */
+typedef struct {
+	const romm_rom *g;
+	romm_file *f;
+	int n, chosen;
+	char whole[48], sizes[ROMM_FILES_MAX][24];
+} romm_choose_ctx;
+
+static int romm_choose_build(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	romm_choose_ctx *c = ctx;
+	int i, n = 0;
+
+	*heading = "Which File?";
+	if (c->g->multi && n < max) rows[n++] = (menu_row){ c->whole, NULL, true, false };
+	for (i = 0; i < c->n && n < max; i++) rows[n++] = (menu_row){ c->f[i].name, c->sizes[i], true, false };
+	return n;
+}
+
+static menu_result romm_choose_key(app *a, void *ctx, in_button key, int sel)
+{
+	romm_choose_ctx *c = ctx;
+
+	(void)a;
+	if (key != IN_ACCEPT || sel < 0) return MENU_STAY;
+	c->chosen = sel - (c->g->multi ? 1 : 0);   /* -1: the whole game */
+	return MENU_DONE;
+}
+
+static bool romm_choose_file(app *a, const romm_rom *g, romm_rom *out)
+{
+	romm_file f[ROMM_FILES_MAX];
+	romm_choose_ctx c;
+	menu_style st = { 0 };
+	char why[160];
+	int n, i;
+
+	*out = *g;
+	if (g->nplay <= 1) return true;
+	pick_frame(a, g->name, NULL, 0, 0, NULL, 0, 0, "Asking RomM", MENU_ACCENT);
+	n = romm_rom_files(&g_romm, g->id, f, ROMM_FILES_MAX, why, sizeof why);
+	if (n < 0) { pick_say(a, g->name, why, MENU_ACCENT); return false; }
+	if (n <= 1) return true;                      /* one after all: no question */
+	memset(&c, 0, sizeof c);
+	c.g = g;
+	c.f = f;
+	c.n = n;
+	c.chosen = -2;
+	snprintf(c.whole, sizeof c.whole, "The whole game (%d files)", g->nplay);
+	for (i = 0; i < n; i++) {
+		if (f[i].size >= 1048576) snprintf(c.sizes[i], sizeof c.sizes[i], "%.0f MB", f[i].size / 1048576.0);
+		else if (f[i].size > 0) snprintf(c.sizes[i], sizeof c.sizes[i], "%ld KB", (f[i].size + 1023) / 1024);
+	}
+	st.accent = MENU_ACCENT;
+	st.fixed_w = menu_std_width(a);
+	menu_run(a, &st, romm_choose_build, romm_choose_key, &c);
+	if (c.chosen < -1 || c.chosen >= n || g_menu_closing) return false;
+	if (c.chosen >= 0) {
+		/* one file alone: downloaded as a game of one file */
+		out->multi = false;
+		out->file_id = f[c.chosen].id;
+		out->size = f[c.chosen].size;
+		snprintf(out->file_name, sizeof out->file_name, "%s", f[c.chosen].name);
+	}
+	return true;
+}
+
 static bool romm_is_here(const char *dir, const romm_rom *g, const char *folder)
 {
 	char p[LIB_PATH * 2];
@@ -19448,37 +19536,45 @@ static int romm_letter_jump(const romm_list *l, int cur, int dir)
 	return i;
 }
 
+/* romm_roms_all's progress: the busy line, and leaving stops it */
+typedef struct { app *a; const char *name; bool stopped; } romm_list_progress;
+
+static bool romm_list_step(void *ctx, int have, int total)
+{
+	romm_list_progress *lp = ctx;
+	char now[96];
+
+	snprintf(now, sizeof now, "Getting %s's games\n%d of %d", lp->name, have, total);
+	romm_busy(lp->a, now);
+	plat_input_poll(&lp->a->in);
+	if (menu_leaving(lp->a)) lp->stopped = true;
+	return !lp->stopped;
+}
+
 static void romm_games_screen(app *a, const romm_platform *p, const char *folder)
 {
 	SDL_Rect panel = PM_PANEL;
 	romm_list l;
 	romm_pic pp;
-	char why[160], now[96], rdir[LIB_PATH];
-	int total = 0, got, cap = 0, sel = 0, first = 0, i;
+	char why[160], rdir[LIB_PATH];
+	int sel = 0, first = 0, i;
 	int vis = (panel.h - 100 - 24 - ui_font_line(UI_F_META) - 16) / menu_row_h();
 	Uint32 held = 0;
 
 	memset(&l, 0, sizeof l);
 	l.folder = folder;
 	romm_dir(rdir, sizeof rdir);
-	/* the whole list, a page at a time */
-	for (;;) {
-		romm_rom *more;
+	/* the whole list, a page at a time (romm_roms_all) */
+	{
+		romm_list_progress lp = { a, p->name, false };
+		int r = romm_roms_all(&g_romm, p->id, p->roms, &l.g, &l.n, romm_list_step, &lp,
+		                      why, sizeof why);
 
-		if (l.n + 100 > cap) {
-			cap = cap ? cap * 2 : 256;
-			more = realloc(l.g, (size_t)cap * sizeof *l.g);
-			if (!more) break;
-			l.g = more;
-		}
-		snprintf(now, sizeof now, "Getting %s's games\n%d of %d", p->name, l.n, total ? total : p->roms);
-		romm_busy(a, now);
-		got = romm_roms(&g_romm, p->id, l.n, 100, l.g + l.n, 100, &total, why, sizeof why);
-		if (got < 0) { pick_say(a, "RomM", why, MENU_ACCENT); free(l.g); return; }
-		l.n += got;
-		if (got == 0 || l.n >= total) break;
-		plat_input_poll(&a->in);
-		if (menu_leaving(a)) break;
+		if (r < 0) { pick_say(a, "RomM", why, MENU_ACCENT); free(l.g); return; }
+		/* part of it: said, then shown, since what came is still worth browsing
+		 * (before, the list just ended at 42 of 282) */
+		if (r == ROMM_LIST_PARTIAL && !lp.stopped) pick_say(a, "RomM", why, MENU_ACCENT);
+		if (lp.stopped) { free(l.g); return; }
 	}
 	l.have = calloc((size_t)(l.n ? l.n : 1), 1);
 	for (i = 0; i < l.n && l.have; i++) l.have[i][0] = romm_is_here(rdir, &l.g[i], folder);
@@ -19488,7 +19584,9 @@ static void romm_games_screen(app *a, const romm_platform *p, const char *folder
 	plat_input_flush();
 	memset(&a->in, 0, sizeof a->in);
 	while (a->running) {
-		if (l.n > 0 && pp.want != sel) { pp.want = sel; pp.since = plat_now_ms(); pp.failed = false; }
+		if (l.n > 0 && pp.want != sel) {
+			pp.want = sel; pp.since = plat_now_ms(); pp.failed = false; pp.tries = 0;
+		}
 		romm_pic_step(a, &pp, l.g);
 		plat_input_poll(&a->in);
 		if (a->in.quit_requested) { a->running = false; break; }
@@ -19517,8 +19615,13 @@ static void romm_games_screen(app *a, const romm_platform *p, const char *folder
 					go = confirm_panel(a, "Download", "It's on this Brick already.\nDownload it again?",
 					                   "Download");
 				if (go) {
+					romm_rom one;
+
+					/* a game of several files: which, asked (Grout does too) */
+					go = romm_choose_file(a, &l.g[sel], &one);
 					romm_cover_path(l.g[sel].id, cover, sizeof cover);
-					if (romm_download_game(a, &l.g[sel], folder, cover)) l.have[sel][0] = 1;
+					if (go && romm_download_game(a, &one, folder, cover) && !strcmp(one.file_name, l.g[sel].file_name))
+						l.have[sel][0] = 1;
 				}
 				plat_input_flush();
 				memset(&a->in, 0, sizeof a->in);
@@ -19832,6 +19935,183 @@ static void romm_sync_states(app *a, const romm_scan *sc, const char *rdir,
 	free(seen);
 }
 
+/* Games put on the card without RomM (copied from its folders, say), matched
+ * to RomM's by name and noted in games.tsv as a download would be, so their
+ * saves sync too: before, sync saw only games RomM had downloaded and said
+ * "Download games from RomM first" (2026-11-25). Only a system with a game
+ * not yet noted asks RomM for its list. */
+typedef struct { const char *folder; char **top; int *id, n, cap; } romm_mapped;
+
+/* a name without its extension, for telling Foo.bin goes with Foo.cue */
+static size_t romm_stem_len(const char *name)
+{
+	const char *dot = strrchr(name, '.');
+
+	return dot && dot != name ? (size_t)(dot - name) : strlen(name);
+}
+
+static bool romm_mapped_add(romm_mapped *m, const char *top, size_t len, int rom_id)
+{
+	char *t;
+
+	if (m->n == m->cap) {
+		int cap = m->cap ? m->cap * 2 : 64;
+		char **more = realloc(m->top, (size_t)cap * sizeof *more);
+		int *ids;
+
+		if (!more) return false;
+		m->top = more;
+		if (!(ids = realloc(m->id, (size_t)cap * sizeof *ids))) return false;
+		m->id = ids;
+		m->cap = cap;
+	}
+	if (!(t = strndup(top, len))) return false;
+	m->id[m->n] = rom_id;
+	m->top[m->n++] = t;
+	return true;
+}
+
+static bool romm_mapped_one(int rom_id, const char *folder, const char *file, void *ctx)
+{
+	romm_mapped *m = ctx;
+
+	if (strcmp(folder, m->folder)) return true;
+	/* a multi-file game's line is folder/disc: its folder is the name here */
+	return romm_mapped_add(m, file, strcspn(file, "/"), rom_id);
+}
+
+/* Already noted: by name, or as the companion of a noted file (Foo.bin
+ * beside Foo.cue), so it isn't asked about again on every sync */
+static bool romm_mapped_has(const romm_mapped *m, const char *name)
+{
+	size_t sl = romm_stem_len(name);
+	int j;
+
+	for (j = 0; j < m->n; j++)
+		if (!strcmp(m->top[j], name) ||
+		    (romm_stem_len(m->top[j]) == sl && !strncmp(m->top[j], name, sl)))
+			return true;
+	return false;
+}
+
+static bool romm_mapped_id(const romm_mapped *m, int rom_id)
+{
+	int j;
+
+	for (j = 0; j < m->n; j++) if (m->id[j] == rom_id) return true;
+	return false;
+}
+
+/* What the launcher starts a game from goes first: a folder, .m3u, .cue... */
+static bool romm_match_first(const char *dir, const char *name)
+{
+	char p[LIB_PATH * 3];
+	const char *dot = strrchr(name, '.');
+	struct stat st;
+	int i;
+
+	snprintf(p, sizeof p, "%s/%s", dir, name);
+	if (stat(p, &st) == 0 && S_ISDIR(st.st_mode)) return true;
+	for (i = 0; dot && romm_firsts[i]; i++) if (!strcasecmp(dot + 1, romm_firsts[i])) return true;
+	return false;
+}
+
+static void romm_mapped_free(romm_mapped *m)
+{
+	int j;
+
+	for (j = 0; j < m->n; j++) free(m->top[j]);
+	free(m->top);
+	free(m->id);
+	memset(m, 0, sizeof *m);
+}
+
+static bool romm_match_skip(const char *name)
+{
+	static const char *const not_games[] = { "png", "jpg", "jpeg", "txt", "xml", "nfo", "pdf",
+	                                         "srm", "sav", "state", "cfg", "db", NULL };
+	const char *dot = strrchr(name, '.');
+	int i;
+
+	if (name[0] == '.') return true;
+	for (i = 0; dot && not_games[i]; i++) if (!strcasecmp(dot + 1, not_games[i])) return true;
+	return false;
+}
+
+static int romm_match_card(app *a, const char *rdir, int *looked)
+{
+	romm_platform all[64];
+	char why[160];
+	int n, i, matched = 0;
+
+	*looked = 0;
+	n = romm_platforms(&g_romm, all, 64, why, sizeof why);
+	if (n < 0) { fprintf(stderr, "romm: matching skipped: %s\n", why); return 0; }
+	for (i = 0; i < n; i++) {
+		char folder[CFG_STR], dir[LIB_PATH * 2], (*want)[LIB_NAME] = NULL;
+		romm_mapped m = { folder, NULL, NULL, 0, 0 };
+		romm_list_progress lp = { a, all[i].name, false };
+		romm_rom *g = NULL;
+		int nw = 0, cw = 0, ng = 0, k, j;
+		DIR *d;
+		struct dirent *e;
+
+		if (!all[i].tag || !all[i].roms || !romm_folder_for(all[i].tag, folder, sizeof folder)) continue;
+		snprintf(dir, sizeof dir, "%s/%s", P_ROMS, folder);
+		if (!(d = opendir(dir))) continue;
+		romm_map_each(rdir, romm_mapped_one, &m);
+		while ((e = readdir(d))) {
+			if (romm_match_skip(e->d_name) || strlen(e->d_name) >= LIB_NAME) continue;
+			if (romm_mapped_has(&m, e->d_name)) continue;
+			if (nw == cw) {
+				void *more = realloc(want, (size_t)(cw = cw ? cw * 2 : 32) * sizeof *want);
+
+				if (!more) break;
+				want = more;
+			}
+			snprintf(want[nw++], LIB_NAME, "%s", e->d_name);
+		}
+		closedir(d);
+		if (!nw) { romm_mapped_free(&m); free(want); continue; }
+		/* RomM's list for this system, as the games screen gets it */
+		k = romm_roms_all(&g_romm, all[i].id, all[i].roms, &g, &ng, romm_list_step, &lp,
+		                  why, sizeof why);
+		/* twice: what a game starts from, then the rest, so Foo.cue is noted
+		 * and its Foo.bin is then seen as the same game, not a second one */
+		for (int pass = 0; k >= 0 && pass < 2; pass++)
+			for (j = 0; j < nw; j++) {
+				int hit;
+				char file[LIB_PATH], path[LIB_PATH * 3], disc[LIB_NAME];
+				struct stat st;
+
+				if (romm_match_first(dir, want[j]) != (pass == 0)) continue;
+				if (pass == 1 && romm_mapped_has(&m, want[j])) continue;
+				(*looked)++;
+				hit = romm_match_file(g, ng, want[j]);
+				if (hit < 0 || romm_mapped_id(&m, g[hit].id)) continue;   /* once each */
+				snprintf(path, sizeof path, "%s/%s", dir, want[j]);
+				if (stat(path, &st) != 0) continue;
+				if (S_ISDIR(st.st_mode)) {
+					/* a folder: the disc it starts from, as a download notes it */
+					if (!romm_first_of(path, romm_firsts, disc, sizeof disc)) continue;
+					snprintf(file, sizeof file, "%s/%s", want[j], disc);
+				} else {
+					snprintf(file, sizeof file, "%s", want[j]);
+				}
+				if (romm_map_add(rdir, g[hit].id, folder, file)) {
+					matched++;
+					romm_mapped_add(&m, want[j], strlen(want[j]), g[hit].id);
+				}
+			}
+		romm_mapped_free(&m);
+		free(g);
+		free(want);
+		if (lp.stopped) return -1;   /* B: the sync stops with it */
+	}
+	if (*looked) fprintf(stderr, "romm: matched %d of %d games on the card\n", matched, *looked);
+	return matched;
+}
+
 /* Sync: what the server's plan says, for the games that came from RomM. A
  * save replaced is kept first, in Saves/.romm-backup; a conflict is sent up
  * as a new save beside the server's, so both are kept. */
@@ -19840,15 +20120,17 @@ static void romm_sync_screen(app *a)
 	romm_scan sc;
 	romm_sync_op ops[256];
 	char rdir[LIB_PATH], why[160], msg[200];
-	int n, session = 0, i, up = 0, down = 0, failed = 0;
+	int n, session = 0, i, up = 0, down = 0, failed = 0, matched, looked;
 
 	if (!net_online()) { pick_say(a, "Sync Saves", "Connect to Wi-Fi first", MENU_ACCENT); return; }
 	memset(&sc, 0, sizeof sc);
 	romm_dir(rdir, sizeof rdir);
+	romm_busy(a, "Matching your games");
+	if ((matched = romm_match_card(a, rdir, &looked)) < 0) return;
 	romm_busy(a, "Looking at your saves");
 	romm_map_each(rdir, romm_scan_one, &sc);
 	if (sc.ng == 0) {
-		pick_say(a, "Sync Saves", "Download games from RomM first:\ntheir saves are what syncs", MENU_ACCENT);
+		pick_say(a, "Sync Saves", "No games here match RomM's:\ndownload some from RomM first", MENU_ACCENT);
 		free(sc.s); free(sc.games);
 		return;
 	}
@@ -19910,6 +20192,11 @@ static void romm_sync_screen(app *a)
 	if (up + down + failed == 0) snprintf(msg, sizeof msg, "Everything is in sync");
 	else snprintf(msg, sizeof msg, "Saves and states: sent %d, got %d%s", up, down,
 	              failed ? "\nSome couldn't be synced" : "");
+	if (looked) {
+		size_t L = strlen(msg);
+
+		snprintf(msg + L, sizeof msg - L, "\nMatched %d of %d games here", matched, looked);
+	}
 	pick_say(a, "Sync Saves", msg, MENU_ACCENT);
 	{
 		char p[LIB_PATH];
@@ -25028,6 +25315,8 @@ static void updater_art(app *a, const char *dir)
 	fprintf(stderr, "updater art: wrote %s\n", dir);
 }
 
+static void hb_shot_menu(app *a, menu_build_fn build, void *ctx, int sel);
+
 /* One frame of RomM's screens for --romm */
 static void romm_shot(app *a)
 {
@@ -25065,6 +25354,44 @@ static void romm_shot(app *a)
 		if (l.n) { pp.want = shot_romm_b < l.n ? shot_romm_b : 0; pp.failed = true; }
 		for (i = 0; i < 1; i++) ;
 		romm_list_draw(a, "Game Boy", &l, pp.want < 0 ? 0 : pp.want, 0, vis, &pp);
+	} else if (!strcmp(shot_romm, "files")) {
+		/* --romm files PLATFORM GAME: the file picker for a platform's game */
+		romm_rom g[8];
+		romm_file f[ROMM_FILES_MAX];
+		romm_choose_ctx c;
+		char why[160];
+		int total, n = romm_roms(&g_romm, shot_romm_a, 0, 8, g, 8, &total, why, sizeof why), i;
+
+		if (n <= 0) { fprintf(stderr, "--romm files: %s\n", n < 0 ? why : "no games"); return; }
+		memset(&c, 0, sizeof c);
+		c.g = &g[shot_romm_b < n ? shot_romm_b : 0];
+		c.f = f;
+		c.n = romm_rom_files(&g_romm, c.g->id, f, ROMM_FILES_MAX, why, sizeof why);
+		if (c.n < 0) { fprintf(stderr, "--romm files: %s\n", why); return; }
+		snprintf(c.whole, sizeof c.whole, "The whole game (%d files)", c.g->nplay);
+		for (i = 0; i < c.n; i++)
+			snprintf(c.sizes[i], sizeof c.sizes[i], "%ld KB", (f[i].size + 1023) / 1024);
+		hb_shot_menu(a, romm_choose_build, &c, 0);
+	} else if (!strcmp(shot_romm, "match")) {
+		/* --romm match: Sync Saves' matching alone, for a check */
+		char rdir[LIB_PATH];
+		int looked, got;
+
+		romm_dir(rdir, sizeof rdir);
+		got = romm_match_card(a, rdir, &looked);
+		fprintf(stderr, "--romm match: %d of %d\n", got, looked);
+	} else if (!strcmp(shot_romm, "say")) {
+		/* --romm say N: what this round's RomM screens say, to see it fits */
+		static const char *const says[] = {
+			"RomM sent 42 of its 282 games",
+			"RomM stopped after 200 of 282 games",
+			"No games here match RomM's:\ndownload some from RomM first",
+			"Saves and states: sent 3, got 12\nMatched 280 of 282 games here",
+			"Everything is in sync\nMatched 0 of 4 games here",
+		};
+		int k = shot_romm_a < (int)(sizeof says / sizeof *says) ? shot_romm_a : 0;
+
+		pick_frame(a, k >= 2 ? "Sync Saves" : "RomM", NULL, 0, 0, NULL, 0, 0, says[k], MENU_ACCENT);
 	}
 }
 

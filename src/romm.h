@@ -57,7 +57,16 @@ typedef struct {
 	int  file_id;              /* the single file's, 0 for a multi-file game */
 	char file_name[ROMM_STR];  /* that file's name, what lands on the card */
 	char cover[ROMM_STR];      /* path_cover_small, or url_cover */
+	int  nplay;                /* its files that are the game (not a manual): >1, a choice */
 } romm_rom;
+
+/* One of a game's files, for choosing which to download */
+#define ROMM_FILES_MAX 32
+typedef struct {
+	int  id;
+	long size;
+	char name[ROMM_STR];
+} romm_file;
 
 typedef struct {
 	int  id;
@@ -108,9 +117,25 @@ bool romm_register(romm_conn *c, const char *device_name, char *why, size_t wn);
 const char *romm_tag_for(const char *slug, const char *fs_slug);
 
 int  romm_platforms(const romm_conn *c, romm_platform *out, int max, char *why, size_t wn);
-/* A page of a platform's games, by name. *total, the platform's count. */
+/* A page of a platform's games, by name. *total, the platform's count, or
+ * -1 when the server didn't say. ROMM_PAGE_TOO_BIG when the page was too
+ * long to read whole: ask for fewer. */
+#define ROMM_PAGE_TOO_BIG (-2)
 int  romm_roms(const romm_conn *c, int platform_id, int offset, int limit, romm_rom *out,
                int max, int *total, char *why, size_t wn);
+/* A platform's whole list, a page at a time: smaller pages when one is too
+ * long to read, on to the server's end, and a page with no total taken as
+ * the last only when it is short. `expect` is the platform's rom_count, for
+ * the progress line; `progress` is told how many have come and returns false
+ * to stop. 0 for the whole list; ROMM_LIST_PARTIAL, with `why`, for part of
+ * it (or stopped: `why` untouched); -1 with `why` for none. *out is the
+ * caller's to free in every case. */
+#define ROMM_LIST_PARTIAL 1
+int  romm_roms_all(const romm_conn *c, int platform_id, int expect, romm_rom **out, int *n,
+                   bool (*progress)(void *ctx, int have, int total), void *ctx,
+                   char *why, size_t wn);
+/* A game's files that are the game (not its manual), in RomM's order */
+int  romm_rom_files(const romm_conn *c, int rom_id, romm_file *out, int max, char *why, size_t wn);
 int  romm_firmware_list(const romm_conn *c, int platform_id, romm_firmware *out, int max,
                    char *why, size_t wn);
 
@@ -122,6 +147,11 @@ void romm_firmware_url(const romm_conn *c, const romm_firmware *f, char *out, si
 /* ---- what came from RomM (games.tsv: id, system folder, file) ----------- */
 
 bool romm_map_add(const char *dir, int rom_id, const char *folder, const char *file);
+/* Which of a platform's games `file` (a name on the card: a file, or a
+ * multi-file game's folder) is: RomM's own name for it, else the same name
+ * without extension, case or punctuation when only one game has it. -1 for
+ * none. For games put on the card without RomM, so their saves can sync. */
+int  romm_match_file(const romm_rom *g, int n, const char *file);
 /* The RomM id of a file on a shelf, 0 if it didn't come from RomM */
 int  romm_map_find(const char *dir, const char *folder, const char *file);
 typedef bool (*romm_map_fn)(int rom_id, const char *folder, const char *file, void *ctx);

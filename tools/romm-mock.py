@@ -53,6 +53,22 @@ ROMS = [
 ]
 CONTENT = {8: b'ZELDA-ROM-12', 9: b'TETRIS-GB'}
 
+# Paging (ChaOS 2.7.8): platforms the list reaches by id, not shown in
+# /api/platforms. 4: 282 PlayStation games, each listing many files, so 100
+# of them pass ChaOS's 1 MB reply (a tester's list stopped at 42 of 282);
+# 5: a server that caps a page at 30; 6: pages without a total.
+BIG = [{'id': 1000 + i, 'platform_id': 4, 'name': 'PS Game %03d' % i, 'fs_name': 'PS Game %03d' % i,
+        'fs_size_bytes': 700000000, 'has_multiple_files': True,
+        'files': [{'id': 100000 + i * 40 + f, 'file_name': 'PS Game %03d (Disc %d) (Track %02d).bin' % (i, f // 20 + 1, f % 20),
+                   'category': None, 'file_path': 'roms/psx/PS Game %03d/' % i + 'x' * 160} for f in range(40)]}
+       for i in range(282)]
+CAPPED = [{'id': 5000 + i, 'platform_id': 5, 'name': 'Capped %03d' % i, 'fs_name': 'Capped %03d.nes' % i,
+           'fs_size_bytes': 9, 'has_multiple_files': False, 'files': [{'id': 50000 + i, 'file_name': 'Capped %03d.nes' % i}]}
+          for i in range(75)]
+NOTOTAL = [{'id': 6000 + i, 'platform_id': 6, 'name': 'Bare %03d' % i, 'fs_name': 'Bare %03d.nes' % i,
+            'fs_size_bytes': 9, 'has_multiple_files': False, 'files': [{'id': 60000 + i, 'file_name': 'Bare %03d.nes' % i}]}
+           for i in range(130)]
+
 
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a):
@@ -91,7 +107,12 @@ class H(BaseHTTPRequestHandler):
         if p == '/api/roms':
             pid = int((q.get('platform_ids') or q.get('platform_id') or ['0'])[0])
             off, lim = int(q.get('offset', ['0'])[0]), int(q.get('limit', ['50'])[0])
-            items = [r for r in ROMS if r['platform_id'] == pid]
+            state.setdefault('pages', []).append((pid, off, lim))
+            if pid == 6:
+                return self.send(200, {'items': NOTOTAL[off:off + lim], 'limit': lim, 'offset': off})
+            if pid == 5:
+                lim = min(lim, 30)
+            items = BIG if pid == 4 else CAPPED if pid == 5 else [r for r in ROMS if r['platform_id'] == pid]
             return self.send(200, {'items': items[off:off + lim], 'total': len(items), 'limit': lim, 'offset': off})
         if p.startswith('/api/roms/') and '/content/' in p:
             rid = int(p.split('/')[3])
@@ -104,6 +125,14 @@ class H(BaseHTTPRequestHandler):
                 return self.send(200, raw=b.getvalue(), ctype='application/zip')
             fid = int(q.get('file_ids', ['0'])[0])
             return self.send(200, raw=CONTENT[fid], ctype='application/octet-stream')
+        if p.startswith('/api/roms/') and p.count('/') == 3:
+            # a game, with its files (the file picker, ChaOS 2.7.8)
+            rid = int(p.split('/')[3])
+            rom = next((r for r in ROMS + BIG if r['id'] == rid), None)
+            if not rom:
+                return self.send(404, {'detail': 'Not found'})
+            return self.send(200, dict(rom, files=[dict(f, file_size_bytes=f.get('file_size_bytes', 1536))
+                                                   for f in rom['files']]))
         if p == '/api/firmware':
             if q.get('platform_id') == ['1']:
                 return self.send(200, [{'id': 5, 'file_name': 'gb_bios.bin', 'file_size_bytes': 4, 'md5_hash': 'x'},
