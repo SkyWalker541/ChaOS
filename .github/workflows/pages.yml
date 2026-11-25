@@ -32,6 +32,7 @@ on:
 
 permissions:
   contents: read
+  actions: read     # to see the artifact listed before deploying it
   pages: write
   id-token: write
 
@@ -74,5 +75,21 @@ jobs:
       - uses: actions/upload-pages-artifact@v5
         with:
           path: site
+      # deploy-pages asks for the artifact once, a moment after it is
+      # finalized, and GitHub's list can lag that moment: from 2026-11-23 every
+      # run found "0 artifact(s)" and failed, leaving 2.7.6's image here while
+      # 2.7.7 was the release ChaOS Wire looked for. So wait until the list
+      # shows it - every 2 s, up to a minute - then deploy.
+      - name: Wait until GitHub lists the artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for i in $(seq 1 30); do
+            n=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?name=github-pages" --jq '.total_count' || echo 0)
+            if [ "${n:-0}" -ge 1 ]; then echo "listed after $((i * 2 - 2)) s"; exit 0; fi
+            sleep 2
+          done
+          echo "github-pages was never listed" >&2
+          exit 1
       - id: deploy
         uses: actions/deploy-pages@v5
