@@ -39,9 +39,9 @@ jobs:
           # own boot files' revision when it carries them (chaos-image.sh)
           if [ -f PLASTRON_REV ]; then echo "cardbase=$B+$(tr -d ' \n' < PLASTRON_REV)"; else echo "cardbase=$B"; fi >> "$GITHUB_OUTPUT"
           case "$GITHUB_REF_NAME:$V" in
-          testing:*-test[0-9]*) echo "test=1" >> "$GITHUB_OUTPUT" ;;
+          testing:*-test|testing:*-test[0-9]*) echo "test=1" >> "$GITHUB_OUTPUT" ;;
           main:*-*) echo "main takes releases only, not $V" >&2; exit 1 ;;
-          testing:*) echo "the testing branch takes test builds only (N.N.N-testN), not $V" >&2; exit 1 ;;
+          testing:*) echo "the testing branch takes test builds only (N.N.N-test), not $V" >&2; exit 1 ;;
           esac
           if gh release view "v$V" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
             echo "ChaOS $V is already released"; echo "out=1" >> "$GITHUB_OUTPUT"

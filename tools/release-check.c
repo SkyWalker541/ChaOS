@@ -129,7 +129,12 @@ static void check_versions(void)
 		/* ChaOS: test builds, before the release they lead to */
 		{ "2.6.0-test1", "2.5.0", true }, { "2.6.0", "2.6.0-test3", true },
 		{ "2.6.0-test3", "2.6.0", false }, { "2.6.0-test2", "2.6.0-test1", true },
-		{ "2.6.0-test1", "2.6.0-test1", false }, { "2.6.0-test", "2.5.0", false },
+		{ "2.6.0-test1", "2.6.0-test1", false },
+		/* and since 2.7.8-test1, unnumbered: the version itself goes up */
+		{ "2.6.0-test", "2.5.0", true }, { "2.6.0", "2.6.0-test", true },
+		{ "2.6.0-test", "2.6.0", false }, { "2.7.10-test", "2.7.9-test", true },
+		{ "2.7.9-test", "2.7.8-test1", true }, { "2.7.9-test", "2.7.9", false },
+		{ "2.6.0-tests", "2.5.0", false }, { "2.6.0-test-", "2.5.0", false },
 		{ "2.6.0-test0", "2.5.0", false },
 	};
 

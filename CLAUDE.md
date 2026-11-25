@@ -50,7 +50,12 @@ that adds a feature and breaks another is not done.
 ## Versions and branches
 
 - `main` is Public Release, versions `X.Y.Z`. `testing` is Pre-Release,
-  `X.Y.(Z+1)-testN`, always numerically ahead of Public.
+  `X.Y.Z-test` with no number after "test": each Pre-Release raises the
+  version itself (2.7.9-test, then 2.7.10-test), always numerically ahead of
+  Public. Bricks read "-test" unnumbered from the build after 2.7.8-test1;
+  older builds (`-testN`) still compare correctly.
+- New releases go to Pre-Release first, Brick Pro work included; Public
+  Release follows when Pre-Release has had enough good feedback.
 - `testing` keeps its own history: commits are cherry-picked between the two,
   never merged. Brick Pro work lives on `testing` only.
 - Pushing a new version in `CHAOS_VERSION` releases it (`release.yml`), and

@@ -102,7 +102,7 @@ static void trim(char *s)
 	memmove(s, s + strspn(s, " \t"), strlen(s + strspn(s, " \t")) + 1);
 }
 
-/* "2.5.0", and a test build's "2.6.0-test1" */
+/* "2.5.0", and a test build's "2.7.9-test" (or, until 2.7.8-test1, "2.6.0-test1") */
 static bool version_ok(const char *v)
 {
 	int dots = 0;
@@ -112,7 +112,7 @@ static bool version_ok(const char *v)
 		else if (!isdigit((unsigned char)*v)) return false;
 	}
 	if (*v == '-') {
-		if (strncmp(v, "-test", 5) || !isdigit((unsigned char)v[5])) return false;
+		if (strncmp(v, "-test", 5)) return false;
 		for (v += 5; *v; v++) if (!isdigit((unsigned char)*v)) return false;
 	}
 	return dots >= 1 && dots <= 3;

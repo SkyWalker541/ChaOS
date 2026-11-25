@@ -257,7 +257,7 @@ EOF
 SEED=$((va * 1000000 + vb * 1000 + ${vc:-0}))
 SV=$NUM
 if [ "$NUM" != "$V" ]; then
-	case "$V" in *-test[0-9]*) ;; *) echo "CHAOS_VERSION $V: a test build is N.N.N-testN" >&2; exit 1 ;; esac
+	case "$V" in *-test|*-test[0-9]*) ;; *) echo "CHAOS_VERSION $V: a test build is N.N.N-test" >&2; exit 1 ;; esac
 	SEED=$((SEED - 1))
 	SV=$((SEED / 1000000)).$((SEED / 1000 % 1000)).$((SEED % 1000))
 fi

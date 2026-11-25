@@ -23,8 +23,10 @@ static void say(char *why, size_t whyn, const char *text)
 }
 
 /* One to four numbers of up to five digits, joined by dots. */
-/* ChaOS: and a test build's "-testN" after the numbers, into *test (0 for a
- * release, which comes after every test of it) */
+/* ChaOS: and a test build's "-test" after the numbers, into *test (0 for a
+ * release, which comes after every test of it). Numbered until 2.7.8-test1
+ * ("-testN"); since, the version itself goes up and "-test" has no number,
+ * which reads as test 1. */
 static bool version_parts(const char *v, long part[4], int *count, long *test)
 {
 	int n = 0;
@@ -43,7 +45,8 @@ static bool version_parts(const char *v, long part[4], int *count, long *test)
 		part[n++] = x;
 		if (*v == '\0') break;
 		if (*v == '-') {
-			if (strncmp(v, "-test", 5) || !isdigit((unsigned char)v[5])) return false;
+			if (strncmp(v, "-test", 5)) return false;
+			if (!v[5]) { *test = 1; break; }
 			for (v += 5; isdigit((unsigned char)*v); v++) {
 				if (*test > 99999) return false;
 				*test = *test * 10 + (*v - '0');

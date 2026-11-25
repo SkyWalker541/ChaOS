@@ -49,6 +49,11 @@ int main(void)
 	ck(!ota_parse("<html>Not Found</html>", &o), "and a web page is not one");
 
 	printf("versions:\n");
+	ck(ota_parse("version = 2.7.10-test\nbase = 2.1.1\nroot = x.squashfs.xz\nsha256 = " SHA
+	             "\nsize = 1\n", &o) && !strcmp(o.version, "2.7.10-test"),
+	   "an unnumbered test build's file reads (since 2.7.8-test1)");
+	ck(!ota_parse("version = 2.7.10-tests\nbase = 2.1.1\nroot = x.squashfs.xz\nsha256 = " SHA
+	              "\nsize = 1\n", &o), "but not a near miss");
 	ck(ota_vercmp("0.10.0", "0.9.2") > 0, "0.10.0 is after 0.9.2");
 	ck(ota_vercmp("0.7.1", "0.7.1") == 0, "the same is the same");
 	ck(ota_vercmp("0.7", "0.7.1") < 0 && ota_vercmp("1.0.0", "0.99.9") > 0, "and the rest");
@@ -59,6 +64,11 @@ int main(void)
 	ck(ota_vercmp("2.6.0-test10", "2.6.0-test9") > 0 && ota_vercmp("2.6.0-test2", "2.6.0-test2") == 0,
 	   "tests in order");
 	ck(ota_vercmp("2.6.1", "2.6.0-test3") > 0 && ota_vercmp("2.5.9", "2.6.0-test1") < 0, "and around them");
+	/* Unnumbered test builds since 2.7.8-test1: the version itself goes up */
+	ck(ota_vercmp("2.7.10-test", "2.7.9-test") > 0 && ota_vercmp("2.7.9-test", "2.7.8-test1") > 0,
+	   "2.7.10-test after 2.7.9-test after 2.7.8-test1");
+	ck(ota_vercmp("2.7.9", "2.7.9-test") > 0 && ota_vercmp("2.7.9-test", "2.7.8") > 0,
+	   "2.7.9-test between 2.7.8 and 2.7.9");
 
 	printf("the small update:\n");
 	ck(ota_parse("version = 0.9.3\nbase = 2.1.1\nroot = r.squashfs.xz\nsha256 = " SHA "\nsize = 9\n"
