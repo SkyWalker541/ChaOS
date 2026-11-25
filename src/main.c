@@ -6492,12 +6492,16 @@ static int menu_build(app *a, screen_id screen, int sys,
 static void wait_panel(app *a, const char *heading, const char *msg)
 {
 	menu_row row = { msg, NULL, false };
+	bool root = g_menu_root;
 
 	draw_shelf(a);
 	SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
 	SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
 	SDL_RenderFillRect(a->r, NULL);
+	/* no back chevron: nothing here goes back, it is waited out */
+	g_menu_root = true;
 	menu_draw(a, heading, &row, 1, -1, 0, MENU_ACCENT);
+	g_menu_root = root;
 	plat_draw_osd(a->r);
 	plat_present();
 }
@@ -11007,7 +11011,7 @@ static void update_after_start(app *a)
  * step a percentage, A too; the two switches flip. The blinking one never
  * sits at or above the low one: it is the last of the two. */
 static int g_bw_shot;   /* --battwarn: the page, one frame */
-static int g_off_shot;  /* --offnote 1|2: shutting down, restarting */
+static int g_off_shot;  /* --offnote 1|2|3: shutting down, restarting, loading */
 
 static int bw_build(void *ctx, menu_row *rows, int max, const char **heading)
 {
@@ -22900,6 +22904,12 @@ static void launch_game(app *a)
 			        st, stat(st, &rs) == 0 ? "there" : "none",
 			        rewind_load(a->sys.systems[o].tag) ? "on" : "off");
 		}
+		/* ChaOS: a PlayStation game boots on black for seconds while its
+		 * disc loads (16 for Castlevania). The last frame drawn here stays on
+		 * the panel until Diatom (0.9.21) has a picture to show, so it says
+		 * what is happening (Aquilus, 2026-11-25). Drawn before RUN: from
+		 * RUNNING the panel is Diatom's. */
+		if (!strcmp(s->tag, "PS")) wait_panel(a, s->name, "Loading...");
 		if (plat_resident_send(s->tag, core, rom, st, st, pv,
 		                       console, active[0] ? active : NULL)) {
 			int r;
@@ -25797,7 +25807,16 @@ static void take_shot(app *a)
 		menu_draw(a, heading, rows, n, shot_menu_sel, menu_std_width(a), MENU_ACCENT);
 	}
 	if (g_about_shot) about_screen(a);
-	if (g_off_shot) draw_off_note(a, g_off_shot == 2);
+	if (g_off_shot == 3) {   /* --offnote 3: a PlayStation game's Loading... */
+		menu_row row = { "Loading...", NULL, false };
+
+		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
+		SDL_RenderFillRect(a->r, NULL);
+		g_menu_root = true;
+		menu_draw(a, "PlayStation", &row, 1, -1, 0, MENU_ACCENT);
+		g_menu_root = false;
+	} else if (g_off_shot) draw_off_note(a, g_off_shot == 2);
 	if (g_bw_shot) {
 		menu_row rows[10];
 		const char *heading;
