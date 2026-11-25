@@ -3719,8 +3719,6 @@ static void draw_menu_status(SDL_Renderer *r, int left, int right, int y,
 {
 	TTF_Font *f = ui_font(UI_F_META);
 	int mid = y + ui_font_height(UI_F_META) / 2;
-	int dot_x = right - 9;
-	int level = battery_level();
 
 	if (g_status_clock) {
 		char s[16];
@@ -3753,9 +3751,12 @@ static void draw_menu_status(SDL_Renderer *r, int left, int right, int y,
 			int tw = 0, gap = icon && words ? bh / 2 : 0;
 			int iw = icon ? bw + nub : 0;
 			int total, ix;
-			SDL_Color fill = pct <= g_bw_low ? (SDL_Color){ 224, 72, 72, 255 }
-			               : charging ? (SDL_Color){ 120, 200, 120, 255 }
-			               : UI_TEXT_SOFT;
+			/* Never red: this heading is in every menu and popup, an
+			 * update's included, where a red battery looked like part of
+			 * the message (Aquilus, 2026-11-25). The low-battery warning is
+			 * draw_low_battery_chrome's dot, on the shelf and in Muse, and
+			 * Diatom's over a game; here the battery is only information. */
+			SDL_Color fill = charging ? (SDL_Color){ 120, 200, 120, 255 } : UI_TEXT_SOFT;
 
 			if (words) {
 				snprintf(s, sizeof s, "%d%%", pct);
@@ -3798,16 +3799,13 @@ static void draw_menu_status(SDL_Renderer *r, int left, int right, int y,
 							SDL_RenderFillRect(r, &(SDL_Rect){ bx + 4 + q * (seg + 2), in.y, seg, in.h });
 					} else
 					if (w > 0) SDL_RenderFillRect(r, &in);
-					dot_x = bx - 18;
-				} else {
-					dot_x = right - tw - 18;
 				}
 			}
 		}
 	}
-
-	if (level == 1 || (level == 2 && (plat_now_ms() / 1000) % 2 == 0))
-		draw_low_battery_dot(r, dot_x, mid);
+	/* No low-battery dot here either, for the same reason as the icon's
+	 * colour: it showed inside every popup. At empty ChaOS still saves the
+	 * game and turns off by itself (battery_level's caller), menu or not. */
 }
 
 static void draw_low_battery_dot(SDL_Renderer *r, int cx, int cy)
