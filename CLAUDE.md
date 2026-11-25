@@ -52,8 +52,11 @@ that adds a feature and breaks another is not done.
 - `main` is Public Release, versions `X.Y.Z`. `testing` is Pre-Release,
   `X.Y.Z-test` with no number after "test": each Pre-Release raises the
   version itself (2.7.9-test, then 2.7.10-test), always numerically ahead of
-  Public. Bricks read "-test" unnumbered from the build after 2.7.8-test1;
-  older builds (`-testN`) still compare correctly.
+  Public. Bricks read "-test" unnumbered from 2.7.9-test1 on; older
+  builds read only `-testN`. So test builds stay numbered (bridging) until
+  the reader is out on both channels: in a Public release too, since a
+  Public Brick switched to Pre-Release reads the test name with its own
+  code. Then drop the number.
 - New releases go to Pre-Release first, Brick Pro work included; Public
   Release follows when Pre-Release has had enough good feedback.
 - `testing` keeps its own history: commits are cherry-picked between the two,
