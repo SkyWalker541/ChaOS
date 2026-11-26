@@ -11335,7 +11335,6 @@ static void controls_screen(app *a)
 
 	ctl_set_fn_volume(plat_brightness_on_volume());
 	ctl_set_battery_lights(plat_battery_lights());
-	ctl_set_m_keys(plat_sticks((int[4]){ 0 }));   /* the Brick Pro: M1, M2 */
 
 	while (!done && !want_quit && a->running) {
 		menu_row rows[CTL_MAX_ROWS];
@@ -26269,7 +26268,6 @@ static void take_shot(app *a)
 
 		ctl_set_fn_volume(plat_brightness_on_volume());
 		ctl_set_battery_lights(plat_battery_lights());
-		ctl_set_m_keys(plat_sticks((int[4]){ 0 }));   /* the Brick Pro: M1, M2 */
 		n = ctl_rows(p, controls_dir(), rows);
 
 		snprintf(head, sizeof head, "Main Menu Controls");

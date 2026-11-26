@@ -63,6 +63,8 @@ that adds a feature and breaks another is not done.
   the Pro's sticks answering on TWI3 leave "PRO!", else "BRIC"), and
   `boot.scr` loading the Pro's device tree and kernel, or the Brick's.
 - **Home**: F1 or F2 pressed alone, out of every menu to the shelves.
+- **M1 / M2**: the Brick Pro's F1 and F2, in code and button mapping only.
+  Players see F1 and F2 on every device.
 
 ## Versions and branches
 
@@ -77,7 +79,8 @@ that adds a feature and breaks another is not done.
 - **Pro Detect is in every Pre-Release**, from 2.7.9-test1 on: `PLASTRON_REV`
   and `dist/brick/plastron` stay on `testing`, and `make check-pro-detect`
   fails a `-test` version without them. Everything works on both devices:
-  the Pro's M1/M2 are the Brick's F1/F2 and are named so on a Pro, and the
+  the Pro's M1 and M2 (their name in code and mapping) send the Brick's F1
+  and F2, and everything a player reads calls them F1 and F2, and the
   Pro's left stick moves in every menu as the d-pad does.
 - New releases go to Pre-Release first, Brick Pro work included; Public
   Release follows when Pre-Release has had enough good feedback.

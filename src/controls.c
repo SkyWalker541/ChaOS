@@ -8,16 +8,9 @@
 
 static bool fn_volume;        /* see ctl_set_fn_volume */
 static bool battery_lights;   /* see ctl_set_battery_lights */
-static bool m_keys;           /* see ctl_set_m_keys */
 
 void ctl_set_fn_volume(bool on) { fn_volume = on; }
 void ctl_set_battery_lights(bool on) { battery_lights = on; }
-void ctl_set_m_keys(bool on) { m_keys = on; }
-
-/* The front function keys by the name printed on them: F1 and F2 on the
- * Brick, M1 and M2 on the Brick Pro, which sends the same keys (plastron's
- * 0048 patch) */
-static const char *fk(const char *brick, const char *pro) { return m_keys ? pro : brick; }
 
 static const char *const NAMES[CTL_PAGES] = {
 	[CTL_MOVING]   = "Moving",
@@ -66,9 +59,9 @@ static int cc_shortcuts(const ctl_console *cc, menu_row *out)
 	int n = 0;
 	out[n++] = (menu_row){ "MENU",        "Menu",              false };
 	out[n++] = (menu_row){ "MENU+SELECT", "Save and quit",     false };
-	out[n++] = (menu_row){ fk("F2", "M2"), "Fast forward",      false };
+	out[n++] = (menu_row){ "F2",          "Fast forward",      false };
 	if (cc->rewind)
-		out[n++] = (menu_row){ fk("F1", "M1"), "Rewind, held",  false };
+		out[n++] = (menu_row){ "F1",      "Rewind, held",      false };
 	out[n++] = (menu_row){ "MENU+X",      "Screenshot",        false };
 	out[n++] = (menu_row){ "POWER",       "Save and turn off", false };
 	return n;
@@ -200,7 +193,7 @@ static int menus(menu_row *out)
 	out[n++] = (menu_row){ CTL_PEEK_NAME, "Held: see the game", false };
 	/* Home: either one alone, out of every menu (not a game's, not Muse's).
 	 * The Pixel 2 has no F1 or F2; MENU does the same there */
-	if (!fn_volume) out[n++] = (menu_row){ fk("F1 or F2", "M1 or M2"), "Home: the shelves", false };
+	if (!fn_volume) out[n++] = (menu_row){ "F1 or F2", "Home: the shelves", false };
 	return n;
 }
 
@@ -227,7 +220,7 @@ static int muse(menu_row *out)
 	/* The pocket lock. It took SELECT's row: "Close Muse" is SELECT
 	 * doing on Muse what the Anywhere page already says it does. F1/F2 are
 	 * L3/R3 to anyone coming from another CFW; the guide says so. */
-	out[n++] = (menu_row){ fn_volume ? "FN+both Vol" : fk("F1+F2", "M1+M2"), "Lock, held", false };
+	out[n++] = (menu_row){ fn_volume ? "FN+both Vol" : "F1+F2", "Lock, held", false };
 	return n;
 }
 

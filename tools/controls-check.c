@@ -44,10 +44,10 @@ static const char *const BUTTONS[] = {
 static bool pixel, pro;
 static int other_devices(const char *b)
 {
-	/* ChaOS: the Brick Pro's front keys are printed M1 and M2 */
-	if (pro) return !strncmp(b, "F1", 2) || !strcmp(b, "FN+Vol") ||
-	                !strcmp(b, "FN+both Vol") || !strcmp(b, "L2+R2");
-	if (!pixel && !strncmp(b, "M1", 2)) return 1;
+	/* ChaOS: the Brick Pro's front keys are M1 and M2 to the code (plastron's
+	 * 0048 patch sends them as the Brick's F1 and F2), but a player has the
+	 * same two buttons on both and reads F1 and F2 on both */
+	if (!strncmp(b, "M1", 2)) return 1;
 	/* ChaOS: the Brick's brightness is MENU+Vol now; F1 and F2 are rewind
 	 * and fast forward, on a console's own page */
 	return pixel ? !strcmp(b, "MENU+Vol") || !strncmp(b, "F1", 2) ||
@@ -341,9 +341,9 @@ static void pagers_and_consoles(void)
 	   !strcmp(ctl_console_short("SFC", "SNES"), "SNES"), "short names in headings");
 }
 
-/* A console's own page names rewind and fast forward by the key printed on
- * the device: added with the Brick Pro's names, 2.7.9-test1, where every page
- * said F1 and F2 and the Pro's keys say M1 and M2. */
+/* A console's own page says F1 and F2 on every device that has them, the
+ * Brick Pro too: added 2026-11-25, when the Pro's pages briefly said M1 and
+ * M2, the name only the code uses. */
 static void game_keys_by_device(void)
 {
 	ctl_console cc;
@@ -352,22 +352,16 @@ static void game_keys_by_device(void)
 
 	memset(&cc, 0, sizeof cc);
 	cc.rewind = true;
-	printf("rewind and fast forward by the device's names\n");
-	for (int d = 0; d < 2; d++) {
-		ctl_set_m_keys(d == 1);
-		f = m = 0;
-		for (int pg = 0; pg < ctl_console_pages(&cc); pg++) {
-			n = ctl_console_rows(&cc, pg, r);
-			for (i = 0; i < n; i++) {
-				if (!r[i].label || ROW_IS_NOTE(r[i])) continue;
-				if (!strcmp(r[i].label, "F1") || !strcmp(r[i].label, "F2")) f++;
-				if (!strcmp(r[i].label, "M1") || !strcmp(r[i].label, "M2")) m++;
-			}
+	printf("rewind and fast forward say F1 and F2\n");
+	for (int pg = 0; pg < ctl_console_pages(&cc); pg++) {
+		n = ctl_console_rows(&cc, pg, r);
+		for (i = 0; i < n; i++) {
+			if (!r[i].label || ROW_IS_NOTE(r[i])) continue;
+			if (!strcmp(r[i].label, "F1") || !strcmp(r[i].label, "F2")) f++;
+			if (!strncmp(r[i].label, "M1", 2) || !strncmp(r[i].label, "M2", 2)) m++;
 		}
-		ck(d == 0 ? (f == 2 && m == 0) : (m == 2 && f == 0),
-		   d == 0 ? "the Brick's page says F1 and F2" : "the Pro's page says M1 and M2");
 	}
-	ctl_set_m_keys(false);
+	ck(f == 2 && m == 0, "a console's page says F1 and F2");
 }
 
 int main(void)
@@ -381,14 +375,12 @@ int main(void)
 		pro = d == 2;
 		ctl_set_fn_volume(pixel);
 		ctl_set_battery_lights(pixel);
-		ctl_set_m_keys(pro);
 		printf("on the %s:\n", pixel ? "Pixel 2" : pro ? "Brick Pro" : "Brick");
 		every_button_somewhere();
 		no_page_repeats();
 		rows_fit();
 	}
 
-	ctl_set_m_keys(false);
 	game_keys_by_device();
 
 	if (fails) {

@@ -91,8 +91,4 @@ void ctl_set_fn_volume(bool on);
  * says so. Not shown until it is set. */
 void ctl_set_battery_lights(bool on);
 
-/* ChaOS: the Brick Pro's front keys are printed M1 and M2 where the Brick's
- * say F1 and F2 (they send the same keys): true names them M1 and M2. */
-void ctl_set_m_keys(bool on);
-
 #endif

@@ -55,6 +55,8 @@ static const struct { int code; in_button b; } keymap[] = {
 	{ BTN_TL, IN_L1 },            { BTN_TR, IN_R1 },
 	{ BTN_SELECT, IN_SELECT },    { BTN_START, IN_START },
 	{ BTN_MODE, IN_MENU },
+	/* ChaOS: on the Brick Pro these are M1 and M2 (plastron's 0048 patch
+	 * sends them as the Brick's); a player reads F1 and F2 on both */
 	{ BTN_THUMBL, IN_F1 },        { BTN_THUMBR, IN_F2 },
 	{ KEY_VOLUMEDOWN, IN_VOLDN }, { KEY_VOLUMEUP, IN_VOLUP },
 	{ KEY_POWER, IN_POWER },
