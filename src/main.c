@@ -17120,6 +17120,123 @@ static void pm_gui_art(app *a)
 	closedir(d);
 }
 
+/* ChaOS: the old PortMaster screens' picture cache (.userdata/ports/img, a
+ * port zip's name as the file: 2048.jpg for 2048.zip), retired with them
+ * once PortMaster's own app has run here: every shelf script with no art
+ * first gets its picture from it, by the old installs' manifests (the zip's
+ * name, the scripts it unpacked) or a port's own port.json ("name": the
+ * zip), then the cache goes. Once (ports/.img-retired); interrupted, it runs
+ * again. Nothing else of the old setup is touched: ports, their homes,
+ * runtimes, libraries, manifests and the catalogue all stay (2026-11-26). */
+static void pm_img_art(app *a, const char *zipbase, const char *script)
+{
+	static const char *const EXT[] = { "png", "jpg", "jpeg" };
+	char stem[LIB_NAME], img[LIB_PATH * 2], media[LIB_PATH];
+	size_t l, k;
+
+	snprintf(stem, sizeof stem, "%s", script);
+	l = strlen(stem);
+	if (l <= 3 || strcasecmp(stem + l - 3, ".sh") || strchr(stem, '/')) return;
+	stem[l - 3] = '\0';
+	if (has_box_art("Ports", stem)) return;
+	for (k = 0; k < sizeof EXT / sizeof EXT[0]; k++) {
+		snprintf(img, sizeof img, "%s/ports/img/%s.%s", P_USERDATA, zipbase, EXT[k]);
+		if (access(img, R_OK) != 0) continue;
+		snprintf(media, sizeof media, "%s/Ports/.media", P_ROMS);
+		mkdir(media, 0755);
+		if (cover_save(a, img, "Ports", stem))
+			fprintf(stderr, "ports: art for %s kept from the old screens' pictures\n", stem);
+		return;
+	}
+}
+
+static void pm_retire_img(app *a)
+{
+	char dir[LIB_PATH], mark[LIB_PATH], p[LIB_PATH * 2], line[LIB_PATH];
+	DIR *d;
+	struct dirent *e;
+	int gone = 0, kept = 0;
+	long long bytes = 0;
+
+	snprintf(mark, sizeof mark, "%s/ports/.img-retired", P_USERDATA);
+	if (access(mark, F_OK) == 0) return;
+	snprintf(dir, sizeof dir, "%s/ports/img", P_USERDATA);
+	if (access(dir, F_OK) == 0) {
+		/* the old installs: each manifest is a zip's, and names its scripts */
+		snprintf(p, sizeof p, "%s/ports/installed", P_USERDATA);
+		if ((d = opendir(p))) {
+			while ((e = readdir(d))) {
+				char zb[LIB_NAME], mf[LIB_PATH * 2];
+				FILE *f;
+				size_t l = strlen(e->d_name);
+
+				if (e->d_name[0] == '.' || l <= 4 || strcmp(e->d_name + l - 4, ".txt")) continue;
+				snprintf(zb, sizeof zb, "%.*s", (int)(l - 4), e->d_name);
+				snprintf(mf, sizeof mf, "%s/%s", p, e->d_name);
+				if (!(f = fopen(mf, "r"))) continue;
+				while (fgets(line, sizeof line, f)) {
+					line[strcspn(line, "\r\n")] = '\0';
+					pm_img_art(a, zb, line);
+				}
+				fclose(f);
+			}
+			closedir(d);
+		}
+		/* and ports with a port.json naming their zip */
+		snprintf(p, sizeof p, "%s/Ports", P_ROMS);
+		if ((d = opendir(p))) {
+			while ((e = readdir(d))) {
+				char pj[LIB_PATH * 2], zb[LIB_NAME], nm[LIB_NAME], *buf;
+				FILE *f;
+				long len;
+				jsv root, name, items, it = { 0 }, v;
+				size_t l;
+
+				if (e->d_name[0] == '.' || !strcmp(e->d_name, "PortMaster")) continue;
+				snprintf(pj, sizeof pj, "%s/%s/port.json", p, e->d_name);
+				if (!(f = fopen(pj, "rb"))) continue;
+				fseek(f, 0, SEEK_END);
+				len = ftell(f);
+				rewind(f);
+				if (len <= 0 || len > 512 * 1024 || !(buf = malloc((size_t)len + 1))) { fclose(f); continue; }
+				len = (long)fread(buf, 1, (size_t)len, f);
+				fclose(f);
+				buf[len] = '\0';
+				root = js_root(buf, (size_t)len);
+				if (js_member(root, "name", &name) && js_str(name, zb, sizeof zb) &&
+				    (l = strlen(zb)) > 4 && !strcasecmp(zb + l - 4, ".zip") && !strchr(zb, '/')) {
+					zb[l - 4] = '\0';
+					if (js_member(root, "items", &items))
+						while (js_next(items, &it, &v))
+							if (js_str(v, nm, sizeof nm)) pm_img_art(a, zb, nm);
+				}
+				free(buf);
+			}
+			closedir(d);
+		}
+		/* then the cache itself: plain files only, and the folder if empty */
+		if ((d = opendir(dir))) {
+			while ((e = readdir(d))) {
+				struct stat st;
+
+				if (e->d_name[0] == '.' && (!e->d_name[1] || (e->d_name[1] == '.' && !e->d_name[2]))) continue;
+				snprintf(p, sizeof p, "%s/%s", dir, e->d_name);
+				if (lstat(p, &st) != 0 || !S_ISREG(st.st_mode)) { kept++; continue; }
+				if (unlink(p) == 0) { gone++; bytes += st.st_size; } else kept++;
+			}
+			closedir(d);
+		}
+		if (!kept) rmdir(dir);
+		fprintf(stderr, "ports: the old screens' pictures retired: %d files, %lld KB%s\n",
+		        gone, bytes / 1024, kept ? ", some kept" : "");
+	}
+	if (!kept) {
+		FILE *f = fopen(mark, "w");
+
+		if (f) { fprintf(f, "%d files\n", gone); fclose(f); }
+	}
+}
+
 static void pm_box_art(app *a, const pm_port *p, unsigned accent)
 {
 	char img[LIB_PATH], url[400], file[96], why[96], stem[LIB_NAME];
@@ -18467,7 +18584,7 @@ static void pm_get(app *a)
 
 		for (o = 0; o < a->sys.count; o++)
 			if (!strcmp(a->sys.systems[o].tag, "PORTS")) break;
-		if (o < a->sys.count) { port_launch(a, o, PM_ENTRY_FILE, PM_ENTRY_NAME); pm_gui_art(a); rescan_all(a); }
+		if (o < a->sys.count) { port_launch(a, o, PM_ENTRY_FILE, PM_ENTRY_NAME); pm_gui_art(a); pm_retire_img(a); rescan_all(a); }
 	}
 }
 
@@ -23125,6 +23242,7 @@ static void launch_game(app *a)
 			/* ChaOS: PortMaster's own app, and the shelf found again after */
 			port_launch(a, o, PM_ENTRY_FILE, PM_ENTRY_NAME);
 			pm_gui_art(a);
+			pm_retire_img(a);
 			rescan_all(a);
 			return;
 		}
@@ -26385,7 +26503,7 @@ static void take_shot(app *a)
 		SDL_RenderFillRect(a->r, NULL);
 		menu_draw(a, heading, rows, n, g_bw_shot - 1, 0, MENU_ACCENT);
 	}
-	if (g_pm_art_shot) pm_gui_art(a);
+	if (g_pm_art_shot) { pm_gui_art(a); pm_retire_img(a); }
 	if (g_log_shot) {
 		menu_row rows[16];
 		const char *heading;
