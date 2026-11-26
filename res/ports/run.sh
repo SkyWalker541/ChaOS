@@ -222,6 +222,40 @@ if [ -f /usr/lib/chaos-ports/libSDL2-2.0.so.0 ] &&
 		echo "ChaOS: its script puts /usr/lib first; ChaOS's SDL preloaded"
 	fi
 fi
+# A port's saves in the card's common Saves folder (Saves/Ports/<its
+# folder>/<folder>), as every other game's are, so the Saves that Syncthing
+# shares carries them too: each folder a port keeps saves or settings in is
+# bound from there over the one in the port's own folder while it runs. The
+# first time, what the port had is copied there (and left where it was,
+# under the bind, so nothing is lost); after, Saves' copy is the one, as
+# synced from another device. Unbound as this ends (chaos_unbind), and
+# again at the next start if this was cut off.
+card=${CHAOS_USERDATA%/.userdata/*}
+binds=/tmp/chaos-port-binds
+chaos_unbind() {
+	[ -f "$binds" ] || return 0
+	while IFS= read -r m; do
+		[ -n "$m" ] && /bin/umount "$m" 2> /dev/null
+	done < "$binds"
+	rm -f "$binds"
+}
+chaos_unbind
+gd=$(sed -n 's|^[[:space:]]*\(export[[:space:]]\{1,\}\)\{0,1\}GAMEDIR=.*/ports/\([^/"'"'"' ]*\).*|\2|p' "$PORT" | head -1)
+if [ -n "$gd" ] && [ -n "$card" ] && [ -d "/roms/ports/$gd" ] && [ -d "$card/Saves" ]; then
+	for sub in saves save savedata savegames conf config cfg userdata user; do
+		src="/roms/ports/$gd/$sub"
+		dst="$card/Saves/Ports/$gd/$sub"
+		[ -d "$src" ] || continue
+		if [ ! -d "$dst" ]; then
+			mkdir -p "$dst.new" && cp -a "$src/." "$dst.new/" && mv "$dst.new" "$dst" ||
+				{ rm -rf "$dst.new"; echo "ChaOS: couldn't copy $sub to Saves"; continue; }
+			echo "ChaOS: $gd/$sub copied to Saves/Ports"
+		fi
+		/bin/mount -o bind "$dst" "$src" && echo "$src" >> "$binds" &&
+			echo "ChaOS: $gd/$sub kept in Saves/Ports"
+	done
+fi
+trap 'cpu_back; chaos_unbind' EXIT
 cd "$(dirname "$PORT")" || exit 1
 /bin/bash "$PORT"
 st=$?

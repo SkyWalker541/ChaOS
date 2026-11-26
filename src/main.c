@@ -105,6 +105,9 @@ static void os_cycle(const char *tag, int d, bool live);
 #include <string.h>
 #include <strings.h>
 #include <sys/stat.h>
+#ifdef __linux__
+#include <sys/mount.h>
+#endif
 #include <sys/wait.h>
 #include <sys/resource.h>
 #include <sys/statvfs.h>
@@ -16488,6 +16491,26 @@ static void port_cpu_end(void)
 	        g_port_cpu.min / 1000, g_port_cpu.max / 1000);
 }
 
+/* ChaOS: a port's save folders, bound from Saves/Ports while it ran
+ * (res/ports/run.sh), let go after it however it ended: run.sh does as it
+ * exits, but not when it was killed outright. One mount point a line. */
+static void port_saves_unbind(void)
+{
+#ifdef __linux__
+	FILE *f = fopen("/tmp/chaos-port-binds", "r");
+	char line[512];
+
+	if (!f) return;
+	while (fgets(line, sizeof line, f)) {
+		line[strcspn(line, "\n")] = '\0';
+		if (!strncmp(line, "/roms/ports/", 12) && !strstr(line, ".."))
+			umount2(line, MNT_DETACH);
+	}
+	fclose(f);
+	unlink("/tmp/chaos-port-binds");
+#endif
+}
+
 /* At start: a launcher that died while a port ran left the clock raised and
  * what it was in PORT_CPU_SAVED; put back, if run.sh hasn't already. A line
  * that doesn't read as one is left alone and removed. */
@@ -16587,6 +16610,7 @@ static void port_launch(app *a, int o, const char *romfile, const char *title)
 	port_cpu_begin();
 	rc = plat_run_port(argv, envkv, NULL, &how, port_power_prompt, a);
 	port_cpu_end();
+	port_saves_unbind();
 	sth_hold(false);
 	fprintf(stderr, "port %s exited %d (%s)\n", romfile, rc,
 	        how == PORT_POWER ? "power held" : how == PORT_QUIT ? "select+start" : "itself");
