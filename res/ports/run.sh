@@ -42,9 +42,16 @@ export SDL_GAMECONTROLLERCONFIG="$CHAOS_PAD"
 # that brings an SDL of its own puts that ahead of both.
 # and after it, the libraries fetched from ChaOS's pack for ports that need
 # what the Brick hasn't got (src/libpack.h), kept in .userdata
-# and last, what ChaOS ships for ports beside run.sh (lib/: libudev-zero,
-# tools/build-libudev.sh), behind anything a port brings of its own
-export LD_LIBRARY_PATH="/usr/lib/chaos-ports:$CHAOS_USERDATA/ports/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}:$HERE/lib"
+export LD_LIBRARY_PATH="/usr/lib/chaos-ports:$CHAOS_USERDATA/ports/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+# and last, for a port that runs on Weston only, libudev-zero (lib/,
+# tools/build-libudev.sh), which Weston's libinput needs. Not for every port:
+# an SDL that finds a libudev uses it to find the pad and the keyboard
+# gptokeyb makes, and libudev-zero's guesses aren't the Brick's own scan, so
+# with it on every port's path ports lost their buttons (Undertale's title
+# screen, PortMaster's app) in 2.7.9-test3 (2026-11-26)
+if [ -f "$PORT" ] && grep -q weston "$PORT" 2> /dev/null; then
+	export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$HERE/lib"
+fi
 # Weston's seat daemon (PortMaster's weston_pkg) ties its seat to a virtual
 # terminal unless told not to; the Brick has none (no /dev/tty0), so it never
 # made Weston's session active and refused it every input device: Switchfin,

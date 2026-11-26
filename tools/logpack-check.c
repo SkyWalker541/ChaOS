@@ -164,9 +164,11 @@ static void pack(void)
 static void pack_more(void)
 {
 	char dir[] = "/tmp/logpack-more.XXXXXX", p[600], k[600], out[600], cmd[1400], line[512], err[128];
-	const char *more[4];
+	const char *more[6];
+	char big[600];
 	FILE *f;
 	bool masked = false, leaked = false, missing_left_out = true;
+	bool head_cut = true, tail_kept = false, said = false;
 
 	printf("the other logs, in more/\n");
 	if (!mkdtemp(dir)) { perror("mkdtemp"); failures++; return; }
@@ -178,9 +180,21 @@ static void pack_more(void)
 	if ((f = fopen(k, "w"))) { fputs("mmc0: error on ReinFi\n", f); fclose(f); }
 	more[0] = k;               more[1] = "kernel-now.log";
 	more[2] = "/nonexistent";  more[3] = "gone.log";
+	/* ChaOS 2.7.9-test3: a log megabytes long packed whole made Download
+	 * logs take long enough to look like a lock-up: only its end now */
+	snprintf(big, sizeof big, "%s/big.txt", dir);
+	if ((f = fopen(big, "w"))) {
+		int i;
+
+		fputs("BIGHEAD\n", f);
+		for (i = 0; i < 30000; i++) fputs("libinput bug: Event for missing capability CAP_POINTER\n", f);
+		fputs("BIGTAIL\n", f);
+		fclose(f);
+	}
+	more[4] = big;             more[5] = "port-big.log";
 	snprintf(p, sizeof p, "%s/logs", dir);
 	snprintf(out, sizeof out, "%s/pack.tar.gz", dir);
-	CHECK(logpack_build_more(p, "ChaOS\n", SECRETS, NSECRETS, more, 2, "chaos-logs-test", out, err, sizeof err),
+	CHECK(logpack_build_more(p, "ChaOS\n", SECRETS, NSECRETS, more, 3, "chaos-logs-test", out, err, sizeof err),
 	      "built: %s", err);
 	snprintf(cmd, sizeof cmd, "cd '%s' && tar -xzf pack.tar.gz && ls chaos-logs-test/more && cat chaos-logs-test/more/*", dir);
 	if ((f = popen(cmd, "r"))) {
@@ -188,11 +202,15 @@ static void pack_more(void)
 			if (strstr(line, "gone.log")) missing_left_out = false;
 			if (strstr(line, "ReinFi")) leaked = true;
 			if (strstr(line, "mmc0: error on R...i")) masked = true;
+			if (strstr(line, "BIGHEAD")) head_cut = false;
+			if (strstr(line, "BIGTAIL")) tail_kept = true;
+			if (strstr(line, "KB left out")) said = true;
 		}
 		pclose(f);
 	}
 	CHECK(masked && !leaked, "the kernel's log is packed, its names masked");
 	CHECK(missing_left_out, "a log that isn't there is left out");
+	CHECK(head_cut && tail_kept && said, "a long one: its last LOGPACK_MORE_TAIL bytes, and says so");
 	snprintf(cmd, sizeof cmd, "rm -rf '%s'", dir);
 	if (system(cmd) != 0) { }
 }

@@ -320,20 +320,43 @@ static void mask_shapes(char *line, size_t cap)
 
 /* ---- the pack ------------------------------------------------------------- */
 
-static bool copy_masked(const char *from, const char *to,
-                        const char *const *secrets, int n)
+/* At most `tail` bytes of it, its end, when tail > 0: the other logs (a
+ * port's own, the kernel's) can run to megabytes - a Weston port writes a
+ * line for every button press - and each is masked line by line and packed
+ * on the Brick while Download logs waits; 2.7.9-test3's took long enough to
+ * look like a lock-up (Aquilus, 2026-11-26). The end is what says what went
+ * wrong. */
+static bool copy_masked_tail(const char *from, const char *to,
+                             const char *const *secrets, int n, long tail)
 {
 	FILE *in = fopen(from, "r"), *out;
 	char line[4096];
 
 	if (!in) return false;
 	if (!(out = fopen(to, "w"))) { fclose(in); return false; }
+	if (tail > 0 && fseek(in, 0, SEEK_END) == 0) {
+		long size = ftell(in);
+
+		if (size > tail && fseek(in, size - tail, SEEK_SET) == 0) {
+			int c;
+
+			while ((c = fgetc(in)) != EOF && c != '\n') { }   /* to a whole line */
+			fprintf(out, "[ChaOS: the first %ld KB left out; the last %ld KB follow]\n",
+			        (size - tail) / 1024, tail / 1024);
+		} else rewind(in);
+	}
 	while (fgets(line, sizeof line, in)) {
 		logpack_mask_line(line, sizeof line, secrets, n);
 		fputs(line, out);
 	}
 	fclose(in);
 	return fclose(out) == 0;
+}
+
+static bool copy_masked(const char *from, const char *to,
+                        const char *const *secrets, int n)
+{
+	return copy_masked_tail(from, to, secrets, n, 0);
 }
 
 static bool run(char *const argv[])
@@ -452,7 +475,7 @@ bool logpack_build_more(const char *logs_dir, const char *about,
 		for (k = 0; k + 1 < nmore * 2; k += 2) {
 			if (!more[k] || !more[k + 1] || access(more[k], R_OK) != 0) continue;
 			snprintf(path, sizeof path, "%s/more/%s", dir, more[k + 1]);
-			copy_masked(more[k], path, secrets, n);
+			copy_masked_tail(more[k], path, secrets, n, LOGPACK_MORE_TAIL);
 		}
 	}
 	snprintf(path, sizeof path, "%s/about.txt", dir);

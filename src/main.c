@@ -4865,56 +4865,6 @@ static void anim_launch(app *a, unsigned ms)
 	plat_present();
 }
 
-/* The send-off (ChaOS), the boot played backwards: the logo whole, as the
- * boot left it, then every square flies out along the path it came in by,
- * accelerating and fading, in the order tools/genchaosmotion.py gave them,
- * until only the ground is left.
- *
- * TortOS's timing, measured against the shutdown (2026-08-28): 1.42 s from
- * the Power off press to the system going, so the animation runs about
- * 900 ms and ends without clearing; power_off turns the backlight off right
- * after. Its last frame is the empty ground. */
-static void anim_poweroff(app *a)
-{
-	const unsigned T_HOLD = 160, T_SPREAD = 420, T_FLY = 300;
-	const unsigned ms = T_HOLD + T_SPREAD + T_FLY;      /* 880, about TortOS's 900 */
-	unsigned t0 = plat_now_ms(), now;
-
-	while ((now = plat_now_ms()) - t0 < ms) {
-		float t = (float)(now - t0);
-		int i;
-
-		SDL_SetRenderDrawColor(a->r, CHAOS_GROUND_R, CHAOS_GROUND_G, CHAOS_GROUND_B, 255);
-		SDL_RenderClear(a->r);
-		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
-		for (i = 0; i < CHAOS_NCELLS; i++) {
-			const chaos_cell *c = &CHAOS_CELLS[i];
-			/* Leaves in the boot's arrival order reversed: last in, first out */
-			float k = (t - T_HOLD - (1.0f - c->delay) * T_SPREAD) / (float)T_FLY;
-			float e, d;
-			SDL_FRect q;
-
-			if (k >= 1.0f) continue;
-			if (k < 0.0f) k = 0.0f;
-			e = k * k * k;                       /* accelerating away */
-			d = c->dist * e;
-			q.x = c->x + c->dx * d;
-			q.y = c->y + c->dy * d;
-			q.w = q.h = CHAOS_CELL;
-			SDL_SetRenderDrawColor(a->r, c->r, c->g, c->b,
-			                       (Uint8)(255.0f * (k < 0.4f ? 1.0f : 1.0f - (k - 0.4f) / 0.6f)));
-			SDL_RenderFillRectF(a->r, &q);
-		}
-		plat_present();
-		SDL_Delay(6);
-	}
-	/* The empty ground, exactly, and no clear after: it is what is on the
-	 * panel as the backlight goes. */
-	SDL_SetRenderDrawColor(a->r, CHAOS_GROUND_R, CHAOS_GROUND_G, CHAOS_GROUND_B, 255);
-	SDL_RenderClear(a->r);
-	plat_present();
-}
-
 /* ChaOS: the kernel's own log, kept at each power off (kernel.log, and the
  * one before as kernel.log.1) for Download logs: SD card errors, crashes and
  * power trouble are written there, not in chaos.log, and a power off is when
@@ -4940,14 +4890,16 @@ static void log_kernel_at_off(void)
  * start it again did nothing (Aquilus, 2026-11-25). The frame stays on the
  * panel after ChaOS exits, as the lit shell did before 2026-10-02, until the
  * power goes. */
+/* ChaOS: the logo, whole and still, rather than "Shutting down..." under a
+ * send-off that left the ground empty: one picture from the press to the
+ * power going (Aquilus, 2026-11-26). Restarting the same: the boot then
+ * builds the same logo. */
 static void draw_off_note(app *a, bool restart)
 {
-	TTF_Font *f = ui_font(UI_F_MENU);
-
+	(void)restart;
 	SDL_SetRenderDrawColor(a->r, CHAOS_GROUND_R, CHAOS_GROUND_G, CHAOS_GROUND_B, 255);
 	SDL_RenderClear(a->r);
-	if (f) ui_text(a->r, f, restart ? "Restarting..." : "Shutting down...", TORTOS_SCREEN_W / 2,
-	               (TORTOS_SCREEN_H - TTF_FontHeight(f)) / 2, 0, UI_TEXT_SOFT);
+	draw_chaos_mark(a->r, 0.0f, 255, 1.0f, 0.0f, 0.0f);
 }
 
 static void power_off(app *a)
@@ -4957,10 +4909,9 @@ static void power_off(app *a)
 	remember_place(a);
 	book_keep(true);
 	plat_request_poweroff();
-	anim_poweroff(a);
 	/* TortOS went dark here (Eric's call, 2026-10-02): the rest of the
 	 * shutdown is not instant, and the shell stayed lit through it. ChaOS
-	 * says so instead, and the power going takes the light. */
+	 * shows its logo instead, and the power going takes the light. */
 	draw_off_note(a, access(CHAOS_REBOOT_FLAG, F_OK) == 0);
 	plat_present();
 	/* The card's writes flushed here, under the note, rather than after

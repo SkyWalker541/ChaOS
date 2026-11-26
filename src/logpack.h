@@ -49,4 +49,7 @@ bool logpack_build_more(const char *logs_dir, const char *about,
                         const char *const *more, int nmore,
                         const char *folder, const char *out, char *err, size_t en);
 
+/* The most of each other log (more/) a pack keeps: its last this many bytes */
+#define LOGPACK_MORE_TAIL (512L * 1024)
+
 #endif
