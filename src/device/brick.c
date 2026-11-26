@@ -8,6 +8,7 @@
 #include "db.h"
 #include "device.h"
 #include "fbhold.h"
+#include "portsticks.h"
 #include "platform.h"
 
 #include <dirent.h>
@@ -451,6 +452,66 @@ float plat_stick_axis(const plat_stick_cal *c, const int raw[4])
 	if (v > 1) v = 1;
 	if (v < 0) v = 0;
 	return plus ? v : -v;
+}
+
+/* ChaOS: the sticks for a port (portsticks.h): the mapping's fields for
+ * SDL, and each axis's range set around its calibrated middle until the port
+ * ends. NULL with no sticks, or on the way back. */
+const char *plat_port_sticks(bool on)
+{
+	static char map[128];
+#ifdef __linux__
+	static struct input_absinfo saved[4];
+	static int was_set[4];
+	int i;
+
+	if (!on) {
+		for (i = 0; i < 4; i++)
+			if (was_set[i] && fd_pad >= 0) ioctl(fd_pad, EVIOCSABS(stick_abs[i]), &saved[i]);
+		memset(was_set, 0, sizeof was_set);
+		return NULL;
+	}
+	if (!g_sticks || fd_pad < 0) return NULL;
+	{
+		unsigned long abs_bits[NLONGS(ABS_MAX)];
+		portsticks_cal cal[4];
+		portsticks_range range[4];
+		int sdl_axis[4], set[4], code, n = 0, r;
+
+		/* SDL's numbering: every axis the device has, in ABS order, the
+		 * hats left out (SDL2's linux joystick, ConfigJoystick) */
+		memset(abs_bits, 0, sizeof abs_bits);
+		ioctl(fd_pad, EVIOCGBIT(EV_ABS, sizeof abs_bits), abs_bits);
+		for (r = 0; r < 4; r++) sdl_axis[r] = -1;
+		for (code = 0; code < ABS_MAX; code++) {
+			if (code == ABS_HAT0X) { code = ABS_HAT3Y; continue; }
+			if (!BIT_IS_SET(abs_bits, code)) continue;
+			for (r = 0; r < 4; r++) if (stick_abs[r] == code) sdl_axis[r] = n;
+			n++;
+		}
+		for (i = 0; i < 4; i++) {
+			cal[i].idx = g_cal[i].idx; cal[i].neg = g_cal[i].neg;
+			cal[i].mid = g_cal[i].mid; cal[i].pos = g_cal[i].pos;
+		}
+		if (!portsticks_build(cal, sdl_axis, map, sizeof map, range, set)) return NULL;
+		for (r = 0; r < 4; r++) {
+			struct input_absinfo ai;
+
+			if (!set[r] || ioctl(fd_pad, EVIOCGABS(stick_abs[r]), &ai) != 0) continue;
+			saved[r] = ai;
+			ai.minimum = range[r].min;
+			ai.maximum = range[r].max;
+			ai.flat = range[r].flat;
+			if (ioctl(fd_pad, EVIOCSABS(stick_abs[r]), &ai) == 0) was_set[r] = 1;
+		}
+		fprintf(stderr, "input: sticks for the port: %s\n", map);
+		return map;
+	}
+#else
+	(void)on;
+	(void)map;
+	return NULL;
+#endif
 }
 
 static void sticks_dpad(in_state *st)

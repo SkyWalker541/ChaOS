@@ -50,7 +50,10 @@ date
 # ChaOS forces no mapping of its own on ports now, so a port gets the d-pad
 # as a d-pad, as PortMaster expects on a device with no stick (Aquilus's
 # "defaults aren't great", 2026-11-26).
-M="a:b1,b:b0,x:b3,y:b2,back:b8,start:b9,guide:b10,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,leftstick:b11,rightstick:b12,dpup:b13,dpdown:b14,dpleft:b15,dpright:b16,platform:Linux,"
+# The Brick Pro's sticks are SDL's sticks too: CHAOS_STICKS, set by ChaOS from
+# Calibrate Sticks ("leftx:a0,lefty:a1,..." - src/portsticks.h), empty on a
+# Brick
+M="a:b1,b:b0,x:b3,y:b2,back:b8,start:b9,guide:b10,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,leftstick:b11,rightstick:b12,dpup:b13,dpdown:b14,dpleft:b15,dpright:b16,${CHAOS_STICKS}platform:Linux,"
 CHAOS_PAD="19001eec427269636b2047616d657000,Brick Gamepad,$M
 19000000427269636b2047616d657000,Brick Gamepad,$M"
 export CHAOS_PAD

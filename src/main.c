@@ -55,6 +55,7 @@ static void os_cycle(const char *tag, int d, bool live);
 #include "ssrun.h"
 #include "sys_menu.h"
 #include "controls.h"
+#include "cpumode.h"
 #include "update.h"
 #include "remap.h"
 #include "shots.h"
@@ -3715,6 +3716,8 @@ static void draw_low_battery_dot(SDL_Renderer *r, int cx, int cy);
 static void redraw_at(Uint32 t);   /* below, with the rest of the redraw clock */
 static void draw_upd_notice(app *a);   /* ChaOS: with the Updates screen */
 static bool rewind_load(const char *tag);   /* ChaOS: with Button Mapping */
+static int  cpu_mode_get(const char *tag, const char *file);   /* ChaOS: with it */
+static void cpu_mode_set(const char *tag, const char *file, int m);
 static int  menu_shelf_width(app *a);
 static void upd_poll(void);
 
@@ -6434,6 +6437,7 @@ static int menu_build(app *a, screen_id screen, int sys,
 			u.overscan = u.fav || u.muse ? NULL : os_label(sc->tag);
 			u.native  = !strcmp(sc->core, PICO8_CORE);
 			u.ports   = !strcmp(sc->core, PORTS_CORE);
+			u.perf    = cpumode_name(cpu_mode_get(sc->tag, NULL));
 			u.shader  = look_console_of(sc->tag) == LOOK_NONE ? NULL
 			          : a->view[sys].look.on ? "On" : "Off";
 			u.overlay = u.fav || u.muse ? NULL : overlay_label(a, sys, ovl, sizeof ovl);
@@ -8396,6 +8400,10 @@ static void gi_gather(app *a, int owner, const game_entry *g, game_info *gi)
 	box_art_path(s->folder, g->name, p, sizeof p);
 	gi->has_art = (stat(p, &st) == 0 && st.st_size > 0);
 	gi->is_fav = fav_is(a->sys.systems[owner].tag, g->file);
+	/* ChaOS: Performance, for what ChaOS sets the clock for: Diatom's games
+	 * and ports, not PICO-8 or PortMaster's own card */
+	if (strcmp(s->core, PICO8_CORE) && s->core[0] && !pm_is_entry(g->file))
+		snprintf(gi->perf, sizeof gi->perf, "%s", cpumode_name(cpu_mode_get(s->tag, g->file)));
 
 	/* Loading the set clobbers whatever set is loaded, which is nobody's
 	 * during shelf browsing - no game is running. It stays loaded after this
@@ -9282,6 +9290,17 @@ static menu_result info_key(app *a, void *ctx, in_button key, int sel)
 
 	/* X closes it, the same button that opened it. */
 	if (key == IN_X) return MENU_DONE;
+	/* ChaOS: Performance, by its label as every row here is: left, right
+	 * and A go round, saved as they change */
+	if (sel < n && !strcmp(rows[sel].label, "Performance") &&
+	    (key == IN_LEFT || key == IN_RIGHT || key == IN_ACCEPT)) {
+		const char *tag = a->sys.systems[c->owner].tag;
+
+		cpu_mode_set(tag, c->g->file,
+		             cpumode_step(cpu_mode_get(tag, c->g->file), key == IN_LEFT ? -1 : 1, true));
+		gi_gather(a, c->owner, c->g, &c->gi);
+		return MENU_STAY;
+	}
 	if (key != IN_ACCEPT || sel >= n || !rows[sel].live) return MENU_STAY;
 
 	if (!strcmp(rows[sel].label, "Synopsis")) {
@@ -9909,6 +9928,45 @@ static void stick_dpad_save(const char *tag, bool on)
 	char k[CFG_STR + 16];
 	snprintf(k, sizeof k, "stickdpad.%s", tag);
 	db_set_int(db_dev(), k, on ? 1 : 0);
+}
+
+/* ChaOS: Performance (cpumode.h): a console's in "cpu.<tag>", Auto unless
+ * set; a game's or port's own in "cpu.<tag>:<file>", none meaning its
+ * console's. Keyed by the file, so it stays with the game whatever moves on
+ * the shelf around it. */
+static void cpu_key(char *k, size_t n, const char *tag, const char *file)
+{
+	if (file && *file) snprintf(k, n, "cpu.%s:%s", tag, file);
+	else snprintf(k, n, "cpu.%s", tag);
+}
+
+static int cpu_mode_get(const char *tag, const char *file)
+{
+	char k[CFG_STR + LIB_PATH + 16];
+	int m;
+
+	cpu_key(k, sizeof k, tag, file);
+	m = db_get_int(db_dev(), k, file && *file ? CPU_DEFAULT : CPU_AUTO);
+	if (m < (file && *file ? CPU_DEFAULT : CPU_AUTO) || m >= CPU_MODES)
+		m = file && *file ? CPU_DEFAULT : CPU_AUTO;
+	return m;
+}
+
+static void cpu_mode_set(const char *tag, const char *file, int m)
+{
+	char k[CFG_STR + LIB_PATH + 16];
+
+	cpu_key(k, sizeof k, tag, file);
+	if (file && *file && m == CPU_DEFAULT) db_del(db_dev(), k);
+	else db_set_int(db_dev(), k, m);
+}
+
+/* What a game or port runs at: its own, else its console's */
+static int cpu_mode_for(const char *tag, const char *file)
+{
+	int m = cpu_mode_get(tag, file);
+
+	return m == CPU_DEFAULT ? cpu_mode_get(tag, NULL) : m;
 }
 
 static void rewind_save(const char *tag, bool on)
@@ -12050,6 +12108,12 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 		if (sel == SM_REWIND) {
 			const char *tag = a->sys.systems[a->sys_cursor].tag;
 			if (d || key == IN_ACCEPT) rewind_save(tag, !rewind_load(tag));
+			return MENU_STAY;
+		}
+		if (sel == SM_PERF) {
+			const char *tag = a->sys.systems[a->sys_cursor].tag;
+			if (d || key == IN_ACCEPT)
+				cpu_mode_set(tag, NULL, cpumode_step(cpu_mode_get(tag, NULL), d ? d : 1, false));
 			return MENU_STAY;
 		}
 		/* Sort order, on the same left/right idiom.
@@ -16437,10 +16501,17 @@ static bool cpu_write(const char *name, const char *v)
 	return ok;
 }
 
-static void port_cpu_begin(void)
+/* ChaOS: Performance (cpumode.h): the clock for a game or a port while it
+ * plays, set as it starts and put back as it ends (port_cpu_end), from the
+ * same saved line either way, so a launcher that died meanwhile puts it back
+ * on its way up (port_cpu_recover) and run.sh puts a port's back as it ends.
+ * For a game Diatom is told the floor (CPU_FLOOR_FILE), as its fast-forward
+ * hands the clock back to it rather than to the device's lowest. */
+#define CPU_FLOOR_FILE "/tmp/chaos-cpu-floor"
+static void port_cpu_begin(int mode, bool port)
 {
 	char v[32], b[32];
-	long top = 1800000, lo = 1608000;
+	long hw_min = 0, hw_max = 0, lo, top;
 
 	g_port_cpu.set = false;
 	if (!cpu_read(PORT_CPU_DIR "scaling_governor", g_port_cpu.gov, sizeof g_port_cpu.gov) ||
@@ -16448,28 +16519,39 @@ static void port_cpu_begin(void)
 	g_port_cpu.min = atol(v);
 	if (!cpu_read(PORT_CPU_DIR "scaling_max_freq", v, sizeof v)) return;
 	g_port_cpu.max = atol(v);
-	if (cpu_read(PORT_CPU_DIR "cpuinfo_max_freq", v, sizeof v) && atol(v) > 0 && atol(v) < top) top = atol(v);
-	/* and never below the top it already had: the Brick's own reaches 2000
-	 * MHz, and 1800 for a port would have been less, not more (2.7.9-test5,
-	 * the first log of it) */
-	if (g_port_cpu.max > top) top = g_port_cpu.max;
-	if (lo > top) lo = top;
+	if (cpu_read(PORT_CPU_DIR "cpuinfo_min_freq", v, sizeof v)) hw_min = atol(v);
+	if (cpu_read(PORT_CPU_DIR "cpuinfo_max_freq", v, sizeof v)) hw_max = atol(v);
+	/* a device that won't say its top: a port's Auto as before, from what
+	 * it has now; anything else left alone */
+	if (hw_max <= 0) {
+		if (!port || mode != CPU_AUTO) return;
+		hw_max = g_port_cpu.max > 1800000 ? g_port_cpu.max : 1800000;
+	}
+	if (!cpumode_plan(mode, port, hw_min, hw_max, g_port_cpu.max, &lo, &top)) return;
 	{
 		FILE *f = fopen(PORT_CPU_SAVED, "w");
 
-		/* not raised unless it can be put back by someone else too */
+		/* not changed unless it can be put back by someone else too */
 		if (!f) return;
 		fprintf(f, "%s %ld %ld\n", g_port_cpu.gov, g_port_cpu.min, g_port_cpu.max);
 		if (fclose(f) != 0) { unlink(PORT_CPU_SAVED); return; }
 	}
 	g_port_cpu.set = true;
-	/* the top first, so the floor is never above it */
-	snprintf(b, sizeof b, "%ld", top);
-	cpu_write(PORT_CPU_DIR "scaling_max_freq", b);
+	/* the floor down first when the top is coming down, the top up first
+	 * when the floor is going up: never a floor above the top */
 	snprintf(b, sizeof b, "%ld", lo);
+	if (lo <= g_port_cpu.min) cpu_write(PORT_CPU_DIR "scaling_min_freq", b);
+	snprintf(v, sizeof v, "%ld", top);
+	cpu_write(PORT_CPU_DIR "scaling_max_freq", v);
 	cpu_write(PORT_CPU_DIR "scaling_min_freq", b);
 	if (strcmp(g_port_cpu.gov, "ondemand")) cpu_write(PORT_CPU_DIR "scaling_governor", "ondemand");
-	fprintf(stderr, "port: CPU %ld-%ld MHz while it runs (was %s, %ld-%ld)\n", lo / 1000, top / 1000,
+	if (!port) {
+		FILE *f = fopen(CPU_FLOOR_FILE, "w");
+
+		if (f) { fprintf(f, "%ld\n", lo); fclose(f); }
+	}
+	fprintf(stderr, "cpu: %s, %ld-%ld MHz while the %s runs (was %s, %ld-%ld)\n",
+	        cpumode_name(mode), lo / 1000, top / 1000, port ? "port" : "game",
 	        g_port_cpu.gov, g_port_cpu.min / 1000, g_port_cpu.max / 1000);
 }
 
@@ -16477,6 +16559,7 @@ static void port_cpu_end(void)
 {
 	char b[32];
 
+	unlink(CPU_FLOOR_FILE);
 	if (!g_port_cpu.set) return;
 	g_port_cpu.set = false;
 	/* the floor first, so it is never above the top being put back */
@@ -16489,7 +16572,7 @@ static void port_cpu_end(void)
 	if (!cpu_read(PORT_CPU_DIR "scaling_governor", b, sizeof b) || strcmp(b, g_port_cpu.gov))
 		cpu_write(PORT_CPU_DIR "scaling_governor", g_port_cpu.gov);
 	unlink(PORT_CPU_SAVED);
-	fprintf(stderr, "port: CPU back to %s, %ld-%ld MHz\n", g_port_cpu.gov,
+	fprintf(stderr, "cpu: back to %s, %ld-%ld MHz\n", g_port_cpu.gov,
 	        g_port_cpu.min / 1000, g_port_cpu.max / 1000);
 }
 
@@ -16528,7 +16611,7 @@ static void port_cpu_recover(void)
 		g_port_cpu.min = mn;
 		g_port_cpu.max = mx;
 		g_port_cpu.set = true;
-		fprintf(stderr, "port: the last one's CPU clock was never put back; now\n");
+		fprintf(stderr, "cpu: the last game's or port's clock was never put back; now\n");
 		fclose(f);
 		port_cpu_end();
 		return;
@@ -16556,7 +16639,7 @@ static void port_launch(app *a, int o, const char *romfile, const char *title)
 	const system_cfg *s = &a->sys.systems[o];
 	char script[LIB_PATH * 2], runner[CFG_STR * 2], why[96], ud[LIB_PATH + 32];
 	char *argv[4];
-	const char *envkv[2];
+	const char *envkv[3];
 	bool music;
 	int how = PORT_ENDED, rc;
 	/* ChaOS: the Ports shelf's first card is PortMaster's own app, run by
@@ -16589,6 +16672,18 @@ static void port_launch(app *a, int o, const char *romfile, const char *title)
 	snprintf(ud, sizeof ud, "CHAOS_USERDATA=%s", P_USERDATA);
 	envkv[0] = ud;
 	envkv[1] = NULL;
+	/* ChaOS: the Brick Pro's sticks, for run.sh's CHAOS_PAD; set here, as
+	 * the axes' ranges are, and put back when the port ends */
+	{
+		static char sk[160];
+		const char *map = plat_port_sticks(true);
+
+		if (map) {
+			snprintf(sk, sizeof sk, "CHAOS_STICKS=%s", map);
+			envkv[1] = sk;
+			envkv[2] = NULL;
+		}
+	}
 	argv[0] = (char *)"/bin/sh";
 	argv[1] = runner;
 	argv[2] = script;
@@ -16609,9 +16704,10 @@ static void port_launch(app *a, int o, const char *romfile, const char *title)
 	fprintf(stderr, "port %s: starting\n", romfile);
 	sth_hold(true);
 	gbs_cancel();   /* and the Game Boy look, tried again later */
-	port_cpu_begin();
+	port_cpu_begin(cpu_mode_for(s->tag, romfile), true);
 	rc = plat_run_port(argv, envkv, NULL, &how, port_power_prompt, a);
 	port_cpu_end();
+	plat_port_sticks(false);
 	port_saves_unbind();
 	sth_hold(false);
 	fprintf(stderr, "port %s exited %d (%s)\n", romfile, rc,
@@ -22625,6 +22721,8 @@ static void launch_game(app *a)
 		 * what is happening (Aquilus, 2026-11-25). Drawn before RUN: from
 		 * RUNNING the panel is Diatom's. */
 		if (!strcmp(s->tag, "PS")) wait_panel(a, s->name, "Loading...");
+		/* ChaOS: Performance, before RUN, put back when the game ends */
+		port_cpu_begin(cpu_mode_for(s->tag, romfile), false);
 		if (plat_resident_send(s->tag, core, rom, st, st, pv,
 		                       console, active[0] ? active : NULL)) {
 			int r;
@@ -22694,6 +22792,7 @@ static void launch_game(app *a)
 				if (r == RES_PAUSED) { game_menu(a); continue; }
 				break;
 			}
+			port_cpu_end();
 			sth_hold(false);
 			resident = (r == RES_EXIT);
 
@@ -22755,6 +22854,7 @@ static void launch_game(app *a)
 			if (!resident)
 				fprintf(stderr, "resident emulator stopped answering, falling back\n");
 		} else {
+			port_cpu_end();
 			fprintf(stderr, "resident emulator did not answer, falling back\n");
 		}
 	} else {
@@ -22832,7 +22932,9 @@ static void launch_game(app *a)
 		argv[n] = NULL;
 		sth_hold(true);
 		gbs_cancel();   /* and the Game Boy look, tried again later */
+		port_cpu_begin(cpu_mode_for(s->tag, romfile), false);   /* ChaOS: Performance */
 		fprintf(stderr, "diatom exited %d\n", plat_run(argv, NULL, P_ROOT));
+		port_cpu_end();
 		sth_hold(false);
 
 		if (!plat_video_init() || !plat_input_init()) { a->running = false; return; }

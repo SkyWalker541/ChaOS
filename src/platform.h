@@ -452,6 +452,10 @@ void  plat_input_debug(bool on);
 bool  plat_sticks_cal(plat_stick_cal out[4]);
 void  plat_sticks_reload(void);
 float plat_stick_axis(const plat_stick_cal *c, const int raw[4]);
+/* ChaOS: the sticks for a port, as PortMaster expects them (portsticks.h):
+ * on, the SDL mapping's stick fields ("leftx:a0,..."), the axes' ranges set
+ * for the port; off, the ranges put back. NULL with no sticks. */
+const char *plat_port_sticks(bool on);
 
 /* Date & Time (src/clock.h). Set the clock to `t`, and the hardware clock with
  * it, which keeps the time while the device is off: the Pixel 2 has nothing

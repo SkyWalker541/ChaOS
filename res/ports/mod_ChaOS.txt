@@ -27,12 +27,14 @@ export ANALOG_STICKS=0
 GODOT2_OPTS="-r ${DISPLAY_WIDTH}x${DISPLAY_HEIGHT} -f"
 GODOT_OPTS="--resolution ${DISPLAY_WIDTH}x${DISPLAY_HEIGHT} -f"
 
-# The pad, for SDL and gptokeyb: "Brick Gamepad" (plastron's brick-pad), keys
-# only. Laid out by position as an Xbox pad is, as PortMaster expects: the
+# The pad, for SDL and gptokeyb: "Brick Gamepad" (plastron's brick-pad), keys,
+# and on a Brick Pro its two sticks. Laid out by position as an Xbox pad is, as PortMaster expects: the
 # bottom face button (B on the Brick) is SDL's a, the right one (A) its b.
 # CHAOS_PAD is set by run.sh, the same lines SDL_GAMECONTROLLERCONFIG has.
 get_controls() {
-  ANALOGSTICKS="0"
+  # Two sticks on a Brick Pro (CHAOS_STICKS, from run.sh's ChaOS), none on a
+  # Brick
+  if [ -n "$CHAOS_STICKS" ]; then ANALOGSTICKS="2"; else ANALOGSTICKS="0"; fi
   LOWRES="N"
   DEVICE="19000000427269636b2047616d657000"
   param_device="brick"

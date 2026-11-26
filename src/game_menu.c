@@ -87,6 +87,10 @@ int gi_rows(menu_row *out, const game_info *gi, bool net)
 	out[n++] = (menu_row){ gi->has_art ? "Replace Box Art" : "Get Box Art", NULL, true,
 	                       .hint = "A cover from libretro, itch.io or your screenshots" };
 	(void)net;
+	/* ChaOS: how fast the CPU runs for it; left and right go round */
+	if (gi->perf[0])
+		out[n++] = (menu_row){ "Performance", gi->perf, true, .cycles = true,
+		                       .hint = "CPU speed. Default follows its shelf" };
 	/* ChaOS: how to favorite it, said where people look. Still Y on the
 	 * shelf and not a row here (above); but nothing said so but the Controls
 	 * page, and the only answer to Y was a dot on the card. */

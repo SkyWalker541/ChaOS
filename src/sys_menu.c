@@ -90,7 +90,7 @@ int sys_menu_system_rows(const sys_ui *u, sm_row *out)
 		if (!u->overscan && r == SM_OVERSCAN) continue;
 		/* ChaOS: Overlay stays: one is drawn over PICO-8 too (res/pico8) */
 		if (u->native && (r == SM_DISPLAY || r == SM_BUTTONS ||
-		                  r == SM_REWIND || r == SM_BOXART))
+		                  r == SM_REWIND || r == SM_PERF || r == SM_BOXART))
 			continue;
 		if (u->ports && (r == SM_DISPLAY || r == SM_SHADER || r == SM_OVERLAY ||
 		                 r == SM_OVERSCAN || r == SM_REWIND || r == SM_BOXART))
@@ -202,6 +202,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 		 * other thing about how a game is played here. */
 		full[SM_BUTTONS] = (menu_row){ "Controls", NULL, true, true };
 		full[SM_REWIND]  = (menu_row){ "Rewind", u->rewind ? "On" : "Off", true };
+		full[SM_PERF]    = (menu_row){ "Performance", u->perf ? u->perf : "Auto", true };
 		/* Just this system. Needs the network like its counterpart in the
 		 * TortOS menu, and says so rather than opening a screen that can only
 		 * report the same thing. */
@@ -222,12 +223,15 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 		full[SM_BUTTONS].hint = u->ports ? "What ChaOS's buttons do in a port"
 		                                 : "What each button does in this console's games";
 		full[SM_REWIND].hint  = "Hold F1 to rewind. Costs a little speed";
+		full[SM_PERF].hint    = u->ports ? "CPU speed for ports. X on one sets its own"
+		                                 : "CPU speed for these games. X on one sets its own";
 		full[SM_BOXART].hint  = "Download box art for this console's games";
 		full[SM_RESCAN].hint  = "Look for games added to the card";
 		/* ChaOS: what left and right do (menu.h): go round the choices, or
 		 * flip a switch */
 		full[SM_SORT].cycles = full[SM_DISPLAY].cycles = full[SM_OVERLAY].cycles = true;
 		full[SM_OVERSCAN].cycles = true;
+		full[SM_PERF].cycles = true;
 		/* no overlay fits this Display Mode (Stretch, say): nothing to
 		 * choose, and the row says so by being dim */
 		if (u->no_overlays) full[SM_OVERLAY].live = full[SM_OVERLAY].cycles = false;

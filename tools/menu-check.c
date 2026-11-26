@@ -836,7 +836,7 @@ static void cursor_reaches(void)
 	k = reachable(rows, n, got, MENU_MAX_ROWS);
 
 	printf("system menu, what the cursor can reach:\n");
-	ck(k == 7, "seven rows, not nine");
+	ck(k == 8, "eight rows, not ten (Performance with them)");
 	ck(reaches(rows, got, k, "Display Mode") && !strcmp(val(&rows[SM_DISPLAY]), "Integer"),
 	   "Display Mode, Integer when nothing says otherwise");
 	ck(!reaches(rows, got, k, "Shader"), "no Shader: nothing is made for the NES yet");
@@ -853,13 +853,30 @@ static void cursor_reaches(void)
 	   "Controls (Button Mapping under it) and Rewind");
 	ck(!holds(got, k, SM_GAMES) && !holds(got, k, SM_CORE),
 	   "the reported facts are not stops");
+	/* ChaOS: Performance (src/cpumode.h), by its id: the row that reads it
+	 * is the row that sets it, whatever is shown around it */
+	{
+		int i, at = -1;
+
+		for (i = 0; i < n; i++) if (rows[i].id == MENU_ID(SM_PERF)) at = i;
+		ck(at >= 0 && !strcmp(rows[at].label, "Performance") && !strcmp(val(&rows[at]), "Auto") &&
+		   rows[at].cycles, "Performance, Auto unless set, left and right going round");
+		u.perf = "Max";
+		n = sys_menu_build(&u, rows, &b, &heading);
+		for (i = 0, at = -1; i < n; i++) if (rows[i].id == MENU_ID(SM_PERF)) at = i;
+		ck(at >= 0 && !strcmp(val(&rows[at]), "Max"), "Performance says what is set");
+		u.perf = NULL;
+		n = sys_menu_build(&u, rows, &b, &heading);
+		k = reachable(rows, n, got, MENU_MAX_ROWS);
+	}
 
 	/* ChaOS: PICO-8, which runs outside the emulator */
 	u.sys_name = "PICO-8"; u.sys_core = "pico8"; u.native = true;
 	n = sys_menu_build(&u, rows, &b, &heading);
 	k = reachable(rows, n, got, MENU_MAX_ROWS);
 	ck(n == 5 && k == 3 && reaches(rows, got, k, "Sort By") && reaches(rows, got, k, "Rescan Folder") &&
-	   reaches(rows, got, k, "Overlay") && !reaches(rows, got, k, "Display Mode"),
+	   reaches(rows, got, k, "Overlay") && !reaches(rows, got, k, "Display Mode") &&
+	   !reaches(rows, got, k, "Performance"),
 	   "PICO-8: Games, Core, Sort By, Overlay and Rescan Folder, and nothing else about the picture");
 	u.native = false; u.sys_name = "NES"; u.sys_core = "nestopia";
 
@@ -873,8 +890,8 @@ static void cursor_reaches(void)
 	   reaches(rows, got, k, "Rescan Folder") && !reaches(rows, got, k, "Display Mode") &&
 	   !reaches(rows, got, k, "Rewind") && !reaches(rows, got, k, "Box Art") &&
 	   !reaches(rows, got, k, "Overlay") && !reaches(rows, got, k, "Shader") &&
-	   !reaches(rows, got, k, "Crop Overscan"),
-	   "Ports: Controls, Sort By and Rescan Folder, none of the emulator's rows");
+	   !reaches(rows, got, k, "Crop Overscan") && reaches(rows, got, k, "Performance"),
+	   "Ports: Controls, Sort By, Performance and Rescan Folder, none of the emulator's rows");
 	u.ports = false; u.sys_name = "NES"; u.sys_core = "nestopia"; u.shader = NULL; u.overscan = NULL;
 
 	memset(&u, 0, sizeof u);
@@ -1232,9 +1249,13 @@ static void info_rows(void)
 	gi.has_synopsis = true;
 	snprintf(gi.year, sizeof gi.year, "1995");
 	snprintf(gi.genre, sizeof gi.genre, "Platform,Shoot'em Up");
+	/* ChaOS: and its Performance, a game's own or Default, under the action */
+	snprintf(gi.perf, sizeof gi.perf, "Default");
 	n = gi_rows(rows, &gi, true);
 	printf("game info, scraped with a year, a genre and prose:\n");
-	ck(n == GI_MAX, "three rows more than an unscraped game");
+	ck(n == GI_MAX, "three rows more than an unscraped game, and Performance");
+	ck(!strcmp(rows[5].label, "Performance") && !strcmp(val(&rows[5]), "Default") && rows[5].cycles,
+	   "Performance under the action, Default, left and right going round");
 	ck(!strcmp(rows[0].label, "Synopsis"), "what the game IS leads");
 	ck(rows[0].live, "and opens, because the prose does not fit on a row");
 	ck(!strcmp(rows[1].label, "Year") && !strcmp(val(&rows[1]), "1995"),
@@ -1245,7 +1266,7 @@ static void info_rows(void)
 	   "then what there is to shoot for, which is worth seeing before starting");
 	ck(!strcmp(rows[4].label, "Replace Box Art"), "and the action last");
 	k = reachable(rows, n, got, GI_MAX);
-	ck(k == 3, "three stops: the synopsis, the set and the action");
+	ck(k == 4, "four stops: the synopsis, the set, the action and Performance");
 
 	gi.has_synopsis = false;
 	n = gi_rows(rows, &gi, true);

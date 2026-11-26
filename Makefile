@@ -22,7 +22,7 @@ CHECKS = check-display check-cheevos check-hare check-httpd check-idle check-rah
          check-db check-stats check-sort check-bt check-ss \
          check-muselib check-musequeue check-museart check-controls check-logpack \
          check-clock check-update check-remap check-shots check-pixfont \
-         check-release check-updater check-chaos-names check-itch check-itchdl check-hbcat check-discset check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore check-gbsort check-menu-keys check-menu-lint check-pro-detect check-logcat check-perf check-pm-gui-art check-cleanup check-fbhold
+         check-release check-updater check-chaos-names check-itch check-itchdl check-hbcat check-discset check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore check-gbsort check-menu-keys check-menu-lint check-pro-detect check-logcat check-perf check-pm-gui-art check-cleanup check-fbhold check-portsticks check-cpumode
 
 check: check-sevenz
 	@fail=0; for c in $(CHECKS); do \
@@ -680,6 +680,22 @@ checkmark:
 
 clean:
 	rm -rf build build-native out
+
+# ChaOS: Performance's modes (src/cpumode.h)
+check-cpumode: build-native/cpumode-check
+	@./build-native/cpumode-check
+
+build-native/cpumode-check: tools/cpumode-check.c src/cpumode.h FORCE
+	@mkdir -p build-native
+	$(CC) -std=gnu11 -Wall -Wextra -O1 -g -Isrc -o $@ tools/cpumode-check.c
+
+# ChaOS: the Brick Pro's sticks for ports (src/portsticks.h)
+check-portsticks: build-native/portsticks-check
+	@./build-native/portsticks-check
+
+build-native/portsticks-check: tools/portsticks-check.c src/portsticks.h FORCE
+	@mkdir -p build-native
+	$(CC) -std=gnu11 -Wall -Wextra -O1 -g -Isrc -o $@ tools/portsticks-check.c
 
 # ChaOS: power off's logo in every framebuffer page (src/fbhold.h)
 check-fbhold: build-native/fbhold-check

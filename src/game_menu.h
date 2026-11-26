@@ -64,7 +64,7 @@ static inline int gm_save_slot(const bool *have)
 	return GM_SLOTS;
 }
 
-#define GI_MAX 7          /* four facts at most, one action, ChaOS's favorite note */
+#define GI_MAX 8          /* four facts at most, one action, ChaOS's Performance, its favorite note (a rule and a line) */
 
 /* The genre line, from the scrape. Sized from the card rather than guessed:
  * measured 2026-09-17 over 1,704 rows, the whole comma-separated value has a
@@ -86,6 +86,9 @@ typedef struct {
 	bool  has_cheevos;     /* there is a set to open, not just a count to read */
 	bool  has_art;         /* chooses the action's label; no longer a row */
 	bool  is_fav;          /* ChaOS: which way the footer says Y goes */
+	/* ChaOS: its Performance (cpumode.h) - its own, or "Default" for its
+	 * console's - empty for no row (PICO-8, PortMaster's card) */
+	char  perf[16];
 	/* Whether this game has a row in the card's games table at all, and
 	 * whether that row carries a synopsis. Two flags rather than one, because
 	 * they answer different questions: a game nobody has scraped shows neither
