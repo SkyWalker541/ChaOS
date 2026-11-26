@@ -7,8 +7,9 @@
  * runs on TortOS's ondemand governor as the boot tuned it, from the lowest
  * clock to the top, and a port on the same with a floor of 1608 MHz.
  *
- * The other four are spruceOS's for the Brick (its Powersave, Smart,
- * Performance and Overclock, tina-stock/Brick.cfg), less what doesn't suit
+ * The other four are spruceOS's for the Brick, credited in CREDITS.md
+ * (https://github.com/spruceUI/spruceOS: its Powersave, Smart, Performance
+ * and Overclock, spruce/scripts/platform/tina-stock/Brick.cfg), less what doesn't suit
  * ChaOS: no core is taken offline, as that is slow and risks suspend, and
  * the governor stays ondemand throughout, a fixed clock being its floor and
  * top made one, which is how Diatom's fast-forward holds the top already.
