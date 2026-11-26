@@ -20294,6 +20294,29 @@ static void romm_sync_screen(app *a)
 	if (!net_online()) { pick_say(a, "Sync Saves", "Connect to Wi-Fi first", MENU_ACCENT); return; }
 	memset(&sc, 0, sizeof sc);
 	romm_dir(rdir, sizeof rdir);
+	/* ChaOS: the clocks first. Sync keeps whichever save is newer by time,
+	 * so a Brick whose clock is far from the server's could keep an old save
+	 * over a new one, on either side. Five minutes apart is nothing to save
+	 * times; beyond that, nothing is synced until the clock is set. A server
+	 * that gives no date can't be checked, and syncs as before. */
+	{
+		long skew = 0, ab;
+
+		romm_busy(a, "Checking the clock");
+		if (romm_clock_skew(&g_romm, &skew) == 0 && (ab = labs(skew)) > 300) {
+			char apart[32], msg[200];
+
+			if (ab < 2 * 3600) snprintf(apart, sizeof apart, "%ld minutes", ab / 60);
+			else if (ab < 2 * 86400) snprintf(apart, sizeof apart, "%ld hours", ab / 3600);
+			else snprintf(apart, sizeof apart, "%ld days", ab / 86400);
+			fprintf(stderr, "romm: sync held, the clock is %ld s %s of the server's\n", ab,
+			        skew > 0 ? "ahead" : "behind");
+			snprintf(msg, sizeof msg, "The clock is %s %s of RomM's.\n"
+			         "Set Date & Time, then sync again", apart, skew > 0 ? "ahead" : "behind");
+			pick_say(a, "Sync Saves", msg, MENU_ACCENT);
+			return;
+		}
+	}
 	romm_busy(a, "Matching your games");
 	if ((matched = romm_match_card(a, rdir, &looked)) < 0) return;
 	romm_busy(a, "Looking at your saves");
@@ -25577,6 +25600,7 @@ static void romm_shot(app *a)
 			"No games here match RomM's:\ndownload some from RomM first",
 			"Saves and states: sent 3, got 12\nMatched 280 of 282 games here",
 			"Everything is in sync\nMatched 0 of 4 games here",
+			"The clock is 3 hours ahead of RomM's.\nSet Date & Time, then sync again",
 		};
 		int k = shot_romm_a < (int)(sizeof says / sizeof *says) ? shot_romm_a : 0;
 

@@ -134,6 +134,14 @@ int  romm_roms(const romm_conn *c, int platform_id, int offset, int limit, romm_
 int  romm_roms_all(const romm_conn *c, int platform_id, int expect, romm_rom **out, int *n,
                    bool (*progress)(void *ctx, int have, int total), void *ctx,
                    char *why, size_t wn);
+/* ChaOS: how far this Brick's clock is from the RomM server's, in seconds
+ * (positive: the Brick is ahead), from the Date its answer carries; 0 when
+ * found, -1 when the server couldn't be asked or gave no date. Save sync
+ * decides which save is newer by time, so a clock far off could keep an old
+ * save over a new one. */
+int  romm_clock_skew(const romm_conn *c, long *skew);
+time_t romm_http_date(const char *s);
+
 /* A game's files that are the game (not its manual), in RomM's order */
 int  romm_rom_files(const romm_conn *c, int rom_id, romm_file *out, int max, char *why, size_t wn);
 int  romm_firmware_list(const romm_conn *c, int platform_id, romm_firmware *out, int max,

@@ -140,6 +140,55 @@ bool romm_set_url(romm_conn *c, const char *typed)
 
 static char *reply_buf(void) { return malloc(ROMM_REPLY); }
 
+/* An HTTP date ("Wed, 25 Nov 2026 23:05:09 GMT") as seconds, or -1 */
+time_t romm_http_date(const char *s)
+{
+	static const char mon[] = "JanFebMarAprMayJunJulAugSepOctNovDec";
+	char m[4] = "";
+	int d, y, hh, mm, ss;
+	const char *p;
+	struct tm tm;
+
+	if (!s || !(p = strchr(s, ','))) return -1;
+	if (sscanf(p + 1, " %d %3s %d %d:%d:%d", &d, m, &y, &hh, &mm, &ss) != 6) return -1;
+	if (strlen(m) != 3 || !(p = strstr(mon, m)) || (p - mon) % 3) return -1;
+	memset(&tm, 0, sizeof tm);
+	tm.tm_mday = d; tm.tm_mon = (int)(p - mon) / 3; tm.tm_year = y - 1900;
+	tm.tm_hour = hh; tm.tm_min = mm; tm.tm_sec = ss;
+	return timegm(&tm);
+}
+
+int romm_clock_skew(const romm_conn *c, long *skew)
+{
+	char url[1024], hp[] = "/tmp/chaos-romm-hdr-XXXXXX", line[256], body[512];
+	net_req r;
+	int http = 0, fd, found = -1;
+	time_t before = time(NULL), after;
+	FILE *f;
+
+	if ((fd = mkstemp(hp)) < 0) return -1;
+	close(fd);
+	memset(&r, 0, sizeof r);
+	snprintf(url, sizeof url, "%s/api/heartbeat", c->url);
+	r.url = url;
+	r.timeout_s = 15;
+	r.headers_to = hp;
+	net_request(&r, body, sizeof body, &http);
+	after = time(NULL);
+	if (http && (f = fopen(hp, "r"))) {
+		while (fgets(line, sizeof line, f))
+			if (!strncasecmp(line, "Date:", 5)) {
+				time_t t = romm_http_date(line + 5);
+
+				/* ours is the middle of the request, as theirs was */
+				if (t > 0) { *skew = (long)(before + (after - before) / 2 - t); found = 0; }
+			}
+		fclose(f);
+	}
+	unlink(hp);
+	return found;
+}
+
 static long call(const romm_conn *c, const char *method, const char *path, const char *json,
                  char *out, size_t outn, int *http, int timeout)
 {

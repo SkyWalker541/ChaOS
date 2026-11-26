@@ -74,6 +74,10 @@ class H(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
 
+    def date_time_string(self, timestamp=None):
+        import time as _t
+        return super().date_time_string((timestamp or _t.time()) + state.get('skew', 0))
+
     def send(self, code, obj=None, raw=None, ctype='application/json'):
         body = raw if raw is not None else json.dumps(obj).encode()
         self.send_response(code)
@@ -98,6 +102,13 @@ class H(BaseHTTPRequestHandler):
         p = u.path
         if p.startswith('/assets/'):
             return self.send(200, raw=b'\x89PNG cover', ctype='image/png')
+        # The clock check before Save Sync (ChaOS 2.7.9): the server's Date,
+        # set N seconds off by /mock/skew/N
+        if p.startswith('/mock/skew/'):
+            state['skew'] = int(p.rsplit('/', 1)[1])
+            return self.send(200, {})
+        if p == '/api/heartbeat':
+            return self.send(200, {'SYSTEM': {'VERSION': '4.4.0'}})
         if not self.authed():
             return
         if p == '/api/users/me':

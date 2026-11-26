@@ -14,6 +14,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <time.h>
 
 static int fails;
 #define CHECK(c, ...) do { if (!(c)) { fails++; printf("FAIL %s:%d: ", __FILE__, __LINE__); \
@@ -253,6 +254,29 @@ int main(void)
 		CHECK(romm_match_file(g, 4, "TETRIS.gb") == -1, "two games answer: neither taken");
 		CHECK(romm_match_file(g, 4, "Tetris.gb") == 1, "but the exact name still is");
 		CHECK(romm_match_file(g, 4, "...") == -1 && romm_match_file(g, 0, "Tetris.gb") == -1, "nothing to go on");
+	}
+
+	/* The clock check before Save Sync (ChaOS 2.7.9): a Brick whose clock is
+	 * far from the server's could keep an old save over a new one, since sync
+	 * goes by time */
+	{
+		long skew = 99999;
+		char murl[300], mb[64];
+		int mh = 0;
+		net_req mr;
+
+		CHECK(romm_http_date(" Wed, 25 Nov 2026 23:05:09 GMT") == 1795647909, "an HTTP date read");
+		CHECK(romm_http_date("Wed 25 Nov") == -1 && romm_http_date(", 25 Foo 2026 01:02:03 GMT") == -1,
+		      "and a bad one refused");
+		CHECK(romm_clock_skew(&c, &skew) == 0 && labs(skew) <= 2, "in step with the server: %ld", skew);
+		memset(&mr, 0, sizeof mr);
+		snprintf(murl, sizeof murl, "%s/mock/skew/-3600", c.url);
+		mr.url = murl;
+		net_request(&mr, mb, sizeof mb, &mh);
+		CHECK(romm_clock_skew(&c, &skew) == 0 && skew >= 3598 && skew <= 3602,
+		      "an hour ahead of the server: %ld", skew);
+		snprintf(murl, sizeof murl, "%s/mock/skew/0", c.url);
+		net_request(&mr, mb, sizeof mb, &mh);
 	}
 
 	/* games.tsv */

@@ -298,6 +298,7 @@ static bool write_req_config(const char *path, const net_req *r, const char *bod
 		fprintf(f, "data-urlencode = "); cfg_quote(f, kv); fputc('\n', f);
 	}
 	if (body_path) { fprintf(f, "output = "); cfg_quote(f, body_path); fputc('\n', f); }
+	if (r->headers_to) { fprintf(f, "dump-header = "); cfg_quote(f, r->headers_to); fputc('\n', f); }
 	fprintf(f, "max-time = %d\n", r->timeout_s > 0 ? r->timeout_s : 30);
 	if (g_ca[0]) { fprintf(f, "cacert = "); cfg_quote(f, g_ca); fputc('\n', f); }
 	fprintf(f, "user-agent = "); cfg_quote(f, NET_UA); fputc('\n', f);

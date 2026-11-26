@@ -114,6 +114,9 @@ typedef struct {
 	int nfields;
 	const char *accept;        /* the Accept header; NULL is JSON's */
 	bool no_follow;            /* a redirect is answered, not followed */
+	/* ChaOS: the reply's headers, written here as well (RomM's Date, for
+	 * the clock check before Save Sync) */
+	const char *headers_to;
 } net_req;
 /* Blocking: the reply into `out` (NUL-terminated, up to outn - 1 bytes),
  * its length or -1; the HTTP status in *http (0 when nothing answered), a
