@@ -33,7 +33,7 @@ static void ck(int cond, const char *what)
 static const char *const BUTTONS[] = {
 	"Up/Down", "Left/Right", "A", "B", "X", "Y", "L1/R1", "L2/R2",
 	"MENU", "SELECT", "POWER", "Volume rocker", "MENU+Vol", "F1+F2",
-	"FN+Vol", "FN+both Vol", "L2+R2",
+	"F1 or F2", "FN+Vol", "FN+both Vol", "L2+R2",
 };
 #define NBUTTONS ((int)(sizeof BUTTONS / sizeof BUTTONS[0]))
 
@@ -46,7 +46,8 @@ static int other_devices(const char *b)
 {
 	/* ChaOS: the Brick's brightness is MENU+Vol now; F1 and F2 are rewind
 	 * and fast forward, on a console's own page */
-	return pixel ? !strcmp(b, "MENU+Vol") || !strcmp(b, "F1+F2")
+	return pixel ? !strcmp(b, "MENU+Vol") || !strcmp(b, "F1+F2") ||
+	               !strcmp(b, "F1 or F2")
 	             : !strcmp(b, "FN+Vol") || !strcmp(b, "FN+both Vol") ||
 	               !strcmp(b, "L2+R2");
 }

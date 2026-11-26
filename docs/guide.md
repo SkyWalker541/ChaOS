@@ -76,7 +76,8 @@ card is the thing to wipe before it goes to anyone else.
 | **X** | game info for the card under the cursor |
 | **Y** | favorite it - Favorites is a shelf of its own. Nothing on Muse's shelf |
 | **Volume rocker** | volume, everywhere, including in game |
-| **F1/F2** | brightness, everywhere, including in game |
+| **F1 or F2** (alone) | Home: out of every menu, back to the shelves. Inside a system, back to the systems row. Not in a game, where they rewind and fast forward, nor in Muse, where both held lock the screen |
+| **MENU+volume up/down** | brighter / dimmer, everywhere, including in game |
 | **MENU** (on the systems row) | the main menu - settings that are about the firmware |
 | **MENU** (inside a system) | that system's menu, below |
 | **MENU** (in `Cubic`) | always the main menu; B is the system's |

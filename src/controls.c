@@ -188,8 +188,12 @@ static int menus(menu_row *out)
 	out[n++] = (menu_row){ "A",          "Choose or open",   false };
 	out[n++] = (menu_row){ "B",          "Back",             false };
 	out[n++] = (menu_row){ "Left/Right", "Change a setting", false };
-	out[n++] = (menu_row){ CTL_PEEK_NAME, "Held: see the game *", false };
-	out[n++] = MENU_NOTE("* in the in-game menu");
+	/* Only the in-game menu has a game behind it, so it needs no footnote;
+	 * the footnote it had gave its line to Home (six lines is the page) */
+	out[n++] = (menu_row){ CTL_PEEK_NAME, "Held: see the game", false };
+	/* Home: either one alone, out of every menu (not a game's, not Muse's).
+	 * The Pixel 2 has no F1 or F2; MENU does the same there */
+	if (!fn_volume) out[n++] = (menu_row){ "F1 or F2", "Home: the shelves", false };
 	return n;
 }
 

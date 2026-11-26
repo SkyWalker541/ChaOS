@@ -6519,9 +6519,30 @@ static void wait_panel(app *a, const char *heading, const char *msg)
 static bool g_menu_closing;
 
 /* True when a menu screen should leave: B, MENU, or a MENU pressed deeper in. */
+/* ChaOS: Home. F1 or F2 pressed on its own leaves every menu for the
+ * shelves, as MENU already did from inside one, so a deep menu isn't backed
+ * out of a page at a time. Not in a game's menu, where F1 and F2 are the
+ * game's (rewind, fast forward), nor in Muse, where both together lock the
+ * screen (g_home_off, raised by game_menu and muse_open). Not either
+ * together, which is that lock. A screen at work (an update installing, a
+ * download) reads MENU itself and is not left by this. */
+static int g_home_off;
+static void home_on(int *p) { (void)p; g_home_off--; }
+#define HOME_OFF int home_guard_ __attribute__((cleanup(home_on), unused)) = (g_home_off++, 0)
+
+static bool home_pressed(const app *a)
+{
+	if (g_home_off) return false;
+	return (a->in.pressed[IN_F1] && !a->in.down[IN_F2]) ||
+	       (a->in.pressed[IN_F2] && !a->in.down[IN_F1]);
+}
+
+/* MENU, or Home: out of every menu */
+static bool menu_or_home(const app *a) { return a->in.pressed[IN_MENU] || home_pressed(a); }
+
 static bool menu_leaving(app *a)
 {
-	if (a->in.pressed[IN_MENU]) g_menu_closing = true;
+	if (menu_or_home(a)) g_menu_closing = true;
 	return a->in.pressed[IN_BACK] || g_menu_closing;
 }
 
@@ -11014,7 +11035,10 @@ static void update_after_start(app *a)
 		plat_input_poll(&a->in);
 		if (a->in.quit_requested) { a->running = false; return; }
 		if (a->in.pressed[IN_POWER]) { power_off(a); return; }
-		if (a->in.pressed[IN_ACCEPT] || a->in.pressed[IN_BACK] || a->in.pressed[IN_MENU]) break;
+		if (a->in.pressed[IN_ACCEPT] || a->in.pressed[IN_BACK] || menu_or_home(a)) {
+			if (home_pressed(a)) g_menu_closing = true;
+			break;
+		}
 		up_draw(a, heading, rows, n, -1);
 		SDL_Delay(8);
 	}
@@ -12820,7 +12844,7 @@ static bool cheevo_detail_screen(app *a, SDL_Texture *bg, bool over_shelf,
 		plat_input_poll(&a->in);
 
 		if (a->in.pressed[IN_BACK] || a->in.pressed[IN_ACCEPT]) done = 1;
-		if (a->in.pressed[IN_MENU]) { done = 1; close_all = true; g_menu_closing = true; }
+		if (menu_or_home(a)) { done = 1; close_all = true; g_menu_closing = true; }
 		/* Only over the shelf. Over a game this card is the in-game menu's,
 		 * and Muse would need that menu's power rule, which this screen does
 		 * not have to give it. SELECT from the in-game menu itself works. */
@@ -13814,6 +13838,7 @@ static muse_exit muse_tracks(app *a, int album, bool now)
  * that draw it. True when that menu's power rule ended it too. */
 static bool muse_open(app *a, const menu_style *over, void *ctx)
 {
+	HOME_OFF;   /* Muse: F1 and F2 together lock the screen */
 	const mu_now *mn = musec_now();
 
 	if (g_muse.ntracks == 0) return false;
@@ -15775,6 +15800,7 @@ static void shader_shot(app *a, int group, int sel)
 
 static void game_menu(app *a)
 {
+	HOME_OFF;   /* F1 and F2 are the game's here */
 	gm_ctx c = { 0 };
 
 	c.a = a;
@@ -17517,7 +17543,7 @@ static void sticks_screen(app *a)
 		plat_sticks(raw);
 		if (a->in.quit_requested) { a->running = false; break; }
 		if (a->in.pressed[IN_POWER] || idle_due(a)) { power_off(a); break; }
-		if (a->in.pressed[IN_MENU]) { g_menu_closing = true; break; }
+		if (menu_or_home(a)) { g_menu_closing = true; break; }
 		if (a->in.pressed[IN_BACK]) {
 			if (step == STK_REST || step == STK_DONE) break;
 			step = step == STK_EDGES ? STK_RRIGHT : step - 1;
@@ -22150,7 +22176,7 @@ static void hb_game_page(app *a, hb_cat *c, int gi)
 		if (a->in.pressed[IN_POWER] || idle_due(a)) { power_off(a); break; }
 		if (p.qr) {
 			if (a->in.pressed[IN_Y] || a->in.pressed[IN_BACK]) p.qr = false;
-			if (a->in.pressed[IN_MENU]) g_menu_closing = true;
+			if (menu_or_home(a)) g_menu_closing = true;
 			if (g_menu_closing) break;
 			hb_page_draw(a, &p, &pp);
 			SDL_Delay(8);
@@ -23454,6 +23480,7 @@ static void seq_card(app *a)
 
 		if (a->in.pressed[IN_BACK] || a->in.pressed[IN_ACCEPT]) done = 1;
 		if (a->in.pressed[IN_MENU]) done = 1;
+		if (home_pressed(a)) { done = 1; g_menu_closing = true; }
 		if (a->in.pressed[IN_POWER] || idle_due(a)) { power_off(a); break; }
 
 		chv_backdrop(a, NULL, true);
@@ -25805,6 +25832,45 @@ static int display_check(app *a)
 	return bad ? 1 : 0;
 }
 
+/* Home (F1 or F2 alone) leaves every menu, but not as half of the F1+F2
+ * lock, and not where the keys are a game's or Muse's (g_home_off). Added
+ * with Home in 2.7.9-test1: a stray F1 in the in-game menu would have closed
+ * it, and F1+F2 for the lock would have left Muse. */
+static int home_check(app *a)
+{
+	struct { bool f1p, f1d, f2p, f2d, menu, off, want; const char *what; } t[] = {
+		{ 1, 1, 0, 0, 0, 0, 1, "F1 alone" },
+		{ 0, 0, 1, 1, 0, 0, 1, "F2 alone" },
+		{ 1, 1, 0, 1, 0, 0, 0, "F1 with F2 held (the lock)" },
+		{ 0, 1, 1, 1, 0, 0, 0, "F2 with F1 held (the lock)" },
+		{ 1, 1, 0, 0, 0, 1, 0, "F1 in a game's menu or Muse" },
+		{ 0, 0, 0, 0, 1, 1, 1, "MENU in a game's menu still closes it" },
+		{ 0, 0, 0, 0, 0, 0, 0, "nothing pressed" },
+	};
+	in_state keep = a->in;
+	int bad = 0;
+
+	for (size_t i = 0; i < sizeof t / sizeof t[0]; i++) {
+		memset(&a->in, 0, sizeof a->in);
+		a->in.pressed[IN_F1] = t[i].f1p; a->in.down[IN_F1] = t[i].f1d;
+		a->in.pressed[IN_F2] = t[i].f2p; a->in.down[IN_F2] = t[i].f2d;
+		a->in.pressed[IN_MENU] = t[i].menu;
+		g_home_off = t[i].off;
+		g_menu_closing = false;
+		bool left = menu_leaving(a);
+		if (left != t[i].want || g_menu_closing != t[i].want) {
+			printf("FAIL home: %s\n", t[i].what); bad = 1;
+		} else printf("ok home: %s\n", t[i].what);
+	}
+	{	/* the guard puts it back however the scope is left */
+		g_home_off = 0;
+		{ HOME_OFF; if (!g_home_off) { printf("FAIL home: guard\n"); bad = 1; } }
+		if (g_home_off) { printf("FAIL home: guard left on\n"); bad = 1; }
+	}
+	g_home_off = 0; g_menu_closing = false; a->in = keep;
+	return bad;
+}
+
 static int menu_ids_check(app *a)
 {
 	bool *pages[] = { NULL, &g_appearance_page, &g_shelf_page, &g_rom_page, &g_net_page, &g_sys_page };
@@ -25854,7 +25920,7 @@ static int menu_ids_check(app *a)
 static void take_shot(app *a)
 {
 	ui_set_pixel(CARDS_PIXEL_UI(g_cards));   /* as the main loop does */
-	if (g_menu_ids) exit(menu_ids_check(a));
+	if (g_menu_ids) exit(menu_ids_check(a) | home_check(a));
 	if (g_display_check) exit(display_check(a));
 	SDL_Surface *out = SDL_CreateRGBSurfaceWithFormat(0, TORTOS_SCREEN_W,
 	                                                  TORTOS_SCREEN_H, 32,
@@ -27436,6 +27502,8 @@ int main(int argc, char *argv[])
 			if (a.screen != SCREEN_SYSTEMS) g_seq_hist = ~0ull;
 			else if (seq_step(&a.in)) { seq_card(&a); continue; }
 			if (a.in.pressed[IN_MENU]) { tortos_menu(&a); continue; }
+			/* Home on a console's games: back to the systems row, as B */
+			if (a.screen != SCREEN_SYSTEMS && home_pressed(&a)) a.in.pressed[IN_BACK] = true;
 			if (a.screen == SCREEN_SYSTEMS) update_systems(&a);
 			else update_games(&a);
 		}
