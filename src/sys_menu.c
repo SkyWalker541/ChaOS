@@ -217,7 +217,9 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 		full[SM_OVERLAY].hint = "A frame drawn around the picture";
 		full[SM_OVERSCAN].hint = "Trim the edges an old TV hid";
 		full[SM_BUTTONS].hint = "What each button does in this console's games";
-		full[SM_REWIND].hint  = "Hold F1 to rewind. Costs a little speed";
+		full[SM_REWIND].hint  = u->sticks   /* the Brick Pro's key says M1 */
+		                      ? "Hold M1 to rewind. Costs a little speed"
+		                      : "Hold F1 to rewind. Costs a little speed";
 		full[SM_BOXART].hint  = "Download box art for this console's games";
 		full[SM_RESCAN].hint  = "Look for games added to the card";
 		/* ChaOS: what left and right do (menu.h): go round the choices, or

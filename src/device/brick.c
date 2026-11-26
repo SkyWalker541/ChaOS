@@ -227,6 +227,11 @@ static void input_scan(void)
 #endif
 
 static bool g_sticks;          /* ChaOS: the Brick Pro's, below */
+#ifdef __linux__
+static const int stick_abs[4];  /* ChaOS: below, with the sticks */
+#endif
+static int g_raw[4];
+static unsigned g_stick_dirs, g_pad_dirs;
 static void sticks_load(void);
 
 bool plat_input_init(void)
@@ -268,6 +273,16 @@ void plat_input_flush(void)
 		/* ChaOS: a MENU held across this is not a tap on its release */
 		menu_held = menu_chorded = false;
 		vol_as[0] = vol_as[1] = IN_NONE;
+		/* ChaOS: the sticks' moves were thrown away with the rest, so read
+		 * where they are now; a stick let go of in a game would otherwise
+		 * still be held here and scroll a menu by itself (Brick Pro) */
+		g_pad_dirs = g_stick_dirs = 0;
+		if (g_sticks && fd_pad >= 0) {
+			struct input_absinfo ai;
+
+			for (i = 0; i < 4; i++)
+				if (ioctl(fd_pad, EVIOCGABS(stick_abs[i]), &ai) == 0) g_raw[i] = ai.value;
+		}
 	}
 #endif
 }
@@ -301,6 +316,10 @@ static const int stick_abs[4] = { ABS_X, ABS_Y, ABS_RX, ABS_RY };
 static int  g_raw[4];
 static plat_stick_cal g_cal[4];
 static unsigned g_stick_dirs;          /* the d-pad directions the left stick holds */
+/* ChaOS: and the ones the d-pad itself holds, so letting go of one doesn't let
+ * go of a direction the other still holds (left, right, up, down) */
+static unsigned g_pad_dirs;
+static const in_button dir_btn[4] = { IN_LEFT, IN_RIGHT, IN_UP, IN_DOWN };
 
 static void sticks_load(void)
 {
@@ -369,7 +388,6 @@ float plat_stick_axis(const plat_stick_cal *c, const int raw[4])
 
 static void sticks_dpad(in_state *st)
 {
-	static const in_button b[4] = { IN_LEFT, IN_RIGHT, IN_UP, IN_DOWN };
 	float x = plat_stick_axis(&g_cal[0], g_raw), y = plat_stick_axis(&g_cal[1], g_raw);
 	float v[4] = { -x, x, -y, y };
 	int i;
@@ -379,7 +397,7 @@ static void sticks_dpad(in_state *st)
 
 		if (want == held) continue;
 		g_stick_dirs ^= 1u << i;
-		plat_set_btn(st, b[i], want);
+		plat_set_btn(st, dir_btn[i], want || (g_pad_dirs & (1u << i)));
 	}
 }
 
@@ -426,6 +444,15 @@ static void key_in(in_state *st, int code, bool down)
 	}
 	for (i = 0; i < sizeof keymap / sizeof keymap[0]; i++)
 		if (keymap[i].code == code) {
+			unsigned k;
+
+			for (k = 0; k < 4; k++)
+				if (keymap[i].b == dir_btn[k]) break;
+			if (k < 4) {   /* a d-pad direction: held while either holds it */
+				if (down) g_pad_dirs |= 1u << k; else g_pad_dirs &= ~(1u << k);
+				plat_set_btn(st, keymap[i].b, down || (g_stick_dirs & (1u << k)));
+				return;
+			}
 			plat_set_btn(st, keymap[i].b, down);
 			return;
 		}

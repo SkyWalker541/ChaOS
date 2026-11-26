@@ -74,6 +74,11 @@ that adds a feature and breaks another is not done.
   the reader is out on both channels: in a Public release too, since a
   Public Brick switched to Pre-Release reads the test name with its own
   code. Then drop the number.
+- **Pro Detect is in every Pre-Release**, from 2.7.9-test1 on: `PLASTRON_REV`
+  and `dist/brick/plastron` stay on `testing`, and `make check-pro-detect`
+  fails a `-test` version without them. Everything works on both devices:
+  the Pro's M1/M2 are the Brick's F1/F2 and are named so on a Pro, and the
+  Pro's left stick moves in every menu as the d-pad does.
 - New releases go to Pre-Release first, Brick Pro work included; Public
   Release follows when Pre-Release has had enough good feedback.
 - `testing` keeps its own history: commits are cherry-picked between the two,
