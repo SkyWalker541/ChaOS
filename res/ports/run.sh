@@ -172,6 +172,23 @@ fi
 # there whether Python is or not.
 chaos_python && export CHAOS_PYTHON="$py"
 export PATH="$PATH:$HERE/pybin"
+# A port whose script puts /usr/lib on its library path ahead of what this
+# exported (Undertale: LD_LIBRARY_PATH="/usr/lib:$GAMEDIR/lib:...") loads the
+# system's SDL, which can't see the Brick's buttons with no udev - ChaOS's
+# own (/usr/lib/chaos-ports) can - and the port took no button (Aquilus,
+# 2.7.9-test3/4). NextUI patches such scripts; ChaOS leaves them as they
+# are and preloads its SDL instead, which then stands for the system's.
+# Only then, and only if the port carries no SDL of its own, and not for a
+# Weston port, whose SDL is the runtime's.
+if [ -f /usr/lib/chaos-ports/libSDL2-2.0.so.0 ] &&
+   grep -Eq 'LD_LIBRARY_PATH=["'"'"']?[^#]*/usr/lib([:"'"'"'$]|$)' "$PORT" 2> /dev/null &&
+   ! grep -q weston "$PORT" 2> /dev/null; then
+	gd=$(sed -n 's|^[[:space:]]*\(export[[:space:]]\{1,\}\)\{0,1\}GAMEDIR=.*/ports/\([^/"'"'"' ]*\).*|\2|p' "$PORT" | head -1)
+	if [ -z "$gd" ] || ! find "/roms/ports/$gd" -maxdepth 3 -name 'libSDL2-2.0.so*' 2> /dev/null | grep -q .; then
+		export LD_PRELOAD="/usr/lib/chaos-ports/libSDL2-2.0.so.0${LD_PRELOAD:+:$LD_PRELOAD}"
+		echo "ChaOS: its script puts /usr/lib first; ChaOS's SDL preloaded"
+	fi
+fi
 cd "$(dirname "$PORT")" || exit 1
 /bin/bash "$PORT"
 st=$?
