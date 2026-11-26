@@ -52,7 +52,7 @@ typedef enum {
 	/* ChaOS: which of the shelves that aren't consoles are on the systems row */
 	PM_SHELF_FAV, PM_RECENT, PM_SHELF_MUSE, PM_SHELF_ORDER, PM_SHELF_ARRANGE,
 	PM_SCRAPE, PM_ACHIEVEMENTS, PM_SS,
-	/* ChaOS: PortMaster's ports, browsed and installed (src/pmcat.h) */
+	/* ChaOS: Get PortMaster, until it is installed; then its own app */
 	PM_PORTS,
 	/* ChaOS: ROM Management, a page of its own (rom_page) for the ways games
 	 * and saves come and go: RomM, a self-hosted game library (src/romm.h),

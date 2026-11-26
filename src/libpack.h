@@ -8,7 +8,7 @@
 /* ChaOS: the libraries a port needs that the Brick hasn't got, and ChaOS's
  * pack of them.
  *
- * PortMaster's catalog says which runtimes a port needs (pmcat_runtimes),
+ * PortMaster says which runtimes a port needs (its port.json),
  * but not which system libraries: a port takes for granted the ones the
  * usual firmwares have. Some of those the Brick's root has, ChaOS adds the
  * common ones (tools/build-portlibs.sh), and the rest are in a pack on

@@ -172,7 +172,8 @@ bool cover_from_web(const char *rom, const char *url, const char *file,
 	}
 
 	s = IMG_Load(src);
-	if (src == COVER_DL) unlink(COVER_DL);
+	/* by its name: two copies of the same literal needn't be one pointer */
+	if (!strcmp(src, COVER_DL)) unlink(COVER_DL);
 	if (!s) { snprintf(why, wn, "That isn't a picture the Brick can read"); return false; }
 	mkdir(dir, 0755);
 	snprintf(out, on, "%s/%s.png", dir, stem);

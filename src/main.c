@@ -7434,7 +7434,8 @@ static bool pack_logs(char *path, size_t pn, char *name, size_t nn)
 
 		/* the kernel now, and as it was at the last power off
 		 * (log_kernel_at_off): SD card errors, crashes, power */
-		system("dmesg > /tmp/chaos-kernel-now.log 2>/dev/null");
+		if (system("dmesg > /tmp/chaos-kernel-now.log 2>/dev/null") != 0)
+			fprintf(stderr, "logs: the kernel's log could not be read\n");
 		MORE("/tmp/chaos-kernel-now.log", "kernel-now.log");
 		snprintf(p, sizeof p, "%s/kernel.log", logs);   MORE(p, "kernel-at-last-off.log");
 		snprintf(p, sizeof p, "%s/kernel.log.1", logs); MORE(p, "kernel-at-off-before.log");
@@ -7466,7 +7467,7 @@ static bool pack_logs(char *path, size_t pn, char *name, size_t nn)
 				snprintf(cmd, sizeof cmd,
 				         "{ echo '== Saves'; ls -laR '%s/Saves'; echo; echo '== Save States'; ls -laR '%s/.tortos'; } "
 				         ">> /tmp/chaos-saves.txt 2>&1", P_CARD, P_SHARED);
-				system(cmd);
+				if (system(cmd) != 0) { }   /* a folder not there yet: the list says so */
 				MORE("/tmp/chaos-saves.txt", "saves-list.txt");
 			}
 		}

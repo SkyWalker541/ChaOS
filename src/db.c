@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 /* See db.h. No SDL and no platform header, deliberately, so the check can link
  * it without a window - the same reason atomic.c is kept clean. */
 #include <sqlite3.h>
