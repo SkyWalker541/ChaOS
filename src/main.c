@@ -4929,6 +4929,12 @@ static void draw_off_note(app *a, bool restart)
 
 static void power_off(app *a)
 {
+	/* Once: a press handled by a menu and then by the screen under it
+	 * reached here twice ("power: turning off" twice in a log, 2.7.9) */
+	static bool going;
+
+	if (going) { a->running = false; return; }
+	going = true;
 	fprintf(stderr, "power: turning off\n");
 	log_kernel_at_off();
 	remember_place(a);

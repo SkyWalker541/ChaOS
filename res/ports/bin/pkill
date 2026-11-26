@@ -41,10 +41,12 @@ for d in /proc/[0-9]*; do
 	pid=${d#/proc/}
 	case "$skip" in *" $pid "*) continue ;; esac
 	if [ $full = 1 ]; then
-		what=$(tr '\0' ' ' < "$d/cmdline" 2>/dev/null)
+		# 2> first: a process gone since the glob had the shell itself
+		# say "can't open /proc/N/cmdline" in every port's log
+		what=$(tr '\0' ' ' 2>/dev/null < "$d/cmdline")
 		what=${what% }
 	else
-		read -r what < "$d/comm" 2>/dev/null || continue
+		read -r what 2>/dev/null < "$d/comm" || continue
 	fi
 	[ -n "$what" ] || continue
 	echo "$what" | grep -Eq -- "$pat" || continue
