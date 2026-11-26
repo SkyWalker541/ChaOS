@@ -22,7 +22,7 @@ CHECKS = check-display check-cheevos check-hare check-httpd check-idle check-rah
          check-db check-stats check-sort check-bt check-ss \
          check-muselib check-musequeue check-museart check-controls check-logpack \
          check-clock check-update check-remap check-shots check-pixfont \
-         check-release check-updater check-chaos-names check-itch check-itchdl check-hbcat check-discset check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore check-gbsort check-menu-keys check-menu-lint check-pro-detect check-logcat check-perf
+         check-release check-updater check-chaos-names check-itch check-itchdl check-hbcat check-discset check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore check-gbsort check-menu-keys check-menu-lint check-pro-detect check-logcat check-perf check-pm-gui-art
 
 check: check-sevenz
 	@fail=0; for c in $(CHECKS); do \
@@ -631,6 +631,10 @@ check-perf: FORCE
 	@mkdir -p build-native
 	@$(CC) -std=gnu11 -Wall -Wextra -Werror -O1 -D_GNU_SOURCE -o build-native/perf-check tools/perf-check.c src/perf.c
 	@./build-native/perf-check
+
+# ChaOS: art for ports PortMaster's own app installed (main.c pm_gui_art)
+check-pm-gui-art: native
+	@sh tools/pm-gui-art-check.sh
 
 check-logcat: FORCE
 	@mkdir -p build-native

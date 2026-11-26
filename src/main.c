@@ -43,6 +43,7 @@ static void os_cycle(const char *tag, int d, bool live);
 #include "logpack.h"
 #include "logstamp.h"
 #include "logcat.h"
+#include "rajson.h"
 #include "wifi.h"
 #include "audioout.h"
 #include "menu.h"
@@ -17039,6 +17040,82 @@ static int pm_libs(app *a, const char *port_dir, const char *title, unsigned acc
 }
 
 /* Its screenshot as its box art on the Ports shelf */
+/* ChaOS: box art for the ports PortMaster's own app installed. Each port
+ * keeps its picture beside it, named in its port.json (attr.image: a cover,
+ * else the screenshot), and its scripts in "items". A script on the Ports
+ * shelf with no art of its own gets that picture, once: the app put the
+ * port there, not ChaOS, so no cover was saved for it (2026-11-26). */
+static bool g_pm_art_shot;   /* --pm-gui-art: run it, for the check */
+static void pm_gui_art(app *a)
+{
+	char ports[LIB_PATH], pj[LIB_PATH * 2], img[LIB_PATH * 2];
+	DIR *d;
+	struct dirent *e;
+
+	snprintf(ports, sizeof ports, "%s/Ports", P_ROMS);
+	if (!(d = opendir(ports))) return;
+	while ((e = readdir(d))) {
+		FILE *f;
+		char *buf;
+		long len;
+		jsv root, attr, image, items, it = { 0 }, v, pic;
+		char name[LIB_NAME], pick[LIB_NAME] = "";
+
+		if (e->d_name[0] == '.' || !strcmp(e->d_name, "PortMaster")) continue;
+		snprintf(pj, sizeof pj, "%s/%s/port.json", ports, e->d_name);
+		if (!(f = fopen(pj, "rb"))) continue;
+		fseek(f, 0, SEEK_END);
+		len = ftell(f);
+		rewind(f);
+		if (len <= 0 || len > 512 * 1024 || !(buf = malloc((size_t)len + 1))) { fclose(f); continue; }
+		len = (long)fread(buf, 1, (size_t)len, f);
+		fclose(f);
+		buf[len] = '\0';
+		root = js_root(buf, (size_t)len);
+		if (js_member(root, "attr", &attr) && js_member(attr, "image", &image)) {
+			jsv covers, cit = { 0 }, c0;
+
+			if (js_member(image, "covers", &covers) && js_next(covers, &cit, &c0) && js_str(c0, name, sizeof name))
+				snprintf(pick, sizeof pick, "%s", name);
+			else if (js_member(image, "screenshot", &pic) && js_str(pic, name, sizeof name))
+				snprintf(pick, sizeof pick, "%s", name);
+		}
+		/* a picture named nowhere but there, as PortMaster's own ports have */
+		if (!pick[0] || strchr(pick, '/') || strstr(pick, "..")) {
+			static const char *const TRY[] = { "cover.png", "cover.jpg", "screenshot.png", "screenshot.jpg" };
+			size_t k;
+
+			pick[0] = '\0';
+			for (k = 0; k < sizeof TRY / sizeof TRY[0]; k++) {
+				snprintf(img, sizeof img, "%s/%s/%s", ports, e->d_name, TRY[k]);
+				if (access(img, R_OK) == 0) { snprintf(pick, sizeof pick, "%s", TRY[k]); break; }
+			}
+		}
+		snprintf(img, sizeof img, "%s/%s/%s", ports, e->d_name, pick);
+		if (pick[0] && access(img, R_OK) == 0 && js_member(root, "items", &items)) {
+			while (js_next(items, &it, &v)) {
+				size_t l;
+
+				if (!js_str(v, name, sizeof name)) continue;
+				l = strlen(name);
+				if (l <= 3 || strcasecmp(name + l - 3, ".sh") || strchr(name, '/')) continue;
+				name[l - 3] = '\0';
+				if (has_box_art("Ports", name)) continue;
+				{
+					char media[LIB_PATH];
+
+					snprintf(media, sizeof media, "%s/.media", ports);
+					mkdir(media, 0755);
+				}
+				if (cover_save(a, img, "Ports", name))
+					fprintf(stderr, "ports: art for %s from its own picture\n", name);
+			}
+		}
+		free(buf);
+	}
+	closedir(d);
+}
+
 static void pm_box_art(app *a, const pm_port *p, unsigned accent)
 {
 	char img[LIB_PATH], url[400], file[96], why[96], stem[LIB_NAME];
@@ -18386,7 +18463,7 @@ static void pm_get(app *a)
 
 		for (o = 0; o < a->sys.count; o++)
 			if (!strcmp(a->sys.systems[o].tag, "PORTS")) break;
-		if (o < a->sys.count) { port_launch(a, o, PM_ENTRY_FILE, PM_ENTRY_NAME); rescan_all(a); }
+		if (o < a->sys.count) { port_launch(a, o, PM_ENTRY_FILE, PM_ENTRY_NAME); pm_gui_art(a); rescan_all(a); }
 	}
 }
 
@@ -23043,6 +23120,7 @@ static void launch_game(app *a)
 		    !strcmp(v->list.items[v->cursor].file, PM_ENTRY_FILE)) {
 			/* ChaOS: PortMaster's own app, and the shelf found again after */
 			port_launch(a, o, PM_ENTRY_FILE, PM_ENTRY_NAME);
+			pm_gui_art(a);
 			rescan_all(a);
 			return;
 		}
@@ -26303,6 +26381,7 @@ static void take_shot(app *a)
 		SDL_RenderFillRect(a->r, NULL);
 		menu_draw(a, heading, rows, n, g_bw_shot - 1, 0, MENU_ACCENT);
 	}
+	if (g_pm_art_shot) pm_gui_art(a);
 	if (g_log_shot) {
 		menu_row rows[16];
 		const char *heading;
@@ -26748,6 +26827,7 @@ int main(int argc, char *argv[])
 		else if (!strcmp(argv[i], "--display-check")) g_display_check = true;
 		else if (!strcmp(argv[i], "--battwarn") && i + 1 < argc) g_bw_shot = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--logging") && i + 1 < argc) g_log_shot = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "--pm-gui-art")) g_pm_art_shot = true;   /* check-ports */
 		else if (!strcmp(argv[i], "--offnote") && i + 1 < argc) g_off_shot = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--tzpick") && i + 1 < argc) g_tz_shot = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--romm") && i + 1 < argc) {
