@@ -70,8 +70,15 @@ pm_hook_run_pugwash() {
     gk=$!
     echo "chaos pad: no controller in SDL, so the pad as keys (gptokeyb $gk)"
   fi
+  # The pad by its labels for the app: ports get it by position (the Xbox
+  # way, so the Brick's A, on the right, is SDL's B), and the app then had A
+  # and B, X and Y the wrong way round. Its own copy, the app's alone.
+  local pad="$CHAOS_PAD"
+  pad=$(printf '%s\n' "$pad" | sed 's/a:b1,b:b0,x:b3,y:b2/a:b0,b:b1,x:b2,y:b3/')
+  printf '%s\n' "$pad" > /tmp/chaos-pugwash-pad.txt
   # ChaOS's Python (run.sh put it first on PATH); pugwash is #!/usr/bin/env python3
-  python3 ./pugwash $PORTMASTER_CMDS
+  SDL_GAMECONTROLLERCONFIG="$pad" SDL_GAMECONTROLLERCONFIG_FILE=/tmp/chaos-pugwash-pad.txt \
+    python3 ./pugwash $PORTMASTER_CMDS
   [ -n "$gk" ] && kill "$gk" 2> /dev/null
   :
 }
