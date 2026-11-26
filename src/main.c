@@ -16338,8 +16338,8 @@ static int port_power_prompt(void *ctx)
 	SDL_Surface *bg = NULL, *fr = NULL;
 	SDL_Renderer *sw = NULL, *was = a->r;
 	uint8_t *mem = MAP_FAILED, *page, *save = NULL;
-	size_t len = 0;
-	int fd, sel = 0, said = -1, y, drawn = -1;
+	size_t len = 0, pg_bytes = 0;
+	int fd, sel = 0, said = -1, y, drawn = -1, pages = 0;
 	in_state in;
 
 	fd = open("/dev/fb0", O_RDWR);
@@ -16350,17 +16350,21 @@ static int port_power_prompt(void *ctx)
 	len = (size_t)fix.line_length * var.yres_virtual;
 	mem = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 	if (mem == MAP_FAILED) goto out;
-	/* the page on show now, as the port last flipped it */
-	page = mem + (size_t)var.yoffset * fix.line_length + (size_t)var.xoffset * 4;
-	if ((size_t)(page - mem) + (size_t)fix.line_length * var.yres > len) goto out;
-	save = malloc((size_t)fix.line_length * var.yres);
+	/* Every page, each its own frame with the menu over it. Only the page
+	 * the panel was said to show (var.yoffset) was drawn, and a port drawing
+	 * through the GPU flips pages without that saying so: about half the
+	 * presses drew the menu into a page that wasn't on show, and power
+	 * seemed to do nothing (Stardew Valley, 2.8.0-test2). Whichever page is
+	 * on show, it is there - as power off's logo is (fbhold.h). */
+	pg_bytes = (size_t)fix.line_length * var.yres;
+	pages = (int)(len / pg_bytes);
+	if (pages < 1) goto out;
+	if (pages > 4) pages = 4;
+	save = malloc(pg_bytes * (size_t)pages);
 	bg = SDL_CreateRGBSurfaceWithFormat(0, TORTOS_SCREEN_W, TORTOS_SCREEN_H, 32, SDL_PIXELFORMAT_ARGB8888);
 	fr = SDL_CreateRGBSurfaceWithFormat(0, TORTOS_SCREEN_W, TORTOS_SCREEN_H, 32, SDL_PIXELFORMAT_ARGB8888);
 	if (!save || !bg || !fr) goto out;
-	memcpy(save, page, (size_t)fix.line_length * var.yres);
-	for (y = 0; y < TORTOS_SCREEN_H; y++)
-		memcpy((uint8_t *)bg->pixels + (size_t)y * bg->pitch, page + (size_t)y * fix.line_length,
-		       (size_t)TORTOS_SCREEN_W * 4);
+	memcpy(save, mem, pg_bytes * (size_t)pages);
 	sw = SDL_CreateSoftwareRenderer(fr);
 	if (!sw) goto out;
 	a->r = sw;
@@ -16375,16 +16379,26 @@ static int port_power_prompt(void *ctx)
 		bool down;
 
 		if (drawn != sel) {
-			SDL_BlitSurface(bg, NULL, fr, NULL);
-			port_power_draw(a, sel);
-			SDL_RenderFlush(sw);
-			for (y = 0; y < TORTOS_SCREEN_H; y++) {
-				uint32_t *d = (uint32_t *)(page + (size_t)y * fix.line_length);
-				const uint32_t *p = (const uint32_t *)((uint8_t *)fr->pixels + (size_t)y * fr->pitch);
-				int x;
+			int pi;
 
-				/* opaque: the display engine reads the top byte as alpha */
-				for (x = 0; x < TORTOS_SCREEN_W; x++) d[x] = p[x] | 0xff000000u;
+			for (pi = 0; pi < pages; pi++) {
+				const uint8_t *was_pg = save + pg_bytes * (size_t)pi;
+
+				page = mem + pg_bytes * (size_t)pi;
+				for (y = 0; y < TORTOS_SCREEN_H; y++)
+					memcpy((uint8_t *)bg->pixels + (size_t)y * bg->pitch,
+					       was_pg + (size_t)y * fix.line_length, (size_t)TORTOS_SCREEN_W * 4);
+				SDL_BlitSurface(bg, NULL, fr, NULL);
+				port_power_draw(a, sel);
+				SDL_RenderFlush(sw);
+				for (y = 0; y < TORTOS_SCREEN_H; y++) {
+					uint32_t *d = (uint32_t *)(page + (size_t)y * fix.line_length);
+					const uint32_t *p = (const uint32_t *)((uint8_t *)fr->pixels + (size_t)y * fr->pitch);
+					int x;
+
+					/* opaque: the display engine reads the top byte as alpha */
+					for (x = 0; x < TORTOS_SCREEN_W; x++) d[x] = p[x] | 0xff000000u;
+				}
 			}
 			drawn = sel;
 		}
@@ -16404,7 +16418,7 @@ static int port_power_prompt(void *ctx)
 	plat_child_grab(false);
 	fprintf(stderr, "port: power - %s\n", said == 1 ? "power off" : said == 2 ? "close" : "resume");
 	/* the frame back as it was, for a port that only draws when it changes */
-	if (said == 0) memcpy(page, save, (size_t)fix.line_length * var.yres);
+	if (said == 0) memcpy(mem, save, pg_bytes * (size_t)pages);
 	ui_quit();
 out:
 	a->r = was;
