@@ -161,6 +161,10 @@ install -m 755 "$ROOT/dist/brick/unsquashfs" "$C/TortOS/ports/bin/unsquashfs"
 # python3 for ports, at the end of their PATH (res/ports/pybin/python3)
 mkdir -p "$C/TortOS/ports/pybin"
 install -m 755 "$ROOT/res/ports/pybin/python3" "$C/TortOS/ports/pybin/python3"
+# libudev-zero, for Weston's libinput: the Brick has no udev (tools/build-libudev.sh)
+mkdir -p "$C/TortOS/ports/lib"
+install -m 755 "$ROOT/dist/brick/libudev.so.1" "$C/TortOS/ports/lib/libudev.so.1"
+install -m 644 "$ROOT/dist/brick/libudev-LICENSE.txt" "$C/TortOS/ports/lib/libudev-LICENSE.txt"
 # and zip, which BusyBox hasn't (tools/build-zip.sh)
 install -m 755 "$ROOT/dist/brick/zip" "$C/TortOS/ports/pybin/zip"
 install -m 644 "$ROOT/dist/brick/zip-LICENSE.txt" "$C/TortOS/ports/pybin/zip-LICENSE.txt"

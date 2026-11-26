@@ -17050,15 +17050,19 @@ static int pm_libs(app *a, const char *port_dir, const char *script, const char 
 {
 	char lib[LIB_PATH], want[24][LIBPACK_NAME], file[LIBPACK_NAME], md5[40];
 	char rdir[1 + PM_RT_ROOTS][LIB_PATH * 2];
-	const char *have[5], *roots[2 + PM_RT_ROOTS];
+	const char *have[6], *roots[2 + PM_RT_ROOTS];
+	char shipped[LIB_PATH];
 	char *list = NULL;
 	size_t len = 0;
 	int n, i, still = 0, nr;
 
 	left[0] = '\0';
 	pm_lib_dir(lib, sizeof lib);
+	/* and what ChaOS ships beside run.sh for ports (libudev-zero) */
+	snprintf(shipped, sizeof shipped, "%s/ports/lib", P_ROOT);
 	have[0] = "/lib"; have[1] = "/usr/lib"; have[2] = "/usr/lib/chaos-ports"; have[3] = lib;
-	have[4] = NULL;
+	have[4] = shipped;
+	have[5] = NULL;
 	/* the port's own folder, and the runtimes its script mounts */
 	snprintf(rdir[0], sizeof rdir[0], "%s", port_dir);
 	nr = pm_script_runtimes(script, rdir, 1, 1 + PM_RT_ROOTS);

@@ -42,13 +42,20 @@ export SDL_GAMECONTROLLERCONFIG="$CHAOS_PAD"
 # that brings an SDL of its own puts that ahead of both.
 # and after it, the libraries fetched from ChaOS's pack for ports that need
 # what the Brick hasn't got (src/libpack.h), kept in .userdata
-export LD_LIBRARY_PATH="/usr/lib/chaos-ports:$CHAOS_USERDATA/ports/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+# and last, what ChaOS ships for ports beside run.sh (lib/: libudev-zero,
+# tools/build-libudev.sh), behind anything a port brings of its own
+export LD_LIBRARY_PATH="/usr/lib/chaos-ports:$CHAOS_USERDATA/ports/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}:$HERE/lib"
 # Weston's seat daemon (PortMaster's weston_pkg) ties its seat to a virtual
 # terminal unless told not to; the Brick has none (no /dev/tty0), so it never
 # made Weston's session active and refused it every input device: Switchfin,
 # The Brainvore and Pixel Wheels stopped on "failed to create compositor
 # backend" (2026-11-26)
 export SEATD_VTBOUND=0
+# .NET (PortMaster's dotnet runtime) stops at once without ICU, which the
+# Brick hasn't got: GameMaker ports' patchers run UndertaleModCli on it, and
+# Lasagna Boy Classic's stopped on "Couldn't find a valid ICU package"
+# (2026-11-26). Without ICU it runs with invariant culture, as Microsoft says.
+export DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
 # how many there are before the port starts anything (mod_ChaOS.txt)
 CHAOS_EV_BASE=$(ls /dev/input/event* 2> /dev/null | wc -l)
 export CHAOS_EV_BASE
