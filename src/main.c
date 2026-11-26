@@ -16405,6 +16405,10 @@ static void port_cpu_begin(void)
 	if (!cpu_read(PORT_CPU_DIR "scaling_max_freq", v, sizeof v)) return;
 	g_port_cpu.max = atol(v);
 	if (cpu_read(PORT_CPU_DIR "cpuinfo_max_freq", v, sizeof v) && atol(v) > 0 && atol(v) < top) top = atol(v);
+	/* and never below the top it already had: the Brick's own reaches 2000
+	 * MHz, and 1800 for a port would have been less, not more (2.7.9-test5,
+	 * the first log of it) */
+	if (g_port_cpu.max > top) top = g_port_cpu.max;
 	if (lo > top) lo = top;
 	{
 		FILE *f = fopen(PORT_CPU_SAVED, "w");

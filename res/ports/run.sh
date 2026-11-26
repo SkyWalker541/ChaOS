@@ -38,7 +38,9 @@ if mkfifo "$fifo" 2> /dev/null; then
 else
 	exec > "$CHAOS_USERDATA/ports/last.log" 2>&1
 fi
-echo "ChaOS $(cat "$HERE/../VERSION" 2>/dev/null): $PORT"
+# ChaOS's own version is in CHAOS; VERSION is the one the updater compares
+# and can lag (it said 2.7.8 on a 2.7.9-test5 card)
+echo "ChaOS $(cat "$HERE/../CHAOS" 2>/dev/null || cat "$HERE/../VERSION" 2>/dev/null): $PORT"
 date
 
 # The Brick's pad for SDL, by position (see mod_ChaOS.txt): with SDL's
