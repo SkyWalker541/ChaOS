@@ -5,38 +5,96 @@
 #include <stdio.h>
 #include <string.h>
 
-/* West to east, so left and right move the way a map does. */
+/* West to east by standard time, so left and right move the way a map does
+ * and L1/R1 a whole offset at a time. Every offset anyone lives in, and where
+ * one splits on daylight saving (Phoenix and Denver, Brisbane and Sydney), a
+ * city each way, so the offset is right all year. The standard offsets are
+ * checked against the zone database (tools/clock-check.c), so a wrong one, or
+ * a misspelled id (which reads as UTC), fails the build's checks. 2.7.9: the
+ * thirty cities before this are all here, so no setting changes. */
 const clock_zone CLOCK_ZONES[] = {
-	{ "Pacific/Honolulu",    "Honolulu" },
-	{ "America/Anchorage",   "Anchorage" },
-	{ "America/Los_Angeles", "Los Angeles" },
-	{ "America/Phoenix",     "Phoenix" },
-	{ "America/Denver",      "Denver" },
-	{ "America/Chicago",     "Chicago" },
-	{ "America/Mexico_City", "Mexico City" },
-	{ "America/New_York",    "New York" },
-	{ "America/Halifax",     "Halifax" },
-	{ "America/St_Johns",    "St. John's" },
-	{ "America/Sao_Paulo",   "Sao Paulo" },
-	{ "UTC",                 "UTC" },
-	{ "Europe/London",       "London" },
-	{ "Europe/Paris",        "Paris" },
-	{ "Europe/Berlin",       "Berlin" },
-	{ "Africa/Lagos",        "Lagos" },
-	{ "Europe/Athens",       "Athens" },
-	{ "Africa/Johannesburg", "Johannesburg" },
-	{ "Europe/Moscow",       "Moscow" },
-	{ "Asia/Dubai",          "Dubai" },
-	{ "Asia/Karachi",        "Karachi" },
-	{ "Asia/Kolkata",        "India" },
-	{ "Asia/Dhaka",          "Dhaka" },
-	{ "Asia/Bangkok",        "Bangkok" },
-	{ "Asia/Shanghai",       "Shanghai" },
-	{ "Asia/Singapore",      "Singapore" },
-	{ "Asia/Tokyo",          "Tokyo" },
-	{ "Australia/Adelaide",  "Adelaide" },
-	{ "Australia/Sydney",    "Sydney" },
-	{ "Pacific/Auckland",    "Auckland" },
+	{ "Pacific/Pago_Pago",              "Pago Pago",            -660 },
+	{ "Pacific/Honolulu",               "Honolulu",             -600 },
+	{ "Pacific/Marquesas",              "Marquesas",            -570 },
+	{ "America/Anchorage",              "Anchorage",            -540 },
+	{ "America/Los_Angeles",            "Los Angeles",          -480 },
+	{ "America/Vancouver",              "Vancouver",            -480 },
+	{ "America/Tijuana",                "Tijuana",              -480 },
+	{ "America/Denver",                 "Denver",               -420 },
+	{ "America/Phoenix",                "Phoenix",              -420 },
+	{ "America/Edmonton",               "Edmonton",             -420 },
+	{ "America/Chicago",                "Chicago",              -360 },
+	{ "America/Mexico_City",            "Mexico City",          -360 },
+	{ "America/Regina",                 "Regina",               -360 },
+	{ "America/Costa_Rica",             "Costa Rica",           -360 },
+	{ "America/New_York",               "New York",             -300 },
+	{ "America/Toronto",                "Toronto",              -300 },
+	{ "America/Bogota",                 "Bogota",               -300 },
+	{ "America/Lima",                   "Lima",                 -300 },
+	{ "America/Halifax",                "Halifax",              -240 },
+	{ "America/Caracas",                "Caracas",              -240 },
+	{ "America/Santiago",               "Santiago",             -240 },
+	{ "America/Puerto_Rico",            "Puerto Rico",          -240 },
+	{ "America/St_Johns",               "St. John's",           -210 },
+	{ "America/Sao_Paulo",              "Sao Paulo",            -180 },
+	{ "America/Argentina/Buenos_Aires", "Buenos Aires",         -180 },
+	{ "America/Noronha",                "Noronha",              -120 },
+	{ "Atlantic/Azores",                "Azores",                -60 },
+	{ "Atlantic/Cape_Verde",            "Cape Verde",            -60 },
+	{ "UTC",                            "UTC",                     0 },
+	{ "Europe/London",                  "London",                  0 },
+	{ "Europe/Dublin",                  "Dublin",                  0 },
+	{ "Europe/Lisbon",                  "Lisbon",                  0 },
+	{ "Atlantic/Reykjavik",             "Reykjavik",               0 },
+	{ "Europe/Paris",                   "Paris",                  60 },
+	{ "Europe/Berlin",                  "Berlin",                 60 },
+	{ "Europe/Madrid",                  "Madrid",                 60 },
+	{ "Europe/Rome",                    "Rome",                   60 },
+	{ "Africa/Lagos",                   "Lagos",                  60 },
+	{ "Europe/Athens",                  "Athens",                120 },
+	{ "Africa/Johannesburg",            "Johannesburg",          120 },
+	{ "Africa/Cairo",                   "Cairo",                 120 },
+	{ "Europe/Helsinki",                "Helsinki",              120 },
+	{ "Asia/Jerusalem",                 "Jerusalem",             120 },
+	{ "Europe/Bucharest",               "Bucharest",             120 },
+	{ "Europe/Moscow",                  "Moscow",                180 },
+	{ "Europe/Istanbul",                "Istanbul",              180 },
+	{ "Asia/Riyadh",                    "Riyadh",                180 },
+	{ "Africa/Nairobi",                 "Nairobi",               180 },
+	{ "Asia/Tehran",                    "Tehran",                210 },
+	{ "Asia/Dubai",                     "Dubai",                 240 },
+	{ "Asia/Kabul",                     "Kabul",                 270 },
+	{ "Asia/Karachi",                   "Karachi",               300 },
+	{ "Asia/Tashkent",                  "Tashkent",              300 },
+	{ "Asia/Kolkata",                   "India",                 330 },
+	{ "Asia/Colombo",                   "Colombo",               330 },
+	{ "Asia/Kathmandu",                 "Kathmandu",             345 },
+	{ "Asia/Dhaka",                     "Dhaka",                 360 },
+	{ "Asia/Yangon",                    "Yangon",                390 },
+	{ "Asia/Bangkok",                   "Bangkok",               420 },
+	{ "Asia/Jakarta",                   "Jakarta",               420 },
+	{ "Asia/Ho_Chi_Minh",               "Ho Chi Minh",      420 },
+	{ "Asia/Shanghai",                  "Shanghai",              480 },
+	{ "Asia/Singapore",                 "Singapore",             480 },
+	{ "Asia/Hong_Kong",                 "Hong Kong",             480 },
+	{ "Asia/Taipei",                    "Taipei",                480 },
+	{ "Asia/Manila",                    "Manila",                480 },
+	{ "Australia/Perth",                "Perth",                 480 },
+	{ "Asia/Tokyo",                     "Tokyo",                 540 },
+	{ "Asia/Seoul",                     "Seoul",                 540 },
+	{ "Australia/Adelaide",             "Adelaide",              570 },
+	{ "Australia/Darwin",               "Darwin",                570 },
+	{ "Australia/Sydney",               "Sydney",                600 },
+	{ "Australia/Melbourne",            "Melbourne",             600 },
+	{ "Australia/Brisbane",             "Brisbane",              600 },
+	{ "Pacific/Guam",                   "Guam",                  600 },
+	{ "Pacific/Noumea",                 "Noumea",                660 },
+	{ "Pacific/Auckland",               "Auckland",              720 },
+	{ "Pacific/Fiji",                   "Fiji",                  720 },
+	{ "Pacific/Chatham",                "Chatham",       765 },
+	{ "Pacific/Tongatapu",              "Tonga",                 780 },
+	{ "Pacific/Apia",                   "Samoa",                 780 },
+	{ "Pacific/Kiritimati",             "Kiritimati",            840 },
 };
 const int CLOCK_ZONE_COUNT = (int)(sizeof CLOCK_ZONES / sizeof CLOCK_ZONES[0]);
 
@@ -153,5 +211,32 @@ int clock_zone_step(const char *id, int d)
 	i += d;
 	if (i < 0) i = 0;
 	if (i >= CLOCK_ZONE_COUNT) i = CLOCK_ZONE_COUNT - 1;
+	return i;
+}
+
+void clock_offset_label(long gmtoff, char *out, size_t n)
+{
+	long m = gmtoff / 60, a = m < 0 ? -m : m;
+
+	if (!m) snprintf(out, n, "UTC");
+	else if (a % 60) snprintf(out, n, "UTC%c%ld:%02ld", m < 0 ? '-' : '+', a / 60, a % 60);
+	else snprintf(out, n, "UTC%c%ld", m < 0 ? '-' : '+', a / 60);
+}
+
+int clock_zone_jump(const char *id, int d)
+{
+	int i = clock_zone_find(id), std;
+
+	if (i < 0) return clock_zone_find("America/New_York");
+	std = CLOCK_ZONES[i].std_min;
+	if (d > 0) {
+		while (i < CLOCK_ZONE_COUNT && CLOCK_ZONES[i].std_min == std) i++;
+		return i < CLOCK_ZONE_COUNT ? i : clock_zone_find(id);
+	}
+	/* back: to the start of the offset before this one */
+	while (i > 0 && CLOCK_ZONES[i].std_min == std) i--;
+	if (CLOCK_ZONES[i].std_min == std) return clock_zone_find(id);   /* the first offset */
+	std = CLOCK_ZONES[i].std_min;
+	while (i > 0 && CLOCK_ZONES[i - 1].std_min == std) i--;
 	return i;
 }

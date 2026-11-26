@@ -12,6 +12,7 @@
  * chooses.
  */
 #include <stdio.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -138,26 +139,77 @@ int main(void)
 	CHECK(clock_zone_step(CLOCK_ZONES[0].id, -1) == 0, "the west end stops");
 	CHECK(clock_zone_step(CLOCK_ZONES[CLOCK_ZONE_COUNT - 1].id, +1) == CLOCK_ZONE_COUNT - 1,
 	      "and so does the east");
-	CHECK(!strcmp(CLOCK_ZONES[clock_zone_step("America/New_York", +1)].city, "Halifax"),
-	      "one east of New York is Halifax");
+#define ZI(id) clock_zone_find(id)
+	CHECK(!strcmp(CLOCK_ZONES[clock_zone_step("America/New_York", +1)].city, "Toronto"),
+	      "one east of New York is Toronto, on the same offset");
+	/* L1/R1 (2.7.9): a whole offset at a time, to its first city */
+	CHECK(clock_zone_jump("America/New_York", +1) == ZI("America/Halifax"), "R1 from New York: Halifax");
+	CHECK(clock_zone_jump("America/New_York", -1) == ZI("America/Chicago"), "L1 from New York: Chicago");
+	CHECK(clock_zone_jump("America/Toronto", -1) == ZI("America/Chicago"),
+	      "L1 from inside an offset: the start of the one before");
+	CHECK(clock_zone_jump("America/Chicago", -1) == ZI("America/Denver"), "and on west: Denver");
+	CHECK(clock_zone_jump("Asia/Kolkata", +1) == ZI("Asia/Kathmandu"), "UTC+5:30 to UTC+5:45");
+	CHECK(clock_zone_jump(CLOCK_ZONES[0].id, -1) == 0, "L1 stops at the west end");
+	CHECK(clock_zone_jump(CLOCK_ZONES[CLOCK_ZONE_COUNT - 1].id, +1) == CLOCK_ZONE_COUNT - 1,
+	      "R1 at the east end");
+	CHECK(clock_zone_jump("Mars/Olympus_Mons", +1) == ZI("America/New_York"), "an unknown zone: New York");
 	{
-		/* West to east, by what each zone is on one fixed day. A zone this
-		 * machine did not know would read as UTC and break the order, so
-		 * this catches a misspelled id too. */
-		int i;
-		long prev = -86400;
+		/* Every city of the list before 2.7.9, so no one's setting changes */
+		static const char *const old[] = {
+			"Pacific/Honolulu", "America/Anchorage", "America/Los_Angeles", "America/Phoenix",
+			"America/Denver", "America/Chicago", "America/Mexico_City", "America/New_York",
+			"America/Halifax", "America/St_Johns", "America/Sao_Paulo", "UTC", "Europe/London",
+			"Europe/Paris", "Europe/Berlin", "Africa/Lagos", "Europe/Athens", "Africa/Johannesburg",
+			"Europe/Moscow", "Asia/Dubai", "Asia/Karachi", "Asia/Kolkata", "Asia/Dhaka",
+			"Asia/Bangkok", "Asia/Shanghai", "Asia/Singapore", "Asia/Tokyo", "Australia/Adelaide",
+			"Australia/Sydney", "Pacific/Auckland", NULL };
+		int k, missing = 0;
+
+		for (k = 0; old[k]; k++) if (ZI(old[k]) < 0) { missing++; printf("  missing %s\n", old[k]); }
+		CHECK(!missing, "every zone of the old list is still on it");
+	}
+	{
+		char o[16];
+
+		clock_offset_label(-28800, o, sizeof o); CHECK(!strcmp(o, "UTC-8"), "%s", o);
+		clock_offset_label(19800, o, sizeof o);  CHECK(!strcmp(o, "UTC+5:30"), "%s", o);
+		clock_offset_label(-12600, o, sizeof o); CHECK(!strcmp(o, "UTC-3:30"), "%s", o);
+		clock_offset_label(45900, o, sizeof o);  CHECK(!strcmp(o, "UTC+12:45"), "%s", o);
+		clock_offset_label(0, o, sizeof o);      CHECK(!strcmp(o, "UTC"), "%s", o);
+	}
+	{
+		/* Each zone's standard offset is the zone database's (the lesser of
+		 * January's and July's, so either hemisphere's winter), and the list
+		 * goes west to east by it. A misspelled id reads as UTC and fails
+		 * the first, unless it is meant to be on UTC: so each one's file is
+		 * looked for too. Ids, not just offsets, matter: daylight saving is
+		 * the zone database's to keep. */
+		int i, bad = 0, order = 0, nofile = 0;
+		int prev = -24 * 60;
 
 		for (i = 0; i < CLOCK_ZONE_COUNT; i++) {
-			struct tm tm;
-			time_t noon = 1767268800;   /* 2026-01-01 12:00 UTC */
+			const time_t jan = 1768478400, jul = 1784116800;   /* 2026-01-15, 2026-07-15 12:00 UTC */
+			struct tm a, b;
+			long m;
+			char f[160];
 
 			setenv("TZ", CLOCK_ZONES[i].id, 1);
 			tzset();
-			localtime_r(&noon, &tm);
-			CHECK(tm.tm_gmtoff >= prev, "%s is east of the zone before it",
-			      CLOCK_ZONES[i].city);
-			prev = tm.tm_gmtoff;
+			localtime_r(&jan, &a);
+			localtime_r(&jul, &b);
+			m = (a.tm_gmtoff < b.tm_gmtoff ? a.tm_gmtoff : b.tm_gmtoff) / 60;
+			if (m != CLOCK_ZONES[i].std_min) {
+				bad++;
+				printf("  %s: standard %ld, the list says %d\n", CLOCK_ZONES[i].id, m, CLOCK_ZONES[i].std_min);
+			}
+			if (CLOCK_ZONES[i].std_min < prev) { order++; printf("  %s is out of order\n", CLOCK_ZONES[i].id); }
+			prev = CLOCK_ZONES[i].std_min;
+			snprintf(f, sizeof f, "/usr/share/zoneinfo/%s", CLOCK_ZONES[i].id);
+			if (access(f, R_OK) != 0) { nofile++; printf("  no zone file for %s\n", CLOCK_ZONES[i].id); }
 		}
+		CHECK(!bad, "every zone's standard offset is the zone database's (%d zones)", CLOCK_ZONE_COUNT);
+		CHECK(!order, "west to east by standard time");
+		CHECK(!nofile, "and every id is a zone the database has");
 	}
 
 	if (failures) { printf("\n%d check(s) failed\n", failures); return 1; }

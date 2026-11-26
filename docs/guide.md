@@ -167,17 +167,20 @@ is never there.
 
 Date & Time has a row for each part of the clock and one for the time zone,
 each changed with left and right and set the moment it changes, so the time
-holds through a power-off. The zones are one or two cities per hour of offset,
-west to east. Wi-Fi sets the clock again whenever it connects, so with it the
-screen is mostly for the zone; a Pixel 2 without an adapter has no network to
-take the time from, so set it there once.
+holds through a power-off. The time zone row shows the offset and a city,
+**UTC-8 · Los Angeles**: left and right step city by city, west to east, and
+**L1/R1** jump a whole offset at a time. Every offset anyone lives in is
+there, half and quarter hours included, and daylight saving changes by itself.
+Wi-Fi sets the clock again whenever it connects, so with it the screen is
+mostly for the zone; a Pixel 2 without an adapter has no network to take the
+time from, so set it there once.
 
 Under the clock rows, three more set the **status bar**: **Clock** (on or off,
 top left), **12h/24h Clock** (12h or 24h) and **Battery** (Off, Icon,
 Percent, or Icon and percent, top right). The status bar sits over every menu
 and shelf, so you can see the time and the charge without opening anything.
-The low-battery dot is still drawn when the charge runs low; with the battery
-shown it moves in beside it, so the two don't overlap.
+They show on the main menus and the in-game menu, not on popups. When the
+charge runs low, the shelf shows a low-battery warning of its own.
 
 ChaOS Transfer and Box Art need a network, and go quiet without one rather than
 disappearing - a row that vanishes teaches nobody why. RetroAchievements stays reachable

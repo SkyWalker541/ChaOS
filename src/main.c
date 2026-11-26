@@ -11493,7 +11493,7 @@ static int menu_std_width(app *a)
  * Brick's launch.sh reads at boot as well. */
 typedef struct {
 	char field[CLK_FIELDS][24];
-	char zone[64];   /* a city, or a zone id not on the list as it is */
+	char zone[96];   /* "UTC-8 \xC2\xB7 Los Angeles", or a zone id not on the list as it is */
 } clock_ui;
 
 static const char *const CLOCK_ROW_NAMES[CLK_FIELDS] = {
@@ -11514,7 +11514,18 @@ static int clock_build(void *ctx, menu_row *rows, int max, const char **heading)
 	}
 	db_get_str(db_lib(), "timezone", id, sizeof id, "America/New_York");
 	z = clock_zone_find(id);
-	snprintf(c->zone, sizeof c->zone, "%s", z >= 0 ? CLOCK_ZONES[z].city : id);
+	{
+		/* The offset as it is today, daylight saving included: the zone is
+		 * the one TZ holds, so local time says it */
+		struct tm tm;
+		char off[16];
+
+		localtime_r(&now, &tm);
+		clock_offset_label(tm.tm_gmtoff, off, sizeof off);
+		if (z < 0) snprintf(c->zone, sizeof c->zone, "%s", id);
+		else if (!strcmp(CLOCK_ZONES[z].id, "UTC")) snprintf(c->zone, sizeof c->zone, "UTC");
+		else snprintf(c->zone, sizeof c->zone, "%s \xC2\xB7 %s", off, CLOCK_ZONES[z].city);
+	}
 	if (n < max) rows[n++] = (menu_row){ "Time Zone", c->zone, true };
 	/* The clock's style, straight under Time Zone. Showing the clock and the
 	 * battery at all are System Settings' Show Clock and Show Battery. */
@@ -11525,7 +11536,9 @@ static int clock_build(void *ctx, menu_row *rows, int max, const char **heading)
 	}
 	if (n + 4 <= max) {
 		rows[n++] = MENU_RULE;
-		rows[n++] = MENU_NOTE("Left/right: change");
+		/* L1/R1 is Time Zone's: the list is long, and a whole offset at a
+		 * time gets across it */
+		rows[n++] = MENU_NOTE("Left/right: change   L1/R1: zone by hour");
 		/* Only where it is true: the Brick's ntpd sets the clock again once
 		 * Wi-Fi connects, so a time set here lasts until then */
 		if (plat_has_wifi()) rows[n++] = MENU_NOTE("Wi-Fi sets the clock")   /* when connected, as Wi-Fi must be; the longer note sat within pixels of the panel */;
@@ -11538,6 +11551,17 @@ static menu_result clock_key(app *a, void *ctx, in_button key, int sel)
 	int d = key == IN_RIGHT ? 1 : key == IN_LEFT ? -1 : 0;
 
 	(void)a; (void)ctx;
+	/* Time Zone: L1 and R1 a whole offset at a time, as the list is long */
+	if (sel == CLK_FIELDS && (key == IN_L1 || key == IN_R1)) {
+		char id[64];
+		int z;
+
+		db_get_str(db_lib(), "timezone", id, sizeof id, "America/New_York");
+		z = clock_zone_jump(id, key == IN_R1 ? 1 : -1);
+		db_set_str(db_lib(), "timezone", CLOCK_ZONES[z].id);
+		plat_clock_zone(CLOCK_ZONES[z].id);
+		return MENU_STAY;
+	}
 	/* The switches also take A, as the rest of the menus do */
 	if (!d && key != IN_ACCEPT) return MENU_STAY;
 	if (sel >= 0 && sel < CLK_FIELDS) {
