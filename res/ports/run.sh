@@ -43,6 +43,12 @@ export SDL_GAMECONTROLLERCONFIG="$CHAOS_PAD"
 # and after it, the libraries fetched from ChaOS's pack for ports that need
 # what the Brick hasn't got (src/libpack.h), kept in .userdata
 export LD_LIBRARY_PATH="/usr/lib/chaos-ports:$CHAOS_USERDATA/ports/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+# Weston's seat daemon (PortMaster's weston_pkg) ties its seat to a virtual
+# terminal unless told not to; the Brick has none (no /dev/tty0), so it never
+# made Weston's session active and refused it every input device: Switchfin,
+# The Brainvore and Pixel Wheels stopped on "failed to create compositor
+# backend" (2026-11-26)
+export SEATD_VTBOUND=0
 # how many there are before the port starts anything (mod_ChaOS.txt)
 CHAOS_EV_BASE=$(ls /dev/input/event* 2> /dev/null | wc -l)
 export CHAOS_EV_BASE
@@ -131,14 +137,14 @@ PYEOF
 	sync
 	exit $st
 fi
-# python3 for the ports that call it - PortMaster's harbourmaster fetching a
+# python3 and zip for the ports that call them - PortMaster's harbourmaster fetching a
 # runtime (Dust Racing 2D), a patcher run on the first start (Lasagna Boy
 # Classic's), a script - at the end of PATH, so a port's own Python (Pyxel's,
 # Ren'Py's) still comes first; PYTHONHOME set for ChaOS's alone, by the
-# wrapper (res/ports/pybin/python3). The Brick has none of its own.
-if chaos_python; then
-	export CHAOS_PYTHON="$py" PATH="$PATH:$HERE/pybin"
-fi
+# wrapper (res/ports/pybin/python3). The Brick has neither of its own; zip is
+# there whether Python is or not.
+chaos_python && export CHAOS_PYTHON="$py"
+export PATH="$PATH:$HERE/pybin"
 cd "$(dirname "$PORT")" || exit 1
 /bin/bash "$PORT"
 st=$?
