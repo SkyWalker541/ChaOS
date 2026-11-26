@@ -141,6 +141,8 @@ void plat_present(void)
 	static bool shown;
 	Uint8 r, g, b, a;
 
+	if (plat_frozen) return;   /* ChaOS: power off's logo stays */
+
 	SDL_GetRenderDrawColor(ren, &r, &g, &b, &a);
 	if (!shown) {
 		take_from_splash();

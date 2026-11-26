@@ -550,6 +550,9 @@ bool plat_spawn_detached(char *const argv[], const char *const envkv[],
 	return true;
 }
 
+bool plat_frozen;
+void plat_present_freeze(void) { plat_frozen = true; }
+
 void plat_request_poweroff(void)
 {
 	FILE *f = fopen(TORTOS_POWEROFF_FLAG, "w");

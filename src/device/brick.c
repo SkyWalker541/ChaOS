@@ -116,6 +116,8 @@ void plat_present(void)
 {
 	static bool shown;
 
+	if (plat_frozen) return;   /* ChaOS: power off's logo stays */
+
 	if (!shown) {
 		signal_splash(SIGUSR1);
 #ifdef __linux__

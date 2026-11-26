@@ -68,6 +68,12 @@ unsigned plat_now_ms(void);
  * whose panel is another size or turned draws into a texture of this size
  * instead, and fits it to the panel at present. */
 void plat_present(void);
+/* ChaOS: the frame on show now kept there: every plat_present after does
+ * nothing. Power off's logo, which a screen still running under it (a menu
+ * returning, the shelf's next frame) drew over again for a moment before
+ * the power went (Aquilus, 2.7.9-test5). */
+void plat_present_freeze(void);
+extern bool plat_frozen;
 void plat_draw_to_screen(void);
 
 bool plat_input_init(void);
