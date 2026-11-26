@@ -79,6 +79,10 @@ install -m 755 "$ELF" "$C/TortOS/tortos.elf"
 grep -q '::restart:/usr/sbin/tortos-update' "$W/root/etc/inittab" || { echo "inittab has changed: check the updater" >&2; exit 1; }
 install -m 755 "$UPDATER" "$W/root/usr/sbin/tortos-update"
 install -m 755 "$DIATOM" "$C/TortOS/diatom"
+# Muse's player: ChaOS's build (tools/build-muse.sh) in place of TortOS's,
+# from 2.7.9 on; its source is src/muse/
+[ -f "$C/TortOS/muse" ] || { echo "no muse in this image's card folder" >&2; exit 1; }
+install -m 755 "$ROOT/dist/brick/muse" "$C/TortOS/muse"
 
 # ChaOS's plastron (github.com/SkyWalker541/plastron, Eric Reinsmidt's with
 # ChaOS's changes for the Brick Pro: dist/brick/plastron/README.md): its boot

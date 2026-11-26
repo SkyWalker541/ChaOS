@@ -301,6 +301,15 @@ static void handle(const qcmd *q)
 		int tries = strcmp(q->dev, "default") ? 10 : 1, i;
 		struct timespec t0, t1;
 
+		/* Not playing: the device is closed (player), so only where it is
+		 * to be is kept, and it is opened there when something plays */
+		if (S.state != ST_PLAYING) {
+			snprintf(g_dev, sizeof g_dev, "%s", q->dev);
+			snprintf(S.sink, sizeof S.sink, "%s", g_dev);
+			S.ev_sink = 1;
+			wake();
+			break;
+		}
 		/* Already there: reported, and nothing reopened. The launcher resends
 		 * a headset that came back under the same name, and a reopen here
 		 * would put a gap in a song that never left it. Diatom's port does
@@ -360,12 +369,22 @@ static void *player(void *arg)
 	static int16_t buf[CHUNK * DEC_CHANNELS];
 
 	(void)arg;
-	if (!pcm_open(g_dev)) say("%s", pcm_error());
+	/* ChaOS: the sound device is open only while something plays. Paused,
+	 * stopped or idle, Muse lets go of it, so a port started from the shelf
+	 * gets the hardware itself (res/ports/run.sh) rather than the shared
+	 * mixer, which Muse held for good once it had played (2.7.9). A pause
+	 * already drops what was queued and resumes from what was heard
+	 * (C_PAUSE, C_RESUME), so closing loses nothing; reopening takes a few
+	 * ms, a little more on a headset. */
 	pthread_mutex_lock(&S.mu);
 	while (!g_quit) {
 		int n;
 		bool lost = false;
 
+		if (q_len == 0 && S.state != ST_PLAYING && pcm_is_open()) {
+			pcm_close();
+			say("sound device let go (%s)", S.state == ST_PAUSED ? "paused" : "stopped");
+		}
 		while (q_len == 0 && S.state != ST_PLAYING && !g_quit)
 			pthread_cond_wait(&S.cv, &S.mu);
 		if (q_len > 0) {
@@ -377,6 +396,24 @@ static void *player(void *arg)
 			continue;
 		}
 		if (S.state != ST_PLAYING || !g_dec) continue;
+		/* Playing again: the device opened where it is to be, or the default
+		 * if that won't open now (a headset still held elsewhere) */
+		if (!pcm_is_open()) {
+			if (!pcm_open(g_dev) && strcmp(g_dev, "default")) {
+				say("%s; falling back to default", pcm_error());
+				snprintf(g_dev, sizeof g_dev, "default");
+				snprintf(S.sink, sizeof S.sink, "%s", g_dev);
+				S.ev_sink = 1;
+				wake();
+				pcm_open(g_dev);
+			}
+			if (!pcm_is_open()) {
+				fail(pcm_error()[0] ? pcm_error() : "no sound device");
+				dec_close(g_dec);
+				g_dec = NULL;
+				continue;
+			}
+		}
 
 		/* Decode and write WITHOUT the lock: the write blocks for as long as
 		 * the device takes to drain, and a command arriving meanwhile must
