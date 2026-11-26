@@ -106,7 +106,8 @@ int gm_rows(const gm_ui *u, menu_row *out, gm_bufs *b)
 	};
 	int i;
 
-	for (i = 0; i < GM_ROWS; i++) out[i] = (menu_row){ label[i], NULL, true };
+	/* each row's id is its gm_row, kept when main.c leaves rows out */
+	for (i = 0; i < GM_ROWS; i++) out[i] = (menu_row){ label[i], NULL, true, .id = MENU_ID(i) };
 	/* ChaOS: what each row does, under the menu (menu_draw) */
 	{
 		static const char *hint[GM_ROWS] = {

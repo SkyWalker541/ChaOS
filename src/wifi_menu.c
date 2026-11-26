@@ -105,9 +105,11 @@ int wifi_build(void *ctx, menu_row *rows, int max, const char **heading)
 
 	/* The switch is row 0, so the state of the radio is the first thing read
 	 * and the first thing reachable. */
-	rows[nrows++] = (menu_row){ "Wi-Fi", w->on ? "on" : "off", true, .toggle = true };
+	/* ids: the switch is WIFI_ROW_SWITCH, a network its index in w->nets */
+	rows[nrows++] = (menu_row){ "Wi-Fi", w->on ? "on" : "off", true, .toggle = true,
+	                            .id = MENU_ID(WIFI_ROW_SWITCH) };
 	for (i = 0; i < w->n && nrows < max - 2; i++)
-		rows[nrows++] = (menu_row){ w->nets[i].ssid, w->vals[i], true };
+		rows[nrows++] = (menu_row){ w->nets[i].ssid, w->vals[i], true, .id = MENU_ID(i) };
 
 	/* These are footers, not list items - they say something about the list
 	 * rather than offering anything - so they sit under a rule like the key

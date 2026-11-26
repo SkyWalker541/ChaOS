@@ -22,7 +22,7 @@ CHECKS = check-display check-cheevos check-hare check-httpd check-idle check-rah
          check-db check-stats check-sort check-bt check-ss \
          check-muselib check-musequeue check-museart check-controls check-logpack \
          check-clock check-update check-remap check-shots check-pixfont \
-         check-release check-updater check-chaos-names check-itch check-itchdl check-hbcat check-discset check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore check-gbsort check-menu-keys
+         check-release check-updater check-chaos-names check-itch check-itchdl check-hbcat check-discset check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore check-gbsort check-menu-keys check-menu-lint
 
 check: check-sevenz
 	@fail=0; for c in $(CHECKS); do \
@@ -119,6 +119,11 @@ check-xfer: build-native/xfer-check
 #
 # It links the pure halves of the screens and NOT SDL. If it ever needs SDL to
 # link, the menu design has failed - reopen it rather than adding the flag.
+# A menu's key handler acts on what a row is (menu_row.id), never on where it
+# is: the regression of 0.10.2, 2.7.0 and 2026-11-25 (tools/menu-lint.py)
+check-menu-lint:
+	@python3 tools/menu-lint.py src/*.c
+
 check-menus: build-native/menu-check
 	@./build-native/menu-check
 

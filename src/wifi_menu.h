@@ -8,6 +8,9 @@
 #define TORTOS_WIFI_MENU_H
 
 #include "menu.h"
+
+/* The Wi-Fi switch row's id (menu_row.id); a network's is its index */
+#define WIFI_ROW_SWITCH (-2)
 #include "wifi.h"
 
 typedef struct {

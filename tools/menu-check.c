@@ -22,6 +22,49 @@
 
 static int fails;
 
+/* Every row a key can land on says what it is (menu_row.id), and no two say
+ * the same, in every state each menu is built in below: the keys act on the
+ * id, never on the row's place, which a row shown only sometimes moved (the
+ * regression of 0.10.2 and 2.7.0). Each builder is wrapped to check it. */
+static void ids_ck(const menu_row *r, int n, const char *where)
+{
+	int i, j;
+
+	for (i = 0; i < n; i++) {
+		if (!r[i].label || ROW_IS_NOTE(r[i])) continue;
+		if (!r[i].id) { printf("  FAIL %s: \"%s\" has no id\n", where, r[i].label); fails++; }
+		for (j = 0; j < i; j++)
+			if (r[j].id && r[j].id == r[i].id) {
+				printf("  FAIL %s: \"%s\" and \"%s\" share an id\n", where, r[j].label, r[i].label);
+				fails++;
+			}
+	}
+}
+
+static int sys_menu_build_ck(const sys_ui *u, menu_row *out, menu_bufs *b, const char **heading)
+{
+	int n = sys_menu_build(u, out, b, heading);
+	ids_ck(out, n, "system menu");
+	return n;
+}
+
+static int wifi_build_ck(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	int n = wifi_build(ctx, rows, max, heading);
+	ids_ck(rows, n, "Wi-Fi");
+	return n;
+}
+
+static int gm_rows_ck(const gm_ui *u, menu_row *out, gm_bufs *b)
+{
+	int n = gm_rows(u, out, b);
+	ids_ck(out, n, "in-game menu");
+	return n;
+}
+#define sys_menu_build sys_menu_build_ck
+#define wifi_build wifi_build_ck
+#define gm_rows gm_rows_ck
+
 static void ck(int cond, const char *what)
 {
 	if (!cond) { printf("  FAIL %s\n", what); fails++; }

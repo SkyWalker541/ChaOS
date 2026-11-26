@@ -123,9 +123,9 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 		 * nothing else - not even the enum's order, since Core sits between
 		 * them and it has none. See SM_FAV_ROWS. */
 		if (u->fav) {
-			out[0] = (menu_row){ "Games",   b->a,                      false };
+			out[0] = (menu_row){ "Games",   b->a,                      false, .id = MENU_ID(SM_GAMES) };
 			out[1] = (menu_row){ "Sort By", u->sort ? u->sort : "Name", true, .cycles = true,
-			                     .hint = "The order of the games on this shelf" };
+			                     .hint = "The order of the games on this shelf", .id = MENU_ID(SM_SORT) };
 			return SM_FAV_ROWS;
 		}
 		if (u->muse) {
@@ -164,6 +164,9 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 					                     .hint = "Look for music and books added to the card" };
 					break;
 				}
+			/* each row's id is what it is (sm_muse_row): the key handler
+			 * reads it rather than counting rows */
+			for (k = 0; k < n; k++) out[k].id = MENU_ID(ids[k]);
 			return n;
 		}
 		menu_row full[SM_ROWS];
@@ -232,7 +235,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 			sm_row ids[SM_ROWS];
 			int k, n = sys_menu_system_rows(u, ids);
 
-			for (k = 0; k < n; k++) out[k] = full[ids[k]];
+			for (k = 0; k < n; k++) { out[k] = full[ids[k]]; out[k].id = MENU_ID(ids[k]); }
 			return n;
 		}
 	}
@@ -431,7 +434,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 		pm_row ids[PM_ROWS];
 		int k, n = sys_menu_tortos_rows(u, ids);
 
-		for (k = 0; k < n; k++) out[k] = full[ids[k]];
+		for (k = 0; k < n; k++) { out[k] = full[ids[k]]; out[k].id = MENU_ID(ids[k]); }
 		return n;
 	}
 }

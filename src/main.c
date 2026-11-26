@@ -6698,6 +6698,15 @@ static bool muse_open(app *a, const menu_style *over, void *ctx);
  * `sel` indexes the rows the last build produced. */
 typedef menu_result (*menu_key_fn)(app *a, void *ctx, in_button key, int sel);
 
+/* ChaOS: the id (menu_row.id, less MENU_ID's one) of the row a key landed
+ * on, set by the runner before it calls the screen's handler: a handler
+ * acts on what the row is, never on where it is (CLAUDE.md). -1 for a row
+ * with no id, or none. A list of like items (games, networks) still
+ * indexes its own array with `sel`, the same array its build used. */
+static int g_menu_id = -1;
+static int menu_id(void) { return g_menu_id; }
+#define MENU_SET_ID() (g_menu_id = sel >= 0 && sel < n ? rows[sel].id - 1 : -1)
+
 /* The loop itself. Called only through menu_run below, which owns the flush on
  * either side of it. */
 static menu_exit menu_run_body(app *a, const menu_style *st,
@@ -6773,10 +6782,10 @@ static menu_exit menu_run_body(app *a, const menu_style *st,
 		 * triggered: holding A on a row that opens a screen should open it
 		 * once. Sent before the press loop below, which skips them. */
 		if (on_key && in_repeat(&a->in, IN_LEFT))
-			if (on_key(a, ctx, IN_LEFT, sel) == MENU_DONE)
+			if ((MENU_SET_ID(), 1) && on_key(a, ctx, IN_LEFT, sel) == MENU_DONE)
 				return MENU_LEFT_SCREEN;
 		if (on_key && in_repeat(&a->in, IN_RIGHT))
-			if (on_key(a, ctx, IN_RIGHT, sel) == MENU_DONE)
+			if ((MENU_SET_ID(), 1) && on_key(a, ctx, IN_RIGHT, sel) == MENU_DONE)
 				return MENU_LEFT_SCREEN;
 		if (!a->running) return MENU_LEFT_GONE;
 
@@ -6788,7 +6797,7 @@ static menu_exit menu_run_body(app *a, const menu_style *st,
 			if (b == IN_UP || b == IN_DOWN || b == IN_BACK || b == IN_MENU
 			    || b == IN_POWER || b == IN_VOLUP || b == IN_VOLDN
 			    || b == IN_BRIGHTUP || b == IN_BRIGHTDN) continue;
-			if (on_key && on_key(a, ctx, (in_button)b, sel) == MENU_DONE)
+			if (on_key && (MENU_SET_ID(), 1) && on_key(a, ctx, (in_button)b, sel) == MENU_DONE)
 				return MENU_LEFT_SCREEN;
 			if (!a->running) return MENU_LEFT_GONE;
 			/* The screen it opened was left with MENU: out of this one too,
@@ -6860,8 +6869,8 @@ static menu_result wifi_key(app *a, void *ctx, in_button key, int sel)
 {
 	wifi_ui *w = ctx;
 	char status[96], ssid[WIFI_SSID_MAX], ip[64];
-	int k = sel - 1;                    /* row 0 is the switch */
-	bool net_row = sel >= 1 && sel <= w->n;
+	int k = menu_id();                  /* a network's index, or the switch */
+	bool net_row = k >= 0 && k < w->n;
 
 	if (key == IN_Y && w->on) { wifi_begin_scan(w); return MENU_STAY; }
 
@@ -6903,7 +6912,8 @@ static menu_result wifi_key(app *a, void *ctx, in_button key, int sel)
 
 	/* The switch. Saved on every change rather than on the way out: the way out
 	 * of a handheld is often the power button. */
-	if (sel == 0) {
+	(void)sel;
+	if (k == WIFI_ROW_SWITCH) {
 		if (w->on) {
 			wifi_down();
 			wifi_pref_save(false);
@@ -9127,12 +9137,12 @@ static int boxart_build(void *ctx, menu_row *rows, int max, const char **heading
 
 	(void)max;
 	*heading = "Box Art";
-	rows[n++] = (menu_row){ "Find Automatically", net ? NULL : "needs Wi-Fi", true };
-	rows[n++] = (menu_row){ "Search LaunchBox", net ? NULL : "needs Wi-Fi", true };
+	rows[n++] = (menu_row){ "Find Automatically", net ? NULL : "needs Wi-Fi", true, .id = MENU_ID(BA_AUTO) };
+	rows[n++] = (menu_row){ "Search LaunchBox", net ? NULL : "needs Wi-Fi", true, .id = MENU_ID(BA_LBOX) };
 	if (c->itch)
-		rows[n++] = (menu_row){ "Search itch.io", net ? NULL : "needs Wi-Fi", true };
+		rows[n++] = (menu_row){ "Search itch.io", net ? NULL : "needs Wi-Fi", true, .id = MENU_ID(BA_ITCH) };
 	snprintf(shots, sizeof shots, "%d", c->shots);
-	rows[n++] = (menu_row){ "Use a Screenshot", c->shots ? shots : "none yet", c->shots > 0 };
+	rows[n++] = (menu_row){ "Use a Screenshot", c->shots ? shots : "none yet", c->shots > 0, .id = MENU_ID(BA_SHOT) };
 	rows[n++] = MENU_RULE;
 	rows[n++] = MENU_NOTE("LaunchBox: romhacks too; screenshots: MENU+X");
 	return n;
@@ -9144,7 +9154,7 @@ static menu_result boxart_key(app *a, void *ctx, in_button key, int sel)
 	info_ctx *ic = c->ic;
 	const char *folder = a->sys.systems[ic->owner].folder;
 	unsigned accent = a->sys.systems[ic->owner].accent;
-	int id = sel == 0 ? BA_AUTO : sel == 1 ? BA_LBOX : (c->itch && sel == 2) ? BA_ITCH : BA_SHOT;
+	int id = menu_id();
 	bool done = false;
 
 	if (key != IN_ACCEPT) return MENU_STAY;
@@ -9163,7 +9173,7 @@ static menu_result boxart_key(app *a, void *ctx, in_button key, int sel)
 	if (id == BA_ITCH) {
 		if (!net_online()) return MENU_STAY;
 		done = itch_cover_screen(a, folder, ic->g->name, ic->g->title, accent);
-	} else {
+	} else if (id == BA_SHOT) {
 		done = shot_cover_screen(a, folder, ic->g->file, ic->g->name, ic->g->title, accent);
 	}
 	return done ? MENU_DONE : MENU_STAY;
@@ -11019,6 +11029,9 @@ static int g_bw_shot;   /* --battwarn: the page, one frame */
 static int g_tz_shot;   /* --tzpick N / -N: the time zone lists, one frame */
 static int g_off_shot;  /* --offnote 1|2|3|4: shutting down, restarting, loading, didn't start */
 
+/* Battery Warnings' rows, by what they are (menu_id) */
+enum { BW_ROW_LOW, BW_ROW_LOWGAME, BW_ROW_CRIT, BW_ROW_CRITGAME, BW_ROW_OFF };
+
 static int bw_build(void *ctx, menu_row *rows, int max, const char **heading)
 {
 	static char low[8], crit[8], off[8];
@@ -11031,20 +11044,20 @@ static int bw_build(void *ctx, menu_row *rows, int max, const char **heading)
 	snprintf(low, sizeof low, "%d%%", g_bw_low);
 	if (g_bw_crit > 0) snprintf(crit, sizeof crit, "%d%%", g_bw_crit);
 	else snprintf(crit, sizeof crit, "Auto");
-	rows[n] = (menu_row){ "Low Battery At", low, true };
+	rows[n] = (menu_row){ "Low Battery At", low, true, .id = MENU_ID(BW_ROW_LOW) };
 	rows[n].cycles = true;
 	rows[n++].hint = "A red dot shows from here, on the battery";
-	rows[n] = (menu_row){ "Low Dot in Games", g_bw_low_game ? "On" : "Off", true };
+	rows[n] = (menu_row){ "Low Dot in Games", g_bw_low_game ? "On" : "Off", true, .id = MENU_ID(BW_ROW_LOWGAME) };
 	rows[n].toggle = true;
 	rows[n++].hint = "The red dot over a game too, not only in menus";
-	rows[n] = (menu_row){ "Blinking At", crit, true };
+	rows[n] = (menu_row){ "Blinking At", crit, true, .id = MENU_ID(BW_ROW_CRIT) };
 	rows[n].cycles = true;
 	rows[n++].hint = g_bw_crit > 0 ? "The dot blinks from here: a few minutes left"
 	                               : "Auto: when the battery says it's nearly out";
-	rows[n] = (menu_row){ "Blinking Dot in Games", g_bw_crit_game ? "On" : "Off", true };
+	rows[n] = (menu_row){ "Blinking Dot in Games", g_bw_crit_game ? "On" : "Off", true, .id = MENU_ID(BW_ROW_CRITGAME) };
 	rows[n].toggle = true;
 	rows[n++].hint = "The blinking dot over a game too";
-	rows[n] = (menu_row){ "Save and Turn Off At", off, true };
+	rows[n] = (menu_row){ "Save and Turn Off At", off, true, .id = MENU_ID(BW_ROW_OFF) };
 	rows[n].cycles = true;
 	rows[n++].hint = g_bw_off > 0 ? "ChaOS saves your game and turns off here"
 	                              : "Auto: when the battery says it's empty";
@@ -11095,20 +11108,20 @@ static menu_result bw_key(app *a, void *ctx, in_button key, int sel)
 {
 	int d = key == IN_LEFT ? -1 : key == IN_RIGHT || key == IN_ACCEPT ? 1 : 0;
 
-	(void)a; (void)ctx;
+	(void)a; (void)ctx; (void)sel;
 	if (!d) return MENU_STAY;
-	switch (sel) {
-	case 0:
+	switch (menu_id()) {
+	case BW_ROW_LOW:
 		g_bw_low = bw_step(BW_LOWS, (int)(sizeof BW_LOWS / sizeof *BW_LOWS), g_bw_low, d, 0);
 		if (g_bw_crit >= g_bw_low)
 			g_bw_crit = bw_step(BW_CRITS, (int)(sizeof BW_CRITS / sizeof *BW_CRITS), g_bw_crit, -1, g_bw_low);
 		break;
-	case 1: g_bw_low_game = !g_bw_low_game; break;
-	case 2:
+	case BW_ROW_LOWGAME: g_bw_low_game = !g_bw_low_game; break;
+	case BW_ROW_CRIT:
 		g_bw_crit = bw_step(BW_CRITS, (int)(sizeof BW_CRITS / sizeof *BW_CRITS), g_bw_crit, d, g_bw_low);
 		break;
-	case 3: g_bw_crit_game = !g_bw_crit_game; break;
-	case 4:
+	case BW_ROW_CRITGAME: g_bw_crit_game = !g_bw_crit_game; break;
+	case BW_ROW_OFF:
 		/* below the low warning, and never at or above the blinking one */
 		g_bw_off = bw_step(BW_OFFS, (int)(sizeof BW_OFFS / sizeof *BW_OFFS), g_bw_off, d,
 		                   g_bw_crit > 0 ? g_bw_crit : g_bw_low);
@@ -11143,10 +11156,10 @@ static int chan_build(void *ctx, menu_row *rows, int max, const char **heading)
 
 	(void)ctx; (void)max;
 	*heading = "Update Channels";
-	rows[n] = (menu_row){ "Public Release", !g_test_updates ? "In Use" : NULL, true };
+	rows[n] = (menu_row){ "Public Release", !g_test_updates ? "In Use" : NULL, true, .id = MENU_ID(0) };
 	rows[n++].hint = "Official releases";
-	rows[n] = (menu_row){ "Pre-Release", g_test_updates ? "In Use" : NULL, true };
-	rows[n++].hint = "Public Release plus Brick Pro testing";
+	rows[n] = (menu_row){ "Pre-Release", g_test_updates ? "In Use" : NULL, true, .id = MENU_ID(1) };
+	rows[n++].hint = "The newest updates first, Brick Pro too";
 	rows[n++] = MENU_RULE;
 	rows[n++] = MENU_NOTE("Saves and settings stay either way");
 	return n;
@@ -11162,12 +11175,12 @@ static void chan_set(bool test)
 
 static menu_result chan_key(app *a, void *ctx, in_button key, int sel)
 {
-	(void)ctx;
+	(void)ctx; (void)sel;
 	if (key != IN_ACCEPT) return MENU_STAY;
-	if (sel == 0 && g_test_updates) {
+	if (menu_id() == 0 && g_test_updates) {
 		chan_set(false);
-	} else if (sel == 1 && !g_test_updates &&
-	           confirm_panel(a, "Pre-Release", "The same as Public Release, plus\nBrick Pro support still in testing.\nGet it?", "Get It")) {
+	} else if (menu_id() == 1 && !g_test_updates &&
+	           confirm_panel(a, "Pre-Release", "The newest updates first, Brick Pro\nsupport too, before Public Release.\nGet it?", "Get It")) {
 		chan_set(true);
 	}
 	return MENU_STAY;
@@ -11515,7 +11528,7 @@ static int clock_build(void *ctx, menu_row *rows, int max, const char **heading)
 	*heading = "Date & Time";
 	for (i = 0; i < CLK_FIELDS && n < max; i++) {
 		clock_field_label(now, (clock_field)i, c->field[i], sizeof c->field[i]);
-		rows[n++] = (menu_row){ CLOCK_ROW_NAMES[i], c->field[i], true };
+		rows[n++] = (menu_row){ CLOCK_ROW_NAMES[i], c->field[i], true, .id = MENU_ID(i) };
 	}
 	db_get_str(db_lib(), "timezone", id, sizeof id, "America/New_York");
 	z = clock_zone_find(id);
@@ -11531,13 +11544,14 @@ static int clock_build(void *ctx, menu_row *rows, int max, const char **heading)
 		else if (!strcmp(CLOCK_ZONES[z].id, "UTC")) snprintf(c->zone, sizeof c->zone, "UTC");
 		else snprintf(c->zone, sizeof c->zone, "%s \xC2\xB7 %s", off, CLOCK_ZONES[z].city);
 	}
-	if (n < max) rows[n++] = (menu_row){ "Time Zone", c->zone, true, .opens = true };
+	if (n < max) rows[n++] = (menu_row){ "Time Zone", c->zone, true, .opens = true, .id = MENU_ID(CLK_FIELDS) };
 	/* The clock's style, straight under Time Zone. Showing the clock and the
 	 * battery at all are System Settings' Show Clock and Show Battery. */
 	if (n + 1 <= max) {
 		/* Which of two, so a value and arrows rather than a switch: a switch
 		 * reads On or Off, and neither says which format is on */
-		rows[n++] = (menu_row){ "12h/24h Clock", g_status_clock24 ? "24h" : "12h", true, .cycles = true };
+		rows[n++] = (menu_row){ "12h/24h Clock", g_status_clock24 ? "24h" : "12h", true, .cycles = true,
+		                        .id = MENU_ID(CLK_FIELDS + 1) };
 	}
 	if (n + 4 <= max) {
 		rows[n++] = MENU_RULE;
@@ -11669,11 +11683,12 @@ static void tz_pick(app *a)
 	}
 }
 
-static menu_result clock_key(app *a, void *ctx, in_button key, int sel)
+static menu_result clock_key(app *a, void *ctx, in_button key, int row)
 {
 	int d = key == IN_RIGHT ? 1 : key == IN_LEFT ? -1 : 0;
+	int sel = menu_id();   /* the clock's field, Time Zone, or 12h/24h: by id */
 
-	(void)ctx;
+	(void)ctx; (void)row;
 	/* Time Zone: A opens the list, an offset and then its cities; left
 	 * and right still step city by city on the row itself */
 	if (sel == CLK_FIELDS && key == IN_ACCEPT) {
@@ -11749,30 +11764,6 @@ typedef struct {
 	int       screen;
 } sysmenu_ctx;
 
-/* ChaOS: which row is which on the ChaOS menu and its pages, for the keys.
- * Every field that hides a row, as the build sets it - a row hidden there and
- * not here moves every row under it by one (0.10.2's Transition Speed turned
- * Menu Color; 2.7.0's Show Shelf Name turned Shelf Order into Arrange
- * Shelves). --menu-ids holds it to the build on every page. */
-static int sysmenu_ids(pm_row *ids)
-{
-	sys_ui dev = { .no_wifi = !plat_has_wifi(), .no_bt = !plat_has_bluetooth(),
-	               .cable_xfer = plat_cable_link(NULL, 0), .ss_have = ss_have_dev(),
-	               .pm_have = ports_pm_ready(P_ROMS),
-	               .night_ok = plat_volume_night_ok(), .appearance = g_appearance_page,
-	               .rom_page = g_rom_page, .net_page = g_net_page, .sys_page = g_sys_page,
-	               .sticks = plat_sticks((int[4]){ 0 }),
-	               .shelf_page = g_shelf_page,
-	               .name_speed = CARDS_DRAWN(g_cards) ? PN_SPEEDS[g_pn_speed[g_dir]].name
-	                                                  : NULL,
-	               /* the same value as the build's: Show Shelf Name is
-	                * there only with "Normal", so "" here hid it and
-	                * every row under it answered for the one above
-	                * (2.7.0: Shelf Order and Arrange Shelves) */
-	               .list_view = list_view_label() };
-	return sys_menu_tortos_rows(&dev, ids);
-}
-
 static int sysmenu_build(void *ctx, menu_row *rows, int max,
                          const char **heading)
 {
@@ -11798,11 +11789,8 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 		 * to the Sort By below like any shelf's. Album Art is a dead row off
 		 * the network, and the runner does not land on dead rows. */
 		if (is_muse(&a->sys.systems[a->sys_cursor])) {
-			sm_muse_row ids[SM_MUSE_ROWS];
-			int n = sys_menu_muse_rows(muse_books_shown(),
-			                           ml_count(&g_muse, true) && ml_count(&g_muse, false),
-			                           !plat_has_wifi(), ids);
-			sm_muse_row id = sel >= 0 && sel < n ? ids[sel] : SMM_COUNT;
+			/* the row's id is its sm_muse_row (sys_menu_build) */
+			sm_muse_row id = menu_id() >= 0 ? (sm_muse_row)menu_id() : SMM_COUNT;
 
 			if (id == SMM_SORT) {
 				sel = SM_SORT;
@@ -11829,21 +11817,11 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 		 * SM_FAV_ROWS - so its Sort By is row 1 and not SM_SORT. Nothing here
 		 * knew that from the day the menu was cut to two rows, and left and
 		 * right on Favorites' Sort By did nothing at all. */
-		if (a->view[a->sys_cursor].owner) sel = sel == 1 ? SM_SORT : SM_GAMES;
 		/* And a console's rows lose Box Art on a device with no radio, which
-		 * moves Rescan Folder up one: which row is which comes from the same
-		 * list the build used. */
-		else if (!is_muse(&a->sys.systems[a->sys_cursor])) {
-			sys_ui dev = { .no_wifi = !plat_has_wifi(),
-			               .shader = look_console_of(a->sys.systems[a->sys_cursor].tag)
-			                         == LOOK_NONE ? NULL : "",
-			               .overscan = os_label(a->sys.systems[a->sys_cursor].tag),
-			               .native = !strcmp(a->sys.systems[a->sys_cursor].core, PICO8_CORE) };
-			sm_row ids[SM_ROWS];
-			int n = sys_menu_system_rows(&dev, ids);
-
-			sel = sel >= 0 && sel < n ? (int)ids[sel] : SM_ROWS;
-		}
+		 * moved Rescan Folder up one: each row's id is its sm_row, set where
+		 * it is built (sys_menu_build), so nothing here counts rows. */
+		if (!is_muse(&a->sys.systems[a->sys_cursor]))
+			sel = menu_id() >= 0 ? menu_id() : SM_ROWS;
 		/* ChaOS. Shader: A opens its page, whose first row turns it on and
 		 * off - the row itself only says which; a switch here as well as
 		 * there was two ways to one setting. Overlay: left, right and A go
@@ -11943,12 +11921,7 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 
 	/* The row's identity rather than its position: a device with no radio has
 	 * fewer of them, and the same list the build used says which is which. */
-	{
-		pm_row ids[PM_ROWS];
-		int n = sysmenu_ids(ids);
-
-		sel = sel >= 0 && sel < n ? (int)ids[sel] : PM_ROWS;
-	}
+	sel = menu_id() >= 0 ? menu_id() : PM_ROWS;   /* its pm_row (sys_menu_build) */
 
 	/* Auto Off, on the left/right idiom Display mode uses. */
 	if (d && sel == PM_SLEEP) {
@@ -15312,9 +15285,9 @@ static int how_build(void *ctx, menu_row *rows, int max, const char **heading)
 	(void)max;
 	snprintf(h, sizeof h, "Disc %d", u->pick + 1);
 	*heading = h;
-	rows[0] = (menu_row){ "Swap Disc", NULL, true };
+	rows[0] = (menu_row){ "Swap Disc", NULL, true, .id = MENU_ID(1) };   /* u->how */
 	rows[0].hint = "When the game asks for it";
-	rows[1] = (menu_row){ "Restart With This Disc", NULL, true };
+	rows[1] = (menu_row){ "Restart With This Disc", NULL, true, .id = MENU_ID(2) };
 	/* Every PlayStation disc boots; what it does then is the game's own -
 	 * a story of its own, its title and Load, or "insert disc 1" - and no
 	 * disc says which, so the hint says what it does, not what follows */
@@ -15327,8 +15300,9 @@ static menu_result how_key(app *a, void *ctx, in_button key, int sel)
 	disc_ui *u = ctx;
 
 	(void)a;
-	if (key != IN_ACCEPT || sel < 0 || sel > 1) return MENU_STAY;
-	u->how = sel + 1;
+	(void)sel;
+	if (key != IN_ACCEPT || menu_id() < 1) return MENU_STAY;
+	u->how = menu_id();   /* 1: swap, 2: restart (how_build's ids) */
 	return MENU_DONE;
 }
 
@@ -15379,14 +15353,9 @@ static menu_result gm_key(app *a, void *ctx, in_button key, int sel)
 {
 	gm_ctx *c = ctx;
 
-	/* ChaOS: the rows as gm_row counts them, past the rows not shown */
-	{
-		int i, k = -1;
-
-		for (i = 0; i < GM_ROWS; i++)
-			if (!c->hide[i] && ++k == sel) break;
-		sel = i < GM_ROWS ? i : sel + (GM_ROWS - k - 1);
-	}
+	/* ChaOS: the row's gm_row, from its id: rows left out (Cheats, Crop
+	 * Overscan, Disc) moved every row after them by position */
+	sel = menu_id();
 
 	/* ChaOS. Applied to the paused game at once, not on resume: the point
 	 * of these rows being here is judging them against the game. Left and
@@ -17068,11 +17037,11 @@ static int pm_choice_build(void *ctx, menu_row *rows, int max, const char **head
 
 	(void)max;
 	*heading = c->heading;
-	rows[n] = (menu_row){ c->one, NULL, true };
+	rows[n] = (menu_row){ c->one, NULL, true, .id = MENU_ID(1) };
 	rows[n++].hint = c->one_hint;
-	rows[n] = (menu_row){ c->two, NULL, true };
+	rows[n] = (menu_row){ c->two, NULL, true, .id = MENU_ID(2) };
 	rows[n++].hint = c->two_hint;
-	rows[n++] = (menu_row){ "Cancel", NULL, true };
+	rows[n++] = (menu_row){ "Cancel", NULL, true, .id = MENU_ID(0) };
 	rows[n++] = MENU_RULE;
 	rows[n++] = MENU_NOTE(c->say);
 	return n;
@@ -17084,7 +17053,8 @@ static menu_result pm_choice_key(app *a, void *ctx, in_button key, int sel)
 
 	(void)a;
 	if (key != IN_ACCEPT) return MENU_STAY;
-	c->chose = sel == 0 ? 1 : sel == 1 ? 2 : 0;
+	(void)sel;
+	c->chose = menu_id() > 0 ? menu_id() : 0;   /* 1, 2, or Cancel's 0 */
 	return MENU_DONE;
 }
 
@@ -18131,25 +18101,25 @@ static int pm_home_build(void *ctx, menu_row *rows, int max, const char **headin
 
 	(void)max;
 	*heading = "PortMaster";
-	rows[n] = (menu_row){ "May Run on ChaOS", c->counts[PMH_MAY], have, true };
+	rows[n] = (menu_row){ "May Run on ChaOS", c->counts[PMH_MAY], have, true, .id = MENU_ID(PMH_MAY) };
 	rows[n++].hint = "Nothing it needs rules out the Brick";
-	rows[n] = (menu_row){ "Show All", c->counts[PMH_ALL], have, true };
+	rows[n] = (menu_row){ "Show All", c->counts[PMH_ALL], have, true, .id = MENU_ID(PMH_ALL) };
 	rows[n++].hint = "Every port, with the ones that can't run here marked";
-	rows[n] = (menu_row){ "Genres", NULL, have, true };
+	rows[n] = (menu_row){ "Genres", NULL, have, true, .id = MENU_ID(PMH_GENRES) };
 	rows[n++].hint = "What may run, by kind of game";
-	rows[n] = (menu_row){ "Installed", c->counts[PMH_INSTALLED], have, true };
+	rows[n] = (menu_row){ "Installed", c->counts[PMH_INSTALLED], have, true, .id = MENU_ID(PMH_INSTALLED) };
 	rows[n++].hint = "The ports on this Brick from the catalog";
-	rows[n] = (menu_row){ "Updates", c->counts[PMH_UPDATES], have && strcmp(c->counts[PMH_UPDATES], "0"), true };
+	rows[n] = (menu_row){ "Updates", c->counts[PMH_UPDATES], have && strcmp(c->counts[PMH_UPDATES], "0"), true, .id = MENU_ID(PMH_UPDATES) };
 	rows[n++].hint = "Installed ports with a newer version";
-	rows[n] = (menu_row){ "Ready to Run Only", g_pm_rtr_only ? "On" : "Off", true };
+	rows[n] = (menu_row){ "Ready to Run Only", g_pm_rtr_only ? "On" : "Off", true, .id = MENU_ID(PMH_RTR) };
 	rows[n].toggle = true;
 	rows[n++].hint = "Hide the ports that need files from a game you own";
-	rows[n] = (menu_row){ "Refresh List", c->when, true };
+	rows[n] = (menu_row){ "Refresh List", c->when, true, .id = MENU_ID(PMH_REFRESH) };
 	rows[n++].hint = "Get PortMaster's latest catalog";
-	rows[n] = (menu_row){ pm ? "Update PortMaster" : "Get PortMaster", NULL, true };
+	rows[n] = (menu_row){ pm ? "Update PortMaster" : "Get PortMaster", NULL, true, .id = MENU_ID(PMH_PM) };
 	rows[n++].hint = pm ? "Its newest release; your ports, saves and settings stay"
 	                    : "Ports run with PortMaster: download it (about 25 MB)";
-	rows[n] = (menu_row){ "Uninstall PortMaster", NULL, pm, true };
+	rows[n] = (menu_row){ "Uninstall PortMaster", NULL, pm, true, .id = MENU_ID(PMH_UNINSTALL) };
 	rows[n++].hint = "Remove it and its ports, keeping their saves if you like";
 	rows[n++] = MENU_RULE;
 	rows[n++] = MENU_NOTE(c->note);
@@ -18158,6 +18128,7 @@ static int pm_home_build(void *ctx, menu_row *rows, int max, const char **headin
 
 static menu_result pm_home_key(app *a, void *ctx, in_button key, int sel)
 {
+	sel = menu_id();   /* its PMH_ row (pm_home_build's ids), never its place */
 	pm_home_ctx *c = ctx;
 	static const char *const heads[] = { "May Run on ChaOS", "All Ports",
 	                                     NULL, "Installed", "Updates" };
@@ -19623,8 +19594,10 @@ static int romm_choose_build(void *ctx, menu_row *rows, int max, const char **he
 	int i, n = 0;
 
 	*heading = "Which File?";
-	if (c->g->multi && n < max) rows[n++] = (menu_row){ c->whole, NULL, true, false };
-	for (i = 0; i < c->n && n < max; i++) rows[n++] = (menu_row){ c->f[i].name, c->sizes[i], true, false };
+	/* ids: a file's index, or -2 for the whole game (-1 is menu_id's "none") */
+	if (c->g->multi && n < max) rows[n++] = (menu_row){ c->whole, NULL, true, false, .id = MENU_ID(-2) };
+	for (i = 0; i < c->n && n < max; i++)
+		rows[n++] = (menu_row){ c->f[i].name, c->sizes[i], true, false, .id = MENU_ID(i) };
 	return n;
 }
 
@@ -19633,8 +19606,9 @@ static menu_result romm_choose_key(app *a, void *ctx, in_button key, int sel)
 	romm_choose_ctx *c = ctx;
 
 	(void)a;
-	if (key != IN_ACCEPT || sel < 0) return MENU_STAY;
-	c->chosen = sel - (c->g->multi ? 1 : 0);   /* -1: the whole game */
+	(void)sel;
+	if (key != IN_ACCEPT || menu_id() == -1) return MENU_STAY;
+	c->chosen = menu_id() == -2 ? -1 : menu_id();   /* -1: the whole game */
 	return MENU_DONE;
 }
 
@@ -20482,20 +20456,20 @@ static int romm_home_build(void *ctx, menu_row *rows, int max, const char **head
 	(void)max;
 	*heading = "RomM";
 	if (in) {
-		rows[n] = (menu_row){ "Games", NULL, net, true };
+		rows[n] = (menu_row){ "Games", NULL, net, true, .id = MENU_ID(RM_GAMES) };
 		rows[n++].hint = "Download games from your library";
-		rows[n] = (menu_row){ "Sync Saves", c->when, net, true };
+		rows[n] = (menu_row){ "Sync Saves", c->when, net, true, .id = MENU_ID(RM_SYNC) };
 		rows[n++].hint = "Saves and states of the games from RomM, both ways";
-		rows[n] = (menu_row){ "BIOS", NULL, net, true };
+		rows[n] = (menu_row){ "BIOS", NULL, net, true, .id = MENU_ID(RM_BIOS) };
 		rows[n++].hint = "Get the BIOS files RomM has";
 	}
-	rows[n] = (menu_row){ "Server", server, true, true };
+	rows[n] = (menu_row){ "Server", server, true, true, .id = MENU_ID(RM_SERVER) };
 	rows[n++].hint = "Your RomM's address, like nas.local:8080";
 	if (in) {
-		rows[n] = (menu_row){ "Sign Out", g_romm.user[0] ? g_romm.user : NULL, true, true };
+		rows[n] = (menu_row){ "Sign Out", g_romm.user[0] ? g_romm.user : NULL, true, true, .id = MENU_ID(RM_SIGNOUT) };
 		rows[n++].hint = "Your games and saves stay";
 	} else {
-		rows[n] = (menu_row){ "Sign In", NULL, net && g_romm.url[0], true };
+		rows[n] = (menu_row){ "Sign In", NULL, net && g_romm.url[0], true, .id = MENU_ID(RM_SIGNOUT) };
 		rows[n++].hint = "Pair this Brick with your RomM";
 	}
 	(void)c;
@@ -20506,10 +20480,10 @@ static menu_result romm_home_key(app *a, void *ctx, in_button key, int sel)
 {
 	romm_home_ctx *c = ctx;
 	bool in = g_romm.token[0] != 0;
-	int row = sel;
+	int row = menu_id();   /* Sign In and Sign Out share a row: in or not says which */
 
+	(void)sel;
 	if (key != IN_ACCEPT) return MENU_STAY;
-	if (!in) row = sel == 0 ? RM_SERVER : RM_SIGNOUT;   /* Server, Sign In */
 	switch (row) {
 	case RM_GAMES: romm_systems_screen(a); break;
 	case RM_SYNC:  romm_sync_screen(a); break;
@@ -22412,15 +22386,15 @@ static int hb_mgr_build(void *ctx, menu_row *rows, int max, const char **heading
 	int n = 0, i;
 
 	*heading = "Manage Downloads";
-	rows[n] = (menu_row){ "Check for Updates", m->checked, m->n > 0 };
+	rows[n] = (menu_row){ "Check for Updates", m->checked, m->n > 0, .id = MENU_ID(-3) };
 	rows[n++].hint = "Newer files, and games gone from itch.io";
-	rows[n++] = (menu_row){ "Delete All", NULL, m->n > 0 };
+	rows[n++] = (menu_row){ "Delete All", NULL, m->n > 0, .id = MENU_ID(-2) };
 	rows[n++] = MENU_RULE;
 	if (!m->n) { rows[n++] = MENU_NOTE("Nothing downloaded yet"); return n; }
 	for (i = 0; i < m->n && n < max; i++) {
 		rows[n] = (menu_row){ m->names[i], m->flags[i] & HB_GONE ? "Removed" : m->flags[i] & HB_UPDATE ? "Update"
 		                                   : m->sys[i] >= 0 ? m->a->sys.systems[m->sys[i]].tag : "",
-		                      true };
+		                      true, .id = MENU_ID(i) };
 		n++;
 	}
 	return n;
@@ -22507,10 +22481,11 @@ static void hb_check_updates(app *a, hb_mgr_ctx *m)
 static menu_result hb_mgr_key(app *a, void *ctx, in_button key, int sel)
 {
 	hb_mgr_ctx *m = ctx;
-	int i = sel - 3;
+	int i = menu_id();   /* a game's index, or -3 / -2 for the two rows above them */
 
-	if (sel == 0 && key == IN_ACCEPT && m->n) { hb_check_updates(a, m); return MENU_STAY; }
-	if (sel == 1 && key == IN_ACCEPT && m->n) {
+	(void)sel;
+	if (i == -3 && key == IN_ACCEPT && m->n) { hb_check_updates(a, m); return MENU_STAY; }
+	if (i == -2 && key == IN_ACCEPT && m->n) {
 		char say[96];
 		int k;
 
@@ -22582,11 +22557,11 @@ static int hb_cw_build(void *ctx, menu_row *rows, int max, const char **heading)
 	if (w->cat == -1) {
 		*heading = "Content Warnings";
 		for (c = 0; c < HB_CWS; c++) {
-			rows[n] = (menu_row){ hb_cw_name((hb_cw)c), on & (1u << c) ? "On" : "Off", true };
+			rows[n] = (menu_row){ hb_cw_name((hb_cw)c), on & (1u << c) ? "On" : "Off", true, .id = MENU_ID(c) };
 			rows[n].toggle = true;
 			rows[n++].hint = hb_cw_hint((hb_cw)c);
 		}
-		rows[n] = (menu_row){ "Choose Tags", NULL, true, true };
+		rows[n] = (menu_row){ "Choose Tags", NULL, true, true, .id = MENU_ID(HB_CWS) };
 		rows[n++].hint = "Which tags warn";
 		rows[n++] = MENU_RULE;
 		rows[n++] = MENU_NOTE("A game with these tags asks first");
@@ -22594,7 +22569,7 @@ static int hb_cw_build(void *ctx, menu_row *rows, int max, const char **heading)
 	}
 	if (w->cat == -2) {
 		*heading = "Choose Tags";
-		for (c = 0; c < HB_CWS; c++) rows[n++] = (menu_row){ hb_cw_name((hb_cw)c), NULL, true, true };
+		for (c = 0; c < HB_CWS; c++) rows[n++] = (menu_row){ hb_cw_name((hb_cw)c), NULL, true, true, .id = MENU_ID(c) };
 		return n;
 	}
 	*heading = hb_cw_name((hb_cw)w->cat);
@@ -22602,7 +22577,7 @@ static int hb_cw_build(void *ctx, menu_row *rows, int max, const char **heading)
 		const char *const *t = hb_cw_tags((hb_cw)w->cat);
 
 		for (; *t && n < max; t++) {
-			rows[n] = (menu_row){ *t, hb_cw_tag_off(*t, NULL) ? "Off" : "On", true };
+			rows[n] = (menu_row){ *t, hb_cw_tag_off(*t, NULL) ? "Off" : "On", true, .id = MENU_ID(t - hb_cw_tags((hb_cw)w->cat)) };
 			rows[n++].toggle = true;
 		}
 	}
@@ -22626,6 +22601,7 @@ static menu_result hb_cw_key(app *a, void *ctx, in_button key, int sel)
 {
 	hb_cw_ctx *w = ctx;
 
+	sel = menu_id();   /* a category, Choose Tags (HB_CWS), or a tag: by id */
 	if (key != IN_ACCEPT && key != IN_LEFT && key != IN_RIGHT) return MENU_STAY;
 	if (w->cat == -1) {
 		if (sel >= 0 && sel < HB_CWS) {
@@ -22726,17 +22702,17 @@ static int hb_build(void *ctx, menu_row *rows, int max, const char **heading)
 
 	(void)max;
 	*heading = "Get Homebrew";
-	rows[n] = (menu_row){ "Browse Games", c->games[0] ? c->games : NULL, true, true };
+	rows[n] = (menu_row){ "Browse Games", c->games[0] ? c->games : NULL, true, true, .id = MENU_ID(HB_ROW_BROWSE) };
 	rows[n++].hint = "Every console's games on itch.io";
-	rows[n] = (menu_row){ "Manage Downloads", c->downloads[0] ? c->downloads : NULL, true, true };
+	rows[n] = (menu_row){ "Manage Downloads", c->downloads[0] ? c->downloads : NULL, true, true, .id = MENU_ID(HB_ROW_MANAGE) };
 	rows[n++].hint = "Updates, and deleting";
-	rows[n] = (menu_row){ "Content Warnings", NULL, true, true };
+	rows[n] = (menu_row){ "Content Warnings", NULL, true, true, .id = MENU_ID(HB_ROW_CW) };
 	rows[n++].hint = "Ask before showing some games";
-	rows[n] = (menu_row){ "itch.io Key", c->keyval, true, true };
+	rows[n] = (menu_row){ "itch.io Key", c->keyval, true, true, .id = MENU_ID(HB_ROW_KEY) };
 	rows[n++].hint = "For games you bought. Or paste it in ChaOS Transfer";
-	rows[n] = (menu_row){ "Refresh Game Lists", NULL, true };
+	rows[n] = (menu_row){ "Refresh Game Lists", NULL, true, .id = MENU_ID(HB_ROW_REFRESH) };
 	rows[n++].hint = "Read every list again, with dates";
-	rows[n] = (menu_row){ "Clear Image Cache", c->cache[0] ? c->cache : NULL, c->cache[0] != '\0' };
+	rows[n] = (menu_row){ "Clear Image Cache", c->cache[0] ? c->cache : NULL, c->cache[0] != '\0', .id = MENU_ID(HB_ROW_CLEAR) };
 	rows[n++].hint = "Covers and screenshots";
 	return n;
 }
@@ -22783,7 +22759,7 @@ static menu_result hb_menu_key(app *a, void *ctx, in_button key, int sel)
 	hb_ctx *c = ctx;
 
 	if (key != IN_ACCEPT || sel < 0) return MENU_STAY;
-	switch (sel) {
+	switch (menu_id()) {
 	case HB_ROW_BROWSE:
 		hb_browse(a);
 		break;
@@ -25843,20 +25819,32 @@ static int menu_ids_check(app *a)
 				menu_row rows[MENU_MAX_ROWS];
 				menu_bufs b;
 				const char *heading = NULL;
-				pm_row ids[PM_ROWS];
-				int nb, nk;
+				int nb, i, j, noid = 0, twice = 0;
 
 				g_dir = d;
 				g_list_view = lv;
 				if (pages[p]) *pages[p] = true;
 				if (p == 2) g_appearance_page = true;     /* Shelves opens from Appearance */
 				nb = menu_build(a, SCREEN_SYSTEMS, 0, rows, &b, &heading);
-				nk = sysmenu_ids(ids);
 				if (pages[p]) *pages[p] = false;
 				if (p == 2) g_appearance_page = false;
-				printf("%s %-18s %-16s %-10s built %2d, keyed %2d\n", nb == nk ? "ok  " : "FAIL",
-				       names[p], GLV_LABEL[lv], CARD_DIRS[d].name, nb, nk);
-				if (nb != nk) bad++;
+				/* Every row a key can land on says what it is (menu_row.id),
+				 * and no two say the same: the keys act on that, never on a
+				 * row's place, which a row shown only sometimes moved (0.10.2:
+				 * Transition Speed turned Menu Color; 2.7.0: Shelf Order
+				 * opened Arrange Shelves). */
+				for (i = 0; i < nb; i++) {
+					if (!rows[i].label || ROW_IS_NOTE(rows[i])) continue;
+					if (!rows[i].id) { noid++; printf("     no id: %s\n", rows[i].label); }
+					for (j = 0; j < i; j++)
+						if (rows[j].id && rows[j].id == rows[i].id) {
+							twice++;
+							printf("     same id: %s, %s\n", rows[j].label, rows[i].label);
+						}
+				}
+				printf("%s %-18s %-16s %-10s %2d rows, each its own id\n", noid || twice ? "FAIL" : "ok  ",
+				       names[p], GLV_LABEL[lv], CARD_DIRS[d].name, nb);
+				if (noid || twice) bad++;
 			}
 	g_dir = was_dir;
 	g_list_view = was_lv;

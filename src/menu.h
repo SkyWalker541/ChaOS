@@ -31,7 +31,16 @@ typedef struct {
 	/* ChaOS: a dot after the label, in the panel's color: something new
 	 * there (an update waiting) */
 	bool badge;
+	/* ChaOS: what the row IS, for the screen's key handler (menu_id()), set
+	 * with MENU_ID(x) from the screen's own enum. A handler that went by the
+	 * row's position acted on the wrong setting the moment a row was added
+	 * above it, or shown only sometimes: a regression this project kept
+	 * having. The id is set where the row is built, so the two can't drift.
+	 * 0 is "none"; MENU_ID adds one so an enum's first value is an id too. */
+	int id;
 } menu_row;
+
+#define MENU_ID(x) ((int)(x) + 1)
 
 /* A row that is only a rule, separating a list from a footer that is not part
  * of it. Drawn with the same bar the heading uses, so the two cannot drift
