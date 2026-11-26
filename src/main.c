@@ -1723,6 +1723,10 @@ static void box_art_path(const char *folder, const char *name, char *out, size_t
 	if (!strcmp(name, PICO8_SPLORE_NAME) && !strcmp(folder, "PICO-8") &&
 	    !(stat(out, &st) == 0 && st.st_size > 0))
 		snprintf(out, n, "%s/pico8/splore.png", P_ROOT);
+	/* and PortMaster, the Ports shelf's (tools/genportmaster.py) */
+	else if (!strcmp(name, PM_ENTRY_NAME) && !strcmp(folder, "Ports") &&
+	         !(stat(out, &st) == 0 && st.st_size > 0))
+		snprintf(out, n, "%s/ports/portmaster.png", P_ROOT);
 }
 
 /* Whether it is there. An empty file is not art - the rule the info screen

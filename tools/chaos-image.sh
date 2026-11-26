@@ -163,6 +163,8 @@ install -m 644 "$ROOT/res/ports/chaos/launch_hooks.txt" "$C/TortOS/ports/chaos/l
 # and its look: PortMaster's theme in ChaOS's colors (res/ports/chaos_theme)
 mkdir -p "$C/TortOS/ports/chaos_theme"
 install -m 644 "$ROOT"/res/ports/chaos_theme/* "$C/TortOS/ports/chaos_theme/"
+# the Ports shelf's PortMaster card (tools/genportmaster.py)
+install -m 644 "$ROOT/res/ports/portmaster.png" "$C/TortOS/ports/portmaster.png"
 install -m 644 "$ROOT/dist/brick/chaos-python.squashfs" "$C/TortOS/ports/python/chaos-python.squashfs"
 # ChaOS: PICO-8 (src/pico8.h), the player's own copy: what runs it, the
 # curl-backed wget its Splore downloads with, and the read-me the launcher
