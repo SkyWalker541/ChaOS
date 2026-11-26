@@ -157,7 +157,8 @@ record past regressions, open risks and what still needs hardware testing.
 make check                    # every check, offline (docs/building.md)
 make check-asan               # the same, sanitized; before a release
 make native                   # host build, for screenshots: ./build-native/tortos --shot
-make -f mk/cross.mk DEVICE=brick VERSION=<v> SYSROOT=<sysroot> CC=aarch64-linux-gnu-gcc build/tortos.elf
+make -f mk/cross.mk DEVICE=brick SYSROOT=<sysroot> CC=aarch64-linux-gnu-gcc build/tortos.elf
+# VERSION is TortOS's (the Makefile's); ChaOS's comes from CHAOS_VERSION
 ```
 
 `docs/building.md` explains each check and why it exists.

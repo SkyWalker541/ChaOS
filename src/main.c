@@ -11451,7 +11451,7 @@ static void about_screen(app *a)
 
 	snprintf(ver, sizeof ver, "%s", CHAOS_VERSION);
 	/* ChaOS: what it is built on, and the card's room */
-	snprintf(base, sizeof base, "TortOS %s", TORTOS_VERSION);
+	snprintf(base, sizeof base, "TortOS v%s", TORTOS_VERSION);
 	{
 		struct statvfs vs;
 

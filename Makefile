@@ -44,8 +44,10 @@ check-asan:
 	@$(MAKE) --no-print-directory check CC="$(CC) $(SANITIZE)"
 
 # One version number: plastron reads it from here for the card and the About
-# page (its package/tortos/tortos.mk).
-VERSION ?= 2.2.0
+# page (its package/tortos/tortos.mk). ChaOS: the TortOS release ChaOS's code
+# has taken in, which About shows as "Built on TortOS"; ChaOS's own version
+# is CHAOS_VERSION. 2.2.1, upstream's newest (2026-11-26).
+VERSION ?= 2.2.1
 
 # The ScreenScraper developer pair, from .screenscraper.env in this directory
 # (gitignored, never committed). A value already in the environment wins, and

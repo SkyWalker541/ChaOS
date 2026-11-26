@@ -9,7 +9,10 @@ SRC := $(wildcard src/*.c) src/device/$(DEVICE).c
 SRC += tools/tortos-update/sha256.c
 CC ?= aarch64-linux-gnu-gcc
 
-VERSION ?= 0.0
+# TortOS's version, the Makefile's one number (not ChaOS's, which is
+# CHAOS_VERSION): About read a ChaOS version beside "TortOS" while builds
+# passed ChaOS's here (2.7.x to 2.8.0-test1)
+VERSION ?= $(shell sed -n 's/^VERSION ?= //p' Makefile)
 CHAOS_VERSION ?= $(shell cat CHAOS_VERSION 2>/dev/null || echo 0.0)
 CFLAGS := -DTORTOS_VERSION='"$(VERSION)"' -DCHAOS_VERSION='"$(CHAOS_VERSION)"' -O2 -mcpu=cortex-a53 -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -std=gnu11 \
           -I$(SYSROOT)/usr/include/SDL2 -D_GNU_SOURCE
