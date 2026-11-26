@@ -5252,6 +5252,11 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 	int scroll_span = 0;
 	int scroll_split = 0;  /* first pinned row: the rule, or n if there is none */
 	int scroll_foot = 0;   /* the pinned rows' total height */
+	/* ChaOS: a list with a cursor that scrolls keeps its footer (the last
+	 * rule and the notes under it) pinned under the window, as a card does:
+	 * windowed with the rows, the last note was drawn half under the panel's
+	 * edge when the list ran to the screen (Date & Time, 2026-11-25) */
+	int pin_split = n, pin_h = 0, body_h = 0;
 	/* A SMALL, FAST GIVE WHEN THE WINDOW SCROLLS - not a full slide.
 	 *
 	 * REPEAT_RATE_MS is 90, so any animation long enough to watch is
@@ -5368,14 +5373,28 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 			 * top rather than inheriting someone else's scroll. */
 			static int win_n = -1, win_first;
 
-			vis = avail / row_h;
+			int nb, j2;
+
+			/* the footer: a last plain rule with only notes after it, under
+			 * the selection */
+			for (j2 = n - 1; j2 > sel && j2 >= 0; j2--) {
+				if (!rows[j2].label && !ROW_IS_HR(rows[j2])) { pin_split = j2; break; }
+				if (!ROW_IS_NOTE(rows[j2])) break;
+			}
+			if (pin_split < n) {
+				for (j2 = pin_split; j2 < n; j2++) pin_h += ROW_H(rows[j2]);
+				if (avail - pin_h < row_h) { pin_split = n; pin_h = 0; }
+			}
+			nb = pin_split;
+			vis = (avail - pin_h) / row_h;
 			if (vis < 1) vis = 1;
-			if (vis > n) vis = n;
+			if (vis > nb) vis = nb;
 
 			if (win_n != n) win_first = 0;
 			win_n = n;
-			win_first = menu_window_first(rows, n, sel, vis, win_first);
+			win_first = menu_window_first(rows, nb, sel, vis, win_first);
 			first = win_first;
+			for (j2 = first; j2 < first + vis && j2 < nb; j2++) body_h += ROW_H(rows[j2]);
 		} else {
 			/* NO CURSOR MEANS NOTHING CAN SCROLL IT, so it scrolls itself.
 			 * Dropping rows off the bottom is what a cursor makes safe: you
@@ -5434,6 +5453,7 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 		 * Summing the rows would size the panel to text that is deliberately
 		 * not all on it. */
 		panel.h = content_off + (scroll_h ? scroll_h + scroll_foot : sum) + pad + desc_h;
+		if (pin_split < n) panel.h = content_off + body_h + pin_h + pad + desc_h;
 		/* A panel that ends in a footer gets a smaller bottom pad. The full
 		 * pad is there to keep list ITEMS off the border; a note is already
 		 * held off the list by its rule and is meant to sit low.
@@ -5841,6 +5861,7 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 		SDL_Rect rc = { lane_x + (lane_x == panel.x ? UI_PANEL_BORDER : 0), content_y,
 		                lane_w - UI_PANEL_BORDER * (g_menu_art.side ? 1 : 2),
 		                panel.y + panel.h - pad - desc_h - content_y };
+		if (pin_split < n) rc.h = body_h;
 		/* ChaOS: a panel stretched to the screen is taller than its rows;
 		 * the clip stays at the rows, or the row past the window shows */
 		if (g_menu_fill >= 0) {
@@ -5851,12 +5872,18 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 		SDL_RenderSetClipRect(a->r, &rc);
 	}
 	for (k = 0, i = (first > 0 ? first - 1 : first);
-	     i < n && i <= first + vis; k++, i++) {
+	     i < n && (i <= first + vis || i >= pin_split);
+	     k++, i = (i + 1 > first + vis && i + 1 < pin_split) ? pin_split : i + 1) {
 		int y, ty, j;
 		float sel_w;
 		SDL_Color lc, vc;
 
-		if (scroll_h && i >= scroll_split) {
+		if (i >= pin_split) {
+			/* ChaOS: the pinned footer, under the window */
+			if (i == pin_split) SDL_RenderSetClipRect(a->r, NULL);
+			y = content_y + body_h;
+			for (j = pin_split; j < i; j++) y += ROW_H(rows[j]);
+		} else if (scroll_h && i >= scroll_split) {
 			/* Pinned. Measured from the bottom of the viewport rather than
 			 * from the top of the rows, so the footer does not move when the
 			 * body does. The clip comes off here and stays off. */
@@ -6220,7 +6247,7 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 		const int tw = row_h / 3, th = tw / 2, off = 8;
 		/* ChaOS: with a hint footer, the down one sits in the gap above the
 		 * footer's rule, not on the rule and the hint under it */
-		int down_y = content_y + vis * row_h + off;
+		int down_y = content_y + (pin_split < n ? body_h : vis * row_h) + off;
 
 		if (descs) {
 			int rule_top = panel.y + panel.h - pad - desc_h + rule_h - 2;
@@ -6237,7 +6264,7 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 			if (first > 0)
 				SDL_RenderFillRect(a->r, &(SDL_Rect){ cx - up_w / 2,
 				                   content_y - off - th + k, up_w, 1 });
-			if (first + vis < n)
+			if (first + vis < pin_split)   /* n, or the pinned footer's start */
 				SDL_RenderFillRect(a->r, &(SDL_Rect){ cx - down_w / 2,
 				                   down_y + k, down_w, 1 });
 		}
