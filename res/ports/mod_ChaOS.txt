@@ -70,3 +70,15 @@ pm_platform_helper() {
     done
   fi
 }
+
+# gptokeyb2, PortMaster's newer button mapper, as PortMaster itself and
+# NextUI run it: with PortMaster's libinterpose preloaded. PortMaster's
+# control.txt sets LD_PRELOAD to that alone, which would drop ChaOS's SDL
+# where run.sh preloaded it (a port whose script puts /usr/lib first:
+# Undertale), and gptokeyb2 would then read the pad through the system's
+# SDL, which can't see it. Both, then: libinterpose first, as PortMaster
+# has it, and whatever run.sh preloaded after. Old gptokeyb inherits
+# LD_PRELOAD as it is.
+if [ -x "$controlfolder/gptokeyb2" ] && [ -f "$controlfolder/libinterpose.${DEVICE_ARCH}.so" ]; then
+  export GPTOKEYB2="$ESUDO env LD_PRELOAD=$controlfolder/libinterpose.${DEVICE_ARCH}.so${LD_PRELOAD:+:$LD_PRELOAD} $controlfolder/gptokeyb2 $ESUDOKILL2"
+fi
