@@ -156,6 +156,14 @@ install -m 755 "$ROOT/res/ports/bin/pkill" "$ROOT/res/ports/bin/pgrep" "$ROOT/re
 # unsquashfs, for runtimes the kernel can't mount (res/ports/bin/mount,
 # tools/build-unsquashfs.sh)
 install -m 755 "$ROOT/dist/brick/unsquashfs" "$C/TortOS/ports/bin/unsquashfs"
+# PortMaster's own app: ChaOS's hooks for it, and the Python it runs on
+# (tools/build-python.sh), unpacked by run.sh --portmaster on first use
+mkdir -p "$C/TortOS/ports/chaos" "$C/TortOS/ports/python"
+install -m 644 "$ROOT/res/ports/chaos/launch_hooks.txt" "$C/TortOS/ports/chaos/launch_hooks.txt"
+# and its look: PortMaster's theme in ChaOS's colors (res/ports/chaos_theme)
+mkdir -p "$C/TortOS/ports/chaos_theme"
+install -m 644 "$ROOT"/res/ports/chaos_theme/* "$C/TortOS/ports/chaos_theme/"
+install -m 644 "$ROOT/dist/brick/chaos-python.squashfs" "$C/TortOS/ports/python/chaos-python.squashfs"
 # ChaOS: PICO-8 (src/pico8.h), the player's own copy: what runs it, the
 # curl-backed wget its Splore downloads with, and the read-me the launcher
 # puts in the card's PICO-8 folder. ChaOS carries none of PICO-8 itself.
@@ -214,6 +222,8 @@ for p in "ogg COPYING" "vorbis COPYING" "flac COPYING.Xiph" "flac COPYING.GPL" "
 done
 # GCEM, inside FluidSynth
 tar -xJOf "$ROOT/dist/brick/portlibs-source.tar.xz" "portlibs-source/fluidsynth/gcem/LICENSE" > "$C/Licenses/ports/fluidsynth-gcem-LICENSE.txt"
+# PortMaster's Python (tools/build-python.sh): CPython's license
+install -m 644 "$ROOT/res/ports/python/LICENSE.Python.txt" "$C/Licenses/ports/python-LICENSE.txt"
 chmod 644 "$C/Licenses/ports/"*
 rm -rf "$C/TortOS/overlays"
 cp -R "$ROOT/res/overlays" "$C/TortOS/overlays"

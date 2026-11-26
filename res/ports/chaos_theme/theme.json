@@ -1,0 +1,3423 @@
+{
+    "#info": {
+        "version": 1,
+        "name": "ChaOS",
+        "creator": "ChaOS",
+        "description": "PortMaster in ChaOS's colors: its night panels, Josefin Sans, and the logo's orange, cyan or cream.\n\nBased on PortMaster New (MIT).\n\nColor schemes: ChaOS Orange, ChaOS Cyan and Cream.",
+        "default-scheme": "ChaOS Orange",
+        "default-layout": "List"
+    },
+    "#layouts": {
+        "List": {},
+        "Grid": {}
+    },
+    "#schemes": {
+        "#base": {
+            "#resources": {
+                "click.ogg": {
+                    "name": "click"
+                },
+                "buttons.png": {
+                    "atlas": {
+                        "_A": [
+                            0,
+                            0,
+                            180,
+                            180
+                        ],
+                        "_B": [
+                            180,
+                            0,
+                            180,
+                            180
+                        ],
+                        "_X": [
+                            360,
+                            0,
+                            180,
+                            180
+                        ],
+                        "_Y": [
+                            540,
+                            0,
+                            180,
+                            180
+                        ],
+                        "_START": [
+                            0,
+                            180,
+                            360,
+                            180
+                        ],
+                        "_SELECT": [
+                            360,
+                            180,
+                            360,
+                            180
+                        ],
+                        "_L": [
+                            0,
+                            360,
+                            270,
+                            180
+                        ],
+                        "_R": [
+                            270,
+                            360,
+                            270,
+                            180
+                        ],
+                        "_UNCHECKED": [
+                            720,
+                            0,
+                            180,
+                            180
+                        ],
+                        "_CHECKED": [
+                            900,
+                            0,
+                            180,
+                            180
+                        ],
+                        "_MORE": [
+                            720,
+                            180,
+                            180,
+                            180
+                        ],
+                        "_LEFT": [
+                            900,
+                            180,
+                            90,
+                            180
+                        ],
+                        "_RIGHT": [
+                            990,
+                            180,
+                            90,
+                            180
+                        ],
+                        "_UP": [
+                            900,
+                            360,
+                            180,
+                            90
+                        ],
+                        "_DOWN": [
+                            900,
+                            450,
+                            180,
+                            90
+                        ]
+                    }
+                },
+                "no-image.png": {
+                    "name": "NO_IMAGE"
+                }
+            }
+        },
+        "ChaOS Orange": {
+            "#pallet": {
+                "background": "#17151c",
+                "chrome": "#0f0e13",
+                "chrome_text": "#ededf2",
+                "chrome_muted": "#9499ac",
+                "text": "#ededf2",
+                "text_body": "#c6c9d6",
+                "text_muted": "#9499ac",
+                "text_faint": "#767b90",
+                "accent": "#ff7a2f",
+                "accent_text": "#ff7a2f",
+                "on_accent": "#17151c",
+                "divider": "#3a3446",
+                "track": "#3a3446",
+                "fade": [
+                    0,
+                    0,
+                    0,
+                    150
+                ],
+                "card_fill": "#221f2a"
+            },
+            "#resources": {
+                "card_chaos.png": {
+                    "name": "card"
+                },
+                "card_chaos_hi.png": {
+                    "name": "card_hi"
+                },
+                "pill_cap_orange.png": {
+                    "name": "pill_cap.png"
+                },
+                "icon_storage_orange.png": {
+                    "name": "icon_storage.png"
+                },
+                "icon_battery_orange.png": {
+                    "name": "icon_battery.png"
+                },
+                "icon_device_orange.png": {
+                    "name": "icon_device.png"
+                },
+                "icon_firmware_orange.png": {
+                    "name": "icon_firmware.png"
+                }
+            }
+        },
+        "ChaOS Cyan": {
+            "#pallet": {
+                "background": "#17151c",
+                "chrome": "#0f0e13",
+                "chrome_text": "#ededf2",
+                "chrome_muted": "#9499ac",
+                "text": "#ededf2",
+                "text_body": "#c6c9d6",
+                "text_muted": "#9499ac",
+                "text_faint": "#767b90",
+                "accent": "#39c5d6",
+                "accent_text": "#39c5d6",
+                "on_accent": "#17151c",
+                "divider": "#3a3446",
+                "track": "#3a3446",
+                "fade": [
+                    0,
+                    0,
+                    0,
+                    150
+                ],
+                "card_fill": "#221f2a"
+            },
+            "#resources": {
+                "card_chaos.png": {
+                    "name": "card"
+                },
+                "card_chaos_hi.png": {
+                    "name": "card_hi"
+                },
+                "pill_cap_cyan.png": {
+                    "name": "pill_cap.png"
+                },
+                "icon_storage_cyan.png": {
+                    "name": "icon_storage.png"
+                },
+                "icon_battery_cyan.png": {
+                    "name": "icon_battery.png"
+                },
+                "icon_device_cyan.png": {
+                    "name": "icon_device.png"
+                },
+                "icon_firmware_cyan.png": {
+                    "name": "icon_firmware.png"
+                }
+            }
+        },
+        "Cream": {
+            "#pallet": {
+                "background": "#17151c",
+                "chrome": "#0f0e13",
+                "chrome_text": "#ededf2",
+                "chrome_muted": "#9499ac",
+                "text": "#ededf2",
+                "text_body": "#c6c9d6",
+                "text_muted": "#9499ac",
+                "text_faint": "#767b90",
+                "accent": "#f4ead5",
+                "accent_text": "#f4ead5",
+                "on_accent": "#17151c",
+                "divider": "#3a3446",
+                "track": "#3a3446",
+                "fade": [
+                    0,
+                    0,
+                    0,
+                    150
+                ],
+                "card_fill": "#221f2a"
+            },
+            "#resources": {
+                "card_chaos.png": {
+                    "name": "card"
+                },
+                "card_chaos_hi.png": {
+                    "name": "card_hi"
+                },
+                "pill_cap_cream.png": {
+                    "name": "pill_cap.png"
+                },
+                "icon_storage_cream.png": {
+                    "name": "icon_storage.png"
+                },
+                "icon_battery_cream.png": {
+                    "name": "icon_battery.png"
+                },
+                "icon_device_cream.png": {
+                    "name": "icon_device.png"
+                },
+                "icon_firmware_cream.png": {
+                    "name": "icon_firmware.png"
+                }
+            }
+        }
+    },
+    "#base": {
+        "font": "JosefinSans-ChaOS.ttf",
+        "font-scale": "auto",
+        "font-scale[640x480]": 1.0,
+        "font-scale[480x320]": 0.85,
+        "font-scale[854x480]": 0.9,
+        "font-scale[960x544]": 1.0,
+        "font-scale[720x480]": 1.0,
+        "font-scale[720x720]": 1.45,
+        "font-scale[960x720]": 1.5,
+        "font-scale[1024x768]": 1.6,
+        "font-scale[1280x720]": 1.5,
+        "font-scale[1280x800]": 1.6,
+        "font-scale[1920x1080]": 2.2,
+        "font-scale[1920x1152]": 2.3,
+        "font-override[ja_JP]": "NotoSansJP-Regular.ttf",
+        "font-override[zh_TW]": "NotoSansTC-Regular.ttf",
+        "font-override[zh_CN]": "NotoSansSC-Regular.ttf",
+        "font-override[zh_HK]": "NotoSansHK-Regular.ttf",
+        "font-override[ko_KR]": "NotoSansKR-Regular.ttf",
+        "line-height-scale[ja_JP|zh_TW|zh_CN|zh_HK|ko_KR]": 0.8
+    },
+    "#styles": {
+        "caption": {
+            "font-size": 11,
+            "font-color": "text_faint"
+        },
+        "byline": {
+            "font-size": 13,
+            "font-color": "text_faint"
+        },
+        "body": {
+            "font-size": 14,
+            "font-color": "text_body"
+        },
+        "strong": {
+            "font": "JosefinSans-ChaOS.ttf",
+            "font-color": "text"
+        },
+        "value": {
+            "style": "strong",
+            "font-size": 14
+        },
+        "section_title": {
+            "style": "strong",
+            "font-size": 17
+        },
+        "title": {
+            "style": "strong",
+            "font-size": 21
+        },
+        "status": {
+            "font": "JosefinSans-ChaOS.ttf",
+            "font-size": 15,
+            "font-color": "accent_text"
+        }
+    },
+    "#elements": {
+        "left_pane": {
+            "area": [
+                0.035,
+                0.115,
+                0.335,
+                0.905
+            ],
+            "area[3:2]": [
+                0.035,
+                0.115,
+                0.375,
+                0.905
+            ],
+            "area[wide]": [
+                0.035,
+                0.115,
+                0.375,
+                0.905
+            ],
+            "area[1:1|square]": [
+                0.035,
+                0.115,
+                0.38,
+                0.905
+            ]
+        },
+        "right_pane": {
+            "area": [
+                0.36,
+                0.115,
+                0.97,
+                0.905
+            ],
+            "area[3:2]": [
+                0.4,
+                0.115,
+                0.97,
+                0.905
+            ],
+            "area[wide]": [
+                0.4,
+                0.115,
+                0.97,
+                0.905
+            ],
+            "area[1:1|square]": [
+                0.405,
+                0.115,
+                0.97,
+                0.905
+            ]
+        },
+        "card_inner": {
+            "parent": "right_pane",
+            "area": [
+                16,
+                14,
+                -16,
+                -14
+            ],
+            "area[hires]": [
+                24,
+                20,
+                -24,
+                -20
+            ]
+        },
+        "grid_left": {
+            "comment": "Grid layout: the ports list, wide",
+            "area": [
+                0.035,
+                0.115,
+                0.56,
+                0.905
+            ]
+        },
+        "grid_right": {
+            "comment": "Grid layout: the port's card, narrow",
+            "area": [
+                0.585,
+                0.115,
+                0.97,
+                0.905
+            ]
+        },
+        "grid_card_inner": {
+            "parent": "grid_right",
+            "area": [
+                16,
+                14,
+                -16,
+                -14
+            ],
+            "area[hires]": [
+                24,
+                20,
+                -24,
+                -20
+            ]
+        },
+        "background": {
+            "area": [
+                0.0,
+                0.0,
+                1.0,
+                1.0
+            ],
+            "fill": "background",
+            "font-size": 36,
+            "font-color": "text",
+            "music": "main_menu_stock.ogg",
+            "music-volume": 50
+        },
+        "header_bar": {
+            "area": [
+                0.0,
+                0.0,
+                1.0,
+                0.085
+            ],
+            "fill": "chrome"
+        },
+        "header_brand": {
+            "area": [
+                0.035,
+                0.0,
+                0.5,
+                0.085
+            ],
+            "font": "JosefinSans-ChaOS.ttf",
+            "font-size": 18,
+            "font-color": "chrome_text",
+            "align": "midleft",
+            "text": "PortMaster"
+        },
+        "header_title": {
+            "area": [
+                0.26,
+                0.0,
+                0.74,
+                0.085
+            ],
+            "font-size": 15,
+            "font-color": "chrome_muted",
+            "align": "center",
+            "text": "{scene.title}",
+            "text-clip": true
+        },
+        "header_status": {
+            "area": [
+                0.6,
+                0.0,
+                0.965,
+                0.085
+            ],
+            "font-size": 15,
+            "font-color": "chrome_muted",
+            "align": "midright",
+            "text": "{system.battery_level}    {system.time_24hr}"
+        },
+        "footer_bar": {
+            "area": [
+                0.0,
+                0.925,
+                1.0,
+                1.0
+            ],
+            "fill": "chrome"
+        },
+        "button_bar": {
+            "area": [
+                0.035,
+                0.939,
+                0.965,
+                0.986
+            ],
+            "font-size": 15,
+            "font-color": "chrome_text",
+            "align": "midright",
+            "bar": [
+                "_A",
+                "Accept",
+                "_B",
+                "Back"
+            ],
+            "button-sound": "click",
+            "bar-space": 6
+        },
+        "footer_note": {
+            "area": [
+                0.035,
+                0.925,
+                0.6,
+                1.0
+            ],
+            "font-size": 12,
+            "font-color": "chrome_muted",
+            "align": "midleft",
+            "text-clip": true
+        },
+        "option_list": {
+            "area": [
+                0.07,
+                0.15,
+                0.47,
+                0.88
+            ],
+            "font-size": 20,
+            "font-color": "text",
+            "line-height": 1.6042,
+            "align": "midleft",
+            "text-clip": true,
+            "text-wrap": false,
+            "select-fill": "accent",
+            "select-color": "on_accent",
+            "no-select-color": "text_faint",
+            "inactive-select-color": "on_accent",
+            "pointer": "pill_cap.png",
+            "pointer-fit": "row",
+            "pointer-attach": "list",
+            "pointer-align": [
+                "midleft",
+                "midright"
+            ],
+            "pointer-mirror": true,
+            "pointer-mirror-x": true,
+            "pointer-offset": [
+                0,
+                0
+            ],
+            "autoscroll": "slide",
+            "scroll-speed": 30,
+            "scroll-delay-start": 800,
+            "scroll-delay-end": 800,
+            "click-sound": "click",
+            "click-sound-volume": 64
+        },
+        "side_list": {
+            "parent": "left_pane",
+            "area": [
+                0.0,
+                0.11,
+                1.0,
+                1.0
+            ],
+            "font-size": 16,
+            "font-color": "text",
+            "line-height": 1.5,
+            "align": "midleft",
+            "text-clip": true,
+            "text-wrap": false,
+            "select-fill": "accent",
+            "select-color": "on_accent",
+            "no-select-color": "text_faint",
+            "inactive-select-color": "on_accent",
+            "pointer": "pill_cap.png",
+            "pointer-fit": "row",
+            "pointer-attach": "list",
+            "pointer-align": [
+                "midleft",
+                "midright"
+            ],
+            "pointer-mirror": true,
+            "pointer-mirror-x": true,
+            "pointer-offset": [
+                0,
+                0
+            ],
+            "autoscroll": "slide",
+            "scroll-speed": 30,
+            "scroll-delay-start": 800,
+            "scroll-delay-end": 800,
+            "click-sound": "click",
+            "click-sound-volume": 64
+        }
+    },
+    "ports_list": {
+        "#element:background": {},
+        "#element:header_bar": {},
+        "#element:header_brand": {},
+        "#element:header_title": {},
+        "#element:header_status": {},
+        "#element:footer_bar": {},
+        "#element:button_bar": {},
+        "section_title": {
+            "style": "section_title",
+            "parent": "left_pane",
+            "parent[layout_grid]": "grid_left",
+            "area": [
+                0.0,
+                0.0,
+                1.0,
+                0.055
+            ],
+            "align": "midleft",
+            "text": "{ports_list.filter_ports} games",
+            "text-clip": true
+        },
+        "port_filters": {
+            "style": "caption",
+            "parent": "left_pane",
+            "parent[layout_grid]": "grid_left",
+            "area": [
+                0.0,
+                0.055,
+                1.0,
+                0.095
+            ],
+            "font-size": 12,
+            "align": "midleft",
+            "text": "{if:!ports_list.total_ports::ports_list.filter_ports}{ports_list.filters}{else}All ports{endif}",
+            "text-clip": true,
+            "autoscroll": "marquee",
+            "scroll-speed": 40,
+            "scroll-delay-start": 1500,
+            "scroll-delay-end": 1500
+        },
+        "#element:side_list:ports_list": {
+            "parent[layout_grid]": "grid_left",
+            "font-size[layout_grid]": 12,
+            "line-height[layout_grid]": 1.4,
+            "roundness[layout_grid]": 8,
+            "roundness[layout_grid,hires]": 12,
+            "list-columns[layout_grid]": 3,
+            "list-columns[layout_grid,wide]": 4,
+            "item-spacer[layout_grid]": 6,
+            "item-spacer[layout_grid,hires]": 10,
+            "item-padding[layout_grid]": 5,
+            "item-padding[layout_grid,hires]": 8,
+            "alt-fill[layout_grid]": "card_fill"
+        },
+        "port_card": {
+            "parent": "right_pane",
+            "parent[layout_grid]": "grid_right",
+            "area": [
+                0.0,
+                0.0,
+                1.0,
+                1.0
+            ],
+            "image": "card",
+            "image[hires]": "card_hi",
+            "patch": [
+                14,
+                14,
+                14,
+                14
+            ],
+            "patch[hires]": [
+                20,
+                20,
+                20,
+                20
+            ]
+        },
+        "port_title": {
+            "style": "title",
+            "parent": "card_inner",
+            "parent[layout_grid]": "grid_card_inner",
+            "area": [
+                0.0,
+                0.0,
+                1.0,
+                0.085
+            ],
+            "align": "midleft",
+            "text": "{port_info.title}",
+            "text-clip": true,
+            "autoscroll": "marquee",
+            "scroll-speed": 40,
+            "scroll-delay-start": 1500,
+            "scroll-delay-end": 1500
+        },
+        "port_byline": {
+            "style": "byline",
+            "parent": "card_inner",
+            "parent[layout_grid]": "grid_card_inner",
+            "area": [
+                0.0,
+                0.088,
+                1.0,
+                0.135
+            ],
+            "align": "topleft",
+            "text": "{if:port_info.porter}by {port_info.porter}{endif}",
+            "text-clip": true
+        },
+        "port_image": {
+            "parent": "card_inner",
+            "parent[layout_grid]": "grid_card_inner",
+            "area": [
+                0.0,
+                0.165,
+                0.6,
+                0.62
+            ],
+            "area[wide|3:2]": [
+                0.0,
+                0.165,
+                0.56,
+                0.7
+            ],
+            "area[1:1|square]": [
+                0.0,
+                0.15,
+                1.0,
+                0.5
+            ],
+            "area[layout_grid]": [
+                0.0,
+                0.15,
+                1.0,
+                0.5
+            ],
+            "image": "{port_info.image}",
+            "image-mode": "fit",
+            "image-align": "topleft",
+            "image-align[1:1|square]": "midtop",
+            "image-align[layout_grid]": "midtop"
+        },
+        "port_image_corners": {
+            "parent": "card_inner",
+            "parent[layout_grid]": "grid_card_inner",
+            "area": [
+                0.0,
+                0.165,
+                0.6,
+                0.62
+            ],
+            "area[wide|3:2]": [
+                0.0,
+                0.165,
+                0.56,
+                0.7
+            ],
+            "area[1:1|square]": [
+                0.0,
+                0.15,
+                1.0,
+                0.5
+            ],
+            "area[layout_grid]": [
+                0.0,
+                0.15,
+                1.0,
+                0.5
+            ],
+            "image": "shot_mask.png",
+            "image-mode": "fit",
+            "image-align": "topleft",
+            "image-align[1:1|square]": "midtop",
+            "image-align[layout_grid]": "midtop",
+            "image-mod": "card_fill"
+        },
+        "port_status": {
+            "style": "status",
+            "parent": "card_inner",
+            "parent[layout_grid]": "grid_card_inner",
+            "area": [
+                0.64,
+                0.165,
+                1.0,
+                0.23
+            ],
+            "area[wide|3:2]": [
+                0.6,
+                0.165,
+                1.0,
+                0.23
+            ],
+            "area[1:1|square]": [
+                0.0,
+                0.53,
+                0.5,
+                0.585
+            ],
+            "area[layout_grid]": [
+                0.0,
+                0.53,
+                1.0,
+                0.585
+            ],
+            "align": "midleft",
+            "text": "{port_info.ready_to_run}",
+            "text-clip": true
+        },
+        "port_rule": {
+            "parent": "card_inner",
+            "parent[layout_grid]": "grid_card_inner",
+            "area": [
+                0.64,
+                0.245,
+                1.0,
+                0.2475
+            ],
+            "area[wide|3:2]": [
+                0.6,
+                0.245,
+                1.0,
+                0.2475
+            ],
+            "area[1:1|square]": [
+                0.0,
+                0.6,
+                1.0,
+                0.6025
+            ],
+            "area[layout_grid]": [
+                0.0,
+                0.6,
+                1.0,
+                0.6025
+            ],
+            "fill": "divider"
+        },
+        "spec_label_0": {
+            "style": "caption",
+            "parent": "card_inner",
+            "parent[layout_grid]": "grid_card_inner",
+            "area": [
+                0.64,
+                0.26,
+                1.0,
+                0.305
+            ],
+            "area[wide|3:2]": [
+                0.6,
+                0.26,
+                1.0,
+                0.305
+            ],
+            "area[1:1|square]": [
+                0.0,
+                0.615,
+                0.3133,
+                0.655
+            ],
+            "area[layout_grid]": [
+                0.0,
+                0.615,
+                0.3133,
+                0.655
+            ],
+            "font-size[layout_grid]": 10,
+            "align": "bottomleft",
+            "text": "GENRE",
+            "text-clip": true
+        },
+        "spec_value_0": {
+            "style": "value",
+            "parent": "card_inner",
+            "parent[layout_grid]": "grid_card_inner",
+            "area": [
+                0.64,
+                0.305,
+                1.0,
+                0.36
+            ],
+            "area[wide|3:2]": [
+                0.6,
+                0.305,
+                1.0,
+                0.36
+            ],
+            "area[1:1|square]": [
+                0.0,
+                0.655,
+                0.3133,
+                0.71
+            ],
+            "area[layout_grid]": [
+                0.0,
+                0.655,
+                0.3133,
+                0.71
+            ],
+            "font-size[layout_grid]": 12,
+            "align": "midleft",
+            "text": "{port_info.genres}",
+            "text-clip": true,
+            "text-wrap": false,
+            "autoscroll": "marquee",
+            "scroll-speed": 40,
+            "scroll-delay-start": 1500,
+            "scroll-delay-end": 1500
+        },
+        "spec_label_1": {
+            "style": "caption",
+            "parent": "card_inner",
+            "parent[layout_grid]": "grid_card_inner",
+            "area": [
+                0.64,
+                0.38,
+                1.0,
+                0.425
+            ],
+            "area[wide|3:2]": [
+                0.6,
+                0.38,
+                1.0,
+                0.425
+            ],
+            "area[1:1|square]": [
+                0.3333,
+                0.615,
+                0.6467,
+                0.655
+            ],
+            "area[layout_grid]": [
+                0.3333,
+                0.615,
+                0.6467,
+                0.655
+            ],
+            "font-size[layout_grid]": 10,
+            "align": "bottomleft",
+            "text": "SIZE",
+            "text-clip": true
+        },
+        "spec_value_1": {
+            "style": "value",
+            "parent": "card_inner",
+            "parent[layout_grid]": "grid_card_inner",
+            "area": [
+                0.64,
+                0.425,
+                1.0,
+                0.48
+            ],
+            "area[wide|3:2]": [
+                0.6,
+                0.425,
+                1.0,
+                0.48
+            ],
+            "area[1:1|square]": [
+                0.3333,
+                0.655,
+                0.6467,
+                0.71
+            ],
+            "area[layout_grid]": [
+                0.3333,
+                0.655,
+                0.6467,
+                0.71
+            ],
+            "font-size[layout_grid]": 12,
+            "align": "midleft",
+            "text": "{if:port_info.install_size}{port_info.install_size}{else}{port_info.download_size}{endif}",
+            "text-clip": true,
+            "text-wrap": false,
+            "autoscroll": "marquee",
+            "scroll-speed": 40,
+            "scroll-delay-start": 1500,
+            "scroll-delay-end": 1500
+        },
+        "spec_label_2": {
+            "style": "caption",
+            "parent": "card_inner",
+            "parent[layout_grid]": "grid_card_inner",
+            "area": [
+                0.64,
+                0.5,
+                1.0,
+                0.545
+            ],
+            "area[wide|3:2]": [
+                0.6,
+                0.5,
+                1.0,
+                0.545
+            ],
+            "area[1:1|square]": [
+                0.6667,
+                0.615,
+                0.98,
+                0.655
+            ],
+            "area[layout_grid]": [
+                0.6667,
+                0.615,
+                0.98,
+                0.655
+            ],
+            "font-size[layout_grid]": 10,
+            "align": "bottomleft",
+            "text": "{if:port_info.runtime}RUNTIME{endif}",
+            "text-clip": true
+        },
+        "spec_value_2": {
+            "style": "value",
+            "parent": "card_inner",
+            "parent[layout_grid]": "grid_card_inner",
+            "area": [
+                0.64,
+                0.545,
+                1.0,
+                0.6
+            ],
+            "area[wide|3:2]": [
+                0.6,
+                0.545,
+                1.0,
+                0.6
+            ],
+            "area[1:1|square]": [
+                0.6667,
+                0.655,
+                0.98,
+                0.71
+            ],
+            "area[layout_grid]": [
+                0.6667,
+                0.655,
+                0.98,
+                0.71
+            ],
+            "font-size[layout_grid]": 12,
+            "align": "midleft",
+            "text": "{if:port_info.runtime}{port_info.runtime} ({port_info.runtime_status}){endif}",
+            "text-clip": true,
+            "text-wrap": false,
+            "autoscroll": "marquee",
+            "scroll-speed": 40,
+            "scroll-delay-start": 1500,
+            "scroll-delay-end": 1500
+        },
+        "port_rule_2": {
+            "parent": "card_inner",
+            "parent[layout_grid]": "grid_card_inner",
+            "area": [
+                0.0,
+                0.655,
+                1.0,
+                0.6575
+            ],
+            "area[wide|3:2]": [
+                0.0,
+                0.72,
+                1.0,
+                0.7225
+            ],
+            "area[1:1|square]": [
+                0.0,
+                0.735,
+                1.0,
+                0.7375
+            ],
+            "area[layout_grid]": [
+                0.0,
+                0.735,
+                1.0,
+                0.7375
+            ],
+            "fill": "divider"
+        },
+        "port_desc": {
+            "style": "body",
+            "parent": "card_inner",
+            "parent[layout_grid]": "grid_card_inner",
+            "area": [
+                0.0,
+                0.68,
+                1.0,
+                1.0
+            ],
+            "area[wide|3:2]": [
+                0.0,
+                0.745,
+                1.0,
+                1.0
+            ],
+            "area[1:1|square]": [
+                0.0,
+                0.76,
+                1.0,
+                1.0
+            ],
+            "area[layout_grid]": [
+                0.0,
+                0.76,
+                1.0,
+                1.0
+            ],
+            "align": "topleft",
+            "text": "{port_info.description}",
+            "text-clip": true,
+            "text-wrap": true,
+            "autoscroll": "marquee",
+            "scroll-speed": 60,
+            "scroll-delay-start": 2000,
+            "scroll-delay-end": 2000
+        }
+    },
+    "port_info": {
+        "#element:background": {},
+        "#element:header_bar": {},
+        "#element:header_brand": {},
+        "#element:header_title": {},
+        "#element:header_status": {},
+        "#element:footer_bar": {},
+        "#element:button_bar": {},
+        "port_title": {
+            "style": "strong",
+            "area": [
+                0.04,
+                0.105,
+                0.96,
+                0.175
+            ],
+            "font-size": 26,
+            "align": "midleft",
+            "text": "{port_info.title}",
+            "text-clip": true,
+            "autoscroll": "marquee",
+            "scroll-speed": 40,
+            "scroll-delay-start": 1500,
+            "scroll-delay-end": 1500
+        },
+        "port_byline": {
+            "style": "byline",
+            "area": [
+                0.04,
+                0.175,
+                0.96,
+                0.215
+            ],
+            "font-size": 14,
+            "align": "topleft",
+            "text": "{if:port_info.porter}by {port_info.porter}{endif}",
+            "text-clip": true
+        },
+        "info_left": {
+            "comment": "the left column: the screenshot above, the description card below",
+            "area": [
+                0.04,
+                0.235,
+                0.6,
+                0.905
+            ],
+            "area[wide]": [
+                0.04,
+                0.235,
+                0.68,
+                0.905
+            ],
+            "area[3:2]": [
+                0.04,
+                0.235,
+                0.66,
+                0.905
+            ]
+        },
+        "port_image": {
+            "parent": "info_left",
+            "area": [
+                0.0,
+                0.0,
+                1.0,
+                0.63
+            ],
+            "area[1:1|square]": [
+                0.0,
+                0.0,
+                1.0,
+                0.55
+            ],
+            "image": "{port_info.image}",
+            "image-mode": "fit",
+            "image-align": "midtop"
+        },
+        "port_image_corners": {
+            "parent": "info_left",
+            "area": [
+                0.0,
+                0.0,
+                1.0,
+                0.63
+            ],
+            "area[1:1|square]": [
+                0.0,
+                0.0,
+                1.0,
+                0.55
+            ],
+            "image": "shot_mask.png",
+            "image-mode": "fit",
+            "image-align": "midtop",
+            "image-mod": "background"
+        },
+        "desc_card": {
+            "parent": "info_left",
+            "area": [
+                0.0,
+                0.66,
+                1.0,
+                1.0
+            ],
+            "area[1:1|square]": [
+                0.0,
+                0.58,
+                1.0,
+                1.0
+            ],
+            "image": "card",
+            "image[hires]": "card_hi",
+            "patch": [
+                14,
+                14,
+                14,
+                14
+            ],
+            "patch[hires]": [
+                20,
+                20,
+                20,
+                20
+            ]
+        },
+        "port_info": {
+            "style": "body",
+            "parent": "desc_card",
+            "area": [
+                0.045,
+                0.1,
+                0.955,
+                0.9
+            ],
+            "font-size": 17,
+            "align": "topleft",
+            "text": "{port_info.description}",
+            "text-clip": true,
+            "text-wrap": true,
+            "autoscroll": "marquee",
+            "scroll-speed": 60,
+            "scroll-delay-start": 2000,
+            "scroll-delay-end": 2000
+        },
+        "side_card": {
+            "area": [
+                0.625,
+                0.235,
+                0.96,
+                0.905
+            ],
+            "area[wide]": [
+                0.705,
+                0.235,
+                0.96,
+                0.905
+            ],
+            "area[3:2]": [
+                0.685,
+                0.235,
+                0.96,
+                0.905
+            ],
+            "image": "card",
+            "image[hires]": "card_hi",
+            "patch": [
+                14,
+                14,
+                14,
+                14
+            ],
+            "patch[hires]": [
+                20,
+                20,
+                20,
+                20
+            ]
+        },
+        "port_status": {
+            "style": "status",
+            "parent": "side_card",
+            "area": [
+                0.075,
+                0.03,
+                0.925,
+                0.12
+            ],
+            "font-size": 22,
+            "align": "midleft",
+            "text": "{port_info.ready_to_run}",
+            "text-clip": true
+        },
+        "side_rule": {
+            "parent": "side_card",
+            "area": [
+                0.075,
+                0.135,
+                0.925,
+                0.139
+            ],
+            "fill": "divider"
+        },
+        "spec_label_0": {
+            "style": "caption",
+            "parent": "side_card",
+            "area": [
+                0.075,
+                0.155,
+                0.925,
+                0.2
+            ],
+            "font-size": 13,
+            "align": "bottomleft",
+            "text": "GENRE",
+            "text-clip": true
+        },
+        "spec_value_0": {
+            "style": "value",
+            "parent": "side_card",
+            "area": [
+                0.075,
+                0.2,
+                0.925,
+                0.27
+            ],
+            "font-size": 19,
+            "align": "midleft",
+            "text": "{port_info.genres}",
+            "text-clip": true,
+            "text-wrap": false,
+            "autoscroll": "marquee",
+            "scroll-speed": 40,
+            "scroll-delay-start": 1500,
+            "scroll-delay-end": 1500
+        },
+        "spec_label_1": {
+            "style": "caption",
+            "parent": "side_card",
+            "area": [
+                0.075,
+                0.28,
+                0.925,
+                0.325
+            ],
+            "font-size": 13,
+            "align": "bottomleft",
+            "text": "DOWNLOAD SIZE",
+            "text-clip": true
+        },
+        "spec_value_1": {
+            "style": "value",
+            "parent": "side_card",
+            "area": [
+                0.075,
+                0.325,
+                0.925,
+                0.395
+            ],
+            "font-size": 19,
+            "align": "midleft",
+            "text": "{port_info.download_size}",
+            "text-clip": true,
+            "text-wrap": false,
+            "autoscroll": "marquee",
+            "scroll-speed": 40,
+            "scroll-delay-start": 1500,
+            "scroll-delay-end": 1500
+        },
+        "spec_label_2": {
+            "style": "caption",
+            "parent": "side_card",
+            "area": [
+                0.075,
+                0.405,
+                0.925,
+                0.45
+            ],
+            "font-size": 13,
+            "align": "bottomleft",
+            "text": "FREE SPACE",
+            "text-clip": true
+        },
+        "spec_value_2": {
+            "style": "value",
+            "parent": "side_card",
+            "area": [
+                0.075,
+                0.45,
+                0.925,
+                0.52
+            ],
+            "font-size": 19,
+            "align": "midleft",
+            "text": "{system.free_space}",
+            "text-clip": true,
+            "text-wrap": false,
+            "autoscroll": "marquee",
+            "scroll-speed": 40,
+            "scroll-delay-start": 1500,
+            "scroll-delay-end": 1500
+        },
+        "spec_label_3": {
+            "style": "caption",
+            "parent": "side_card",
+            "area": [
+                0.075,
+                0.53,
+                0.925,
+                0.575
+            ],
+            "font-size": 13,
+            "align": "bottomleft",
+            "text": "{if:port_info.runtime}RUNTIME{endif}",
+            "text-clip": true
+        },
+        "spec_value_3": {
+            "style": "value",
+            "parent": "side_card",
+            "area": [
+                0.075,
+                0.575,
+                0.925,
+                0.645
+            ],
+            "font-size": 19,
+            "align": "midleft",
+            "text": "{if:port_info.runtime}{port_info.runtime} ({port_info.runtime_status}){endif}",
+            "text-clip": true,
+            "text-wrap": false,
+            "autoscroll": "marquee",
+            "scroll-speed": 40,
+            "scroll-delay-start": 1500,
+            "scroll-delay-end": 1500
+        },
+        "instr_label": {
+            "style": "caption",
+            "parent": "side_card",
+            "area": [
+                0.075,
+                0.665,
+                0.925,
+                0.71
+            ],
+            "font-size": 13,
+            "align": "bottomleft",
+            "text": "INSTRUCTIONS",
+            "text-clip": true
+        },
+        "port_info_instruction": {
+            "style": "body",
+            "parent": "side_card",
+            "area": [
+                0.075,
+                0.715,
+                0.925,
+                0.97
+            ],
+            "font-size": 15,
+            "align": "topleft",
+            "text": "{port_info.instructions}",
+            "text-clip": true,
+            "text-wrap": true,
+            "autoscroll": "marquee",
+            "scroll-speed": 60,
+            "scroll-delay-start": 2000,
+            "scroll-delay-end": 2000
+        }
+    },
+    "port_links": {
+        "#element:background": {},
+        "#element:header_bar": {},
+        "#element:header_brand": {},
+        "#element:header_title": {},
+        "#element:header_status": {},
+        "#element:footer_bar": {},
+        "#element:button_bar": {},
+        "section_title": {
+            "style": "section_title",
+            "parent": "left_pane",
+            "area": [
+                0.0,
+                0.0,
+                1.0,
+                0.055
+            ],
+            "align": "midleft",
+            "text": "{port_info.title}",
+            "text-clip": true,
+            "autoscroll": "marquee",
+            "scroll-speed": 40,
+            "scroll-delay-start": 1500,
+            "scroll-delay-end": 1500
+        },
+        "links_count": {
+            "style": "caption",
+            "parent": "left_pane",
+            "area": [
+                0.0,
+                0.055,
+                1.0,
+                0.095
+            ],
+            "font-size": 12,
+            "align": "midleft",
+            "text": "Links: {port_links.count}"
+        },
+        "#element:side_list:links_list": {},
+        "links_panel": {
+            "parent": "right_pane",
+            "area": [
+                0.0,
+                0.0,
+                1.0,
+                1.0
+            ],
+            "image": "card",
+            "image[hires]": "card_hi",
+            "patch": [
+                14,
+                14,
+                14,
+                14
+            ],
+            "patch[hires]": [
+                20,
+                20,
+                20,
+                20
+            ]
+        },
+        "links_title": {
+            "style": "strong",
+            "parent": "card_inner",
+            "area": [
+                0.0,
+                0.0,
+                1.0,
+                0.09
+            ],
+            "font-size": 19,
+            "align": "midleft",
+            "text": "{port_links.name}",
+            "text-clip": true
+        },
+        "link_qr": {
+            "parent": "card_inner",
+            "area": [
+                0.0,
+                0.12,
+                1.0,
+                0.8
+            ],
+            "image": "qr:{port_links.url}",
+            "image-mode": "fit"
+        },
+        "link_info": {
+            "parent": "card_inner",
+            "area": [
+                0.0,
+                0.83,
+                1.0,
+                1.0
+            ],
+            "font-size": 13,
+            "font-color": "text_muted",
+            "align": "center",
+            "text": "{port_links.url}",
+            "text-wrap": true
+        }
+    },
+    "port_instructions": {
+        "#element:background": {},
+        "#element:header_bar": {},
+        "#element:header_brand": {},
+        "#element:header_title": {},
+        "#element:header_status": {},
+        "#element:footer_bar": {},
+        "#element:button_bar": {},
+        "instructions_card": {
+            "area": [
+                0.04,
+                0.115,
+                0.96,
+                0.905
+            ],
+            "image": "card",
+            "image[hires]": "card_hi",
+            "patch": [
+                14,
+                14,
+                14,
+                14
+            ],
+            "patch[hires]": [
+                20,
+                20,
+                20,
+                20
+            ]
+        },
+        "port_title": {
+            "style": "title",
+            "parent": "instructions_card",
+            "area": [
+                0.035,
+                0.03,
+                0.965,
+                0.12
+            ],
+            "align": "midleft",
+            "text": "{port_info.title}",
+            "text-clip": true,
+            "autoscroll": "marquee",
+            "scroll-speed": 40,
+            "scroll-delay-start": 1500,
+            "scroll-delay-end": 1500
+        },
+        "port_rule": {
+            "parent": "instructions_card",
+            "area": [
+                0.035,
+                0.135,
+                0.965,
+                0.138
+            ],
+            "fill": "divider"
+        },
+        "port_instructions": {
+            "style": "body",
+            "parent": "instructions_card",
+            "area": [
+                0.035,
+                0.16,
+                0.965,
+                0.97
+            ],
+            "font-size": 16,
+            "line-height": 1.2,
+            "align": "topleft",
+            "text": "{port_instructions.text}",
+            "text-wrap": true,
+            "text-clip": true,
+            "scrollable": true,
+            "scroll-amount": 2
+        }
+    },
+    "main_menu": {
+        "#element:background": {},
+        "#element:header_bar": {},
+        "#element:header_brand": {},
+        "#element:header_status": {},
+        "#element:footer_bar": {},
+        "#element:button_bar": {},
+        "#element:option_list": {
+            "area[wide|3:2]": [
+                0.07,
+                0.15,
+                0.43,
+                0.88
+            ],
+            "list": [],
+            "options": []
+        },
+        "menu_card": {
+            "area": [
+                0.52,
+                0.15,
+                0.955,
+                0.88
+            ],
+            "area[wide|3:2]": [
+                0.48,
+                0.15,
+                0.955,
+                0.88
+            ],
+            "image": "card",
+            "image[hires]": "card_hi",
+            "patch": [
+                14,
+                14,
+                14,
+                14
+            ],
+            "patch[hires]": [
+                20,
+                20,
+                20,
+                20
+            ]
+        },
+        "menu_tooltip": {
+            "area": [
+                0.56,
+                0.19,
+                0.92,
+                0.37
+            ],
+            "area[wide|3:2]": [
+                0.52,
+                0.19,
+                0.92,
+                0.37
+            ],
+            "font-size": 19,
+            "font-color": "text",
+            "align": "topleft",
+            "text": "{scene.tooltip}",
+            "text-wrap": true
+        },
+        "menu_rule": {
+            "area": [
+                0.56,
+                0.4,
+                0.92,
+                0.4025
+            ],
+            "area[wide|3:2]": [
+                0.52,
+                0.4,
+                0.92,
+                0.4025
+            ],
+            "fill": "divider"
+        },
+        "stat_icon_0": {
+            "area": [
+                0.56,
+                0.44,
+                0.73,
+                0.49
+            ],
+            "area[wide|3:2]": [
+                0.52,
+                0.44,
+                0.71,
+                0.49
+            ],
+            "image": "icon_storage.png",
+            "image-mode": "fit",
+            "image-align": "midleft"
+        },
+        "stat_value_0": {
+            "style": "strong",
+            "area": [
+                0.56,
+                0.495,
+                0.73,
+                0.55
+            ],
+            "area[wide|3:2]": [
+                0.52,
+                0.495,
+                0.71,
+                0.55
+            ],
+            "font-size": 16,
+            "align": "midleft",
+            "text": "{system.free_space}",
+            "text-clip": true,
+            "text-wrap": false,
+            "autoscroll": "marquee",
+            "scroll-speed": 40,
+            "scroll-delay-start": 1500,
+            "scroll-delay-end": 1500
+        },
+        "stat_label_0": {
+            "style": "caption",
+            "area": [
+                0.56,
+                0.55,
+                0.73,
+                0.585
+            ],
+            "area[wide|3:2]": [
+                0.52,
+                0.55,
+                0.71,
+                0.585
+            ],
+            "align": "topleft",
+            "text": "FREE SPACE",
+            "text-clip": true
+        },
+        "stat_icon_1": {
+            "area": [
+                0.75,
+                0.44,
+                0.92,
+                0.49
+            ],
+            "area[wide|3:2]": [
+                0.73,
+                0.44,
+                0.92,
+                0.49
+            ],
+            "image": "icon_battery.png",
+            "image-mode": "fit",
+            "image-align": "midleft"
+        },
+        "stat_value_1": {
+            "style": "strong",
+            "area": [
+                0.75,
+                0.495,
+                0.92,
+                0.55
+            ],
+            "area[wide|3:2]": [
+                0.73,
+                0.495,
+                0.92,
+                0.55
+            ],
+            "font-size": 16,
+            "align": "midleft",
+            "text": "{system.battery_level}",
+            "text-clip": true,
+            "text-wrap": false,
+            "autoscroll": "marquee",
+            "scroll-speed": 40,
+            "scroll-delay-start": 1500,
+            "scroll-delay-end": 1500
+        },
+        "stat_label_1": {
+            "style": "caption",
+            "area": [
+                0.75,
+                0.55,
+                0.92,
+                0.585
+            ],
+            "area[wide|3:2]": [
+                0.73,
+                0.55,
+                0.92,
+                0.585
+            ],
+            "align": "topleft",
+            "text": "BATTERY",
+            "text-clip": true
+        },
+        "stat_icon_2": {
+            "area": [
+                0.56,
+                0.65,
+                0.73,
+                0.7
+            ],
+            "area[wide|3:2]": [
+                0.52,
+                0.65,
+                0.71,
+                0.7
+            ],
+            "image": "icon_device.png",
+            "image-mode": "fit",
+            "image-align": "midleft"
+        },
+        "stat_value_2": {
+            "style": "strong",
+            "area": [
+                0.56,
+                0.705,
+                0.73,
+                0.76
+            ],
+            "area[wide|3:2]": [
+                0.52,
+                0.705,
+                0.71,
+                0.76
+            ],
+            "font-size": 16,
+            "align": "midleft",
+            "text": "{system.device_name}",
+            "text-clip": true,
+            "text-wrap": false,
+            "autoscroll": "marquee",
+            "scroll-speed": 40,
+            "scroll-delay-start": 1500,
+            "scroll-delay-end": 1500
+        },
+        "stat_label_2": {
+            "style": "caption",
+            "area": [
+                0.56,
+                0.76,
+                0.73,
+                0.795
+            ],
+            "area[wide|3:2]": [
+                0.52,
+                0.76,
+                0.71,
+                0.795
+            ],
+            "align": "topleft",
+            "text": "DEVICE",
+            "text-clip": true
+        },
+        "stat_icon_3": {
+            "area": [
+                0.75,
+                0.65,
+                0.92,
+                0.7
+            ],
+            "area[wide|3:2]": [
+                0.73,
+                0.65,
+                0.92,
+                0.7
+            ],
+            "image": "icon_firmware.png",
+            "image-mode": "fit",
+            "image-align": "midleft"
+        },
+        "stat_value_3": {
+            "style": "strong",
+            "area": [
+                0.75,
+                0.705,
+                0.92,
+                0.76
+            ],
+            "area[wide|3:2]": [
+                0.73,
+                0.705,
+                0.92,
+                0.76
+            ],
+            "font-size": 16,
+            "align": "midleft",
+            "text": "{system.cfw_name} {system.cfw_version}",
+            "text-clip": true,
+            "text-wrap": false,
+            "autoscroll": "marquee",
+            "scroll-speed": 40,
+            "scroll-delay-start": 1500,
+            "scroll-delay-end": 1500
+        },
+        "stat_label_3": {
+            "style": "caption",
+            "area": [
+                0.75,
+                0.76,
+                0.92,
+                0.795
+            ],
+            "area[wide|3:2]": [
+                0.73,
+                0.76,
+                0.92,
+                0.795
+            ],
+            "align": "topleft",
+            "text": "FIRMWARE",
+            "text-clip": true
+        },
+        "#element:footer_note:version": {
+            "text": "PortMaster {system.portmaster_version}"
+        }
+    },
+    "option_menu": {
+        "#element:background": {
+            "music": null
+        },
+        "#element:header_bar": {},
+        "#element:header_brand": {},
+        "#element:header_title": {},
+        "#element:header_status": {},
+        "#element:footer_bar": {},
+        "#element:button_bar": {},
+        "#element:option_list": {
+            "area": [
+                0.07,
+                0.14,
+                0.57,
+                0.89
+            ],
+            "area[wide|3:2]": [
+                0.07,
+                0.14,
+                0.55,
+                0.89
+            ],
+            "font-size": 18,
+            "line-height": 1.4773,
+            "list": [],
+            "options": [],
+            "list-section-add-blank": true
+        },
+        "desc_card": {
+            "area": [
+                0.61,
+                0.14,
+                0.955,
+                0.89
+            ],
+            "area[wide|3:2]": [
+                0.59,
+                0.14,
+                0.955,
+                0.89
+            ],
+            "image": "card",
+            "image[hires]": "card_hi",
+            "patch": [
+                14,
+                14,
+                14,
+                14
+            ],
+            "patch[hires]": [
+                20,
+                20,
+                20,
+                20
+            ]
+        },
+        "option_description": {
+            "area": [
+                0.64,
+                0.18,
+                0.925,
+                0.85
+            ],
+            "area[wide|3:2]": [
+                0.62,
+                0.18,
+                0.925,
+                0.85
+            ],
+            "font-size": 17,
+            "font-color": "text",
+            "align": "topleft",
+            "text": "{scene.tooltip}",
+            "text-wrap": true
+        },
+        "#element:footer_note:ip": {
+            "text": "IP: {system.ip_address}"
+        }
+    },
+    "themes_list": {
+        "#element:background": {},
+        "#element:header_bar": {},
+        "#element:header_brand": {},
+        "#element:header_title": {},
+        "#element:header_status": {},
+        "#element:footer_bar": {},
+        "#element:button_bar": {},
+        "section_title": {
+            "style": "section_title",
+            "parent": "left_pane",
+            "area": [
+                0.0,
+                0.0,
+                1.0,
+                0.055
+            ],
+            "align": "midleft",
+            "text": "{scene.title}",
+            "text-clip": true
+        },
+        "#element:side_list:themes_list": {},
+        "port_info": {
+            "parent": "right_pane",
+            "area": [
+                0.0,
+                0.0,
+                1.0,
+                1.0
+            ],
+            "image": "card",
+            "image[hires]": "card_hi",
+            "patch": [
+                14,
+                14,
+                14,
+                14
+            ],
+            "patch[hires]": [
+                20,
+                20,
+                20,
+                20
+            ]
+        },
+        "theme_name": {
+            "style": "title",
+            "parent": "card_inner",
+            "area": [
+                0.0,
+                0.0,
+                1.0,
+                0.085
+            ],
+            "align": "midleft",
+            "text": "{theme_info.name}",
+            "text-clip": true,
+            "autoscroll": "marquee",
+            "scroll-speed": 40,
+            "scroll-delay-start": 1500,
+            "scroll-delay-end": 1500
+        },
+        "theme_general_info": {
+            "style": "byline",
+            "parent": "card_inner",
+            "area": [
+                0.0,
+                0.088,
+                1.0,
+                0.135
+            ],
+            "align": "topleft",
+            "text": "{if:theme_info.creator}by {theme_info.creator}  \u00b7  {endif}{theme_info.status}",
+            "text-clip": true
+        },
+        "theme_image": {
+            "parent": "card_inner",
+            "area": [
+                0.0,
+                0.165,
+                1.0,
+                0.66
+            ],
+            "image": "{theme_info.image}",
+            "image-mode": "fit",
+            "image-align": "midtop"
+        },
+        "theme_rule": {
+            "parent": "card_inner",
+            "area": [
+                0.0,
+                0.68,
+                1.0,
+                0.6825
+            ],
+            "fill": "divider"
+        },
+        "theme_desc": {
+            "style": "body",
+            "parent": "card_inner",
+            "area": [
+                0.0,
+                0.7,
+                1.0,
+                1.0
+            ],
+            "align": "topleft",
+            "text": "{theme_info.description}",
+            "text-clip": true,
+            "text-wrap": true,
+            "autoscroll": "marquee",
+            "scroll-speed": 60,
+            "scroll-delay-start": 2000,
+            "scroll-delay-end": 2000
+        }
+    },
+    "theme_server": {
+        "#element:background": {},
+        "#element:header_bar": {},
+        "#element:header_brand": {},
+        "#element:header_title": {},
+        "#element:header_status": {},
+        "#element:footer_bar": {},
+        "#element:button_bar": {},
+        "server_qr_panel": {
+            "area": [
+                0.04,
+                0.115,
+                0.46,
+                0.905
+            ],
+            "image": "card",
+            "image[hires]": "card_hi",
+            "patch": [
+                14,
+                14,
+                14,
+                14
+            ],
+            "patch[hires]": [
+                20,
+                20,
+                20,
+                20
+            ]
+        },
+        "server_qr": {
+            "area": [
+                0.07,
+                0.155,
+                0.43,
+                0.865
+            ],
+            "image": "qr:{theme_server.url}",
+            "image-mode": "fit"
+        },
+        "server_card": {
+            "area": [
+                0.49,
+                0.115,
+                0.96,
+                0.905
+            ],
+            "image": "card",
+            "image[hires]": "card_hi",
+            "patch": [
+                14,
+                14,
+                14,
+                14
+            ],
+            "patch[hires]": [
+                20,
+                20,
+                20,
+                20
+            ]
+        },
+        "server_title": {
+            "style": "status",
+            "area": [
+                0.52,
+                0.145,
+                0.93,
+                0.215
+            ],
+            "font-size": 17,
+            "align": "midleft",
+            "text": "{theme_server.url}",
+            "text-clip": true
+        },
+        "server_info": {
+            "area": [
+                0.52,
+                0.235,
+                0.93,
+                0.875
+            ],
+            "font-size": 15,
+            "font-color": "text",
+            "align": "topleft",
+            "text": "{theme_server.status}",
+            "text-clip": true,
+            "text-wrap": true,
+            "autoscroll": null,
+            "scroll-speed": 60,
+            "scroll-delay-start": 2000,
+            "scroll-delay-end": 2000
+        }
+    },
+    "runtime_list": {
+        "#element:background": {
+            "music": null
+        },
+        "#element:header_bar": {},
+        "#element:header_brand": {},
+        "#element:header_title": {},
+        "#element:header_status": {},
+        "#element:footer_bar": {},
+        "#element:button_bar": {},
+        "#element:option_list:runtime_list": {
+            "area": [
+                0.07,
+                0.14,
+                0.52,
+                0.89
+            ],
+            "font-size": 17,
+            "line-height": 1.525,
+            "list": [],
+            "options": []
+        },
+        "desc_card": {
+            "area": [
+                0.56,
+                0.14,
+                0.955,
+                0.89
+            ],
+            "image": "card",
+            "image[hires]": "card_hi",
+            "patch": [
+                14,
+                14,
+                14,
+                14
+            ],
+            "patch[hires]": [
+                20,
+                20,
+                20,
+                20
+            ]
+        },
+        "runtime_name": {
+            "style": "strong",
+            "area": [
+                0.59,
+                0.17,
+                0.925,
+                0.23
+            ],
+            "font-size": 18,
+            "align": "midleft",
+            "text": "{runtime_info.name}",
+            "text-clip": true,
+            "autoscroll": "marquee",
+            "scroll-speed": 40,
+            "scroll-delay-start": 1500,
+            "scroll-delay-end": 1500
+        },
+        "runtime_status": {
+            "area": [
+                0.59,
+                0.23,
+                0.925,
+                0.27
+            ],
+            "font-size": 14,
+            "font-color": "accent_text",
+            "align": "midleft",
+            "text": "{runtime_info.status}",
+            "text-clip": true
+        },
+        "runtime_rule": {
+            "area": [
+                0.59,
+                0.29,
+                0.925,
+                0.2925
+            ],
+            "fill": "divider"
+        },
+        "dl_label": {
+            "style": "caption",
+            "area": [
+                0.59,
+                0.31,
+                0.7575,
+                0.34
+            ],
+            "align": "bottomleft",
+            "text": "DOWNLOAD SIZE",
+            "text-clip": true
+        },
+        "dl_value": {
+            "style": "value",
+            "area": [
+                0.59,
+                0.34,
+                0.7475,
+                0.39
+            ],
+            "align": "midleft",
+            "text": "{runtime_info.download_size}",
+            "text-clip": true,
+            "text-wrap": false,
+            "autoscroll": "marquee",
+            "scroll-speed": 40,
+            "scroll-delay-start": 1500,
+            "scroll-delay-end": 1500
+        },
+        "disk_label": {
+            "style": "caption",
+            "area": [
+                0.7575,
+                0.31,
+                0.925,
+                0.34
+            ],
+            "align": "bottomleft",
+            "text": "INSTALL SIZE",
+            "text-clip": true
+        },
+        "disk_value": {
+            "style": "value",
+            "area": [
+                0.7575,
+                0.34,
+                0.925,
+                0.39
+            ],
+            "align": "midleft",
+            "text": "{runtime_info.disk_size}",
+            "text-clip": true,
+            "text-wrap": false,
+            "autoscroll": "marquee",
+            "scroll-speed": 40,
+            "scroll-delay-start": 1500,
+            "scroll-delay-end": 1500
+        },
+        "ports_label": {
+            "style": "caption",
+            "area": [
+                0.59,
+                0.42,
+                0.925,
+                0.45
+            ],
+            "align": "bottomleft",
+            "text": "USED BY",
+            "text-clip": true
+        },
+        "option_description": {
+            "style": "body",
+            "area": [
+                0.59,
+                0.455,
+                0.925,
+                0.86
+            ],
+            "align": "topleft",
+            "text": "{runtime_info.ports}",
+            "text-clip": true,
+            "text-wrap": true,
+            "autoscroll": "marquee",
+            "scroll-speed": 60,
+            "scroll-delay-start": 2000,
+            "scroll-delay-end": 2000
+        },
+        "#element:footer_note:ip": {
+            "text": "IP: {system.ip_address}"
+        }
+    },
+    "on_screen_keyboard": {
+        "#element:background": {},
+        "#element:header_bar": {},
+        "#element:header_brand": {},
+        "#element:header_title": {},
+        "#element:header_status": {},
+        "#element:footer_bar": {},
+        "#element:button_bar": {},
+        "key_card": {
+            "area": [
+                0.04,
+                0.27,
+                0.96,
+                0.77
+            ],
+            "image": "card",
+            "image[hires]": "card_hi",
+            "patch": [
+                14,
+                14,
+                14,
+                14
+            ],
+            "patch[hires]": [
+                20,
+                20,
+                20,
+                20
+            ]
+        },
+        "keyboard": {
+            "area": [
+                0.07,
+                0.31,
+                0.93,
+                0.75
+            ],
+            "font": "DejaVuSans.ttf",
+            "font-size": 26,
+            "font-color": "text",
+            "align": "center",
+            "list": [],
+            "select-color": "accent_text",
+            "inactive-select-color": "text",
+            "options": []
+        }
+    },
+    "filter_list": {
+        "#element:background": {
+            "fill": "fade",
+            "blend-mode": "blend"
+        },
+        "#element:header_bar": {},
+        "#element:header_brand": {},
+        "#element:header_title": {
+            "text": "Filters"
+        },
+        "#element:header_status": {},
+        "filter_card": {
+            "parent": "right_pane",
+            "area": [
+                0.0,
+                0.0,
+                1.0,
+                1.0
+            ],
+            "image": "card",
+            "image[hires]": "card_hi",
+            "patch": [
+                14,
+                14,
+                14,
+                14
+            ],
+            "patch[hires]": [
+                20,
+                20,
+                20,
+                20
+            ]
+        },
+        "filter_list": {
+            "parent": "right_pane",
+            "area": [
+                16,
+                0.035,
+                -16,
+                0.965
+            ],
+            "area[hires]": [
+                24,
+                0.035,
+                -24,
+                0.965
+            ],
+            "font-size": 15,
+            "font-color": "text",
+            "line-height": 1.4722,
+            "align": "midleft",
+            "text-clip": true,
+            "text-wrap": false,
+            "list": [],
+            "select-fill": "accent",
+            "select-color": "on_accent",
+            "no-select-color": "text_faint",
+            "inactive-select-color": "text",
+            "pointer": "pill_cap.png",
+            "pointer-fit": "row",
+            "pointer-attach": "list",
+            "pointer-align": [
+                "midleft",
+                "midright"
+            ],
+            "pointer-mirror": true,
+            "pointer-mirror-x": true,
+            "pointer-offset": [
+                0,
+                0
+            ],
+            "autoscroll": "slide",
+            "scroll-speed": 30,
+            "scroll-delay-start": 800,
+            "scroll-delay-end": 800,
+            "click-sound": "click",
+            "click-sound-volume": 64
+        },
+        "#element:footer_bar": {},
+        "#element:button_bar": {}
+    },
+    "message_window": {
+        "#element:background": {},
+        "#element:header_bar": {},
+        "#element:header_brand": {},
+        "#element:header_title": {},
+        "#element:header_status": {},
+        "#element:footer_bar": {},
+        "#element:button_bar": {},
+        "message_card": {
+            "area": [
+                0.04,
+                0.115,
+                0.96,
+                0.765
+            ],
+            "image": "card",
+            "image[hires]": "card_hi",
+            "patch": [
+                14,
+                14,
+                14,
+                14
+            ],
+            "patch[hires]": [
+                20,
+                20,
+                20,
+                20
+            ]
+        },
+        "message_text": {
+            "style": "body",
+            "area": [
+                0.07,
+                0.145,
+                0.93,
+                0.735
+            ],
+            "font-size": 17,
+            "align": "bottomleft",
+            "text": "",
+            "text-wrap": true
+        },
+        "progress_text": {
+            "area": [
+                0.04,
+                0.785,
+                0.7,
+                0.835
+            ],
+            "font-size": 14,
+            "font-color": "text_muted",
+            "align": "midleft",
+            "text": "{system.progress_text}",
+            "text-clip": true
+        },
+        "progress_bar_amount": {
+            "style": "value",
+            "area": [
+                0.5,
+                0.785,
+                0.96,
+                0.835
+            ],
+            "align": "midright",
+            "text": "{system.progress_amount}"
+        },
+        "progress_bar": {
+            "area": [
+                0.04,
+                0.85,
+                0.96,
+                0.875
+            ],
+            "fill": "track",
+            "roundness": 5,
+            "progress-fill": "accent"
+        }
+    },
+    "featured_ports_list": {
+        "#element:background": {},
+        "#element:header_bar": {},
+        "#element:header_brand": {},
+        "#element:header_title": {},
+        "#element:header_status": {},
+        "#element:footer_bar": {},
+        "#element:button_bar": {},
+        "port_info": {
+            "area": [
+                0.055,
+                0.135,
+                0.945,
+                0.31
+            ],
+            "image": "{featured_ports.image}",
+            "image-mode": "fit"
+        },
+        "featured_port_description": {
+            "style": "body",
+            "area": [
+                0.06,
+                0.315,
+                0.94,
+                0.385
+            ],
+            "font-size": 15,
+            "align": "center",
+            "text": "{featured_ports.description}",
+            "text-wrap": true,
+            "autoscroll": "marquee",
+            "scroll-speed": 50,
+            "scroll-delay-start": 1500,
+            "scroll-delay-end": 1500
+        },
+        "option_list": {
+            "area": [
+                0.2,
+                0.43,
+                0.8,
+                0.895
+            ],
+            "font-size": 19,
+            "font-color": "text",
+            "line-height": 1.5,
+            "align": "center",
+            "text-clip": true,
+            "text-wrap": false,
+            "list": [],
+            "select-fill": "accent",
+            "select-color": "on_accent",
+            "no-select-color": "text_faint",
+            "inactive-select-color": "on_accent",
+            "pointer": "pill_cap.png",
+            "pointer-fit": "row",
+            "pointer-attach": "list",
+            "pointer-align": [
+                "midleft",
+                "midright"
+            ],
+            "pointer-mirror": true,
+            "pointer-mirror-x": true,
+            "pointer-offset": [
+                0,
+                0
+            ],
+            "autoscroll": "slide",
+            "scroll-speed": 30,
+            "scroll-delay-start": 800,
+            "scroll-delay-end": 800,
+            "click-sound": "click",
+            "click-sound-volume": 64
+        }
+    },
+    "featured_ports": {
+        "#element:background": {},
+        "#element:header_bar": {},
+        "#element:header_brand": {},
+        "#element:header_title": {},
+        "#element:header_status": {},
+        "#element:footer_bar": {},
+        "#element:button_bar": {},
+        "featured_image": {
+            "parent": "left_pane",
+            "area": [
+                0.0,
+                0.0,
+                1.0,
+                0.2
+            ],
+            "image": "{featured_ports.image}",
+            "image-mode": "fit",
+            "image-align": "topleft"
+        },
+        "featured_port_description": {
+            "style": "caption",
+            "parent": "left_pane",
+            "area": [
+                0.0,
+                0.21,
+                1.0,
+                0.3
+            ],
+            "font-size": 12,
+            "align": "topleft",
+            "text": "{featured_ports.description}",
+            "text-wrap": true,
+            "autoscroll": "marquee",
+            "scroll-speed": 50,
+            "scroll-delay-start": 1500,
+            "scroll-delay-end": 1500
+        },
+        "#element:side_list:ports_list": {
+            "area": [
+                0.0,
+                0.32,
+                1.0,
+                1.0
+            ]
+        },
+        "port_card": {
+            "parent": "right_pane",
+            "area": [
+                0.0,
+                0.0,
+                1.0,
+                1.0
+            ],
+            "image": "card",
+            "image[hires]": "card_hi",
+            "patch": [
+                14,
+                14,
+                14,
+                14
+            ],
+            "patch[hires]": [
+                20,
+                20,
+                20,
+                20
+            ]
+        },
+        "port_title": {
+            "style": "title",
+            "parent": "card_inner",
+            "area": [
+                0.0,
+                0.0,
+                1.0,
+                0.085
+            ],
+            "align": "midleft",
+            "text": "{port_info.title}",
+            "text-clip": true,
+            "autoscroll": "marquee",
+            "scroll-speed": 40,
+            "scroll-delay-start": 1500,
+            "scroll-delay-end": 1500
+        },
+        "port_byline": {
+            "style": "byline",
+            "parent": "card_inner",
+            "area": [
+                0.0,
+                0.088,
+                1.0,
+                0.135
+            ],
+            "align": "topleft",
+            "text": "{if:port_info.porter}by {port_info.porter}{endif}",
+            "text-clip": true
+        },
+        "port_image": {
+            "parent": "card_inner",
+            "area": [
+                0.0,
+                0.165,
+                0.6,
+                0.62
+            ],
+            "area[wide|3:2]": [
+                0.0,
+                0.165,
+                0.56,
+                0.7
+            ],
+            "area[1:1|square]": [
+                0.0,
+                0.15,
+                1.0,
+                0.5
+            ],
+            "image": "{port_info.image}",
+            "image-mode": "fit",
+            "image-align": "topleft"
+        },
+        "port_image_corners": {
+            "parent": "card_inner",
+            "area": [
+                0.0,
+                0.165,
+                0.6,
+                0.62
+            ],
+            "area[wide|3:2]": [
+                0.0,
+                0.165,
+                0.56,
+                0.7
+            ],
+            "area[1:1|square]": [
+                0.0,
+                0.15,
+                1.0,
+                0.5
+            ],
+            "image": "shot_mask.png",
+            "image-mode": "fit",
+            "image-align": "topleft",
+            "image-mod": "card_fill"
+        },
+        "port_status": {
+            "style": "status",
+            "parent": "card_inner",
+            "area": [
+                0.64,
+                0.165,
+                1.0,
+                0.23
+            ],
+            "area[wide|3:2]": [
+                0.6,
+                0.165,
+                1.0,
+                0.23
+            ],
+            "area[1:1|square]": [
+                0.0,
+                0.53,
+                0.5,
+                0.585
+            ],
+            "align": "midleft",
+            "text": "{port_info.ready_to_run}",
+            "text-clip": true
+        },
+        "port_rule": {
+            "parent": "card_inner",
+            "area": [
+                0.64,
+                0.245,
+                1.0,
+                0.2475
+            ],
+            "area[wide|3:2]": [
+                0.6,
+                0.245,
+                1.0,
+                0.2475
+            ],
+            "area[1:1|square]": [
+                0.0,
+                0.6,
+                1.0,
+                0.6025
+            ],
+            "fill": "divider"
+        },
+        "spec_label_0": {
+            "style": "caption",
+            "parent": "card_inner",
+            "area": [
+                0.64,
+                0.26,
+                1.0,
+                0.305
+            ],
+            "area[wide|3:2]": [
+                0.6,
+                0.26,
+                1.0,
+                0.305
+            ],
+            "area[1:1|square]": [
+                0.0,
+                0.615,
+                0.3133,
+                0.655
+            ],
+            "align": "bottomleft",
+            "text": "GENRE",
+            "text-clip": true
+        },
+        "spec_value_0": {
+            "style": "value",
+            "parent": "card_inner",
+            "area": [
+                0.64,
+                0.305,
+                1.0,
+                0.36
+            ],
+            "area[wide|3:2]": [
+                0.6,
+                0.305,
+                1.0,
+                0.36
+            ],
+            "area[1:1|square]": [
+                0.0,
+                0.655,
+                0.3133,
+                0.71
+            ],
+            "align": "midleft",
+            "text": "{port_info.genres}",
+            "text-clip": true,
+            "text-wrap": false,
+            "autoscroll": "marquee",
+            "scroll-speed": 40,
+            "scroll-delay-start": 1500,
+            "scroll-delay-end": 1500
+        },
+        "spec_label_1": {
+            "style": "caption",
+            "parent": "card_inner",
+            "area": [
+                0.64,
+                0.38,
+                1.0,
+                0.425
+            ],
+            "area[wide|3:2]": [
+                0.6,
+                0.38,
+                1.0,
+                0.425
+            ],
+            "area[1:1|square]": [
+                0.3333,
+                0.615,
+                0.6467,
+                0.655
+            ],
+            "align": "bottomleft",
+            "text": "SIZE",
+            "text-clip": true
+        },
+        "spec_value_1": {
+            "style": "value",
+            "parent": "card_inner",
+            "area": [
+                0.64,
+                0.425,
+                1.0,
+                0.48
+            ],
+            "area[wide|3:2]": [
+                0.6,
+                0.425,
+                1.0,
+                0.48
+            ],
+            "area[1:1|square]": [
+                0.3333,
+                0.655,
+                0.6467,
+                0.71
+            ],
+            "align": "midleft",
+            "text": "{if:port_info.install_size}{port_info.install_size}{else}{port_info.download_size}{endif}",
+            "text-clip": true,
+            "text-wrap": false,
+            "autoscroll": "marquee",
+            "scroll-speed": 40,
+            "scroll-delay-start": 1500,
+            "scroll-delay-end": 1500
+        },
+        "spec_label_2": {
+            "style": "caption",
+            "parent": "card_inner",
+            "area": [
+                0.64,
+                0.5,
+                1.0,
+                0.545
+            ],
+            "area[wide|3:2]": [
+                0.6,
+                0.5,
+                1.0,
+                0.545
+            ],
+            "area[1:1|square]": [
+                0.6667,
+                0.615,
+                0.98,
+                0.655
+            ],
+            "align": "bottomleft",
+            "text": "{if:port_info.runtime}RUNTIME{endif}",
+            "text-clip": true
+        },
+        "spec_value_2": {
+            "style": "value",
+            "parent": "card_inner",
+            "area": [
+                0.64,
+                0.545,
+                1.0,
+                0.6
+            ],
+            "area[wide|3:2]": [
+                0.6,
+                0.545,
+                1.0,
+                0.6
+            ],
+            "area[1:1|square]": [
+                0.6667,
+                0.655,
+                0.98,
+                0.71
+            ],
+            "align": "midleft",
+            "text": "{if:port_info.runtime}{port_info.runtime} ({port_info.runtime_status}){endif}",
+            "text-clip": true,
+            "text-wrap": false,
+            "autoscroll": "marquee",
+            "scroll-speed": 40,
+            "scroll-delay-start": 1500,
+            "scroll-delay-end": 1500
+        },
+        "port_rule_2": {
+            "parent": "card_inner",
+            "area": [
+                0.0,
+                0.655,
+                1.0,
+                0.6575
+            ],
+            "area[wide|3:2]": [
+                0.0,
+                0.72,
+                1.0,
+                0.7225
+            ],
+            "area[1:1|square]": [
+                0.0,
+                0.735,
+                1.0,
+                0.7375
+            ],
+            "fill": "divider"
+        },
+        "port_desc": {
+            "style": "body",
+            "parent": "card_inner",
+            "area": [
+                0.0,
+                0.68,
+                1.0,
+                1.0
+            ],
+            "area[wide|3:2]": [
+                0.0,
+                0.745,
+                1.0,
+                1.0
+            ],
+            "area[1:1|square]": [
+                0.0,
+                0.76,
+                1.0,
+                1.0
+            ],
+            "align": "topleft",
+            "text": "{port_info.description}",
+            "text-clip": true,
+            "text-wrap": true,
+            "autoscroll": "marquee",
+            "scroll-speed": 60,
+            "scroll-delay-start": 2000,
+            "scroll-delay-end": 2000
+        }
+    },
+    "message_box": {
+        "#element:background": {},
+        "#element:header_bar": {},
+        "#element:header_brand": {},
+        "#element:header_title": {},
+        "#element:header_status": {},
+        "#element:footer_bar": {},
+        "#element:button_bar": {},
+        "message_card": {
+            "area": [
+                0.08,
+                0.2,
+                0.92,
+                0.82
+            ],
+            "area[3:2]": [
+                0.08,
+                0.18,
+                0.92,
+                0.86
+            ],
+            "image": "card",
+            "image[hires]": "card_hi",
+            "patch": [
+                14,
+                14,
+                14,
+                14
+            ],
+            "patch[hires]": [
+                20,
+                20,
+                20,
+                20
+            ]
+        },
+        "message_text": {
+            "area": [
+                0.12,
+                0.25,
+                0.88,
+                0.77
+            ],
+            "area[3:2]": [
+                0.12,
+                0.23,
+                0.88,
+                0.81
+            ],
+            "font-size": 21,
+            "font-color": "text",
+            "align": "center",
+            "text": "",
+            "text-wrap": true,
+            "autoscroll": "marquee",
+            "scroll-speed": 40,
+            "scroll-delay-start": 1500,
+            "scroll-delay-end": 1500
+        }
+    },
+    "blank": {
+        "#element:background": {},
+        "#element:header_bar": {},
+        "#element:header_brand": {},
+        "#element:header_title": {},
+        "#element:header_status": {},
+        "#element:footer_bar": {},
+        "#element:button_bar": {}
+    },
+    "selection_list": {
+        "#element:background": {},
+        "#element:header_bar": {},
+        "#element:header_brand": {},
+        "#element:header_title": {},
+        "#element:header_status": {},
+        "#element:footer_bar": {},
+        "#element:button_bar": {},
+        "#element:option_list:selection_list": {
+            "area": [
+                0.07,
+                0.135,
+                0.93,
+                0.905
+            ],
+            "list": []
+        }
+    },
+    "selection_list_description": {
+        "#element:background": {},
+        "#element:header_bar": {},
+        "#element:header_brand": {},
+        "#element:header_title": {},
+        "#element:header_status": {},
+        "#element:footer_bar": {},
+        "#element:button_bar": {},
+        "#element:option_list:selection_list": {
+            "area": [
+                0.07,
+                0.135,
+                0.93,
+                0.5
+            ],
+            "list": []
+        },
+        "desc_card": {
+            "area": [
+                0.04,
+                0.53,
+                0.96,
+                0.905
+            ],
+            "image": "card",
+            "image[hires]": "card_hi",
+            "patch": [
+                14,
+                14,
+                14,
+                14
+            ],
+            "patch[hires]": [
+                20,
+                20,
+                20,
+                20
+            ]
+        },
+        "selection_description": {
+            "area": [
+                0.07,
+                0.56,
+                0.93,
+                0.875
+            ],
+            "font-size": 16,
+            "font-color": "text",
+            "align": "topleft",
+            "text": "{selection_list.description}",
+            "text-clip": true,
+            "text-wrap": true,
+            "autoscroll": "marquee",
+            "scroll-speed": 60,
+            "scroll-delay-start": 2000,
+            "scroll-delay-end": 2000
+        }
+    },
+    "selection_list_images": {
+        "#element:background": {},
+        "#element:header_bar": {},
+        "#element:header_brand": {},
+        "#element:header_title": {},
+        "#element:header_status": {},
+        "#element:footer_bar": {},
+        "#element:button_bar": {},
+        "image_card": {
+            "area": [
+                0.53,
+                0.115,
+                0.96,
+                0.905
+            ],
+            "image": "card",
+            "image[hires]": "card_hi",
+            "patch": [
+                14,
+                14,
+                14,
+                14
+            ],
+            "patch[hires]": [
+                20,
+                20,
+                20,
+                20
+            ]
+        },
+        "selection_image": {
+            "area": [
+                0.55,
+                0.145,
+                0.94,
+                0.875
+            ],
+            "image": "{selection_list.image}",
+            "image-mode": "fit"
+        },
+        "#element:option_list:selection_list": {
+            "area": [
+                0.07,
+                0.135,
+                0.5,
+                0.905
+            ],
+            "list": []
+        }
+    },
+    "selection_list_description_images": {
+        "#element:background": {},
+        "#element:header_bar": {},
+        "#element:header_brand": {},
+        "#element:header_title": {},
+        "#element:header_status": {},
+        "#element:footer_bar": {},
+        "#element:button_bar": {},
+        "image_card": {
+            "area": [
+                0.53,
+                0.115,
+                0.96,
+                0.5
+            ],
+            "image": "card",
+            "image[hires]": "card_hi",
+            "patch": [
+                14,
+                14,
+                14,
+                14
+            ],
+            "patch[hires]": [
+                20,
+                20,
+                20,
+                20
+            ]
+        },
+        "selection_image": {
+            "area": [
+                0.55,
+                0.145,
+                0.94,
+                0.47
+            ],
+            "image": "{selection_list.image}",
+            "image-mode": "fit"
+        },
+        "#element:option_list:selection_list": {
+            "area": [
+                0.07,
+                0.135,
+                0.5,
+                0.5
+            ],
+            "list": []
+        },
+        "desc_card": {
+            "area": [
+                0.04,
+                0.53,
+                0.96,
+                0.905
+            ],
+            "image": "card",
+            "image[hires]": "card_hi",
+            "patch": [
+                14,
+                14,
+                14,
+                14
+            ],
+            "patch[hires]": [
+                20,
+                20,
+                20,
+                20
+            ]
+        },
+        "selection_description": {
+            "area": [
+                0.07,
+                0.56,
+                0.93,
+                0.875
+            ],
+            "font-size": 16,
+            "font-color": "text",
+            "align": "topleft",
+            "text": "{selection_list.description}",
+            "text-clip": true,
+            "text-wrap": true,
+            "autoscroll": "marquee",
+            "scroll-speed": 60,
+            "scroll-delay-start": 2000,
+            "scroll-delay-end": 2000
+        }
+    }
+}

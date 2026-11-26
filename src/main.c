@@ -16392,25 +16392,31 @@ static void port_launch(app *a, int o, const char *romfile, const char *title)
 	const char *envkv[2];
 	bool music;
 	int how = PORT_ENDED, rc;
+	/* ChaOS: the Ports shelf's first card is PortMaster's own app, run by
+	 * run.sh --portmaster with ChaOS's Python and hooks */
+	bool gui = !strcmp(romfile, PM_ENTRY_FILE);
 
 	snprintf(script, sizeof script, "%s/%s/%s", P_ROMS, s->folder, romfile);
+	if (gui) snprintf(script, sizeof script, "--portmaster");
 	snprintf(runner, sizeof runner, "%s/ports/run.sh", P_ROOT);
 	if (access(runner, R_OK) != 0 || access("/bin/bash", X_OK) != 0) {
 		pick_say(a, title, "Ports need ChaOS's full update", s->accent);
 		return;
 	}
-	if (!ports_script_ok(script, why, sizeof why)) {
+	if (!gui && !ports_script_ok(script, why, sizeof why)) {
 		pick_say(a, title, why, s->accent);
 		return;
 	}
 	if (!ports_pm_ready(P_ROMS) && !ports_setup_screen(a, title, s->accent)) return;
 	if (!a->running) return;
-	/* A runtime it needs and hasn't got - a port put on the card some
-	 * other way, or one PortMaster's own app installed - fetched first */
-	if (!pm_launch_runtimes(a, romfile, title, s->accent) || !a->running) return;
-	/* and any library it needs that the Brick hasn't, from ChaOS's pack */
-	port_libs_before(a, script, romfile, title, s->accent);
-	if (!a->running) return;
+	if (!gui) {
+		/* A runtime it needs and hasn't got - a port put on the card some
+		 * other way - fetched first */
+		if (!pm_launch_runtimes(a, romfile, title, s->accent) || !a->running) return;
+		/* and any library it needs that the Brick hasn't, from ChaOS's pack */
+		port_libs_before(a, script, romfile, title, s->accent);
+		if (!a->running) return;
+	}
 
 	remember_place(a);
 	snprintf(ud, sizeof ud, "CHAOS_USERDATA=%s", P_USERDATA);
@@ -18375,7 +18381,13 @@ static void pm_get(app *a)
 {
 	if (!ports_setup_screen(a, "PortMaster", MENU_ACCENT) || !a->running) return;
 	rescan_all(a);
-	pm_screen(a, MENU_ACCENT);
+	{	/* ChaOS: PortMaster's own app, from the Ports system */
+		int o;
+
+		for (o = 0; o < a->sys.count; o++)
+			if (!strcmp(a->sys.systems[o].tag, "PORTS")) break;
+		if (o < a->sys.count) { port_launch(a, o, PM_ENTRY_FILE, PM_ENTRY_NAME); rescan_all(a); }
+	}
 }
 
 /* PortMaster, from the Ports shelf's first card or the ChaOS menu */
@@ -23027,6 +23039,13 @@ static void launch_game(app *a)
 	/* ChaOS: a port, not a game for Diatom */
 	if (!strcmp(s->core, PORTS_CORE)) {
 		/* ChaOS: its first card is PortMaster's catalog, not a port */
+		if (pm_is_entry(v->list.items[v->cursor].file) &&
+		    !strcmp(v->list.items[v->cursor].file, PM_ENTRY_FILE)) {
+			/* ChaOS: PortMaster's own app, and the shelf found again after */
+			port_launch(a, o, PM_ENTRY_FILE, PM_ENTRY_NAME);
+			rescan_all(a);
+			return;
+		}
 		if (pm_is_entry(v->list.items[v->cursor].file)) { pm_screen(a, s->accent); return; }
 		port_launch(a, o, v->list.items[v->cursor].file, v->list.items[v->cursor].title);
 		return;

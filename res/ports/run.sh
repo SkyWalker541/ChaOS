@@ -61,6 +61,60 @@ fi
 # kernel had to say (an out-of-memory kill, a crash)
 trap 'echo "run.sh: stopped by ChaOS"; dmesg 2> /dev/null | tail -15; exit 143' TERM HUP INT
 
+if [ "$PORT" = --portmaster ]; then
+	# ChaOS: PortMaster's own app. Its Python is ChaOS's (tools/build-python.sh),
+	# shipped as one squashfs and unpacked once into userdata (the kernel
+	# can't mount it, and the card has no symlinks: python3 is a copy), again
+	# only when the image changes. Then PortMaster's own launcher, with
+	# ChaOS's hooks (chaos/launch_hooks.txt).
+	img="$HERE/python/chaos-python.squashfs"
+	py="$CHAOS_USERDATA/ports/python"
+	stamp="$(wc -c < "$img" 2> /dev/null | tr -d ' ')"
+	if [ -n "$stamp" ] && [ "$(cat "$py/.chaos-stamp" 2> /dev/null)" != "$stamp" ]; then
+		echo "unpacking Python ($stamp bytes)"
+		rm -rf "$py.new"
+		"$HERE/bin/unsquashfs" -no-progress -ignore-errors -f -d "$py.new" "$img" > /dev/null 2>&1
+		[ -x "$py.new/bin/python3.11" ] || { echo "Python didn't unpack"; exit 1; }
+		[ -x "$py.new/bin/python3" ] || cp -f "$py.new/bin/python3.11" "$py.new/bin/python3"
+		echo "$stamp" > "$py.new/.chaos-stamp"
+		rm -rf "$py" && mv "$py.new" "$py"
+	fi
+	[ -x "$py/bin/python3" ] || { echo "no Python for PortMaster"; exit 1; }
+	# PYTHONHOME: found by name, not by where the binary thinks it runs from
+	export PATH="$py/bin:$PATH" PYTHONHOME="$py"
+	mkdir -p "$PM/chaos"
+	cmp -s "$HERE/chaos/launch_hooks.txt" "$PM/chaos/launch_hooks.txt" ||
+		cp -f "$HERE/chaos/launch_hooks.txt" "$PM/chaos/launch_hooks.txt"
+	# ChaOS's theme for it (res/ports/chaos_theme), kept up to date in
+	# PortMaster/themes/, and chosen once, the first time: a theme picked in
+	# PortMaster's own options afterwards is left alone
+	if [ -d "$HERE/chaos_theme" ] && ! cmp -s "$HERE/chaos_theme/theme.json" "$PM/themes/chaos_theme/theme.json"; then
+		rm -rf "$PM/themes/chaos_theme" && mkdir -p "$PM/themes" &&
+			cp -rf "$HERE/chaos_theme" "$PM/themes/chaos_theme"
+	fi
+	python3 - "$PM/config/config.json" << 'PYEOF'
+import json, os, sys
+p = sys.argv[1]
+try:
+    d = json.load(open(p))
+    if not isinstance(d, dict): d = {}
+except Exception:
+    d = {}
+if "theme" not in d:
+    d["theme"] = "chaos_theme"
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    with open(p + ".tmp", "w") as f: json.dump(d, f, indent=4)
+    os.replace(p + ".tmp", p)
+    print("PortMaster's theme: ChaOS")
+PYEOF
+	export controlfolder="$PM" PM_CUR_TTY=/dev/null
+	cd "$PM" || exit 1
+	/bin/bash -c 'source "$controlfolder/utils/pm_launch.txt" chaos'
+	st=$?
+	echo "PortMaster exited $st"
+	sync
+	exit $st
+fi
 cd "$(dirname "$PORT")" || exit 1
 /bin/bash "$PORT"
 st=$?

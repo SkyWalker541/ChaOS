@@ -1,0 +1,50 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+# ChaOS: PortMaster's own app on ChaOS. PortMaster's utils/pm_launch.txt
+# sources this when it is started as `source pm_launch.txt chaos` (ChaOS's
+# res/ports/run.sh --portmaster), and these replace its defaults: no sudo, no
+# text console, no systemd, and ChaOS's own Python and SDL. run.sh copies this
+# file into PortMaster/chaos/ before every start, as it does mod_ChaOS.txt,
+# so a PortMaster update can't leave it out.
+
+pm_hook_env() {
+  export ESUDO=""
+  export ESUDOKILL="-1"
+  source "$controlfolder/control.txt"
+  [ -f "${controlfolder}/mod_${CFW_NAME}.txt" ] && source "${controlfolder}/mod_${CFW_NAME}.txt"
+  get_controls
+}
+
+pm_hook_gui_env() {
+  # pySDL2 finds the system's SDL2, SDL2_image, _ttf and _mixer here
+  export PYSDL2_DLL_PATH="/usr/lib"
+}
+
+pm_hook_autoinstall_dirs() {
+  echo "$controlfolder/autoinstall"
+  echo "/$directory/ports/autoinstall"
+}
+
+pm_hook_pre_launch() {
+  # no text console to clear or write to (CUR_TTY is /dev/null)
+  chmod -R +x . 2> /dev/null
+  :
+}
+
+pm_hook_run_pugwash() {
+  # ChaOS's Python (run.sh put it first on PATH); pugwash is #!/usr/bin/env python3
+  python3 ./pugwash $PORTMASTER_CMDS
+}
+
+pm_hook_post_launch() {
+  :
+}
+
+pm_hook_frontend_refresh() {
+  # ChaOS rescans the Ports shelf itself when PortMaster closes; a marker any
+  # of PortMaster's refreshes leave is only cleared
+  rm -f "$controlfolder/.emustation-refresh" "$controlfolder/.emulationstation-refresh" \
+        "$controlfolder/.weston-refresh" "$controlfolder/.sway-refresh" \
+        "$controlfolder/.batocera-es-refresh" "$controlfolder/.trimui-refresh" 2> /dev/null
+  :
+}
