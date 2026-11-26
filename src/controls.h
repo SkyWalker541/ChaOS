@@ -72,6 +72,9 @@ int ctl_console_pages(const ctl_console *cc);
 int ctl_console_rows(const ctl_console *cc, int page, menu_row *out);
 /* "GB", "SNES", "TG-16": a console in a heading */
 const char *ctl_console_short(const char *tag, const char *name);
+/* ChaOS: the Ports shelf's Controls page: what ChaOS's own buttons do in a
+ * port, one page, nothing live. Returns the row count (at most 8). */
+int ctl_ports_rows(menu_row *out);
 
 /* One page's rows, the rule and footer note included, and how many there are.
  * Every button the Brick has is named on some page, and no page names one

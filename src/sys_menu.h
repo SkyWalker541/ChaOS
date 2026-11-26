@@ -230,6 +230,11 @@ typedef struct {
 	 * of its rows about the picture (but Overlay), the buttons, rewind or
 	 * box art */
 	bool        native;
+	/* ChaOS: the Ports shelf: a port is its own program too, so none of
+	 * the emulator's rows (picture, Rewind, Box Art); its Controls is the
+	 * page of what ChaOS's buttons do in a port (controls.h ctl_ports_rows),
+	 * not a console's mapping, which a port never reads (Aquilus, 2.7.9) */
+	bool        ports;
 	int         auto_off;    /* seconds, 0 for off */
 	const char *clock;       /* the local date and time, "Oct 3, 6:12 AM" */
 	/* Where sound goes: the policy the player set, and where it actually ends

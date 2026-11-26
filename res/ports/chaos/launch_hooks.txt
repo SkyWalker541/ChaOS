@@ -42,15 +42,11 @@ pm_hook_pre_launch() {
 }
 
 pm_hook_run_pugwash() {
-  # The pad by its labels for the app: ports get it by position (the Xbox
-  # way, so the Brick's A, on the right, is SDL's B), and the app then had A
-  # and B, X and Y the wrong way round. Its own copy, the app's alone.
-  local pad="$CHAOS_PAD"
-  pad=$(printf '%s\n' "$pad" | sed 's/a:b1,b:b0,x:b3,y:b2/a:b0,b:b1,x:b2,y:b3/')
-  printf '%s\n' "$pad" > /tmp/chaos-pugwash-pad.txt
+  # The pad as ports get it, by position, as PortMaster and NextUI run the
+  # app (their Xbox layout): the bottom button selects. ChaOS swapped A and
+  # B for the app alone until 2.7.9-test5; it forces no mapping now.
   # ChaOS's Python (run.sh put it first on PATH); pugwash is #!/usr/bin/env python3
-  SDL_GAMECONTROLLERCONFIG="$pad" SDL_GAMECONTROLLERCONFIG_FILE=/tmp/chaos-pugwash-pad.txt \
-    python3 ./pugwash $PORTMASTER_CMDS
+  python3 ./pugwash $PORTMASTER_CMDS
   :
 }
 

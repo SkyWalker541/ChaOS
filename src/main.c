@@ -6396,6 +6396,7 @@ static int menu_build(app *a, screen_id screen, int sys,
 			u.rewind  = rewind_load(sc->tag);
 			u.overscan = u.fav || u.muse ? NULL : os_label(sc->tag);
 			u.native  = !strcmp(sc->core, PICO8_CORE);
+			u.ports   = !strcmp(sc->core, PORTS_CORE);
 			u.shader  = look_console_of(sc->tag) == LOOK_NONE ? NULL
 			          : a->view[sys].look.on ? "On" : "Off";
 			u.overlay = u.fav || u.muse ? NULL : overlay_label(a, sys, ovl, sizeof ovl);
@@ -10055,6 +10056,10 @@ static int cc_build(void *ctx, menu_row *rows, int max, const char **heading)
 	const system_cfg *sc = &c->a->sys.systems[c->sys];
 
 	(void)max;
+	if (!strcmp(sc->core, PORTS_CORE)) {   /* ChaOS: a port's (ctl_ports_rows) */
+		*heading = "Ports Controls";
+		return ctl_ports_rows(rows);
+	}
 	cc_fill(c);
 	snprintf(c->head, sizeof c->head, "%s Controls", ctl_console_short(sc->tag, sc->name));
 	*heading = c->head;
@@ -10067,6 +10072,7 @@ static menu_result cc_key(app *a, void *ctx, in_button key, int sel)
 	int pages = ctl_console_pages(&c->cc);
 
 	(void)sel;
+	if (!strcmp(a->sys.systems[c->sys].core, PORTS_CORE)) return MENU_STAY;   /* one page, nothing live */
 	if (key == IN_RIGHT && c->page + 1 < pages) c->page++;
 	if (key == IN_LEFT && c->page > 0) c->page--;
 	if (key == IN_ACCEPT) remap_screen(a, c->sys, c->file, c->game, c->over);

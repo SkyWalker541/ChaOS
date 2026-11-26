@@ -863,6 +863,20 @@ static void cursor_reaches(void)
 	   "PICO-8: Games, Core, Sort By, Overlay and Rescan Folder, and nothing else about the picture");
 	u.native = false; u.sys_name = "NES"; u.sys_core = "nestopia";
 
+	/* ChaOS: Ports. Its Controls said MENU+SELECT saved and F2 fast
+	 * forwarded, the console page, which no port does (2.7.9-test5): the
+	 * ports' own page now, and none of the emulator's rows */
+	u.ports = true; u.sys_name = "Ports"; u.sys_core = "port"; u.shader = "Off"; u.overscan = "Off";
+	n = sys_menu_build(&u, rows, &b, &heading);
+	k = reachable(rows, n, got, MENU_MAX_ROWS);
+	ck(reaches(rows, got, k, "Controls") && reaches(rows, got, k, "Sort By") &&
+	   reaches(rows, got, k, "Rescan Folder") && !reaches(rows, got, k, "Display Mode") &&
+	   !reaches(rows, got, k, "Rewind") && !reaches(rows, got, k, "Box Art") &&
+	   !reaches(rows, got, k, "Overlay") && !reaches(rows, got, k, "Shader") &&
+	   !reaches(rows, got, k, "Crop Overscan"),
+	   "Ports: Controls, Sort By and Rescan Folder, none of the emulator's rows");
+	u.ports = false; u.sys_name = "NES"; u.sys_core = "nestopia"; u.shader = NULL; u.overscan = NULL;
+
 	memset(&u, 0, sizeof u);
 	u.ss_have = true;   /* the full menu; its hiding is checked on its own */
 	u.night = "Off";

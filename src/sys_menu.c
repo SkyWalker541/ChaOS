@@ -92,6 +92,9 @@ int sys_menu_system_rows(const sys_ui *u, sm_row *out)
 		if (u->native && (r == SM_DISPLAY || r == SM_BUTTONS ||
 		                  r == SM_REWIND || r == SM_BOXART))
 			continue;
+		if (u->ports && (r == SM_DISPLAY || r == SM_SHADER || r == SM_OVERLAY ||
+		                 r == SM_OVERSCAN || r == SM_REWIND || r == SM_BOXART))
+			continue;
 		out[n++] = (sm_row)r;
 	}
 	return n;
@@ -216,7 +219,8 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 		full[SM_SHADER].hint  = "A screen effect, like a CRT's or a Game Boy's LCD";
 		full[SM_OVERLAY].hint = "A frame drawn around the picture";
 		full[SM_OVERSCAN].hint = "Trim the edges an old TV hid";
-		full[SM_BUTTONS].hint = "What each button does in this console's games";
+		full[SM_BUTTONS].hint = u->ports ? "What ChaOS's buttons do in a port"
+		                                 : "What each button does in this console's games";
 		full[SM_REWIND].hint  = "Hold F1 to rewind. Costs a little speed";
 		full[SM_BOXART].hint  = "Download box art for this console's games";
 		full[SM_RESCAN].hint  = "Look for games added to the card";

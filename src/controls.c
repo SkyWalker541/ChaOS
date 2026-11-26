@@ -106,6 +106,23 @@ int ctl_console_rows(const ctl_console *cc, int page, menu_row *out)
 	return n;
 }
 
+/* ChaOS: the Ports shelf's Controls. A port reads the buttons itself, as its
+ * porter laid them out (most can be changed in the game's own settings);
+ * ChaOS keeps only these. No Button Mapping row: nothing of it reaches a
+ * port, and the console pages said MENU+SELECT saved and F2 fast forwarded,
+ * which no port does (Aquilus, 2026-11-26). */
+int ctl_ports_rows(menu_row *out)
+{
+	int n = 0;
+
+	out[n++] = (menu_row){ "SELECT+START", "Quit the port", false };
+	out[n++] = (menu_row){ "POWER",        "Resume, close or turn off", false };
+	out[n++] = (menu_row){ "Other buttons", "The port's own", false };
+	out[n++] = MENU_RULE;
+	out[n++] = MENU_NOTE("Most ports let you change them in their own settings");
+	return n;
+}
+
 /* The names a console goes by in a heading: the shelf's own where it is
  * short, the everyday short form where it is not */
 const char *ctl_console_short(const char *tag, const char *name)
