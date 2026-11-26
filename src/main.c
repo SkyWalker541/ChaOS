@@ -19375,6 +19375,11 @@ static bool romm_download_game(app *a, const romm_rom *g, const char *folder, co
 	char stem[LIB_NAME];
 
 	if (!net_online()) { pick_say(a, g->name, "Connect to Wi-Fi first", MENU_ACCENT); return false; }
+	/* RomM's name for it becomes the path: only a plain one is written */
+	if (!romm_name_ok(g->multi ? g->fs_name : g->file_name)) {
+		pick_say(a, g->name, "RomM's file name can't be used", MENU_ACCENT);
+		return false;
+	}
 	sync_abandon();
 	snprintf(dir, sizeof dir, "%s/%s", P_ROMS, folder);
 	mkdir(dir, 0755);
@@ -20425,6 +20430,7 @@ static void romm_bios_screen(app *a)
 			char path[LIB_PATH * 2], url[1200];
 			struct stat st;
 
+			if (!romm_name_ok(fw[k].file_name)) { failed++; continue; }
 			snprintf(path, sizeof path, "%s/%s", bios, fw[k].file_name);
 			if (stat(path, &st) == 0 && (fw[k].size <= 0 || st.st_size == fw[k].size)) { had++; continue; }
 			romm_firmware_url(&g_romm, &fw[k], url, sizeof url);

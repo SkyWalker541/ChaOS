@@ -554,6 +554,18 @@ static void parse_rom(jsv e, romm_rom *r)
 	if (!r->file_name[0]) snprintf(r->file_name, sizeof r->file_name, "%s", r->fs_name);
 }
 
+/* A name RomM gives that ChaOS writes to the card as it is (a game's file or
+ * folder, a BIOS): one plain name that stays in its folder. A server could
+ * send "../../.tortos/x" or "/etc/..."; written as given, that is a file
+ * anywhere on the card. A leading dot would also hide it from the shelf. */
+bool romm_name_ok(const char *s)
+{
+	if (!s || !s[0] || s[0] == '.') return false;
+	for (; *s; s++)
+		if (*s == '/' || *s == '\\' || (unsigned char)*s < 0x20) return false;
+	return true;
+}
+
 int romm_rom_files(const romm_conn *c, int rom_id, romm_file *out, int max, char *why, size_t wn)
 {
 	char path[64], *buf = reply_buf();
@@ -577,7 +589,7 @@ int romm_rom_files(const romm_conn *c, int rom_id, romm_file *out, int max, char
 			jstr(f, "file_name", o->name, sizeof o->name);
 			o->size = jint(f, "file_size_bytes");
 			/* a name that could leave the shelf folder isn't offered */
-			if (o->id && o->name[0] && !strchr(o->name, '/') && strcmp(o->name, ".") && strcmp(o->name, ".."))
+			if (o->id && romm_name_ok(o->name))
 				k++;
 		}
 	free(buf);

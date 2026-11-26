@@ -70,6 +70,23 @@ int main(void)
 	if (!mkdtemp(dir)) return 1;
 	srv = start(port, false);
 
+	/* A name from RomM becomes a path on the card. Before 2.7.9-test1 a
+	 * single-file game's name was written as RomM gave it, so one with
+	 * "../" in it could land anywhere on the card. */
+	CHECK(romm_name_ok("Tetris (World).gb"), "a plain name");
+	CHECK(romm_name_ok("Pok\xc3\xa9mon - Red.gb"), "a UTF-8 name");
+	CHECK(romm_name_ok("a..b.gb"), "dots inside a name");
+	CHECK(!romm_name_ok(""), "an empty name");
+	CHECK(!romm_name_ok(NULL), "no name");
+	CHECK(!romm_name_ok(".."), "..");
+	CHECK(!romm_name_ok("."), ".");
+	CHECK(!romm_name_ok("../../.tortos/x"), "up out of the folder");
+	CHECK(!romm_name_ok("/etc/passwd"), "an absolute path");
+	CHECK(!romm_name_ok("dir/game.gb"), "a folder in the name");
+	CHECK(!romm_name_ok("..\\x.gb"), "a backslash");
+	CHECK(!romm_name_ok(".hidden.gb"), "a leading dot");
+	CHECK(!romm_name_ok("a\nb.gb"), "a control character");
+
 	/* a server, as typed */
 	memset(&c, 0, sizeof c);
 	CHECK(!romm_set_url(&c, "  "), "nothing isn't a server");
