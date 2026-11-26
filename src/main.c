@@ -5610,7 +5610,9 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 		static int art_side;
 		unsigned nowa = plat_now_ms();
 		int area_y = content_y, area_h = panel.y + panel.h - pad - content_y;
-		int max_w = panel.w * 42 / 100, aw, ah, lane;
+		/* ChaOS Pixel Burst: a little narrower, for the names the wider
+		 * gap below takes room from */
+		int max_w = panel.w * (ui_pixel() ? 38 : 42) / 100, aw, ah, lane;
 		float dt = art_last ? (float)(nowa - art_last) : 0.0f;
 		/* ChaOS Pixel Burst: room for the frame round the cover */
 		int fr_in = ui_pixel() ? 11 : 0;
@@ -5634,9 +5636,12 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 			aw = ah = 0;
 			if (art_w_cur < 0.0f) art_w_cur = (float)(max_w * 3 / 4);
 		}
-		/* Pixel Burst: the frame takes fr_in each side, so the gap after it
-		 * is half a pad, and the list keeps the room it has without one */
-		lane = (int)(art_w_cur + 0.5f) + (fr_in ? pad / 2 : pad) + fr_in * 2;
+		/* Pixel Burst: the frame takes fr_in each side, and the cover's own
+		 * pad on the panel's side was left out, so the frame ran into the
+		 * cream plate and its corner pixels into the plate's burst
+		 * (2026-11-26). The pad there, and three quarters of one more
+		 * between: about a pad of air from the frame to the plate. */
+		lane = (int)(art_w_cur + 0.5f) + fr_in * 2 + (fr_in ? pad + pad * 3 / 4 : pad);
 		lane_w = panel.w - lane;
 		if (g_menu_art.side < 0) lane_x = panel.x + lane;
 		content_x = lane_x + pad;
@@ -5671,6 +5676,22 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 		}
 	}
 
+	/* ChaOS Pixel Burst: a gutter at the right of the rows for the chevron,
+	 * inside the cream plate. Its chevron sat just past the value, nearly on
+	 * it ("2>", "Pre-Release>"), and the plate's burst against the panel's
+	 * rim (2026-11-26): the values end a gutter earlier, the plate a little
+	 * short of where it did, and the chevron sits in between. */
+	int pix_gut = 0;
+	if (ui_pixel()) {
+		bool chev = false;
+
+		for (int j = 0; j < n && !chev; j++) chev = rows[j].opens || rows[j].cycles;
+		if (chev) {
+			pix_gut = text_h;
+			if (pix_gut > content_w / 8) pix_gut = content_w / 8;
+			content_w -= pix_gut;
+		}
+	}
 	g_menu_seen.row_w = content_w;       /* where a list's names start to slide */
 
 	/* THE HIGHLIGHT SLIDES. It used to be drawn inside the row loop at
@@ -5815,7 +5836,9 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 		 * rather than as a selection. */
 		plate.x = lane_x + pad / 2;
 		plate.y = (int)(pl_y + 0.5f);
-		plate.w = lane_w - pad;
+		/* Pixel Burst: a quarter pad short, so the burst past its end
+		 * clears the panel's rim (and a cover's frame) */
+		plate.w = lane_w - pad - (ui_pixel() ? pad / 4 : 0);
 		plate.h = (int)(pl_h + 0.5f);
 		if (ui_pixel()) {
 			/* ChaOS Pixel Burst: a cream plate, solid, an orange edge at its
@@ -5963,7 +5986,7 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 		/* ChaOS: a row that opens another screen, with a chevron in the
 		 * right margin: the value's color, so it brightens with the row */
 		if (rows[i].opens && rows[i].live && !ROW_IS_NOTE(rows[i]))
-			draw_chevron(a->r, (float)(content_x + content_w) + (ui_pixel() ? (float)text_h * 0.25f + 6.0f : (float)(pad / 2)),
+			draw_chevron(a->r, (float)(content_x + content_w) + (ui_pixel() ? (float)pix_gut * 0.62f : (float)(pad / 2)),
 			             y + ROW_H(rows[i]) / 2.0f, (float)text_h * 0.5f, +1,
 			             rows[i].value ? vc : lc);
 		/* ChaOS: a dot after the label, in the panel's color: something new
@@ -6112,7 +6135,7 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 					draw_chevron(a->r, (float)(content_x + content_w - vw) - ah * 1.2f,
 					             cy, ah, -1, ac);
 					if (!rows[i].opens)
-						draw_chevron(a->r, (float)(content_x + content_w) + (ui_pixel() ? (float)text_h * 0.25f + 6.0f : (float)(pad / 2)),
+						draw_chevron(a->r, (float)(content_x + content_w) + (ui_pixel() ? (float)pix_gut * 0.62f : (float)(pad / 2)),
 						             cy, ah, +1, ac);
 				}
 			} else if (vw > lw) {
@@ -6266,11 +6289,15 @@ static void menu_draw_ex(app *a, const char *heading, const menu_row *rows,
 			int up_w   = tw * (k + 1) / th;      /* apex at the top */
 			int down_w = tw * (th - k) / th;     /* apex at the bottom */
 
+			/* on the names' lane: beside a cover, the panel's middle is
+			 * under the cover's edge */
+			int lx = lane_x + lane_w / 2;
+
 			if (first > 0)
-				SDL_RenderFillRect(a->r, &(SDL_Rect){ cx - up_w / 2,
+				SDL_RenderFillRect(a->r, &(SDL_Rect){ lx - up_w / 2,
 				                   content_y - off - th + k, up_w, 1 });
 			if (first + vis < pin_split)   /* n, or the pinned footer's start */
-				SDL_RenderFillRect(a->r, &(SDL_Rect){ cx - down_w / 2,
+				SDL_RenderFillRect(a->r, &(SDL_Rect){ lx - down_w / 2,
 				                   down_y + k, down_w, 1 });
 		}
 	}
