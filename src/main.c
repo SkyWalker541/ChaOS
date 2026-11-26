@@ -16353,6 +16353,78 @@ static bool port_game_dir(const char *script, char *out, size_t n)
 	return ok;
 }
 
+/* ChaOS: the CPU's clock while a port runs, as NextUI's PortMaster does on
+ * the Brick: ondemand still, but never under 1608 MHz, up to 1800 (or the
+ * chip's top, if lower). The Brick's own setting (/etc/init.d/brick) can drop
+ * to 408 MHz and only climbs after it sees a burst, and a port is mostly
+ * bursts: laggy menus, sound running dry (Doukutsu-rs, 2.7.9-test3; spruce
+ * runs ports at 1800 locked). Put back as it was when the port ends, however
+ * it ends. Emulators in Diatom keep the Brick's own setting. */
+#define PORT_CPU_DIR "/sys/devices/system/cpu/cpu0/cpufreq/"
+static struct { bool set; char gov[32]; long min, max; } g_port_cpu;
+
+static bool cpu_read(const char *name, char *out, size_t n)
+{
+	FILE *f = fopen(name, "r");
+	bool ok = f && fgets(out, (int)n, f);
+
+	if (f) fclose(f);
+	if (ok) out[strcspn(out, "\n")] = '\0';
+	return ok && out[0];
+}
+
+static bool cpu_write(const char *name, const char *v)
+{
+	FILE *f = fopen(name, "w");
+	bool ok = f && fputs(v, f) >= 0;
+
+	if (f && fclose(f) != 0) ok = false;
+	return ok;
+}
+
+static void port_cpu_begin(void)
+{
+	char v[32], b[32];
+	long top = 1800000, lo = 1608000;
+
+	g_port_cpu.set = false;
+	if (!cpu_read(PORT_CPU_DIR "scaling_governor", g_port_cpu.gov, sizeof g_port_cpu.gov) ||
+	    !cpu_read(PORT_CPU_DIR "scaling_min_freq", v, sizeof v)) return;
+	g_port_cpu.min = atol(v);
+	if (!cpu_read(PORT_CPU_DIR "scaling_max_freq", v, sizeof v)) return;
+	g_port_cpu.max = atol(v);
+	if (cpu_read(PORT_CPU_DIR "cpuinfo_max_freq", v, sizeof v) && atol(v) > 0 && atol(v) < top) top = atol(v);
+	if (lo > top) lo = top;
+	g_port_cpu.set = true;
+	/* the top first, so the floor is never above it */
+	snprintf(b, sizeof b, "%ld", top);
+	cpu_write(PORT_CPU_DIR "scaling_max_freq", b);
+	snprintf(b, sizeof b, "%ld", lo);
+	cpu_write(PORT_CPU_DIR "scaling_min_freq", b);
+	if (strcmp(g_port_cpu.gov, "ondemand")) cpu_write(PORT_CPU_DIR "scaling_governor", "ondemand");
+	fprintf(stderr, "port: CPU %ld-%ld MHz while it runs (was %s, %ld-%ld)\n", lo / 1000, top / 1000,
+	        g_port_cpu.gov, g_port_cpu.min / 1000, g_port_cpu.max / 1000);
+}
+
+static void port_cpu_end(void)
+{
+	char b[32];
+
+	if (!g_port_cpu.set) return;
+	g_port_cpu.set = false;
+	/* the floor first, so it is never above the top being put back */
+	snprintf(b, sizeof b, "%ld", g_port_cpu.min);
+	cpu_write(PORT_CPU_DIR "scaling_min_freq", b);
+	snprintf(b, sizeof b, "%ld", g_port_cpu.max);
+	cpu_write(PORT_CPU_DIR "scaling_max_freq", b);
+	/* only if it changed: writing a governor anew can reset its tuning
+	 * (the boot's 50 ms sampling, its 80% threshold) */
+	if (!cpu_read(PORT_CPU_DIR "scaling_governor", b, sizeof b) || strcmp(b, g_port_cpu.gov))
+		cpu_write(PORT_CPU_DIR "scaling_governor", g_port_cpu.gov);
+	fprintf(stderr, "port: CPU back to %s, %ld-%ld MHz\n", g_port_cpu.gov,
+	        g_port_cpu.min / 1000, g_port_cpu.max / 1000);
+}
+
 /* ChaOS: Logging > Performance. A port (or PICO-8) is its own program, off
  * before it starts, so its idle is "off"; what it used is what the kernel
  * counted when it ended. Its GPU isn't read: by now nothing is running. */
@@ -16425,7 +16497,9 @@ static void port_launch(app *a, int o, const char *romfile, const char *title)
 	fprintf(stderr, "port %s: starting\n", romfile);
 	sth_hold(true);
 	gbs_cancel();   /* and the Game Boy look, tried again later */
+	port_cpu_begin();
 	rc = plat_run_port(argv, envkv, NULL, &how, port_power_prompt, a);
+	port_cpu_end();
 	sth_hold(false);
 	fprintf(stderr, "port %s exited %d (%s)\n", romfile, rc,
 	        how == PORT_POWER ? "power held" : how == PORT_QUIT ? "select+start" : "itself");
