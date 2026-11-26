@@ -168,9 +168,10 @@ is never there.
 Date & Time has a row for each part of the clock and one for the time zone,
 each changed with left and right and set the moment it changes, so the time
 holds through a power-off. The time zone row shows the offset and a city,
-**UTC-8 · Los Angeles**: left and right step city by city, west to east, and
-**L1/R1** jump a whole offset at a time. Every offset anyone lives in is
-there, half and quarter hours included, and daylight saving changes by itself.
+**UTC-8 · Los Angeles**. Press **A** on it for the list: pick the offset, then
+the city, from the few on it. Left and right on the row still step city by
+city. Every offset anyone lives in is there, half and quarter hours included,
+listed by standard time; daylight saving changes by itself.
 Wi-Fi sets the clock again whenever it connects, so with it the screen is
 mostly for the zone; a Pixel 2 without an adapter has no network to take the
 time from, so set it there once.

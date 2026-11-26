@@ -142,17 +142,6 @@ int main(void)
 #define ZI(id) clock_zone_find(id)
 	CHECK(!strcmp(CLOCK_ZONES[clock_zone_step("America/New_York", +1)].city, "Toronto"),
 	      "one east of New York is Toronto, on the same offset");
-	/* L1/R1 (2.7.9): a whole offset at a time, to its first city */
-	CHECK(clock_zone_jump("America/New_York", +1) == ZI("America/Halifax"), "R1 from New York: Halifax");
-	CHECK(clock_zone_jump("America/New_York", -1) == ZI("America/Chicago"), "L1 from New York: Chicago");
-	CHECK(clock_zone_jump("America/Toronto", -1) == ZI("America/Chicago"),
-	      "L1 from inside an offset: the start of the one before");
-	CHECK(clock_zone_jump("America/Chicago", -1) == ZI("America/Denver"), "and on west: Denver");
-	CHECK(clock_zone_jump("Asia/Kolkata", +1) == ZI("Asia/Kathmandu"), "UTC+5:30 to UTC+5:45");
-	CHECK(clock_zone_jump(CLOCK_ZONES[0].id, -1) == 0, "L1 stops at the west end");
-	CHECK(clock_zone_jump(CLOCK_ZONES[CLOCK_ZONE_COUNT - 1].id, +1) == CLOCK_ZONE_COUNT - 1,
-	      "R1 at the east end");
-	CHECK(clock_zone_jump("Mars/Olympus_Mons", +1) == ZI("America/New_York"), "an unknown zone: New York");
 	{
 		/* Every city of the list before 2.7.9, so no one's setting changes */
 		static const char *const old[] = {

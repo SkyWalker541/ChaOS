@@ -6602,7 +6602,9 @@ static bool confirm_panel_ex(app *a, const char *heading, const char *msg,
 /* Wi-Fi is the largest menu: the switch, WIFI_MAX_NETS networks, a rule and a
  * note. Distinct from MENU_MAX_ROWS, which is the system menu's own count and
  * is much smaller. */
-#define MENU_RUN_ROWS (WIFI_MAX_NETS + 8)
+/* Wi-Fi's networks and its rows, or the time zone offsets (ChaOS, 2.7.9),
+ * whichever is longer */
+#define MENU_RUN_ROWS (WIFI_MAX_NETS + 8 > 48 ? WIFI_MAX_NETS + 8 : 48)
 
 typedef enum {
 	MENU_STAY,   /* keep the screen up */
@@ -6678,6 +6680,8 @@ typedef struct {
 	 * to, or -1 for the usual step. Arrange Shelves carries the shelf it has
 	 * picked up along with the cursor this way. */
 	int    (*on_step)(void *ctx, int sel, int dir);
+	/* ChaOS: the row the cursor starts on (a picker opening on what is set) */
+	int      start_sel;
 } menu_style;
 
 /* SELECT: Muse, over whatever is on screen. Declared here, after menu_style,
@@ -6702,7 +6706,7 @@ static menu_exit menu_run_body(app *a, const menu_style *st,
 {
 	menu_row rows[MENU_RUN_ROWS];
 	const char *heading = NULL;
-	int sel = 0, n = 0, b;
+	int sel = st->start_sel, n = 0, b;
 
 	while (a->running && !want_quit) {
 		n = build(ctx, rows, MENU_RUN_ROWS, &heading);
@@ -11012,6 +11016,7 @@ static void update_after_start(app *a)
  * step a percentage, A too; the two switches flip. The blinking one never
  * sits at or above the low one: it is the last of the two. */
 static int g_bw_shot;   /* --battwarn: the page, one frame */
+static int g_tz_shot;   /* --tzpick N / -N: the time zone lists, one frame */
 static int g_off_shot;  /* --offnote 1|2|3|4: shutting down, restarting, loading, didn't start */
 
 static int bw_build(void *ctx, menu_row *rows, int max, const char **heading)
@@ -11526,7 +11531,7 @@ static int clock_build(void *ctx, menu_row *rows, int max, const char **heading)
 		else if (!strcmp(CLOCK_ZONES[z].id, "UTC")) snprintf(c->zone, sizeof c->zone, "UTC");
 		else snprintf(c->zone, sizeof c->zone, "%s \xC2\xB7 %s", off, CLOCK_ZONES[z].city);
 	}
-	if (n < max) rows[n++] = (menu_row){ "Time Zone", c->zone, true };
+	if (n < max) rows[n++] = (menu_row){ "Time Zone", c->zone, true, .opens = true };
 	/* The clock's style, straight under Time Zone. Showing the clock and the
 	 * battery at all are System Settings' Show Clock and Show Battery. */
 	if (n + 1 <= max) {
@@ -11536,9 +11541,7 @@ static int clock_build(void *ctx, menu_row *rows, int max, const char **heading)
 	}
 	if (n + 4 <= max) {
 		rows[n++] = MENU_RULE;
-		/* L1/R1 is Time Zone's: the list is long, and a whole offset at a
-		 * time gets across it */
-		rows[n++] = MENU_NOTE("Left/right: change   L1/R1: zone by hour");
+		rows[n++] = MENU_NOTE("Left/right: change");
 		/* Only where it is true: the Brick's ntpd sets the clock again once
 		 * Wi-Fi connects, so a time set here lasts until then */
 		if (plat_has_wifi()) rows[n++] = MENU_NOTE("Wi-Fi sets the clock")   /* when connected, as Wi-Fi must be; the longer note sat within pixels of the panel */;
@@ -11546,20 +11549,135 @@ static int clock_build(void *ctx, menu_row *rows, int max, const char **heading)
 	return n;
 }
 
+/* ChaOS: Time Zone as a submenu, in two short lists rather than one long one:
+ * the offsets west to east, and then the few cities on the one picked. By
+ * standard time, as the list is grouped (daylight saving follows by itself,
+ * from the zone database). */
+#define TZ_GROUPS 64
+typedef struct {
+	int first[TZ_GROUPS], count[TZ_GROUPS], n, pick, here;
+	char lab[TZ_GROUPS][16], hint[TZ_GROUPS][64];
+} tz_offsets;
+
+static int tz_offsets_build(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	tz_offsets *t = ctx;
+	int i, n = 0;
+
+	*heading = "Time Zone";
+	for (i = 0; i < t->n && n < max; i++)
+		rows[n++] = (menu_row){ t->lab[i], NULL, true, .opens = true, .hint = t->hint[i] };
+	if (n + 2 <= max) {
+		rows[n++] = MENU_RULE;
+		rows[n++] = MENU_NOTE("Standard time; summer time is added by itself");
+	}
+	return n;
+}
+
+static menu_result tz_pick_key(app *a, void *ctx, in_button key, int sel)
+{
+	(void)a;
+	if (key != IN_ACCEPT || sel < 0) return MENU_STAY;
+	((tz_offsets *)ctx)->pick = sel;
+	return MENU_DONE;
+}
+
+typedef struct { const tz_offsets *t; int g, pick; char heading[24]; } tz_cities;
+
+static int tz_cities_build(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	tz_cities *c = ctx;
+	int i, n = 0;
+
+	*heading = c->heading;
+	for (i = 0; i < c->t->count[c->g] && n < max; i++)
+		rows[n++] = (menu_row){ CLOCK_ZONES[c->t->first[c->g] + i].city, NULL, true };
+	return n;
+}
+
+static menu_result tz_city_key(app *a, void *ctx, in_button key, int sel)
+{
+	(void)a;
+	if (key != IN_ACCEPT || sel < 0) return MENU_STAY;
+	((tz_cities *)ctx)->pick = sel;
+	return MENU_DONE;
+}
+
+/* The offsets, each with its first cities as a hint; returns the zone set */
+static int tz_offsets_fill(tz_offsets *tp)
+{
+	tz_offsets t;
+	char id[64];
+	int i, here;
+
+	memset(&t, 0, sizeof t);
+	db_get_str(db_lib(), "timezone", id, sizeof id, "America/New_York");
+	here = clock_zone_find(id);
+	for (i = 0; i < CLOCK_ZONE_COUNT && t.n < TZ_GROUPS; i++) {
+		int g;
+
+		if (i && CLOCK_ZONES[i].std_min == CLOCK_ZONES[i - 1].std_min) {
+			g = t.n - 1;
+			if (t.count[g] < 3) {
+				size_t L = strlen(t.hint[g]);
+				snprintf(t.hint[g] + L, sizeof t.hint[g] - L, ", %s", CLOCK_ZONES[i].city);
+			} else if (t.count[g] == 3) {
+				size_t L = strlen(t.hint[g]);
+				snprintf(t.hint[g] + L, sizeof t.hint[g] - L, "...");
+			}
+			t.count[g]++;
+		} else {
+			g = t.n++;
+			t.first[g] = i;
+			t.count[g] = 1;
+			clock_offset_label((long)CLOCK_ZONES[i].std_min * 60, t.lab[g], sizeof t.lab[g]);
+			snprintf(t.hint[g], sizeof t.hint[g], "%s", CLOCK_ZONES[i].city);
+		}
+		if (i == here) t.here = g;
+	}
+	*tp = t;
+	return here;
+}
+
+static void tz_pick(app *a)
+{
+	tz_offsets t;
+	int i, here = tz_offsets_fill(&t);
+	menu_style st = { .fixed_w = menu_std_width(a), .accent = MENU_ACCENT };
+
+	for (;;) {
+		tz_cities c;
+		menu_style cs = st;
+
+		t.pick = -1;
+		st.start_sel = t.here;
+		if (menu_run(a, &st, tz_offsets_build, tz_pick_key, &t) != MENU_LEFT_SCREEN || t.pick < 0) return;
+		t.here = t.pick;
+		memset(&c, 0, sizeof c);
+		c.t = &t;
+		c.g = t.pick;
+		c.pick = -1;
+		snprintf(c.heading, sizeof c.heading, "%s", t.lab[t.pick]);
+		cs.start_sel = (here >= t.first[c.g] && here < t.first[c.g] + t.count[c.g]) ? here - t.first[c.g] : 0;
+		if (menu_run(a, &cs, tz_cities_build, tz_city_key, &c) != MENU_LEFT_SCREEN ||
+		    c.pick < 0)
+			continue;   /* B: back to the offsets */
+		i = t.first[c.g] + c.pick;
+		db_set_str(db_lib(), "timezone", CLOCK_ZONES[i].id);
+		plat_clock_zone(CLOCK_ZONES[i].id);
+		return;
+	}
+}
+
 static menu_result clock_key(app *a, void *ctx, in_button key, int sel)
 {
 	int d = key == IN_RIGHT ? 1 : key == IN_LEFT ? -1 : 0;
 
-	(void)a; (void)ctx;
-	/* Time Zone: L1 and R1 a whole offset at a time, as the list is long */
-	if (sel == CLK_FIELDS && (key == IN_L1 || key == IN_R1)) {
-		char id[64];
-		int z;
-
-		db_get_str(db_lib(), "timezone", id, sizeof id, "America/New_York");
-		z = clock_zone_jump(id, key == IN_R1 ? 1 : -1);
-		db_set_str(db_lib(), "timezone", CLOCK_ZONES[z].id);
-		plat_clock_zone(CLOCK_ZONES[z].id);
+	(void)ctx;
+	/* Time Zone: A opens the list, an offset and then its cities; left
+	 * and right still step city by city on the row itself */
+	if (sel == CLK_FIELDS && key == IN_ACCEPT) {
+		tz_pick(a);
 		return MENU_STAY;
 	}
 	/* The switches also take A, as the rest of the menus do */
@@ -25846,7 +25964,20 @@ static void take_shot(app *a)
 		menu_draw(a, heading, rows, n, shot_menu_sel, menu_std_width(a), MENU_ACCENT);
 	}
 	if (g_about_shot) about_screen(a);
-	if (g_off_shot == 3) {   /* --offnote 3: a PlayStation game's Loading... */
+	if (g_tz_shot) {   /* --tzpick N: the offsets on N; --tzpick -N: offset N's cities */
+		static tz_offsets t;
+		static tz_cities c;
+		int here = tz_offsets_fill(&t);
+
+		if (g_tz_shot > 0) hb_shot_menu(a, tz_offsets_build, &t, g_tz_shot - 1);
+		else {
+			c.t = &t;
+			c.g = -g_tz_shot - 1;
+			snprintf(c.heading, sizeof c.heading, "%s", t.lab[c.g]);
+			hb_shot_menu(a, tz_cities_build, &c,
+			             here >= t.first[c.g] && here < t.first[c.g] + t.count[c.g] ? here - t.first[c.g] : 0);
+		}
+	} else if (g_off_shot == 3) {   /* --offnote 3: a PlayStation game's Loading... */
 		menu_row row = { "Loading...", NULL, false };
 
 		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
@@ -26304,6 +26435,7 @@ int main(int argc, char *argv[])
 		else if (!strcmp(argv[i], "--display-check")) g_display_check = true;
 		else if (!strcmp(argv[i], "--battwarn") && i + 1 < argc) g_bw_shot = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--offnote") && i + 1 < argc) g_off_shot = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "--tzpick") && i + 1 < argc) g_tz_shot = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--romm") && i + 1 < argc) {
 			shot_romm = argv[++i];
 			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9') shot_romm_a = atoi(argv[++i]);

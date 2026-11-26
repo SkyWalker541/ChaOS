@@ -39,7 +39,8 @@ void clock_hhmm(time_t t, bool h24, char *out, size_t n);
 
 /* The time zones on offer, by city. Not the four hundred the zone database
  * has, because stepping through those would take minutes; every offset
- * anyone lives in is here, with L1/R1 to step an offset at a time. */
+ * anyone lives in is here, picked an offset and then a city (Date & Time's
+ * Time Zone list). */
 typedef struct {
 	const char *id;     /* the zone database's name, which TZ takes */
 	const char *city;   /* what the row shows */
@@ -56,10 +57,6 @@ int clock_zone_find(const char *id);
 /* The entry `d` steps from `id`'s, stopping at the ends. An id not on the list
  * steps onto it from New York, the shipped default. */
 int clock_zone_step(const char *id, int d);
-
-/* The first entry of the next offset east (`d` > 0) or west, stopping at the
- * ends; an id not on the list steps onto it from New York */
-int clock_zone_jump(const char *id, int d);
 
 /* An offset from UTC in seconds (tm_gmtoff), as the row shows it: "UTC-8",
  * "UTC+5:30", "UTC" */

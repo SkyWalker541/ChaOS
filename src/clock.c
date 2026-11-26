@@ -6,7 +6,7 @@
 #include <string.h>
 
 /* West to east by standard time, so left and right move the way a map does
- * and L1/R1 a whole offset at a time. Every offset anyone lives in, and where
+ * and the Time Zone list groups them by offset. Every offset anyone lives in, and where
  * one splits on daylight saving (Phoenix and Denver, Brisbane and Sydney), a
  * city each way, so the offset is right all year. The standard offsets are
  * checked against the zone database (tools/clock-check.c), so a wrong one, or
@@ -221,22 +221,4 @@ void clock_offset_label(long gmtoff, char *out, size_t n)
 	if (!m) snprintf(out, n, "UTC");
 	else if (a % 60) snprintf(out, n, "UTC%c%ld:%02ld", m < 0 ? '-' : '+', a / 60, a % 60);
 	else snprintf(out, n, "UTC%c%ld", m < 0 ? '-' : '+', a / 60);
-}
-
-int clock_zone_jump(const char *id, int d)
-{
-	int i = clock_zone_find(id), std;
-
-	if (i < 0) return clock_zone_find("America/New_York");
-	std = CLOCK_ZONES[i].std_min;
-	if (d > 0) {
-		while (i < CLOCK_ZONE_COUNT && CLOCK_ZONES[i].std_min == std) i++;
-		return i < CLOCK_ZONE_COUNT ? i : clock_zone_find(id);
-	}
-	/* back: to the start of the offset before this one */
-	while (i > 0 && CLOCK_ZONES[i].std_min == std) i--;
-	if (CLOCK_ZONES[i].std_min == std) return clock_zone_find(id);   /* the first offset */
-	std = CLOCK_ZONES[i].std_min;
-	while (i > 0 && CLOCK_ZONES[i - 1].std_min == std) i--;
-	return i;
 }
