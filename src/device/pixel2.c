@@ -156,6 +156,14 @@ void plat_present(void)
 	SDL_SetRenderDrawColor(ren, r, g, b, a);
 }
 
+/* ChaOS: power off's last frame, kept (platform.h). The Pixel 2 draws its
+ * panel through one texture of its own, so only the present and freeze. */
+void plat_present_hold(void)
+{
+	plat_present();
+	plat_present_freeze();
+}
+
 void plat_draw_to_screen(void) { SDL_SetRenderTarget(ren, screen_tex); }
 
 bool plat_video_init(void)

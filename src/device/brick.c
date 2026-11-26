@@ -7,13 +7,16 @@
 #include "audioout.h"
 #include "db.h"
 #include "device.h"
+#include "fbhold.h"
 #include "platform.h"
 
 #include <dirent.h>
 #include <fcntl.h>
 #ifdef __linux__
+#include <linux/fb.h>
 #include <linux/input.h>
 #include <sys/ioctl.h>
+#include <sys/mman.h>
 #endif
 #include <signal.h>
 #include <stdio.h>
@@ -138,6 +141,61 @@ void plat_present(void)
 	SDL_RenderPresent(ren);
 }
 void plat_draw_to_screen(void) { SDL_SetRenderTarget(ren, NULL); }
+
+#ifdef __linux__
+/* The frame read back into every page of fb0 (fbhold.h). Only a 32-bit
+ * framebuffer the frame's own size, as the Brick's is; anything else (a
+ * desktop build, no fb0) is left alone, and the GPU's own present stands. */
+static void hold_in_fb(const SDL_Surface *s)
+{
+	struct fb_var_screeninfo v;
+	struct fb_fix_screeninfo f;
+	uint8_t *m;
+	int fd, pages;
+
+	if ((fd = open("/dev/fb0", O_RDWR | O_CLOEXEC)) < 0) return;
+	if (ioctl(fd, FBIOGET_VSCREENINFO, &v) != 0 || ioctl(fd, FBIOGET_FSCREENINFO, &f) != 0 ||
+	    v.bits_per_pixel != 32 || (int)v.xres != s->w || (int)v.yres != s->h ||
+	    !f.line_length || !f.smem_len) {
+		fprintf(stderr, "power: the framebuffer is not the frame's shape; logo left to the GPU\n");
+		close(fd);
+		return;
+	}
+	pages = (int)(f.smem_len / ((size_t)v.yres * f.line_length));
+	m = mmap(NULL, (size_t)pages * v.yres * f.line_length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	if (m != MAP_FAILED) {
+		if (!fbhold_fill(m, pages, f.line_length, s->pixels, (size_t)s->pitch, s->w, s->h))
+			fprintf(stderr, "power: the logo could not be copied into the framebuffer\n");
+		munmap(m, (size_t)pages * v.yres * f.line_length);
+	}
+	close(fd);
+}
+#endif
+
+void plat_present_hold(void)
+{
+	SDL_Surface *s = NULL;
+#ifdef __linux__
+	int w = 0, h = 0;
+
+	/* Read before the present: what is drawn is the back buffer, and after
+	 * the swap what it holds is undefined */
+	if (SDL_GetRendererOutputSize(ren, &w, &h) == 0 && w > 0 && h > 0 &&
+	    (s = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32, SDL_PIXELFORMAT_ARGB8888)) &&
+	    SDL_RenderReadPixels(ren, NULL, SDL_PIXELFORMAT_ARGB8888, s->pixels, s->pitch) != 0) {
+		SDL_FreeSurface(s);
+		s = NULL;
+	}
+#endif
+	plat_present();
+	plat_present_freeze();
+#ifdef __linux__
+	if (s) {
+		hold_in_fb(s);
+		SDL_FreeSurface(s);
+	}
+#endif
+}
 
 bool plat_video_init(void)
 {

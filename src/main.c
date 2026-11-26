@@ -4952,8 +4952,10 @@ static void power_off(app *a)
 	 * shutdown is not instant, and the shell stayed lit through it. ChaOS
 	 * shows its logo instead, and the power going takes the light. */
 	draw_off_note(a, access(CHAOS_REBOOT_FLAG, F_OK) == 0);
-	plat_present();
-	plat_present_freeze();   /* and nothing draws over it after */
+	/* Shown, put into every page of the framebuffer so that it is still the
+	 * picture when the launcher's exit hands the panel back (fbhold.h), and
+	 * frozen: nothing draws over it after */
+	plat_present_hold();
 	/* The card's writes flushed here, under the note, rather than after
 	 * ChaOS has gone: the longest part of what follows, and so said on the
 	 * panel whether or not the frame outlives this process. */

@@ -74,6 +74,10 @@ void plat_present(void);
  * the power went (Aquilus, 2.7.9-test5). */
 void plat_present_freeze(void);
 extern bool plat_frozen;
+/* ChaOS: power off's last frame shown, kept on the panel after the launcher
+ * has gone, and frozen as plat_present_freeze. On the Brick the frame goes
+ * into every page of the framebuffer (src/fbhold.h says why). */
+void plat_present_hold(void);
 void plat_draw_to_screen(void);
 
 bool plat_input_init(void);
