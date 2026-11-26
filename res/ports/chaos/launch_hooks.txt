@@ -16,8 +16,10 @@ pm_hook_env() {
 }
 
 pm_hook_gui_env() {
-  # pySDL2 finds the system's SDL2, SDL2_image, _ttf and _mixer here
-  export PYSDL2_DLL_PATH="/usr/lib"
+  # pySDL2 finds SDL2_gfx in ChaOS's Python first (built with the names
+  # pySDL2 asks for: the system's has them as GFX_*), then the system's
+  # SDL2, SDL2_image, _ttf and _mixer
+  export PYSDL2_DLL_PATH="${PYTHONHOME:+$PYTHONHOME/lib/sdl:}/usr/lib"
 }
 
 pm_hook_autoinstall_dirs() {
