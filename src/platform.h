@@ -214,6 +214,10 @@ int  plat_resident_volume(int *count);
 unsigned plat_resident_generation(void);
 /* Path from the most recent PREVIEW message, or "" - the menu's backdrop. */
 const char *plat_resident_last_preview(void);
+/* ChaOS: why the last game sent didn't start, as Diatom said it ("" if it
+ * started or said nothing). A game it couldn't open fails the same way when
+ * run again, so the launcher says so rather than retrying. */
+const char *plat_resident_error(void);
 
 /* ChaOS: the panel as it stood at the last pause - the game with its
  * shader and overlay, no menu - or "" when Diatom sent none. */

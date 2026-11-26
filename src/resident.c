@@ -274,6 +274,9 @@ void plat_resident_on_battery_empty(bool (*fn)(void)) { d_battery_empty = fn; }
  * to 0 on each re-entry made a running game look like one that never started.
  * The cost was not cosmetic - see the ERROR arm in diatom_wait. */
 static int d_got_running;
+/* ChaOS: why the last game didn't start, from Diatom's ERROR before RUNNING
+ * ("" when it did, or said nothing) */
+static char d_error[160];
 
 bool plat_resident_send(const char *tag, const char *core, const char *rom,
                         const char *resume, const char *exit_state,
@@ -285,6 +288,7 @@ bool plat_resident_send(const char *tag, const char *core, const char *rom,
 	 * diatom_wait, because the launcher re-enters that after every in-game
 	 * menu and the answer must survive those. */
 	d_got_running = 0;
+	d_error[0] = '\0';
 
 	{
 		char *l;
@@ -516,6 +520,7 @@ bool plat_resident_line(const char *fmt, ...)
 }
 
 const char *plat_resident_last_preview(void) { return d_preview; }
+const char *plat_resident_error(void) { return d_error; }
 
 /* ChaOS: the panel at the last pause, or "" when Diatom sent none. */
 const char *plat_resident_last_glass(void) { return d_glass; }
@@ -906,7 +911,13 @@ static int diatom_wait(void)
 				 * framebuffer - two presenters, which wedges the display
 				 * engine in-kernel, and the supervisor powered the device
 				 * off. */
-				if (!d_got_running) return RES_DEAD;
+				if (!d_got_running) {
+					const char *m = strstr(l, "msg=");
+
+					snprintf(d_error, sizeof d_error, "%s", m ? m + 4 : "it didn't start");
+					d_error[strcspn(d_error, "\t\r\n")] = '\0';
+					return RES_DEAD;
+				}
 			}
 		}
 		if (dsock < 0) return RES_DEAD;            /* EOF mid-game */

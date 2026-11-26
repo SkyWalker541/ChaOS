@@ -11012,7 +11012,7 @@ static void update_after_start(app *a)
  * step a percentage, A too; the two switches flip. The blinking one never
  * sits at or above the low one: it is the last of the two. */
 static int g_bw_shot;   /* --battwarn: the page, one frame */
-static int g_off_shot;  /* --offnote 1|2|3: shutting down, restarting, loading */
+static int g_off_shot;  /* --offnote 1|2|3|4: shutting down, restarting, loading, didn't start */
 
 static int bw_build(void *ctx, menu_row *rows, int max, const char **heading)
 {
@@ -11523,7 +11523,7 @@ static int clock_build(void *ctx, menu_row *rows, int max, const char **heading)
 		 * reads On or Off, and neither says which format is on */
 		rows[n++] = (menu_row){ "12h/24h Clock", g_status_clock24 ? "24h" : "12h", true, .cycles = true };
 	}
-	if (n + 3 <= max) {
+	if (n + 4 <= max) {
 		rows[n++] = MENU_RULE;
 		rows[n++] = MENU_NOTE("Left/right: change");
 		/* Only where it is true: the Brick's ntpd sets the clock again once
@@ -22682,6 +22682,7 @@ static void launch_game(app *a)
 	char st[LIB_PATH * 2], pv[LIB_PATH * 2], apv[LIB_PATH * 2];
 	char save[CFG_STR * 2], bios[CFG_STR * 2];
 	char active[LIB_PATH * 2] = "";
+	char rom_err[200] = "";   /* ChaOS: why it didn't start, said on return */
 	char set[LIB_PATH * 2];
 	int  console = 0;
 	bool first_play = false;
@@ -23050,7 +23051,19 @@ static void launch_game(app *a)
 		        waited);
 	}
 
-	if (!resident) {
+	/* ChaOS: Diatom answered that it couldn't open the game (a zip it can't
+	 * read, say). Running it again the slow way fails the same way, with
+	 * nothing said: the player saw the shelf come back and no reason
+	 * (2026-11-25, every Master System game in one set). Said instead. */
+	{
+		const char *why = resident ? "" : plat_resident_error();
+
+		if (why[0]) {
+			snprintf(rom_err, sizeof rom_err, "Couldn't start it:\n%s", why);
+			fprintf(stderr, "game: didn't start: %s\n", why);
+		}
+	}
+	if (!resident && !rom_err[0]) {
 		/* One game per process, the old way: the fallback for a resident that
 		 * is missing or has died. Diatom standalone IS the one-shot mode -
 		 * same binary, no socket - so the fallback stopped being a different
@@ -23165,6 +23178,7 @@ static void launch_game(app *a)
 	 * than a shutdown. Everything above leaves the marker standing, which is
 	 * what makes the next boot able to tell them apart. */
 	playing_clear();
+	if (rom_err[0]) pick_say(a, v->list.items[v->cursor].title, rom_err, MENU_ACCENT);
 
 	/* Straight to the shelf, no fade. The card decode inside this render is
 	 * the only real cost left on the way back, and a fade laid over the top of
@@ -25817,6 +25831,9 @@ static void take_shot(app *a)
 		g_menu_root = true;
 		menu_draw(a, "PlayStation", &row, 1, -1, 0, MENU_ACCENT);
 		g_menu_root = false;
+	} else if (g_off_shot == 4) {   /* --offnote 4: a game that couldn't start */
+		pick_frame(a, "Addams Family, The (Europe)", NULL, 0, 0, NULL, 0, 0,
+		           "Couldn't start it:\nits zip is packed a way ChaOS can't read yet (method 12)", MENU_ACCENT);
 	} else if (g_off_shot) draw_off_note(a, g_off_shot == 2);
 	if (g_bw_shot) {
 		menu_row rows[10];
