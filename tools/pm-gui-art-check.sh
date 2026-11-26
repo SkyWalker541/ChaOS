@@ -8,15 +8,10 @@
 set -eu
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 R=$T/roms/Ports; mkdir -p "$R/a" "$R/b" "$R/c" "$R/.media"
-python3 - "$R" <<'PY'
-import sys
-from PIL import Image
-r = sys.argv[1]
-Image.new('RGB', (64, 48), (200, 80, 40)).save(r + '/a/screenshot.jpg')
-Image.new('RGB', (64, 48), (40, 80, 200)).save(r + '/b/cover.png')
-Image.new('RGB', (64, 48), (40, 200, 80)).save(r + '/c/screenshot.png')
-Image.new('RGB', (64, 48), (1, 2, 3)).save(r + '/.media/Kept.png')
-PY
+# pictures from the repository: CI has no Pillow (2.7.9-test3's run failed
+# here), and any real image will do
+J=res/cards/fancy/source/favorites-heart.jpg P=res/cards/classic/GB.png P2=res/cards/classic/FAVORITES.png
+cp "$J" "$R/a/screenshot.jpg"; cp "$P" "$R/b/cover.png"; cp "$P2" "$R/c/screenshot.png"; cp "$P" "$R/.media/Kept.png"
 printf '#!/bin/bash\n' > "$R/A Port.sh"; printf '#!/bin/bash\n' > "$R/B Port.sh"; printf '#!/bin/bash\n' > "$R/Kept.sh"
 echo '{"items":["A Port.sh","a/"],"attr":{"image":{"screenshot":"screenshot.jpg","covers":[]}}}' > "$R/a/port.json"
 echo '{"items":["B Port.sh","b/"],"attr":{"image":{"screenshot":"../../../evil.png"}}}' > "$R/b/port.json"
@@ -25,13 +20,7 @@ cp "$R/.media/Kept.png" "$T/kept.before"
 # the old screens: a manifest names a script the old picture cache has art
 # for; a port.json names its zip; and what must never go
 U=$T/ud/ports; mkdir -p "$U/img" "$U/installed" "$U/home/.config" "$R/d"
-python3 - "$U/img" <<'PY'
-import sys
-from PIL import Image
-Image.new('RGB', (64, 48), (9, 9, 9)).save(sys.argv[1] + '/oldzip.jpg')
-Image.new('RGB', (64, 48), (8, 8, 8)).save(sys.argv[1] + '/dzip.png')
-Image.new('RGB', (64, 48), (7, 7, 7)).save(sys.argv[1] + '/unused.png')
-PY
+cp "$J" "$U/img/oldzip.jpg"; cp "$P" "$U/img/dzip.png"; cp "$P2" "$U/img/unused.png"
 printf 'Old Port.sh\noldport/\noldport/game.bin\n' > "$U/installed/oldzip.txt"
 printf '#!/bin/bash\n' > "$R/Old Port.sh"; printf '#!/bin/bash\n' > "$R/D Port.sh"
 echo '{"name":"dzip.zip","items":["D Port.sh","d/"]}' > "$R/d/port.json"
