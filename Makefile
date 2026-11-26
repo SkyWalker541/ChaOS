@@ -22,7 +22,7 @@ CHECKS = check-display check-cheevos check-hare check-httpd check-idle check-rah
          check-db check-stats check-sort check-bt check-ss \
          check-muselib check-musequeue check-museart check-controls check-logpack \
          check-clock check-update check-remap check-shots check-pixfont \
-         check-release check-updater check-chaos-names check-itch check-itchdl check-hbcat check-discset check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore check-gbsort check-menu-keys check-menu-lint check-pro-detect check-logcat check-perf check-pm-gui-art
+         check-release check-updater check-chaos-names check-itch check-itchdl check-hbcat check-discset check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore check-gbsort check-menu-keys check-menu-lint check-pro-detect check-logcat check-perf check-pm-gui-art check-cleanup
 
 check: check-sevenz
 	@fail=0; for c in $(CHECKS); do \
@@ -680,3 +680,11 @@ checkmark:
 
 clean:
 	rm -rf build build-native out
+
+# ChaOS: what old releases left on a card, removed once per version (src/cleanup.h)
+check-cleanup: build-native/cleanup-check
+	@./build-native/cleanup-check
+
+build-native/cleanup-check: tools/cleanup-check.c src/cleanup.c src/cleanup.h FORCE
+	@mkdir -p build-native
+	$(CC) -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -O1 -g -Isrc -o $@ tools/cleanup-check.c src/cleanup.c

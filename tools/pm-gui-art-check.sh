@@ -26,6 +26,9 @@ printf '#!/bin/bash\n' > "$R/Old Port.sh"; printf '#!/bin/bash\n' > "$R/D Port.s
 echo '{"name":"dzip.zip","items":["D Port.sh","d/"]}' > "$R/d/port.json"
 echo keep > "$U/home/.config/save.cfg"; echo '{}' > "$U/ports.json"
 mkdir -p "$T/root" "$T/ud" "$T/card" && cp config/systems.cfg "$T/root/"
+# the start's cleanup (src/cleanup.h) done for this version already: this
+# checks the picture cache's retirement alone
+tr -d ' \n' < CHAOS_VERSION > "$T/ud/cleanup"
 TORTOS_ROOT=$T/root TORTOS_ROMS=$T/roms TORTOS_CARD=$T/card TORTOS_USERDATA=$T/ud TORTOS_SHARED=$T/root \
 TORTOS_FONT=res/fonts/menu.ttf SDL_VIDEODRIVER=offscreen ./build-native/tortos --shot "$T/x.png" --pm-gui-art > "$T/out" 2>&1 || true
 bad=0

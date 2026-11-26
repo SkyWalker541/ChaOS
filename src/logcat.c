@@ -27,8 +27,7 @@ static const struct { const char *word; logcat c; } WORDS[] = {
 	{ "game", LOGCAT_GAMES }, { "diatom", LOGCAT_GAMES },
 	{ "to diatom", LOGCAT_GAMES }, { "wire", LOGCAT_GAMES },
 	{ "port", LOGCAT_GAMES }, { "ports", LOGCAT_GAMES },
-	{ "portmaster", LOGCAT_GAMES }, { "--pm", LOGCAT_GAMES },
-	{ "--pm detail", LOGCAT_GAMES }, { "pico8", LOGCAT_GAMES },
+	{ "portmaster", LOGCAT_GAMES }, { "pico8", LOGCAT_GAMES },
 	{ "cheats", LOGCAT_GAMES }, { "states", LOGCAT_GAMES },
 	{ "discset", LOGCAT_GAMES }, { "turbo", LOGCAT_GAMES },
 	{ "autolaunch", LOGCAT_GAMES }, { "gbsort", LOGCAT_GAMES },
@@ -53,6 +52,7 @@ static const struct { const char *word; logcat c; } WORDS[] = {
 	{ "settings", LOGCAT_SYSTEM }, { "setting", LOGCAT_SYSTEM },
 	{ "idle", LOGCAT_SYSTEM }, { "lights", LOGCAT_SYSTEM },
 	{ "boot", LOGCAT_SYSTEM }, { "exit", LOGCAT_SYSTEM },
+	{ "cleanup", LOGCAT_SYSTEM },
 };
 
 logcat logcat_of(const char *line, size_t n)
