@@ -80,6 +80,19 @@ fi
 # Ended from outside (ChaOS's power or Select+Start): said so, and what the
 # kernel had to say (an out-of-memory kill, a crash)
 trap 'echo "run.sh: stopped by ChaOS"; dmesg 2> /dev/null | tail -15; exit 143' TERM HUP INT
+# The CPU's clock as it was before the port (src/main.c port_cpu_begin), put
+# back as this ends, however it ends: the launcher does too, but if it is the
+# one that died, the clock would stay raised until it came back. Idempotent.
+cpu_back() {
+	[ -f /tmp/chaos-port-cpu ] || return 0
+	read -r g mn mx < /tmp/chaos-port-cpu || return 0
+	c=/sys/devices/system/cpu/cpu0/cpufreq
+	case "$mn$mx" in *[!0-9]*|'') return 0 ;; esac
+	echo "$mn" > $c/scaling_min_freq 2> /dev/null
+	echo "$mx" > $c/scaling_max_freq 2> /dev/null
+	[ "$(cat $c/scaling_governor 2> /dev/null)" = "$g" ] || echo "$g" > $c/scaling_governor 2> /dev/null
+}
+trap cpu_back EXIT
 
 # ChaOS's Python (tools/build-python.sh), shipped as one squashfs and
 # unpacked once into userdata (the kernel can't mount it, and the card has no

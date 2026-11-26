@@ -16361,6 +16361,12 @@ static bool port_game_dir(const char *script, char *out, size_t n)
  * runs ports at 1800 locked). Put back as it was when the port ends, however
  * it ends. Emulators in Diatom keep the Brick's own setting. */
 #define PORT_CPU_DIR "/sys/devices/system/cpu/cpu0/cpufreq/"
+/* What it was, kept where a crash can't lose it: in RAM (/tmp, gone with a
+ * restart, when the boot sets the clock afresh anyway), read back by the
+ * launcher when launch.sh starts it again after a crash (port_cpu_recover),
+ * and by run.sh as the port ends, in case the launcher is the one that died.
+ * One line: governor, floor and top in kHz. */
+#define PORT_CPU_SAVED "/tmp/chaos-port-cpu"
 static struct { bool set; char gov[32]; long min, max; } g_port_cpu;
 
 static bool cpu_read(const char *name, char *out, size_t n)
@@ -16395,6 +16401,14 @@ static void port_cpu_begin(void)
 	g_port_cpu.max = atol(v);
 	if (cpu_read(PORT_CPU_DIR "cpuinfo_max_freq", v, sizeof v) && atol(v) > 0 && atol(v) < top) top = atol(v);
 	if (lo > top) lo = top;
+	{
+		FILE *f = fopen(PORT_CPU_SAVED, "w");
+
+		/* not raised unless it can be put back by someone else too */
+		if (!f) return;
+		fprintf(f, "%s %ld %ld\n", g_port_cpu.gov, g_port_cpu.min, g_port_cpu.max);
+		if (fclose(f) != 0) { unlink(PORT_CPU_SAVED); return; }
+	}
 	g_port_cpu.set = true;
 	/* the top first, so the floor is never above it */
 	snprintf(b, sizeof b, "%ld", top);
@@ -16421,8 +16435,33 @@ static void port_cpu_end(void)
 	 * (the boot's 50 ms sampling, its 80% threshold) */
 	if (!cpu_read(PORT_CPU_DIR "scaling_governor", b, sizeof b) || strcmp(b, g_port_cpu.gov))
 		cpu_write(PORT_CPU_DIR "scaling_governor", g_port_cpu.gov);
+	unlink(PORT_CPU_SAVED);
 	fprintf(stderr, "port: CPU back to %s, %ld-%ld MHz\n", g_port_cpu.gov,
 	        g_port_cpu.min / 1000, g_port_cpu.max / 1000);
+}
+
+/* At start: a launcher that died while a port ran left the clock raised and
+ * what it was in PORT_CPU_SAVED; put back, if run.sh hasn't already. A line
+ * that doesn't read as one is left alone and removed. */
+static void port_cpu_recover(void)
+{
+	FILE *f = fopen(PORT_CPU_SAVED, "r");
+	char gov[32];
+	long mn, mx;
+
+	if (!f) return;
+	if (fscanf(f, "%31s %ld %ld", gov, &mn, &mx) == 3 && mn > 0 && mx >= mn) {
+		snprintf(g_port_cpu.gov, sizeof g_port_cpu.gov, "%s", gov);
+		g_port_cpu.min = mn;
+		g_port_cpu.max = mx;
+		g_port_cpu.set = true;
+		fprintf(stderr, "port: the last one's CPU clock was never put back; now\n");
+		fclose(f);
+		port_cpu_end();
+		return;
+	}
+	fclose(f);
+	unlink(PORT_CPU_SAVED);
 }
 
 /* ChaOS: Logging > Performance. A port (or PICO-8) is its own program, off
@@ -27519,6 +27558,7 @@ int main(int argc, char *argv[])
 
 	t_boot0 = plat_now_ms();
 	paths_init();
+	port_cpu_recover();   /* ChaOS: a clock a crash left raised */
 
 	/* Before anything reads a setting. Two databases, because the files this
 	 * replaced kept per-device and per-card data apart on purpose - see db.h.
