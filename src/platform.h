@@ -245,6 +245,12 @@ void plat_resident_set_stick(int on);
 /* ChaOS: Logging > Emulator Details: every game's RUN carries corelog=1, and
  * ChaOS-diatom 0.9.24 on keeps the core's own messages for it */
 void plat_resident_set_corelog(bool on);
+/* ChaOS: Logging > Performance: Diatom's RAM and CPU written at each game's
+ * RUN and EXIT (perf.h), never during it */
+void plat_resident_set_perf(bool on);
+/* ChaOS: the last port's peak RAM, average CPU (% of one core) and run time,
+ * as the kernel counted them when it ended; false if there is none */
+bool plat_port_usage(long *maxrss_kb, int *cpu_pct, unsigned *secs);
 void plat_resident_set_zone(const char *tz);
 /* The paused frame as the shader draws it, the size of the game's rect, or
  * NULL when the game is not shaded. Written by Diatom on the way into its

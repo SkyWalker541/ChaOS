@@ -367,6 +367,23 @@ void plat_child_input(in_state *st) { device_child_poll(st); }
 void plat_child_grab(bool on) { device_child_grab(on); }
 bool plat_power_event(bool *down) { return device_power_event(down); }
 
+/* ChaOS: what the kernel counted for the last port, when it was reaped
+ * (Logging > Performance); zeroed when one starts */
+static struct rusage g_port_ru;
+static unsigned      g_port_ms;
+
+bool plat_port_usage(long *maxrss_kb, int *cpu_pct, unsigned *secs)
+{
+	unsigned long long us = (unsigned long long)g_port_ru.ru_utime.tv_sec * 1000000ull + g_port_ru.ru_utime.tv_usec +
+	                        (unsigned long long)g_port_ru.ru_stime.tv_sec * 1000000ull + g_port_ru.ru_stime.tv_usec;
+
+	if (!g_port_ms || !g_port_ru.ru_maxrss) return false;
+	*maxrss_kb = g_port_ru.ru_maxrss;
+	*cpu_pct = (int)(us / 10ull / g_port_ms);   /* us*100 / (ms*1000) */
+	*secs = g_port_ms / 1000;
+	return true;
+}
+
 int plat_run_port(char *const argv[], const char *const envkv[], const char *workdir,
                   int *how, int (*on_power)(void *ctx), void *ctx)
 {
@@ -378,6 +395,8 @@ int plat_run_port(char *const argv[], const char *const envkv[], const char *wor
 	*how = PORT_ENDED;
 	if (!env) return -1;
 	run_power_pressed = false;
+	memset(&g_port_ru, 0, sizeof g_port_ru);
+	g_port_ms = plat_now_ms();
 	pid = fork();
 	if (pid < 0) { free(env); return -1; }
 	if (pid == 0) {
@@ -406,7 +425,7 @@ int plat_run_port(char *const argv[], const char *const envkv[], const char *wor
 		device_power_pressed();
 		device_power_event(NULL);
 		for (;;) {
-			pid_t r = waitpid(pid, &status, WNOHANG);
+			pid_t r = wait4(pid, &status, WNOHANG, &g_port_ru);
 			bool press;
 
 			if (r == pid) break;
@@ -476,8 +495,9 @@ int plat_run_port(char *const argv[], const char *const envkv[], const char *wor
 		kill(-pid, SIGKILL);
 	}
 #else
-	if (waitpid(pid, &status, 0) < 0) return -1;
+	if (wait4(pid, &status, 0, &g_port_ru) < 0) return -1;
 #endif
+	g_port_ms = plat_now_ms() - g_port_ms;
 	return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
 }
 

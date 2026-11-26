@@ -20,11 +20,12 @@ typedef enum {
 	LOGCAT_GAMES,    /* starting and ending games, ports, cheats, the shelves */
 	LOGCAT_MUSE,     /* the music and audiobook player */
 	LOGCAT_SYSTEM,   /* battery, power, sound, screen, buttons, the clock, settings */
+	LOGCAT_PERF,     /* each emulator's RAM, CPU and GPU (perf.h); off by default */
 	LOGCAT_COUNT,
 	LOGCAT_NONE = -1
 } logcat;
 
-/* On is the default for every group. */
+/* On is the default for every group but Performance. */
 void   logcat_set(logcat c, bool on);
 bool   logcat_get(logcat c);
 

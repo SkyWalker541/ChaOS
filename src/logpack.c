@@ -14,6 +14,7 @@
 #include <strings.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 static void mask_shapes(char *line, size_t cap);
@@ -357,6 +358,44 @@ bool logpack_build(const char *logs_dir, const char *about,
 	return logpack_build_more(logs_dir, about, secrets, n, NULL, 0, folder, out, err, en);
 }
 
+/* ChaOS: a session's log is packed under the date and time it began, so a
+ * pack reads in order and a report's "it happened Tuesday evening" finds its
+ * file: chaos-2026-11-25-2031.log. From the "logs: session YYYY-MM-DD HH:MM"
+ * line the launcher writes once its zone is set (2.7.9-test2 on), else from the time the
+ * file was last written, which for an older log is when its session ended
+ * (then "-ended" says so). Clock wrong before Wi-Fi: the name is what the
+ * Brick believed. */
+static void session_name(const char *from, char *out, size_t n)
+{
+	FILE *f = fopen(from, "r");
+	char line[256];
+	int y, mo, d, h, mi, k;
+	struct stat st;
+
+	if (f) {
+		for (k = 0; k < 400 && fgets(line, sizeof line, f); k++) {
+			const char *s = strstr(line, "logs: session ");
+
+			if (s && sscanf(s, "logs: session %4d-%2d-%2d %2d:%2d", &y, &mo, &d, &h, &mi) == 5) {
+				fclose(f);
+				snprintf(out, n, "chaos-%04d-%02d-%02d-%02d%02d.log", y, mo, d, h, mi);
+				return;
+			}
+		}
+		fclose(f);
+	}
+	if (stat(from, &st) == 0) {
+		struct tm tm;
+		time_t t = st.st_mtime;
+
+		localtime_r(&t, &tm);
+		snprintf(out, n, "chaos-%04d-%02d-%02d-%02d%02d-ended.log", tm.tm_year + 1900,
+		         tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min);
+		return;
+	}
+	snprintf(out, n, "chaos-unknown.log");
+}
+
 bool logpack_build_more(const char *logs_dir, const char *about,
                         const char *const *secrets, int n,
                         const char *const *more, int nmore,
@@ -383,7 +422,21 @@ bool logpack_build_more(const char *logs_dir, const char *about,
 			else if (!strncmp(e->d_name, "tortos.log", 10)) rest = e->d_name + 10;
 			else continue;
 			snprintf(from, sizeof from, "%s/%s", logs_dir, e->d_name);
-			snprintf(path, sizeof path, "%s/chaos.log%s", dir, rest);
+			{
+				/* by when it began (session_name); two the same minute
+				 * get -2, -3 */
+				char name[96], base[96];
+				int dup;
+
+				(void)rest;
+				session_name(from, base, sizeof base);
+				snprintf(name, sizeof name, "%s", base);
+				for (dup = 2; dup < 100; dup++) {
+					snprintf(path, sizeof path, "%s/%s", dir, name);
+					if (access(path, F_OK) != 0) break;
+					snprintf(name, sizeof name, "%.*s-%d.log", (int)(strlen(base) - 4), base, dup);
+				}
+			}
 			if (copy_masked(from, path, secrets, n)) logs++;
 		}
 		closedir(d);

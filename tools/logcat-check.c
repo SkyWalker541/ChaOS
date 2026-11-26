@@ -36,8 +36,13 @@ int main(void)
 	}
 	CK(words > 30, "only %d words read from the sources", words);
 
-	for (c = 0; c < LOGCAT_COUNT; c++) CK(logcat_get((logcat)c), "group %d is off before anything turned it off", c);
-	CK(keep("romm: 12 games") && keep("muse: playing"), "every group on: everything written");
+	for (c = 0; c < LOGCAT_COUNT; c++)
+		CK(logcat_get((logcat)c) == (c != LOGCAT_PERF), "group %d starts %s", c, c == LOGCAT_PERF ? "off" : "on");
+	CK(keep("romm: 12 games") && keep("muse: playing"), "the groups on: their lines written");
+	CK(!keep("perf: gpsp idle: RAM 41 MB"), "Performance starts off");
+	logcat_set(LOGCAT_PERF, true);
+	CK(keep("perf: gpsp idle: RAM 41 MB"), "and on, it is written");
+	logcat_set(LOGCAT_PERF, false);
 
 	logcat_set(LOGCAT_ONLINE, false);
 	CK(!keep("romm: 12 games"), "Online off drops a RomM line");

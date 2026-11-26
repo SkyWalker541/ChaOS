@@ -11201,23 +11201,27 @@ static void battwarn_screen(app *a)
  * the kernel's log kept at power off (a moment of shutdown). Errors and the
  * updater are written whatever is off. Each a switch, kept in the device's
  * settings; Download logs is unchanged by any of them. */
-enum { LG_ONLINE, LG_GAMES, LG_MUSE, LG_SYSTEM, LG_CORE, LG_KEYS, LG_KERNEL };
+enum { LG_ONLINE, LG_GAMES, LG_MUSE, LG_SYSTEM, LG_PERF, LG_CORE, LG_KEYS, LG_KERNEL };
 static bool g_log_core, g_log_keys;
-static const char *const LOG_KEY[LOGCAT_COUNT] = { "log.online", "log.games", "log.muse", "log.system" };
+static const char *const LOG_KEY[LOGCAT_COUNT] = { "log.online", "log.games", "log.muse", "log.system", "log.perf" };
 static int g_log_shot;   /* --logging N: the page, row N-1 picked */
+static bool g_log_perf;  /* Performance: port_launch writes a standalone's use */
 
 static void log_apply(void)
 {
 	logstamp_filter(logcat_keep);
 	plat_input_debug(g_log_keys);
 	plat_resident_set_corelog(g_log_core);
+	plat_resident_set_perf(logcat_get(LOGCAT_PERF));
+	g_log_perf = logcat_get(LOGCAT_PERF);
 }
 
 static void log_load(void)
 {
 	int c;
 
-	for (c = 0; c < LOGCAT_COUNT; c++) logcat_set((logcat)c, db_get_int(db_dev(), LOG_KEY[c], 1) != 0);
+	for (c = 0; c < LOGCAT_COUNT; c++)
+		logcat_set((logcat)c, db_get_int(db_dev(), LOG_KEY[c], c != LOGCAT_PERF) != 0);
 	g_log_core   = db_get_int(db_dev(), "log.core", 0) != 0;
 	g_log_keys   = db_get_int(db_dev(), "log.keys", 0) != 0;
 	g_log_kernel = db_get_int(db_dev(), "log.kernel", 1) != 0;
@@ -11241,17 +11245,19 @@ static int log_build(void *ctx, menu_row *rows, int max, const char **heading)
 		{ "Games",   "Starting and ending games, ports, cheats, shelves" },
 		{ "Muse",    "The music and audiobook player" },
 		{ "System",  "Battery, power, sound, screen, clock, settings" },
+		{ "Performance", "Each emulator's RAM, CPU, GPU: idle, in game" },
 	};
 	int n = 0, c;
 
 	(void)ctx; (void)max;
 	*heading = "Logging";
 	for (c = 0; c < LOGCAT_COUNT; c++) {
+		/* Performance under the rule, with the others that cost something */
+		if (c == LOGCAT_PERF) rows[n++] = MENU_RULE;
 		rows[n] = (menu_row){ CAT[c].name, logcat_get((logcat)c) ? "On" : "Off", true, .id = MENU_ID(LG_ONLINE + c) };
 		rows[n].toggle = true;
 		rows[n++].hint = CAT[c].hint;
 	}
-	rows[n++] = MENU_RULE;
 	rows[n] = (menu_row){ "Emulator Details", g_log_core ? "On" : "Off", true, .id = MENU_ID(LG_CORE) };
 	rows[n].toggle = true;
 	rows[n++].hint = "Each emulator's own messages. Slows some games";
@@ -16364,6 +16370,20 @@ static bool port_game_dir(const char *script, char *out, size_t n)
 	return ok;
 }
 
+/* ChaOS: Logging > Performance. A port (or PICO-8) is its own program, off
+ * before it starts, so its idle is "off"; what it used is what the kernel
+ * counted when it ended. Its GPU isn't read: by now nothing is running. */
+static void perf_port(const char *title)
+{
+	long rss;
+	int cpu;
+	unsigned secs;
+
+	if (g_log_perf && plat_port_usage(&rss, &cpu, &secs))
+		fprintf(stderr, "perf: port %s idle: off; in game %us: CPU %d%% of one core, peak RAM %ld MB\n",
+		        title, secs, cpu, rss / 1024);
+}
+
 static void port_launch(app *a, int o, const char *romfile, const char *title)
 {
 	const system_cfg *s = &a->sys.systems[o];
@@ -16420,6 +16440,7 @@ static void port_launch(app *a, int o, const char *romfile, const char *title)
 	sth_hold(false);
 	fprintf(stderr, "port %s exited %d (%s)\n", romfile, rc,
 	        how == PORT_POWER ? "power held" : how == PORT_QUIT ? "select+start" : "itself");
+	perf_port(title);   /* ChaOS: Logging > Performance */
 	/* and in the port's own log, where whoever reads it about a port that
 	 * stopped looks first */
 	{
@@ -16598,6 +16619,7 @@ static void p8_launch(app *a, int o, const char *file, const char *title)
 	sth_hold(false);
 	fprintf(stderr, "pico8 %s exited %d (%s)\n", file, rc,
 	        how == PORT_POWER ? "power held" : how == PORT_QUIT ? "select+start" : "itself");
+	perf_port(title);   /* ChaOS: Logging > Performance */
 	if (!splore) {
 		stats_tick(plat_now_ms());
 		stats_end(NULL, plat_now_ms());
@@ -25979,16 +26001,16 @@ static unsigned log_state(void)
 	int c;
 
 	for (c = 0; c < LOGCAT_COUNT; c++) if (logcat_get((logcat)c)) b |= 1u << c;
-	if (g_log_core) b |= 1u << 4;
-	if (g_log_keys) b |= 1u << 5;
-	if (g_log_kernel) b |= 1u << 6;
+	if (g_log_core) b |= 1u << 5;
+	if (g_log_keys) b |= 1u << 6;
+	if (g_log_kernel) b |= 1u << 7;
 	return b;
 }
 
 static int logging_check(app *a)
 {
 	static const int bit[] = { [LG_ONLINE] = 0, [LG_GAMES] = 1, [LG_MUSE] = 2, [LG_SYSTEM] = 3,
-	                           [LG_CORE] = 4, [LG_KEYS] = 5, [LG_KERNEL] = 6 };
+	                           [LG_PERF] = 4, [LG_CORE] = 5, [LG_KEYS] = 6, [LG_KERNEL] = 7 };
 	menu_row rows[16];
 	const char *heading;
 	int n = log_build(NULL, rows, 16, &heading), i, bad = 0, live = 0;
@@ -26010,7 +26032,7 @@ static int logging_check(app *a)
 		log_key(a, NULL, IN_ACCEPT, i);   /* and back */
 		if (log_state() != before) { printf("FAIL logging: %s didn't go back\n", rows[i].label); bad = 1; }
 	}
-	if (live != 7) { printf("FAIL logging: %d rows, not 7\n", live); bad = 1; }
+	if (live != 8) { printf("FAIL logging: %d rows, not 8\n", live); bad = 1; }
 	g_menu_id = -1;
 	logstamp_filter(NULL);
 	return bad;
@@ -27218,6 +27240,16 @@ int main(int argc, char *argv[])
 
 		db_get_str(db_lib(), "timezone", tz, sizeof tz, "America/New_York");
 		plat_clock_zone(tz);
+	}
+	{	/* ChaOS: the session's start, in the card's zone, for the log pack's file names
+		 * (logpack.c). "logs:" lines are always written (logcat.h) */
+		time_t t0 = time(NULL);
+		struct tm tm0;
+		char when[32];
+
+		localtime_r(&t0, &tm0);
+		strftime(when, sizeof when, "%Y-%m-%d %H:%M", &tm0);
+		fprintf(stderr, "logs: session %s, ChaOS %s\n", when, CHAOS_VERSION);
 	}
 	t_mark("databases");
 	sth_init(P_USERDATA, P_CARD);   /* ChaOS: Syncthing's place, started at the first frame */

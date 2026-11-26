@@ -197,6 +197,50 @@ static void pack_more(void)
 	if (system(cmd) != 0) { }
 }
 
+/* ChaOS 2.7.9-test2: a session's log is packed under when it began, from its
+ * "logs: session" line, or when it was last written if it has none */
+static void pack_by_date(void)
+{
+	char dir[] = "/tmp/logpack-date-XXXXXX", p[600], out[600], err[128], cmd[1400], line[256];
+	FILE *f;
+	bool named = false, ended = false;
+	int files = 0;
+
+	printf("by date\n");
+	if (!mkdtemp(dir)) { perror("mkdtemp"); failures++; return; }
+	snprintf(p, sizeof p, "%s/logs", dir);
+	mkdir(p, 0755);
+	snprintf(p, sizeof p, "%s/logs/chaos.log", dir);
+	if ((f = fopen(p, "w"))) {
+		fputs("[20:31:02.000 +3.1s] video: 1024x768\n"
+		      "[20:31:02.100 +3.2s] logs: session 2026-11-25 20:31, ChaOS 2.7.9-test2\n", f);
+		fclose(f);
+	}
+	snprintf(p, sizeof p, "%s/logs/chaos.log.1", dir);
+	if ((f = fopen(p, "w"))) { fputs("an older one, no session line\n", f); fclose(f); }
+	snprintf(p, sizeof p, "%s/logs/chaos.log.2", dir);
+	if ((f = fopen(p, "w"))) { fputs("logs: session 2026-11-25 20:31, the same minute\n", f); fclose(f); }
+	snprintf(p, sizeof p, "%s/logs", dir);
+	snprintf(out, sizeof out, "%s/pack.tar.gz", dir);
+	CHECK(logpack_build(p, "ChaOS\n", SECRETS, NSECRETS, "d", out, err, sizeof err), "built: %s", err);
+	snprintf(cmd, sizeof cmd, "cd '%s' && tar -xzf pack.tar.gz && ls d", dir);
+	if ((f = popen(cmd, "r"))) {
+		while (fgets(line, sizeof line, f)) {
+			line[strcspn(line, "\n")] = '\0';
+			if (!strcmp(line, "about.txt")) continue;
+			files++;
+			if (!strcmp(line, "chaos-2026-11-25-2031.log")) named = true;
+			if (strstr(line, "-ended.log")) ended = true;
+		}
+		pclose(f);
+	}
+	CHECK(named, "a log named by its session line");
+	CHECK(ended, "and one without, by when it ended");
+	CHECK(files == 3, "two the same minute both kept: %d", files);
+	snprintf(cmd, sizeof cmd, "rm -rf '%s'", dir);
+	if (system(cmd) != 0) { }
+}
+
 int main(void)
 {
 	printf("logpack: the logs, masked and packed\n");
@@ -205,6 +249,7 @@ int main(void)
 	shapes();
 	pack();
 	pack_more();
+	pack_by_date();
 	if (failures) {
 		printf("\n%d failure%s\n", failures, failures == 1 ? "" : "s");
 		return 1;

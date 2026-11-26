@@ -22,7 +22,7 @@ CHECKS = check-display check-cheevos check-hare check-httpd check-idle check-rah
          check-db check-stats check-sort check-bt check-ss \
          check-muselib check-musequeue check-museart check-controls check-logpack \
          check-clock check-update check-remap check-shots check-pixfont \
-         check-release check-updater check-chaos-names check-itch check-itchdl check-hbcat check-discset check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore check-gbsort check-menu-keys check-menu-lint check-pro-detect check-logcat
+         check-release check-updater check-chaos-names check-itch check-itchdl check-hbcat check-discset check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore check-gbsort check-menu-keys check-menu-lint check-pro-detect check-logcat check-perf
 
 check: check-sevenz
 	@fail=0; for c in $(CHECKS); do \
@@ -626,6 +626,12 @@ build-native/muselib-check: tools/muselib-check.c src/muselib.c src/muselib.h FO
 # unpacked with the same tar and read back.
 # ChaOS: About ChaOS > Logging's groups, with every kind of line the launcher
 # writes sorted into one (tools/logcat-check.c)
+# ChaOS: Logging > Performance's readings, on this machine's /proc
+check-perf: FORCE
+	@mkdir -p build-native
+	@$(CC) -std=gnu11 -Wall -Wextra -Werror -O1 -D_GNU_SOURCE -o build-native/perf-check tools/perf-check.c src/perf.c
+	@./build-native/perf-check
+
 check-logcat: FORCE
 	@mkdir -p build-native
 	@$(CC) -std=gnu11 -Wall -Wextra -Werror -O1 -o build-native/logcat-check tools/logcat-check.c src/logcat.c

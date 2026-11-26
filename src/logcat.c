@@ -5,7 +5,7 @@
 #include <ctype.h>
 #include <string.h>
 
-static bool g_on[LOGCAT_COUNT] = { true, true, true, true };
+static bool g_on[LOGCAT_COUNT] = { true, true, true, true, false };
 
 void logcat_set(logcat c, bool on) { if ((unsigned)c < LOGCAT_COUNT) g_on[c] = on; }
 bool logcat_get(logcat c) { return (unsigned)c < LOGCAT_COUNT ? g_on[c] : true; }
@@ -40,6 +40,8 @@ static const struct { const char *word; logcat c; } WORDS[] = {
 	{ "screenshot", LOGCAT_GAMES },
 
 	{ "muse", LOGCAT_MUSE },
+
+	{ "perf", LOGCAT_PERF },
 
 	{ "battery", LOGCAT_SYSTEM }, { "power", LOGCAT_SYSTEM },
 	{ "audio", LOGCAT_SYSTEM }, { "video", LOGCAT_SYSTEM },

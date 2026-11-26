@@ -3,6 +3,7 @@
  * emulator. Nothing in it knows which device it runs on. */
 #include "device.h"
 #include "platform.h"
+#include "perf.h"
 
 #include <dirent.h>
 #include <fcntl.h>
@@ -23,6 +24,53 @@ static bool g_play_rewind;
 static char g_play_mode[16];     /* Display Mode, Diatom's name: "integer" */
 static char g_play_tz[64];
 static bool g_corelog;            /* ChaOS: Logging > Emulator Details */
+/* ChaOS: Logging > Performance (perf.h): Diatom read at RUN and at EXIT only,
+ * never during the game */
+static bool      g_perf;
+static perf_snap g_perf_idle0, g_perf_run0;   /* since the last game ended; since RUN */
+static char      g_perf_core[64];
+static pid_t     g_perf_pid;                  /* whose idle0 it is: Diatom restarts */
+
+void plat_resident_set_perf(bool on) { g_perf = on; }
+
+static pid_t diatom_pid(void);   /* below: launch.sh's pid file, checked */
+
+static void perf_at_run(const char *core)
+{
+	perf_snap now;
+	pid_t pid = diatom_pid();
+	const char *b = strrchr(core, '/');
+	int cpu;
+
+	snprintf(g_perf_core, sizeof g_perf_core, "%s", b ? b + 1 : core);
+	if (strstr(g_perf_core, "_libretro.so")) *strstr(g_perf_core, "_libretro.so") = '\0';
+	if (!perf_read(pid, &now)) { fprintf(stderr, "perf: %s: Diatom can't be read\n", g_perf_core); return; }
+	cpu = g_perf_idle0.ok && g_perf_pid == pid ? perf_cpu_pct(&g_perf_idle0, &now) : -1;
+	g_perf_pid = pid;
+	if (cpu >= 0)
+		fprintf(stderr, "perf: Diatom idle: RAM %ld MB, CPU %d%% of one core since the last game\n",
+		        now.rss_kb / 1024, cpu);
+	else
+		fprintf(stderr, "perf: Diatom idle: RAM %ld MB\n", now.rss_kb / 1024);
+	perf_reset_peak(pid);
+	g_perf_run0 = now;
+}
+
+static void perf_at_exit(void)
+{
+	perf_snap now;
+	char gpu[64];
+	int cpu;
+
+	if (!g_perf_run0.ok || !perf_read(diatom_pid(), &now)) return;
+	cpu = perf_cpu_pct(&g_perf_run0, &now);
+	perf_gpu(gpu, sizeof gpu);
+	fprintf(stderr, "perf: %s in game %us: CPU %d%% of one core (%d cores), RAM %ld MB, peak %ld MB, GPU %s\n",
+	        g_perf_core, (now.ms - g_perf_run0.ms) / 1000, cpu, perf_cores(),
+	        now.rss_kb / 1024, now.hwm_kb / 1024, gpu);
+	g_perf_run0.ok = false;
+	g_perf_idle0 = now;
+}
 static int  g_play_stick = -1;    /* ChaOS: Left Stick as D-Pad for the next game, -1 none */       /* the player's zone, an id such as "America/New_York" */
 static char g_play_cheats[1024]; /* the cheats on, as a file for Diatom, or "" */
 
@@ -362,6 +410,7 @@ bool plat_resident_send(const char *tag, const char *core, const char *rom,
 		/* The display goes to Diatom before the game does: it presents its
 		 * first frame as soon as the load is done, and cannot while this
 		 * process holds it. */
+		if (g_perf) perf_at_run(core);
 		device_display_release();
 		/* ChaOS: `mode=`, the console's Display Mode, on the RUN itself so
 		 * the first frame is drawn that way (ChaOS-diatom reads it there) */
@@ -897,6 +946,7 @@ static int diatom_wait(void)
 				if (strncmp(l, "EXIT\treason=user", 16) != 0)
 					fprintf(stderr, "diatom: %s\n", l);
 				d_apply_levels();
+				if (g_perf) perf_at_exit();
 				return RES_EXIT;
 			}
 			else if (strncmp(l, "ERROR", 5) == 0) {
