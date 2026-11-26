@@ -20,6 +20,28 @@ pm_hook_gui_env() {
   # pySDL2 asks for: the system's has them as GFX_*), then the system's
   # SDL2, SDL2_image, _ttf and _mixer
   export PYSDL2_DLL_PATH="${PYTHONHOME:+$PYTHONHOME/lib/sdl:}/usr/lib"
+  # The Brick has no udev, so SDL may not find the pad by itself: named
+  # here, as the Brick Gamepad's own event device
+  local ev
+  ev=$(awk '/^N: Name="Brick Gamepad"/{p=1} p && /^H: Handlers=/{for(i=1;i<=NF;i++) if($i ~ /^event[0-9]+$/){print $i; exit}}' /proc/bus/input/devices 2> /dev/null)
+  [ -n "$ev" ] && export SDL_JOYSTICK_DEVICE="/dev/input/$ev"
+  # and what SDL makes of it, in the log: how many pads, and whether each
+  # is a game controller (the app needs that to read its buttons)
+  CHAOS_PAD_OK=$(PYTHONPATH="$controlfolder/exlibs" python3 - << 'PYEOF' 2>&1 | tee -a /dev/stderr | grep -c "controller$"
+import os, sdl2
+sdl2.SDL_Init(sdl2.SDL_INIT_GAMECONTROLLER)
+n = sdl2.SDL_NumJoysticks()
+print("SDL_JOYSTICK_DEVICE=%s, %d joystick(s)" % (os.environ.get("SDL_JOYSTICK_DEVICE"), n))
+for i in range(n):
+    g = sdl2.SDL_JoystickGetDeviceGUID(i)
+    b = (sdl2.c_char * 33)()
+    sdl2.SDL_JoystickGetGUIDString(g, b, 33)
+    print("chaos pad:", i, sdl2.SDL_JoystickNameForIndex(i), b.value,
+          "controller" if sdl2.SDL_IsGameController(i) else "NOT a controller")
+sdl2.SDL_Quit()
+PYEOF
+)
+  export CHAOS_PAD_OK
 }
 
 pm_hook_autoinstall_dirs() {
@@ -34,8 +56,22 @@ pm_hook_pre_launch() {
 }
 
 pm_hook_run_pugwash() {
+  # If SDL found no game controller, the pad is turned into the keys the app
+  # also reads (arrows, Z = A, X = B, Return = Start, Escape = Select...) by
+  # PortMaster's own gptokeyb, for as long as the app runs
+  local gk=""
+  if [ "${CHAOS_PAD_OK:-0}" = 0 ] && [ -x "$controlfolder/gptokeyb" ]; then
+    printf '%s\n' "up = up" "down = down" "left = left" "right = right" \
+      "a = z" "b = x" "x = a" "y = s" "l1 = q" "r1 = e" "start = enter" "back = esc" \
+      > /tmp/chaos-pugwash.gptk
+    "$controlfolder/gptokeyb" -1 "python3" -c /tmp/chaos-pugwash.gptk &
+    gk=$!
+    echo "chaos pad: no controller in SDL, so the pad as keys (gptokeyb $gk)"
+  fi
   # ChaOS's Python (run.sh put it first on PATH); pugwash is #!/usr/bin/env python3
   python3 ./pugwash $PORTMASTER_CMDS
+  [ -n "$gk" ] && kill "$gk" 2> /dev/null
+  :
 }
 
 pm_hook_post_launch() {
