@@ -4909,6 +4909,11 @@ static void power_off(app *a)
 	remember_place(a);
 	book_keep(true);
 	plat_request_poweroff();
+	/* The resident Diatom ended first, and waited for: left to init's TERM
+	 * after ChaOS has gone, its own display teardown landed on the logo at
+	 * some point in the shutdown or none, so the logo sometimes flashed away
+	 * (2.7.9-test4, 2026-11-26). No game is running here; it holds none. */
+	plat_resident_end();
 	/* TortOS went dark here (Eric's call, 2026-10-02): the rest of the
 	 * shutdown is not instant, and the shell stayed lit through it. ChaOS
 	 * shows its logo instead, and the power going takes the light. */
@@ -28148,8 +28153,13 @@ done:
 	ui_quit();
 	IMG_Quit();
 	plat_input_quit();
-	plat_video_quit();
-	SDL_Quit();
+	/* ChaOS: powering off, the window is left as it is: tearing it down
+	 * could clear the panel under the logo (power_off), and the process
+	 * ending frees it anyway */
+	if (access(TORTOS_POWEROFF_FLAG, F_OK) != 0) {
+		plat_video_quit();
+		SDL_Quit();
+	}
 
 	/* Close the databases, which is what checkpoints their WAL and removes
 	 * it. Without this the launcher never called sqlite3_close on a normal
