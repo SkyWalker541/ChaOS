@@ -16,9 +16,11 @@ pm_hook_env() {
 }
 
 pm_hook_gui_env() {
-  # pySDL2 finds SDL2_gfx in ChaOS's Python first (built with the names
-  # pySDL2 asks for: the system's has them as GFX_*), then the system's
-  # SDL2, SDL2_image, _ttf and _mixer
+  # pySDL2 finds SDL2 and SDL2_gfx in ChaOS's Python first: SDL2 as ports
+  # get it (run.sh copies /usr/lib/chaos-ports' there: it reads the pad and
+  # keys without udev; the system's doesn't, and the app saw no button), and
+  # SDL2_gfx built with the names pySDL2 asks for (the system's has them as
+  # GFX_*); then the system's SDL2_image, _ttf and _mixer
   export PYSDL2_DLL_PATH="${PYTHONHOME:+$PYTHONHOME/lib/sdl:}/usr/lib"
   # The Brick has no udev, so SDL may not find the pad by itself: named
   # here, as the Brick Gamepad's own event device
@@ -28,13 +30,13 @@ pm_hook_gui_env() {
   # and what SDL makes of it, in the log: how many pads, and whether each
   # is a game controller (the app needs that to read its buttons)
   CHAOS_PAD_OK=$(PYTHONPATH="$controlfolder/exlibs" python3 - << 'PYEOF' 2>&1 | tee -a /dev/stderr | grep -c "controller$"
-import os, sdl2
+import os, ctypes, sdl2
 sdl2.SDL_Init(sdl2.SDL_INIT_GAMECONTROLLER)
 n = sdl2.SDL_NumJoysticks()
-print("SDL_JOYSTICK_DEVICE=%s, %d joystick(s)" % (os.environ.get("SDL_JOYSTICK_DEVICE"), n))
+print("chaos pad: SDL from %s; SDL_JOYSTICK_DEVICE=%s, %d joystick(s)" % (getattr(getattr(sdl2.dll, "dll", None), "libfile", "?"), os.environ.get("SDL_JOYSTICK_DEVICE"), n))
 for i in range(n):
     g = sdl2.SDL_JoystickGetDeviceGUID(i)
-    b = (sdl2.c_char * 33)()
+    b = (ctypes.c_char * 33)()
     sdl2.SDL_JoystickGetGUIDString(g, b, 33)
     print("chaos pad:", i, sdl2.SDL_JoystickNameForIndex(i), b.value,
           "controller" if sdl2.SDL_IsGameController(i) else "NOT a controller")

@@ -80,6 +80,13 @@ if [ "$PORT" = --portmaster ]; then
 		rm -rf "$py" && mv "$py.new" "$py"
 	fi
 	[ -x "$py/bin/python3" ] || { echo "no Python for PortMaster"; exit 1; }
+	# the SDL2 ports get, under the name pySDL2 looks for first (no symlinks
+	# on the card: a copy, renewed when the system's changes)
+	if [ -f /usr/lib/chaos-ports/libSDL2-2.0.so.0 ]; then
+		mkdir -p "$py/lib/sdl"
+		cmp -s /usr/lib/chaos-ports/libSDL2-2.0.so.0 "$py/lib/sdl/libSDL2.so" ||
+			cp -f /usr/lib/chaos-ports/libSDL2-2.0.so.0 "$py/lib/sdl/libSDL2.so"
+	fi
 	# PYTHONHOME: found by name, not by where the binary thinks it runs from
 	export PATH="$py/bin:$PATH" PYTHONHOME="$py"
 	mkdir -p "$PM/chaos"
