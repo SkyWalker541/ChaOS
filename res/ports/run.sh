@@ -84,6 +84,18 @@ export SEATD_VTBOUND=0
 # Lasagna Boy Classic's stopped on "Couldn't find a valid ICU package"
 # (2026-11-26). Without ICU it runs with invariant culture, as Microsoft says.
 export DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
+# The sound hardware itself as a port's default device, not the shared mixer
+# (res/ports/asound-ports.conf); ALSA's own configuration first, so only the
+# default changes. Only when the hardware is free: while anything still holds
+# the mixer (Muse's player keeps its device), the hardware would answer busy
+# and the port would have no sound at all, so it keeps the mixer then.
+snd=$(cat /proc/asound/card0/pcm0p/sub0/status 2> /dev/null | head -1)
+if [ -f /usr/share/alsa/alsa.conf ] && [ -f "$HERE/asound-ports.conf" ] && [ "$snd" = closed ]; then
+	export ALSA_CONFIG_PATH="/usr/share/alsa/alsa.conf:$HERE/asound-ports.conf"
+	echo "ChaOS: sound straight to the hardware"
+else
+	echo "ChaOS: sound through the shared mixer (the hardware: ${snd:-unknown})"
+fi
 # how many there are before the port starts anything (mod_ChaOS.txt)
 CHAOS_EV_BASE=$(ls /dev/input/event* 2> /dev/null | wc -l)
 export CHAOS_EV_BASE

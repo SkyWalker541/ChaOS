@@ -151,6 +151,7 @@ grep -q '^OS_NAME=' "$OSR" || echo 'OS_NAME=ChaOS' >> "$OSR"
 mkdir -p "$C/TortOS/ports"
 install -m 755 "$ROOT/res/ports/run.sh" "$C/TortOS/ports/run.sh"
 install -m 644 "$ROOT/res/ports/mod_ChaOS.txt" "$C/TortOS/ports/mod_ChaOS.txt"
+install -m 644 "$ROOT/res/ports/asound-ports.conf" "$C/TortOS/ports/asound-ports.conf"
 mkdir -p "$C/TortOS/ports/bin"
 install -m 755 "$ROOT/res/ports/bin/pkill" "$ROOT/res/ports/bin/pgrep" "$ROOT/res/ports/bin/mount" "$C/TortOS/ports/bin/"
 # unsquashfs, for runtimes the kernel can't mount (res/ports/bin/mount,
