@@ -1126,6 +1126,31 @@ static struct { int side; SDL_Texture *tex; int w, h; } g_menu_art;
  * updater, which puts its own version, percentage and fill there. */
 static struct { int head_x, head_y, value_x, value_y, bar_x, bar_y, bar_w, bar_h, row_w; } g_menu_seen;
 
+/* ChaOS: the card's zone set in this process (plat_clock_zone), and kept in
+ * .userdata/<device>/zone for launch.sh, which starts Diatom before the
+ * launcher runs: Diatom's lines in chaos.log were in UTC, hours off the
+ * launcher's, until its first game sent the zone (2026-11-26). Written only
+ * when it changes. */
+static void zone_set(const char *id)
+{
+	char p[LIB_PATH], had[64] = "";
+	FILE *f;
+
+	plat_clock_zone(id);
+	if (!id || !id[0] || strchr(id, '\n')) return;
+	snprintf(p, sizeof p, "%s/zone", P_USERDATA);
+	if ((f = fopen(p, "r"))) {
+		if (!fgets(had, sizeof had, f)) had[0] = '\0';
+		fclose(f);
+		had[strcspn(had, "\n")] = '\0';
+	}
+	if (!strcmp(had, id)) return;
+	if ((f = fopen(p, "w"))) {
+		fprintf(f, "%s\n", id);
+		fclose(f);
+	}
+}
+
 /* ChaOS: the letter popup, with the letter jumps, further down */
 static void letter_note(sysview *v);
 static void letter_hold(sysview *v, bool held);
@@ -11835,7 +11860,7 @@ static void tz_pick(app *a)
 			continue;   /* B: back to the offsets */
 		i = t.first[c.g] + c.pick;
 		db_set_str(db_lib(), "timezone", CLOCK_ZONES[i].id);
-		plat_clock_zone(CLOCK_ZONES[i].id);
+		zone_set(CLOCK_ZONES[i].id);
 		return;
 	}
 }
@@ -11864,7 +11889,7 @@ static menu_result clock_key(app *a, void *ctx, in_button key, int row)
 		db_get_str(db_lib(), "timezone", id, sizeof id, "America/New_York");
 		z = clock_zone_step(id, d);
 		db_set_str(db_lib(), "timezone", CLOCK_ZONES[z].id);
-		plat_clock_zone(CLOCK_ZONES[z].id);
+		zone_set(CLOCK_ZONES[z].id);
 	} else if (sel == CLK_FIELDS + 1) {
 		g_status_clock24 = !g_status_clock24;
 		db_set_int(db_dev(), "status.clock24", g_status_clock24 ? 1 : 0);
@@ -27613,7 +27638,7 @@ int main(int argc, char *argv[])
 		char tz[64];
 
 		db_get_str(db_lib(), "timezone", tz, sizeof tz, "America/New_York");
-		plat_clock_zone(tz);
+		zone_set(tz);
 	}
 	{	/* ChaOS: the session's start, in the card's zone, for the log pack's file names
 		 * (logpack.c). "logs:" lines are always written (logcat.h) */
