@@ -242,6 +242,9 @@ bool plat_resident_disc(int set, int *count, int *index, int timeout_ms);
 /* ChaOS: the Brick Pro's Left Stick as D-Pad for the next game: 1, 0, or -1
  * for a device without sticks */
 void plat_resident_set_stick(int on);
+/* ChaOS: Logging > Emulator Details: every game's RUN carries corelog=1, and
+ * ChaOS-diatom 0.9.24 on keeps the core's own messages for it */
+void plat_resident_set_corelog(bool on);
 void plat_resident_set_zone(const char *tz);
 /* The paused frame as the shader draws it, the size of the game's rect, or
  * NULL when the game is not shaded. Written by Diatom on the way into its
@@ -426,6 +429,10 @@ bool plat_battery_lights(void);
  * Diatom reads too. plat_stick_axis gives a direction, -1 to 1. */
 typedef struct { int idx, neg, mid, pos; } plat_stick_cal;
 bool  plat_sticks(int raw[4]);
+
+/* ChaOS: every button press written to the log ("[in] ..."), for Logging >
+ * Button Presses; TORTOS_INPUT_DEBUG and the .input_debug marker still work */
+void  plat_input_debug(bool on);
 bool  plat_sticks_cal(plat_stick_cal out[4]);
 void  plat_sticks_reload(void);
 float plat_stick_axis(const plat_stick_cal *c, const int raw[4]);

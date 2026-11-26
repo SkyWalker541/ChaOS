@@ -42,6 +42,7 @@ static void os_cycle(const char *tag, int d, bool live);
 #include "keyboard.h"
 #include "logpack.h"
 #include "logstamp.h"
+#include "logcat.h"
 #include "wifi.h"
 #include "audioout.h"
 #include "menu.h"
@@ -4913,9 +4914,12 @@ static void anim_poweroff(app *a)
  * one before as kernel.log.1) for Download logs: SD card errors, crashes and
  * power trouble are written there, not in chaos.log, and a power off is when
  * it would otherwise be lost. A few kilobytes, after the game has ended. */
+static bool g_log_kernel = true;   /* Logging > Kernel Log at Off */
 static void log_kernel_at_off(void)
 {
 	char a1[CFG_STR * 2], a2[CFG_STR * 2], cmd[CFG_STR * 3];
+
+	if (!g_log_kernel) return;
 
 	snprintf(a1, sizeof a1, "%s/logs/kernel.log", P_USERDATA);
 	snprintf(a2, sizeof a2, "%s/logs/kernel.log.1", P_USERDATA);
@@ -11163,6 +11167,101 @@ static void battwarn_screen(app *a)
 	menu_run(a, &(menu_style){ .status = true, .accent = MENU_ACCENT, .fixed_w = 0 }, bw_build, bw_key, NULL);
 }
 
+
+/* ChaOS: About ChaOS > Logging. What goes into chaos.log, by group
+ * (logcat.h), and the three kinds of logging that cost something: a core's
+ * own messages in a game (speed: mGBA's cost 16 fps), every button press, and
+ * the kernel's log kept at power off (a moment of shutdown). Errors and the
+ * updater are written whatever is off. Each a switch, kept in the device's
+ * settings; Download logs is unchanged by any of them. */
+enum { LG_ONLINE, LG_GAMES, LG_MUSE, LG_SYSTEM, LG_CORE, LG_KEYS, LG_KERNEL };
+static bool g_log_core, g_log_keys;
+static const char *const LOG_KEY[LOGCAT_COUNT] = { "log.online", "log.games", "log.muse", "log.system" };
+static int g_log_shot;   /* --logging N: the page, row N-1 picked */
+
+static void log_apply(void)
+{
+	logstamp_filter(logcat_keep);
+	plat_input_debug(g_log_keys);
+	plat_resident_set_corelog(g_log_core);
+}
+
+static void log_load(void)
+{
+	int c;
+
+	for (c = 0; c < LOGCAT_COUNT; c++) logcat_set((logcat)c, db_get_int(db_dev(), LOG_KEY[c], 1) != 0);
+	g_log_core   = db_get_int(db_dev(), "log.core", 0) != 0;
+	g_log_keys   = db_get_int(db_dev(), "log.keys", 0) != 0;
+	g_log_kernel = db_get_int(db_dev(), "log.kernel", 1) != 0;
+	log_apply();
+}
+
+static void log_save(void)
+{
+	int c;
+
+	for (c = 0; c < LOGCAT_COUNT; c++) db_set_int(db_dev(), LOG_KEY[c], logcat_get((logcat)c) ? 1 : 0);
+	db_set_int(db_dev(), "log.core", g_log_core ? 1 : 0);
+	db_set_int(db_dev(), "log.keys", g_log_keys ? 1 : 0);
+	db_set_int(db_dev(), "log.kernel", g_log_kernel ? 1 : 0);
+}
+
+static int log_build(void *ctx, menu_row *rows, int max, const char **heading)
+{
+	static const struct { const char *name, *hint; } CAT[LOGCAT_COUNT] = {
+		{ "Online",  "Wi-Fi, RomM, Save Sync, achievements, downloads" },
+		{ "Games",   "Starting and ending games, ports, cheats, shelves" },
+		{ "Muse",    "The music and audiobook player" },
+		{ "System",  "Battery, power, sound, screen, clock, settings" },
+	};
+	int n = 0, c;
+
+	(void)ctx; (void)max;
+	*heading = "Logging";
+	for (c = 0; c < LOGCAT_COUNT; c++) {
+		rows[n] = (menu_row){ CAT[c].name, logcat_get((logcat)c) ? "On" : "Off", true, .id = MENU_ID(LG_ONLINE + c) };
+		rows[n].toggle = true;
+		rows[n++].hint = CAT[c].hint;
+	}
+	rows[n++] = MENU_RULE;
+	rows[n] = (menu_row){ "Emulator Details", g_log_core ? "On" : "Off", true, .id = MENU_ID(LG_CORE) };
+	rows[n].toggle = true;
+	rows[n++].hint = "Each emulator's own messages. Slows some games";
+	rows[n] = (menu_row){ "Button Presses", g_log_keys ? "On" : "Off", true, .id = MENU_ID(LG_KEYS) };
+	rows[n].toggle = true;
+	rows[n++].hint = "Every press, for a button that misbehaves";
+	rows[n] = (menu_row){ "Kernel Log at Off", g_log_kernel ? "On" : "Off", true, .id = MENU_ID(LG_KERNEL) };
+	rows[n].toggle = true;
+	rows[n++].hint = "Card and power errors. A moment longer to turn off";
+	rows[n++] = MENU_RULE;
+	rows[n++] = MENU_NOTE("Errors and updates are always logged");
+	return n;
+}
+
+static menu_result log_key(app *a, void *ctx, in_button key, int sel)
+{
+	int id = menu_id();
+
+	(void)a; (void)ctx; (void)sel;
+	if (key != IN_LEFT && key != IN_RIGHT && key != IN_ACCEPT) return MENU_STAY;
+	if (id >= LG_ONLINE && id < LG_ONLINE + LOGCAT_COUNT) {
+		logcat c = (logcat)(id - LG_ONLINE);
+		logcat_set(c, !logcat_get(c));
+	} else if (id == LG_CORE)   g_log_core = !g_log_core;
+	else if (id == LG_KEYS)     g_log_keys = !g_log_keys;
+	else if (id == LG_KERNEL)   g_log_kernel = !g_log_kernel;
+	else return MENU_STAY;
+	log_save();
+	log_apply();
+	return MENU_STAY;
+}
+
+static void logging_screen(app *a)
+{
+	menu_run(a, &(menu_style){ .status = true, .accent = MENU_ACCENT, .fixed_w = 0 }, log_build, log_key, NULL);
+}
+
 static bool g_about_shot;   /* --about: one frame, drawn and not shown */
 static int  g_chan_shot;    /* --chan 1|2: Update Channels, on Public Release or Pre-Release */
 static int  g_arrange_shot; /* --arrange N: Arrange Shelves, row N-1 picked up */
@@ -11220,9 +11319,9 @@ static void chan_screen(app *a)
 static void about_screen(app *a)
 {
 	char ver[48], addr[80], batt[32], up[48], base[48], store[64];
-	menu_row rows[8];
+	menu_row rows[9];
 	char ssid[WIFI_SSID_MAX], ip[64];
-	int pct = 0;
+	int pct = 0, sel = 6;   /* ChaOS: the two rows that open, by id below */
 	bool charging = false;
 	unsigned secs;
 	bool done = false;
@@ -11284,14 +11383,21 @@ static void about_screen(app *a)
 		rows[4] = (menu_row){ "Battery",   batt,  false };
 		rows[5] = (menu_row){ "Awake for", up,    false };
 		rows[6] = (menu_row){ "Update Channels",
-		                      g_test_updates ? "Pre-Release" : "Public Release", true, true };
+		                      g_test_updates ? "Pre-Release" : "Public Release", true, true,
+		                      .id = MENU_ID(1) };
+		rows[7] = (menu_row){ "Logging", NULL, true, true, .id = MENU_ID(2) };
 
 		plat_input_poll(&a->in);
 		if (a->in.quit_requested) { a->running = false; return; }
 		if (a->in.pressed[IN_POWER] || idle_due(a)) { power_off(a); return; }
 		if (menu_leaving(a)) done = true;
 		if (a->in.pressed[IN_SELECT]) muse_open(a, NULL, NULL);
-		if (a->in.pressed[IN_ACCEPT]) chan_screen(a);
+		/* up and down between the rows that open; A opens the one it is */
+		if (in_repeat(&a->in, IN_UP) || in_repeat(&a->in, IN_DOWN)) sel = sel == 6 ? 7 : 6;
+		if (a->in.pressed[IN_ACCEPT]) {
+			if (rows[sel].id == MENU_ID(1)) chan_screen(a);
+			else if (rows[sel].id == MENU_ID(2)) logging_screen(a);
+		}
 
 		if (in_repeat(&a->in, IN_VOLUP))    plat_volume_nudge(+1);
 		if (in_repeat(&a->in, IN_VOLDN))    plat_volume_nudge(-1);
@@ -11304,7 +11410,7 @@ static void about_screen(app *a)
 		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
 		SDL_RenderFillRect(a->r, NULL);
 		g_menu_status = true;   /* a main page: the clock and battery */
-		menu_draw(a, "About ChaOS", rows, 7, 6, menu_std_width(a), MENU_ACCENT);
+		menu_draw(a, "About ChaOS", rows, 8, sel, menu_std_width(a), MENU_ACCENT);
 		g_menu_status = false;
 		if (g_about_shot) return;
 		plat_draw_osd(a->r);
@@ -25838,6 +25944,51 @@ static int display_check(app *a)
 	return bad ? 1 : 0;
 }
 
+/* Logging: each row pressed moves its own setting and no other, the way the
+ * project's rule asks of every row (CLAUDE.md). Added with Logging. */
+static unsigned log_state(void)
+{
+	unsigned b = 0;
+	int c;
+
+	for (c = 0; c < LOGCAT_COUNT; c++) if (logcat_get((logcat)c)) b |= 1u << c;
+	if (g_log_core) b |= 1u << 4;
+	if (g_log_keys) b |= 1u << 5;
+	if (g_log_kernel) b |= 1u << 6;
+	return b;
+}
+
+static int logging_check(app *a)
+{
+	static const int bit[] = { [LG_ONLINE] = 0, [LG_GAMES] = 1, [LG_MUSE] = 2, [LG_SYSTEM] = 3,
+	                           [LG_CORE] = 4, [LG_KEYS] = 5, [LG_KERNEL] = 6 };
+	menu_row rows[16];
+	const char *heading;
+	int n = log_build(NULL, rows, 16, &heading), i, bad = 0, live = 0;
+
+	for (i = 0; i < n; i++) {
+		unsigned before, after;
+		int id;
+
+		if (!rows[i].live) continue;
+		live++;
+		id = rows[i].id - 1;
+		g_menu_id = id;
+		before = log_state();
+		log_key(a, NULL, IN_ACCEPT, i);
+		after = log_state();
+		if (id < 0 || id > LG_KERNEL || (before ^ after) != 1u << bit[id]) {
+			printf("FAIL logging: \"%s\" moved %#x\n", rows[i].label, before ^ after); bad = 1;
+		} else printf("ok logging: %s\n", rows[i].label);
+		log_key(a, NULL, IN_ACCEPT, i);   /* and back */
+		if (log_state() != before) { printf("FAIL logging: %s didn't go back\n", rows[i].label); bad = 1; }
+	}
+	if (live != 7) { printf("FAIL logging: %d rows, not 7\n", live); bad = 1; }
+	g_menu_id = -1;
+	logstamp_filter(NULL);
+	return bad;
+}
+
 /* Home (F1 or F2 alone) leaves every menu, but not as half of the F1+F2
  * lock, and not where the keys are a game's or Muse's (g_home_off). Added
  * with Home in 2.7.9-test1: a stray F1 in the in-game menu would have closed
@@ -25926,7 +26077,7 @@ static int menu_ids_check(app *a)
 static void take_shot(app *a)
 {
 	ui_set_pixel(CARDS_PIXEL_UI(g_cards));   /* as the main loop does */
-	if (g_menu_ids) exit(menu_ids_check(a) | home_check(a));
+	if (g_menu_ids) exit(menu_ids_check(a) | home_check(a) | logging_check(a));
 	if (g_display_check) exit(display_check(a));
 	SDL_Surface *out = SDL_CreateRGBSurfaceWithFormat(0, TORTOS_SCREEN_W,
 	                                                  TORTOS_SCREEN_H, 32,
@@ -26083,6 +26234,16 @@ static void take_shot(app *a)
 		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
 		SDL_RenderFillRect(a->r, NULL);
 		menu_draw(a, heading, rows, n, g_bw_shot - 1, 0, MENU_ACCENT);
+	}
+	if (g_log_shot) {
+		menu_row rows[16];
+		const char *heading;
+		int n = log_build(NULL, rows, 16, &heading);
+
+		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
+		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
+		SDL_RenderFillRect(a->r, NULL);
+		menu_draw(a, heading, rows, n, g_log_shot - 1, 0, MENU_ACCENT);
 	}
 	if (g_sticks_shot >= 0) sticks_screen(a);
 	if (g_arrange_shot) {
@@ -26518,6 +26679,7 @@ int main(int argc, char *argv[])
 		else if (!strcmp(argv[i], "--menu-ids")) g_menu_ids = true;
 		else if (!strcmp(argv[i], "--display-check")) g_display_check = true;
 		else if (!strcmp(argv[i], "--battwarn") && i + 1 < argc) g_bw_shot = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "--logging") && i + 1 < argc) g_log_shot = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--offnote") && i + 1 < argc) g_off_shot = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--tzpick") && i + 1 < argc) g_tz_shot = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--romm") && i + 1 < argc) {
@@ -27146,6 +27308,7 @@ int main(int argc, char *argv[])
 		g_status_batt    = db_get_int(db_dev(), "status.battery", STATUS_BATT_ICON);
 		g_update_dot     = db_get_int(db_dev(), "update.dot", 1) != 0;
 		bw_load();
+		log_load();   /* ChaOS: About ChaOS > Logging */
 		/* A test build put on a card as it is (its image, or ChaOS
 		 * Installer's Pre-Release) starts on Pre-Release: whoever chose it
 		 * wants the next one. Once chosen, the choice stands. */

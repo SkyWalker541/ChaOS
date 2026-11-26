@@ -12,4 +12,10 @@
  * call once, early in main; a second call does nothing. */
 void logstamp_install(void);
 
+/* ChaOS: asked at the start of each line whether it is written (logcat.h's
+ * logcat_keep); NULL writes every line. Safe to call any time. */
+#include <stdbool.h>
+#include <stddef.h>
+void logstamp_filter(bool (*keep)(const char *line, size_t n));
+
 #endif

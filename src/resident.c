@@ -22,6 +22,7 @@ static char g_play_map[512];
 static bool g_play_rewind;
 static char g_play_mode[16];     /* Display Mode, Diatom's name: "integer" */
 static char g_play_tz[64];
+static bool g_corelog;            /* ChaOS: Logging > Emulator Details */
 static int  g_play_stick = -1;    /* ChaOS: Left Stick as D-Pad for the next game, -1 none */       /* the player's zone, an id such as "America/New_York" */
 static char g_play_cheats[1024]; /* the cheats on, as a file for Diatom, or "" */
 
@@ -366,13 +367,14 @@ bool plat_resident_send(const char *tag, const char *core, const char *rom,
 		 * the first frame is drawn that way (ChaOS-diatom reads it there) */
 		if (!dsend("RUN\tcore=%s\trom=%s\ttag=%s"
 		           "\tresume=%s\texit_state=%s\tpreview=%s"
-		           "\tconsole=%d\tcheevos=%s%s%s%s%s",
+		           "\tconsole=%d\tcheevos=%s%s%s%s%s%s",
 		           core, rom, tag,
 		           resume ? resume : "", exit_state ? exit_state : "",
 		           preview ? preview : "",
 		           console, cheevos ? cheevos : "",
 		           g_play_mode[0] ? "\tmode=" : "", g_play_mode,
-		           g_play_tz[0] ? "\ttz=" : "", g_play_tz)) {
+		           g_play_tz[0] ? "\ttz=" : "", g_play_tz,
+		           g_corelog ? "\tcorelog=1" : "")) {
 			device_display_take();      /* no game is coming */
 			return false;
 		}
@@ -530,6 +532,7 @@ static void d_note_audio(const char *l);
 static void d_note_display(const char *l);
 
 void plat_resident_set_stick(int on) { g_play_stick = on; }
+void plat_resident_set_corelog(bool on) { g_corelog = on; }
 
 void plat_resident_set_play(const char *map, bool rewind)
 {

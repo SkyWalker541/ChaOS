@@ -10,10 +10,13 @@
 #include <time.h>
 #include <unistd.h>
 
-typedef struct { int fd; bool at_start; } stamp_out;
+typedef struct { int fd; bool at_start, dropping; } stamp_out;
 
 static pthread_mutex_t g_mx = PTHREAD_MUTEX_INITIALIZER;
 static stamp_out g_out[2];
+static bool (*g_keep)(const char *line, size_t n);   /* logstamp_filter */
+
+void logstamp_filter(bool (*keep)(const char *line, size_t n)) { g_keep = keep; }
 
 static void put(int fd, const char *b, size_t n)
 {
@@ -54,8 +57,13 @@ static ssize_t stamp_write(void *cookie, const char *buf, size_t size)
 		const char *nl = memchr(buf + i, '\n', size - i);
 		size_t len = nl ? (size_t)(nl - (buf + i)) + 1 : size - i;
 
-		if (o->at_start) stamp(o->fd);
-		put(o->fd, buf + i, len);
+		/* ChaOS: a line Logging leaves out is decided at its start, from
+		 * what that write holds of it, and the rest of it goes with it */
+		if (o->at_start) {
+			o->dropping = g_keep && !g_keep(buf + i, len);
+			if (!o->dropping) stamp(o->fd);
+		}
+		if (!o->dropping) put(o->fd, buf + i, len);
 		o->at_start = nl != NULL;
 		i += len;
 	}

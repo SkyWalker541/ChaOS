@@ -22,7 +22,7 @@ CHECKS = check-display check-cheevos check-hare check-httpd check-idle check-rah
          check-db check-stats check-sort check-bt check-ss \
          check-muselib check-musequeue check-museart check-controls check-logpack \
          check-clock check-update check-remap check-shots check-pixfont \
-         check-release check-updater check-chaos-names check-itch check-itchdl check-hbcat check-discset check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore check-gbsort check-menu-keys check-menu-lint check-pro-detect
+         check-release check-updater check-chaos-names check-itch check-itchdl check-hbcat check-discset check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore check-gbsort check-menu-keys check-menu-lint check-pro-detect check-logcat
 
 check: check-sevenz
 	@fail=0; for c in $(CHECKS); do \
@@ -624,6 +624,14 @@ build-native/muselib-check: tools/muselib-check.c src/muselib.c src/muselib.h FO
 
 # The logs pack: names and Bluetooth addresses masked, and a whole pack
 # unpacked with the same tar and read back.
+# ChaOS: About ChaOS > Logging's groups, with every kind of line the launcher
+# writes sorted into one (tools/logcat-check.c)
+check-logcat: FORCE
+	@mkdir -p build-native
+	@$(CC) -std=gnu11 -Wall -Wextra -Werror -O1 -o build-native/logcat-check tools/logcat-check.c src/logcat.c
+	@grep -ohE 'fprintf\(stderr, "[a-zA-Z0-9 _-]+:' src/*.c src/device/*.c | sed -E 's/.*"//; s/:$$//' | sort -u | \
+		./build-native/logcat-check
+
 check-logpack: build-native/logpack-check
 	@./build-native/logpack-check
 

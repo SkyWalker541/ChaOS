@@ -40,6 +40,10 @@ static in_button vol_as[2] = { IN_NONE, IN_NONE };    /* "audiocodec sunxi Audio
 /* TORTOS_INPUT_DEBUG=1 logs raw evdev codes, so one press tells you exactly
  * which device a control arrives on. */
 static int dbg_input;
+static bool dbg_input_env;   /* TORTOS_INPUT_DEBUG or the .input_debug marker */
+
+/* ChaOS: About ChaOS > Logging > Button Presses, on top of the old ways */
+void plat_input_debug(bool on) { dbg_input = on || dbg_input_env; }
 
 #ifdef __linux__
 /* Every button by its key code, as the Pixel 2 reads its own. brick-pad sends
@@ -240,7 +244,8 @@ bool plat_input_init(void)
 {
 	char marker[512];
 	snprintf(marker, sizeof marker, "%s/.input_debug", P_ROOT);
-	dbg_input = getenv("TORTOS_INPUT_DEBUG") != NULL || access(marker, F_OK) == 0;
+	dbg_input_env = getenv("TORTOS_INPUT_DEBUG") != NULL || access(marker, F_OK) == 0;
+	dbg_input = dbg_input || dbg_input_env;
 #ifdef __linux__
 	if (fd_pad < 0 || fd_keys < 0 || fd_power < 0) input_scan();
 	if (fd_pad < 0)   fprintf(stderr, "input: no gamepad found\n");

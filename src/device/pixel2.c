@@ -249,6 +249,10 @@ static int fd_keys = -1;    /* "gpio-keys": volume */
 static int fd_power = -1;   /* "rk805 pwrkey" */
 static int jack_fd = -1;    /* "rk817_int Headphones": the jack switch, for the settings */
 static int dbg_input;
+static bool dbg_input_env;   /* TORTOS_INPUT_DEBUG or the .input_debug marker */
+
+/* ChaOS: About ChaOS > Logging > Button Presses, on top of the old ways */
+void plat_input_debug(bool on) { dbg_input = on || dbg_input_env; }
 static bool l2_down, r2_down;  /* the two together ask for the battery level (below) */
 
 /* Kernel code -> TortOS button, by what is printed on the key. Measured
@@ -305,7 +309,8 @@ bool plat_input_init(void)
 	char marker[512];
 
 	snprintf(marker, sizeof marker, "%s/.input_debug", P_ROOT);
-	dbg_input = getenv("TORTOS_INPUT_DEBUG") != NULL || access(marker, F_OK) == 0;
+	dbg_input_env = getenv("TORTOS_INPUT_DEBUG") != NULL || access(marker, F_OK) == 0;
+	dbg_input = dbg_input || dbg_input_env;
 	if (fd_pad < 0 || fd_keys < 0 || fd_power < 0) input_scan();
 	if (fd_pad < 0)   fprintf(stderr, "input: no gamepad found\n");
 	if (fd_keys < 0)  fprintf(stderr, "input: no volume keys found\n");
