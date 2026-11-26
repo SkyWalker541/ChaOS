@@ -57,6 +57,30 @@ int main(void)
 	n = libpack_missing(prog, dirs, miss, 16);
 	CHECK(n == 1 && !strcmp(miss[0], "libgone.so.2"),
 	      "missing: only what the carried library needs (%d%s%s)", n, n ? ", " : "", n ? miss[0] : "");
+	/* A runtime the port's script mounts, looked at with it (2026-11-26:
+	 * Weston's wp_weston needed libevdev, and only the port's own folder
+	 * was looked at, so it was never fetched and Switchfin, The Brainvore
+	 * and Pixel Wheels stopped on a black screen). Its program's needs
+	 * count, and a library it carries counts for the port's program. */
+	snprintf(cmd, sizeof cmd,
+	         "cd %s && mkdir -p port2 rt/lib && cc -shared -fPIC -o rt/lib/librtlib.so.1 -Wl,-soname,librtlib.so.1 b.c && "
+	         "printf 'int b(void); int main(void){return b();}' > m2.c && "
+	         "cc -o port2/game2 m2.c -Lrt/lib -l:librtlib.so.1 && "
+	         "printf 'int z(void); int main(void){return z();}' > w.c && cc -o rt/wp w.c -L. -l:libgone.so.2", dir);
+	if (system(cmd) != 0) { printf("FAIL: couldn't build the test runtime\n"); return 1; }
+	{
+		char p2[600], rt[600];
+		const char *roots[3];
+
+		snprintf(p2, sizeof p2, "%s/port2", dir);
+		snprintf(rt, sizeof rt, "%s/rt", dir);
+		n = libpack_missing(p2, dirs, miss, 16);
+		CHECK(n == 1 && !strcmp(miss[0], "librtlib.so.1"), "the port alone lacks the runtime's library (%d)", n);
+		roots[0] = p2; roots[1] = rt; roots[2] = NULL;
+		n = libpack_missing_in(roots, dirs, miss, 16);
+		CHECK(n == 1 && !strcmp(miss[0], "libgone.so.2"),
+		      "with its runtime: only what the runtime's program lacks (%d%s%s)", n, n ? ", " : "", n ? miss[0] : "");
+	}
 	{
 		const char *list = "{\"version\":1,\"libs\":{\"libgone.so.2\":{\"file\":\"libgone.so.2\","
 		                   "\"md5\":\"abc\",\"size\":7},\"bad\":{\"file\":\"../x\"}}}";

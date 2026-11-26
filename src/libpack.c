@@ -238,13 +238,23 @@ static bool on_device(const char *const *dirs, const char *n, char *path, size_t
 int libpack_missing(const char *port_dir, const char *const *have_dirs,
                     char out[][LIBPACK_NAME], int max)
 {
+	const char *roots[2];
+
+	roots[0] = port_dir;
+	roots[1] = NULL;
+	return libpack_missing_in(roots, have_dirs, out, max);
+}
+
+int libpack_missing_in(const char *const *roots, const char *const *have_dirs,
+                       char out[][LIBPACK_NAME], int max)
+{
 	walk w;
 	char (*seen)[LIBPACK_NAME] = NULL, (*todo)[LIBPACK_NAME] = NULL;
 	int nseen = 0, nmiss = 0, i;
 	const int cap = 2048;
 
 	memset(&w, 0, sizeof w);
-	scan_dir(&w, port_dir, 0);
+	for (i = 0; roots && roots[i]; i++) scan_dir(&w, roots[i], 0);
 	seen = malloc((size_t)cap * LIBPACK_NAME);
 	todo = malloc((size_t)cap * LIBPACK_NAME);
 	if (!seen || !todo) goto done;

@@ -61,25 +61,34 @@ fi
 # kernel had to say (an out-of-memory kill, a crash)
 trap 'echo "run.sh: stopped by ChaOS"; dmesg 2> /dev/null | tail -15; exit 143' TERM HUP INT
 
-if [ "$PORT" = --portmaster ]; then
-	# ChaOS: PortMaster's own app. Its Python is ChaOS's (tools/build-python.sh),
-	# shipped as one squashfs and unpacked once into userdata (the kernel
-	# can't mount it, and the card has no symlinks: python3 is a copy), again
-	# only when the image changes. Then PortMaster's own launcher, with
-	# ChaOS's hooks (chaos/launch_hooks.txt).
-	img="$HERE/python/chaos-python.squashfs"
-	py="$CHAOS_USERDATA/ports/python"
+# ChaOS's Python (tools/build-python.sh), shipped as one squashfs and
+# unpacked once into userdata (the kernel can't mount it, and the card has no
+# symlinks: python3 is a copy), again only when the image changes. False if
+# there is none.
+img="$HERE/python/chaos-python.squashfs"
+py="$CHAOS_USERDATA/ports/python"
+chaos_python() {
 	stamp="$(wc -c < "$img" 2> /dev/null | tr -d ' ')"
 	if [ -n "$stamp" ] && [ "$(cat "$py/.chaos-stamp" 2> /dev/null)" != "$stamp" ]; then
 		echo "unpacking Python ($stamp bytes)"
 		rm -rf "$py.new"
 		"$HERE/bin/unsquashfs" -no-progress -ignore-errors -f -d "$py.new" "$img" > /dev/null 2>&1
-		[ -x "$py.new/bin/python3.11" ] || { echo "Python didn't unpack"; exit 1; }
-		[ -x "$py.new/bin/python3" ] || cp -f "$py.new/bin/python3.11" "$py.new/bin/python3"
-		echo "$stamp" > "$py.new/.chaos-stamp"
-		rm -rf "$py" && mv "$py.new" "$py"
+		if [ -x "$py.new/bin/python3.11" ]; then
+			[ -x "$py.new/bin/python3" ] || cp -f "$py.new/bin/python3.11" "$py.new/bin/python3"
+			echo "$stamp" > "$py.new/.chaos-stamp"
+			rm -rf "$py" && mv "$py.new" "$py"
+		else
+			echo "Python didn't unpack"
+			rm -rf "$py.new"
+		fi
 	fi
-	[ -x "$py/bin/python3" ] || { echo "no Python for PortMaster"; exit 1; }
+	[ -x "$py/bin/python3" ]
+}
+
+if [ "$PORT" = --portmaster ]; then
+	# ChaOS: PortMaster's own app, on ChaOS's Python. Then PortMaster's own
+	# launcher, with ChaOS's hooks (chaos/launch_hooks.txt).
+	chaos_python || { echo "no Python for PortMaster"; exit 1; }
 	# the SDL2 ports get, under the name pySDL2 looks for first (no symlinks
 	# on the card: a copy, renewed when the system's changes)
 	if [ -f /usr/lib/chaos-ports/libSDL2-2.0.so.0 ]; then
@@ -121,6 +130,14 @@ PYEOF
 	echo "PortMaster exited $st"
 	sync
 	exit $st
+fi
+# python3 for the ports that call it - PortMaster's harbourmaster fetching a
+# runtime (Dust Racing 2D), a patcher run on the first start (Lasagna Boy
+# Classic's), a script - at the end of PATH, so a port's own Python (Pyxel's,
+# Ren'Py's) still comes first; PYTHONHOME set for ChaOS's alone, by the
+# wrapper (res/ports/pybin/python3). The Brick has none of its own.
+if chaos_python; then
+	export CHAOS_PYTHON="$py" PATH="$PATH:$HERE/pybin"
 fi
 cd "$(dirname "$PORT")" || exit 1
 /bin/bash "$PORT"

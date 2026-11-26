@@ -1,0 +1,7 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# ChaOS: python3 for ports (res/ports/run.sh puts this folder last on PATH).
+# ChaOS's own Python, with its PYTHONHOME for it alone, so that a port's own
+# Python, which comes first on PATH, keeps its own.
+[ -n "$CHAOS_PYTHON" ] && [ -x "$CHAOS_PYTHON/bin/python3.11" ] || { echo "python3: no Python here" >&2; exit 127; }
+PYTHONHOME="$CHAOS_PYTHON" exec "$CHAOS_PYTHON/bin/python3.11" "$@"

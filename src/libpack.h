@@ -37,6 +37,14 @@ bool libpack_elf(const char *path, char needed[][LIBPACK_NAME], int max, int *n,
 int libpack_missing(const char *port_dir, const char *const *have_dirs,
                     char out[][LIBPACK_NAME], int max);
 
+/* The same over several folders taken as one: a port's own and the
+ * runtimes its script mounts (PortMaster/libs/.chaos/<name>), so a runtime's
+ * programs are looked at too (Weston's wp_weston needs libevdev, which the
+ * Brick hasn't got: Switchfin, The Brainvore and Pixel Wheels stopped there,
+ * 2026-11-26), and a library one carries counts for the others. */
+int libpack_missing_in(const char *const *roots, const char *const *have_dirs,
+                       char out[][LIBPACK_NAME], int max);
+
 /* A library in the pack's list: its file there, MD5 and size. */
 bool libpack_find(const char *list_json, size_t len, const char *name,
                   char *file, size_t fn, char *md5, size_t mn, long *size);

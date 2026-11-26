@@ -158,6 +158,9 @@ install -m 755 "$ROOT/res/ports/bin/pkill" "$ROOT/res/ports/bin/pgrep" "$ROOT/re
 install -m 755 "$ROOT/dist/brick/unsquashfs" "$C/TortOS/ports/bin/unsquashfs"
 # PortMaster's own app: ChaOS's hooks for it, and the Python it runs on
 # (tools/build-python.sh), unpacked by run.sh --portmaster on first use
+# python3 for ports, at the end of their PATH (res/ports/pybin/python3)
+mkdir -p "$C/TortOS/ports/pybin"
+install -m 755 "$ROOT/res/ports/pybin/python3" "$C/TortOS/ports/pybin/python3"
 mkdir -p "$C/TortOS/ports/chaos" "$C/TortOS/ports/python"
 install -m 644 "$ROOT/res/ports/chaos/launch_hooks.txt" "$C/TortOS/ports/chaos/launch_hooks.txt"
 # and its look: PortMaster's theme in ChaOS's colors (res/ports/chaos_theme)

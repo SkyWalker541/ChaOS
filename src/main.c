@@ -16174,8 +16174,8 @@ static bool ports_setup_screen(app *a, const char *title, unsigned accent)
  * standalone emulator path does, and the idle resident emulator is ended and
  * started again after. */
 static bool pm_launch_runtimes(app *a, const char *script, const char *title, unsigned accent);
-static int pm_libs(app *a, const char *port_dir, const char *title, unsigned accent,
-                   char *left, size_t ln);
+static int pm_libs(app *a, const char *port_dir, const char *script, const char *title,
+                   unsigned accent, char *left, size_t ln);
 static bool port_game_dir(const char *script, char *out, size_t n);
 
 /* A port's libraries looked at before it starts (pm_libs), until once
@@ -16193,7 +16193,7 @@ static void port_libs_before(app *a, const char *script, const char *romfile,
 
 	port_checked_path(romfile, mark, sizeof mark);
 	if (access(mark, F_OK) == 0 || !port_game_dir(script, dir, sizeof dir)) return;
-	if (pm_libs(a, dir, title, accent, left, sizeof left) == 0) {
+	if (pm_libs(a, dir, script, title, accent, left, sizeof left) == 0) {
 		char d[LIB_PATH];
 		FILE *f;
 
@@ -16527,7 +16527,7 @@ static void port_launch(app *a, int o, const char *romfile, const char *title)
 			port_checked_path(romfile, mark, sizeof mark);
 			unlink(mark);
 			if (port_game_dir(script, dir, sizeof dir))
-				still = pm_libs(a, dir, title, s->accent, left, sizeof left);
+				still = pm_libs(a, dir, script, title, s->accent, left, sizeof left);
 			if (still == 0)
 				snprintf(msg, sizeof msg, "Got what it was missing:\nstart it again");
 			else
@@ -16982,20 +16982,62 @@ static char *pm_libpack_list(app *a, unsigned accent, size_t *len)
  * pack into .userdata/ports/lib (run.sh puts it on their library path),
  * with what each fetched library needs in turn. Returns how many are still
  * missing after, naming the first in `left`. */
-static int pm_libs(app *a, const char *port_dir, const char *title, unsigned accent,
-                   char *left, size_t ln)
+/* The runtimes a port's script mounts, as ChaOS unpacked them
+ * (PortMaster/libs/.chaos/<name>, res/ports/bin/mount): each one the script
+ * names. Up to `max`, after `at` already in `out`; returns the new count. */
+#define PM_RT_ROOTS 6
+static int pm_script_runtimes(const char *script, char out[][LIB_PATH * 2], int at, int max)
+{
+	char base[LIB_PATH], *text;
+	FILE *f;
+	long len;
+	DIR *d;
+	struct dirent *e;
+
+	if (!script || !(f = fopen(script, "rb"))) return at;
+	fseek(f, 0, SEEK_END);
+	len = ftell(f);
+	rewind(f);
+	if (len <= 0 || len > 256 * 1024 || !(text = malloc((size_t)len + 1))) { fclose(f); return at; }
+	len = (long)fread(text, 1, (size_t)len, f);
+	fclose(f);
+	text[len] = '\0';
+	snprintf(base, sizeof base, "%s/Ports/PortMaster/libs/.chaos", P_ROMS);
+	if ((d = opendir(base))) {
+		while ((e = readdir(d)) && at < max) {
+			char stamp[LIB_PATH * 2 + 16];
+
+			if (e->d_name[0] == '.' || strlen(e->d_name) < 4 || !strstr(text, e->d_name)) continue;
+			snprintf(stamp, sizeof stamp, "%s/%s/.chaos-stamp", base, e->d_name);
+			if (access(stamp, F_OK) != 0) continue;   /* half unpacked: not yet */
+			snprintf(out[at++], LIB_PATH * 2, "%s/%s", base, e->d_name);
+		}
+		closedir(d);
+	}
+	free(text);
+	return at;
+}
+
+static int pm_libs(app *a, const char *port_dir, const char *script, const char *title,
+                   unsigned accent, char *left, size_t ln)
 {
 	char lib[LIB_PATH], want[24][LIBPACK_NAME], file[LIBPACK_NAME], md5[40];
-	const char *have[5];
+	char rdir[1 + PM_RT_ROOTS][LIB_PATH * 2];
+	const char *have[5], *roots[2 + PM_RT_ROOTS];
 	char *list = NULL;
 	size_t len = 0;
-	int n, i, still = 0;
+	int n, i, still = 0, nr;
 
 	left[0] = '\0';
 	pm_lib_dir(lib, sizeof lib);
 	have[0] = "/lib"; have[1] = "/usr/lib"; have[2] = "/usr/lib/chaos-ports"; have[3] = lib;
 	have[4] = NULL;
-	n = libpack_missing(port_dir, have, want, 24);
+	/* the port's own folder, and the runtimes its script mounts */
+	snprintf(rdir[0], sizeof rdir[0], "%s", port_dir);
+	nr = pm_script_runtimes(script, rdir, 1, 1 + PM_RT_ROOTS);
+	for (i = 0; i < nr; i++) roots[i] = rdir[i];
+	roots[nr] = NULL;
+	n = libpack_missing_in(roots, have, want, 24);
 	if (n == 0) return 0;
 	fprintf(stderr, "ports: %s needs %d librar%s the Brick hasn't got, %s first\n", port_dir, n,
 	        n == 1 ? "y" : "ies", want[0]);
@@ -17391,7 +17433,7 @@ static bool pm_install(app *a, int idx, unsigned accent)
 		char dir[LIB_PATH * 2], left[LIBPACK_NAME], msg[200];
 
 		snprintf(dir, sizeof dir, "%s/%s", ports, p->dir);
-		if (p->dir[0] && pm_libs(a, dir, p->title, accent, left, sizeof left) > 0) {
+		if (p->dir[0] && pm_libs(a, dir, NULL, p->title, accent, left, sizeof left) > 0) {
 			snprintf(msg, sizeof msg, "It needs %s,\nwhich ChaOS doesn't have yet:\nit may not start", left);
 			pick_say(a, p->title, msg, accent);
 		}
