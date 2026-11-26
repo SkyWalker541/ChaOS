@@ -20,7 +20,24 @@ export XDG_DATA_HOME="$HOME/.local/share"
 export XDG_CONFIG_HOME="$HOME/.config"
 mkdir -p "$XDG_DATA_HOME" "$XDG_CONFIG_HOME"
 
-exec > "$CHAOS_USERDATA/ports/last.log" 2>&1
+# At most 8 MB of it written: a port that prints an error in a loop wrote
+# 231 MB to the card while it ran (Doukutsu-rs, ALSA errors after its sound
+# died, 2.7.9-test3), card writes the game waited on and a log Download logs
+# then choked on. What comes after is read and dropped, so the port is never
+# blocked or cut off by a full pipe. Flushed line by line until then, so a
+# crash still leaves its last words.
+fifo=/tmp/chaos-port-log.$$
+rm -f "$fifo"
+if mkfifo "$fifo" 2> /dev/null; then
+	awk -v max=8388608 '{
+		if (n <= max) { n += length($0) + 1; print; fflush() }
+		else if (!said) { print "[ChaOS: the log stops here, at 8 MB; the port goes on]"; fflush(); said = 1 }
+	}' < "$fifo" > "$CHAOS_USERDATA/ports/last.log" 2>&1 &
+	exec > "$fifo" 2>&1
+	rm -f "$fifo"
+else
+	exec > "$CHAOS_USERDATA/ports/last.log" 2>&1
+fi
 echo "ChaOS $(cat "$HERE/../VERSION" 2>/dev/null): $PORT"
 date
 
