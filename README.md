@@ -16,6 +16,9 @@
 
 <br>
 
+> [!TIP]
+> **Pre-Release has the newest updates first**, including what's made for the Brick Pro, and installs on the **Brick, Brick Hammer and Brick Pro**. Once tested, Pre-Release's changes are merged into Public Release. Feel free to try it out: choose it in About ChaOS > Update Channels, or in ChaOS Installer.
+
 ## Overview
 
 ChaOS is custom firmware for the **TrimUI Brick** and **Brick Hammer**. It runs from the SD card and changes nothing on the device itself. It is built on [TortOS](https://github.com/ericreinsmidt/TortOS) by Eric Reinsmidt, and adds:
@@ -34,7 +37,7 @@ ChaOS is custom firmware for the **TrimUI Brick** and **Brick Hammer**. It runs 
 | **[Rewind, mapping, screenshots](https://skywalker541.github.io/ChaOS/#playing)** | Hold F1 to rewind, F2 for fast forward, MENU+SELECT to save and quit, alongside TortOS's instant start, resume, turbo and RetroAchievements |
 | **[PlayStation](https://skywalker541.github.io/ChaOS/#playstation)** | On PCSX-ReARMed, with achievements, and a Disc page for games on more than one disc |
 | **[Transfer and Wire](https://skywalker541.github.io/ChaOS/#transfer)** | Add games and covers from any browser, over Wi-Fi or the USB cable |
-| **[Updates](https://skywalker541.github.io/ChaOS/#updates)** | Over Wi-Fi, keeping your games, saves and settings. Choose Public Release or Pre-Release in About ChaOS > Update Channels to test builds before they're released |
+| **[Updates](https://skywalker541.github.io/ChaOS/#updates)** | Over Wi-Fi, keeping your games, saves and settings. Choose Public Release or Pre-Release in About ChaOS > Update Channels. Pre-Release has the newest updates first, Brick Pro support included; once tested, they're merged into Public Release |
 
 The **[ChaOS website](https://skywalker541.github.io/ChaOS/)** has the full tour: the Brick's own screens, a setup walkthrough, every button shortcut, and an FAQ.
 
@@ -47,7 +50,7 @@ The **[ChaOS website](https://skywalker541.github.io/ChaOS/)** has the full tour
 Prefer to do it by hand? Write `ChaOS-v<version>-brick.img.xz` from [Releases](https://github.com/SkyWalker541/ChaOS/releases/latest) to the card with a disk-image writer. That erases the card.
 
 > [!NOTE]
-> ChaOS is for the TrimUI Brick and Brick Hammer only. Found a problem, or have an idea for a feature? Join the [ChaOS Control Discord](https://discord.gg/axxyBSS2me): bugs go in #bugs, with the logs from ChaOS Transfer, and ideas in #feature-requests. It's also the place to get help or test pre-releases.
+> ChaOS is for the TrimUI Brick and Brick Hammer, and on Pre-Release the Brick Pro too. Found a problem, or have an idea for a feature? Join the [ChaOS Control Discord](https://discord.gg/axxyBSS2me): bugs go in #bugs, with the logs from ChaOS Transfer, and ideas in #feature-requests. It's also the place to get help, or to try Pre-Release and the Brick Pro.
 
 ## Documentation
 
