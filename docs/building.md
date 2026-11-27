@@ -45,6 +45,7 @@ exists because something once broke in a way nothing noticed:
 | `check-stats` | play time is recorded, and a LAUNCH still writes nothing |
 | `check-sort` | a shelf sorts the way it says it does, and the same shelf twice the same way |
 | `check-bt` | a device name from the air is only ever data; an address is validated |
+| `check-portaudio` | ports' sound through the Brick's own ALSA, OpenAL Soft and SDL (arm64, under qemu-user) with the ALSA helper preloaded, and a port's default device is what its log says; needs `gcc-aarch64-linux-gnu` and `qemu-user` |
 
 They are offline and need no device. A screen's rows are a pure function of
 its state precisely so the first two can exist.

@@ -91,18 +91,13 @@ export SEATD_VTBOUND=0
 # Lasagna Boy Classic's stopped on "Couldn't find a valid ICU package"
 # (2026-11-26). Without ICU it runs with invariant culture, as Microsoft says.
 export DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
-# The sound hardware itself as a port's default device, not the shared mixer
-# (res/ports/asound-ports.conf); ALSA's own configuration first, so only the
-# default changes. Only when the hardware is free: while anything still holds
-# the mixer (Muse's player keeps its device), the hardware would answer busy
-# and the port would have no sound at all, so it keeps the mixer then.
-snd=$(cat /proc/asound/card0/pcm0p/sub0/status 2> /dev/null | head -1)
-if [ -f /usr/share/alsa/alsa.conf ] && [ -f "$HERE/asound-ports.conf" ] && [ "$snd" = closed ]; then
-	export ALSA_CONFIG_PATH="/usr/share/alsa/alsa.conf:$HERE/asound-ports.conf"
-	echo "ChaOS: sound straight to the hardware"
-else
-	echo "ChaOS: sound through the shared mixer (the hardware: ${snd:-unknown})"
-fi
+# A port plays through the shared mixer, ALSA's default (/etc/asound.conf),
+# as Diatom and Muse do. From 2.7.9-test5 to 2.8.0-test4 this tried to give
+# the port the hardware itself instead, and said so in the log, but it never
+# took: ALSA reads ALSA_CONFIG_PATH's files first and runs alsa.conf's hooks,
+# which read /etc/asound.conf, after, so the mixer was always the default
+# (found 2026-11-26; make check-portaudio now reads what a port really gets).
+echo "ChaOS: sound through the shared mixer"
 # how many there are before the port starts anything (mod_ChaOS.txt)
 CHAOS_EV_BASE=$(ls /dev/input/event* 2> /dev/null | wc -l)
 export CHAOS_EV_BASE
@@ -116,8 +111,17 @@ for f in mod_ChaOS.txt libgl_ChaOS.txt; do
 done
 
 # The input devices once the port is going, for the log: the pad, and the
-# keyboard gptokeyb makes of it
-( sleep 4; echo "inputs, 4 s in:"; grep '^N:' /proc/bus/input/devices ) &
+# keyboard gptokeyb makes of it. And whether its sound is playing, read once
+# from the hardware (the mixer keeps it running while anyone plays), so a
+# port with no sound says so in its log: in 2.8.0-test3 every port lost its
+# sound and no log said a word (2026-11-26)
+( sleep 4; echo "inputs, 4 s in:"; grep '^N:' /proc/bus/input/devices
+  st=$(head -1 /proc/asound/card0/pcm0p/sub0/status 2> /dev/null)
+  case "$st" in
+  "state: RUNNING") echo "ChaOS: sound playing, 4 s in" ;;
+  closed) echo "ChaOS: no sound, 4 s in: nothing has the sound open (the port has none, or couldn't open it)" ;;
+  *) echo "ChaOS: sound open but not playing, 4 s in (${st:-unknown})" ;;
+  esac ) &
 
 # Ended from outside (ChaOS's power or Select+Start): said so, and what the
 # kernel had to say (an out-of-memory kill, a crash)

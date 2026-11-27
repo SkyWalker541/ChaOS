@@ -157,7 +157,6 @@ install -m 755 "$ROOT/res/ports/run.sh" "$C/TortOS/ports/run.sh"
 install -m 644 "$ROOT/res/ports/mod_ChaOS.txt" "$C/TortOS/ports/mod_ChaOS.txt"
 install -m 644 "$ROOT/res/ports/libgl_ChaOS.txt" "$C/TortOS/ports/libgl_ChaOS.txt"
 install -D -m 755 "$ROOT/dist/brick/libchaos-alsafix.so" "$C/TortOS/ports/lib/libchaos-alsafix.so"
-install -m 644 "$ROOT/res/ports/asound-ports.conf" "$C/TortOS/ports/asound-ports.conf"
 mkdir -p "$C/TortOS/ports/bin"
 install -m 755 "$ROOT/res/ports/bin/pkill" "$ROOT/res/ports/bin/pgrep" "$ROOT/res/ports/bin/mount" "$C/TortOS/ports/bin/"
 # unsquashfs, for runtimes the kernel can't mount (res/ports/bin/mount,
