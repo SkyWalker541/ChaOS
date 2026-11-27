@@ -10107,18 +10107,11 @@ static menu_result rm_key(app *a, void *ctx, in_button key, int sel)
 	char k[CFG_STR + LIB_PATH + 16];
 
 	if (!d) return MENU_STAY;
-	if (id >= 0 && id < RM_BUTTONS) {
-		rm_choice ch[RM_CHOICES];
-		int n = rm_choices(tag, ch);
-		c->map.choice[id] = (c->map.choice[id] + d + n) % n;
-		rm_store(c);
-	} else if (id == RM_ROW_SPEED) {
-		/* every turbo button in this map; saved with it, and in a game sent
-		 * at once, as a button's choice is. With none, nothing to change. */
-		if (rm_has_turbo(tag, &c->map)) {
-			c->map.period = rm_speed_step(c->map.period, d);
-			rm_store(c);
-		}
+	if ((id >= 0 && id < RM_BUTTONS) || id == RM_ROW_SPEED) {
+		/* a button's choice, or the speed of every turbo button: remap.c's
+		 * rm_press, which tools/remap-check.c presses row by row. Saved, and
+		 * in a game sent at once. */
+		if (rm_press(tag, &c->map, id, d)) rm_store(c);
 	} else if (id == RM_ROW_SCOPE) {
 		/* This game takes the console's map as its start; all its games
 		 * drops the game's own */

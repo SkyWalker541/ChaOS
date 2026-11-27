@@ -72,10 +72,15 @@ const char *rm_choice_label(const char *tag, int choice, char *buf, int n);
  * its row rests (main.c) */
 bool rm_has_turbo(const char *tag, const rm_map *m);
 
-/* Turbo Speed: "Normal, 10/s", or "Custom" for a period no preset has */
+/* Turbo Speed: "Normal", or "Custom" for a period no preset has */
 const char *rm_speed_label(int period, char *buf, int n);
 /* The next preset, `d` (-1 or 1) along, round the four; a custom period
  * goes to the preset nearest it in that direction */
 int rm_speed_step(int period, int d);
+
+/* Left or right (`d` -1 or 1) on the row `id` (rm_rows): a button's choice
+ * or Turbo Speed moves, and nothing else; false when nothing did (another
+ * row, or Turbo Speed with no turbo button). main.c's rm_key saves it. */
+bool rm_press(const char *tag, rm_map *m, int id, int d);
 
 #endif

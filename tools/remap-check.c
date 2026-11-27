@@ -54,7 +54,7 @@ int main(void)
 	printf("Turbo Speed:\n");
 	rm_from_spec("GB", "x:a~3,y:b~3", &m);
 	ck(m.period == RM_TURBO, "a map from before reads as Normal");
-	ck(!strcmp(rm_speed_label(m.period, spec, sizeof spec), "Normal, 10/s"), "and says so");
+	ck(!strcmp(rm_speed_label(m.period, spec, sizeof spec), "Normal"), "and says so");
 	rm_from_spec("GB", NULL, &m);
 	ck(m.period == RM_TURBO, "no map at all is Normal");
 	m.period = rm_speed_step(m.period, 1);
@@ -113,6 +113,33 @@ int main(void)
 			   "Turbo Speed once, after the buttons, Reset last");
 			ck(scopes == st && (!st || ids[0] == RM_ROW_SCOPE), "For only in a game, first");
 			ck(n <= RM_ROWS_MAX, "it fits its table");
+		}
+	}
+
+	/* Pressing each row moves its own setting and nothing else, with a
+	 * turbo button and without (where Turbo Speed rests) */
+	printf("each row, pressed:\n");
+	{
+		const char *maps[2] = { "x:a~3,y:b~3", "a:a,b:b" };
+		int st, k;
+		for (st = 0; st < 2; st++) {
+			int ids[RM_ROWS_MAX], n = rm_rows(true, ids, RM_ROWS_MAX), bad = 0;
+			for (k = 0; k < n; k++) {
+				rm_map before, after;
+				int b, moved;
+				rm_from_spec("GB", maps[st], &before);
+				after = before;
+				moved = rm_press("GB", &after, ids[k], 1);
+				for (b = 0; b < RM_BUTTONS; b++)
+					if (after.choice[b] != before.choice[b] && b != ids[k]) bad++;
+				if (ids[k] >= 0 && ids[k] < RM_BUTTONS && (!moved || after.choice[ids[k]] == before.choice[ids[k]] ||
+				                                            after.period != before.period)) bad++;
+				if (ids[k] == RM_ROW_SPEED && (moved != (st == 0) ||
+				                               (st == 0 && after.period == before.period))) bad++;
+				if ((ids[k] == RM_ROW_SCOPE || ids[k] == RM_ROW_RESET || ids[k] == RM_ROW_NONE) && moved) bad++;
+			}
+			ck(!bad, st ? "without a turbo button: each row its own, Turbo Speed nothing"
+			            : "with turbo buttons: each row its own, Turbo Speed the speed");
 		}
 	}
 	if (fails) { printf("%d FAILED\n", fails); return 1; }
