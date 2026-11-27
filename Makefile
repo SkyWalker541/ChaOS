@@ -22,7 +22,7 @@ CHECKS = check-display check-cheevos check-hare check-httpd check-idle check-rah
          check-db check-stats check-sort check-bt check-ss \
          check-muselib check-musequeue check-museart check-controls check-logpack \
          check-clock check-update check-remap check-shots check-pixfont \
-         check-release check-updater check-chaos-names check-itch check-itchdl check-hbcat check-discset check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore check-gbsort check-menu-keys check-menu-lint check-pro-detect check-logcat check-perf check-pm-gui-art check-cleanup check-fbhold check-portsticks check-cpumode
+         check-release check-updater check-chaos-names check-itch check-itchdl check-hbcat check-discset check-cover check-ports check-pmcat check-libpack check-romm check-cheats check-overscan check-pico8 check-syncthing check-gamecore check-gbsort check-menu-keys check-menu-lint check-pro-detect check-logcat check-perf check-pm-gui-art check-cleanup check-fbhold check-portsticks check-cpumode check-alsafix
 
 check: check-sevenz
 	@fail=0; for c in $(CHECKS); do \
@@ -682,6 +682,18 @@ checkmark:
 
 clean:
 	rm -rf build build-native out
+
+# ChaOS: the ports' ALSA helper, preloaded before a stand-in ALSA
+check-alsafix: build-native/alsafix-check
+	@LD_PRELOAD=$(CURDIR)/build-native/chaos-alsafix.so LD_LIBRARY_PATH=$(CURDIR)/build-native ./build-native/alsafix-check
+
+build-native/alsafix-check: tools/alsafix-check.c tools/alsafix/chaos-alsafix.c FORCE
+# The compiler alone, never the sanitizers check-asan adds: a preloaded
+# library ahead of their runtime stops the program before it starts
+	@mkdir -p build-native
+	$(firstword $(CC)) -std=gnu11 -Wall -Wextra -O1 -shared -fPIC -DFAKE_ALSA -o build-native/libfakealsa.so tools/alsafix-check.c
+	$(firstword $(CC)) -std=gnu11 -Wall -Wextra -O1 -shared -fPIC -o build-native/chaos-alsafix.so tools/alsafix/chaos-alsafix.c -ldl
+	$(firstword $(CC)) -std=gnu11 -Wall -Wextra -O1 -o $@ tools/alsafix-check.c -Lbuild-native -lfakealsa
 
 # ChaOS: Performance's modes (src/cpumode.h)
 check-cpumode: build-native/cpumode-check

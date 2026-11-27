@@ -231,6 +231,13 @@ if [ -f /usr/lib/chaos-ports/libSDL2-2.0.so.0 ] &&
 		echo "ChaOS: its script puts /usr/lib first; ChaOS's SDL preloaded"
 	fi
 fi
+# ChaOS's ALSA helper (tools/alsafix/chaos-alsafix.c): a port's sound brought
+# back after the power menu froze it, which a port playing through cpal
+# (Doukutsu-rs) didn't do on its own. It calls the port's own ALSA, and only
+# steps in when a call fails.
+if [ -f "$HERE/lib/libchaos-alsafix.so" ] && ! grep -q weston "$PORT" 2> /dev/null; then
+	export LD_PRELOAD="$HERE/lib/libchaos-alsafix.so${LD_PRELOAD:+:$LD_PRELOAD}"
+fi
 # A port's saves in the card's common Saves folder (Saves/Ports/<its
 # folder>/<folder>), as every other game's are, so the Saves that Syncthing
 # shares carries them too: each folder a port keeps saves or settings in is
