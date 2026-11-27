@@ -641,6 +641,82 @@ bool bt_forget(const char *mac)
 	return true;
 }
 
+#define BT_LOOP_PID "/tmp/chaos-btloop.pid"
+#define BT_SINK     "/tmp/tortos_btsink"
+
+/* The loop's pid, when the one in the pid file is still that script */
+static pid_t loop_pid(void)
+{
+	char path[64], cmd[256];
+	FILE *f = fopen(BT_LOOP_PID, "r");
+	long pid = 0;
+	size_t n;
+
+	if (!f) return 0;
+	if (fscanf(f, "%ld", &pid) != 1 || pid <= 1) pid = 0;
+	fclose(f);
+	if (!pid) return 0;
+	snprintf(path, sizeof path, "/proc/%ld/cmdline", pid);
+	if (!(f = fopen(path, "r"))) return 0;
+	n = fread(cmd, 1, sizeof cmd - 1, f);
+	fclose(f);
+	cmd[n] = '\0';
+	/* cmdline's words are NUL-separated: look through all of them */
+	for (size_t i = 0; i < n; i += strlen(cmd + i) + 1)
+		if (strstr(cmd + i, "bt-reconnect")) return (pid_t)pid;
+	return 0;
+}
+
+void bt_loop_start(const char *tortos_dir)
+{
+	char script[512];
+	pid_t pid;
+	int st;
+
+	if (!tortos_dir || !*tortos_dir || loop_pid()) return;
+	if (snprintf(script, sizeof script, "%s/bt-reconnect.sh", tortos_dir) >= (int)sizeof script ||
+	    access(script, R_OK) != 0)
+		return;
+	/* Twice forked and in a session of its own, so it outlives this screen
+	 * and is never the launcher's child to reap; nothing of the launcher's
+	 * held open in it (Diatom's socket, the display) */
+	pid = fork();
+	if (pid < 0) return;
+	if (pid == 0) {
+		int fd;
+
+		setsid();
+		if (fork() != 0) _exit(0);
+		for (fd = 3; fd < 1024; fd++) close(fd);
+		fd = open("/dev/null", O_RDWR);
+		if (fd >= 0) { dup2(fd, 0); dup2(fd, 1); dup2(fd, 2); if (fd > 2) close(fd); }
+		/* "settle": both audio profiles registered before it dials, as
+		 * boot's bt_on waits */
+		execl("/bin/sh", "sh", script, "settle", (char *)NULL);
+		_exit(127);
+	}
+	waitpid(pid, &st, 0);
+}
+
+void bt_loop_stop(void)
+{
+	pid_t pid = loop_pid();
+
+	/* the loop first, so it dials nothing more, and gone before its files
+	 * go: a TERM waits for the command it is in, and one mid-publish would
+	 * put the sink back after it was withdrawn (a second at most); then
+	 * where the sound was, so the game and Muse go back to the speaker */
+	if (pid && kill(pid, SIGTERM) == 0) {
+		char proc[32];
+		int i;
+
+		snprintf(proc, sizeof proc, "/proc/%d", (int)pid);
+		for (i = 0; i < 20 && access(proc, F_OK) == 0; i++) usleep(50000);
+	}
+	unlink(BT_LOOP_PID);
+	unlink(BT_SINK);
+}
+
 bool bt_asoundrc(const char *tortos_dir, const char *userdata_dir)
 {
 	char script[512];
@@ -693,5 +769,7 @@ bool bt_disconnect(const char *m) { (void)m; return false; }
 int  bt_disconnect_others(const char *k) { (void)k; return 0; }
 bool bt_forget(const char *m) { (void)m; return false; }
 bool bt_asoundrc(const char *t, const char *d) { (void)t; (void)d; return false; }
+void bt_loop_start(const char *t) { (void)t; }
+void bt_loop_stop(void) { }
 
 #endif

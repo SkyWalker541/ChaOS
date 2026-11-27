@@ -21,6 +21,8 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
 
 static int fails;
 static void ck(int cond, const char *what)
@@ -288,6 +290,59 @@ static void sweep(void)
 	system("rm -rf " SWEEPROOT);
 }
 
+/* bt_loop_stop ends the reconnect loop when the menu turns Bluetooth off, and
+ * withdraws the sink, so the sound goes back to the speaker; it kills only a
+ * process that is the loop, never whatever took a stale pid (2026-11-27) */
+#ifdef __linux__
+static pid_t stand_in(const char *name)
+{
+	pid_t p = fork();
+
+	if (p == 0) {
+		char *argv[] = { (char *)name, (char *)"30", NULL };
+		execv(name, argv);
+		_exit(127);
+	}
+	return p;
+}
+
+static void loop_stop(void)
+{
+	const char *fake = "/tmp/tortos-bt-check-bt-reconnect";
+	char cmd[256];
+	pid_t p, other;
+	FILE *f;
+	int st;
+
+	printf("the reconnect loop, stopped:\n");
+	snprintf(cmd, sizeof cmd, "cp \"$(command -v sleep)\" %s", fake);
+	if (system(cmd) != 0) { ck(0, "a stand-in loop to stop"); return; }
+
+	p = stand_in(fake);
+	usleep(200000);
+	f = fopen("/tmp/chaos-btloop.pid", "w");
+	if (f) { fprintf(f, "%d\n", (int)p); fclose(f); }
+	f = fopen("/tmp/tortos_btsink", "w");
+	if (f) { fputs("bt_00_11_22_33_44_55\n7\n", f); fclose(f); }
+	bt_loop_stop();
+	ck(waitpid(p, &st, 0) == p && WIFSIGNALED(st), "the loop is ended");
+	ck(access("/tmp/tortos_btsink", F_OK) != 0, "and the sound comes back from the headset");
+	ck(access("/tmp/chaos-btloop.pid", F_OK) != 0, "and its pid goes");
+
+	/* a pid that is not the loop's: left alone */
+	other = fork();
+	if (other == 0) { execl("/bin/sleep", "sleep", "30", (char *)NULL); _exit(127); }
+	usleep(200000);
+	f = fopen("/tmp/chaos-btloop.pid", "w");
+	if (f) { fprintf(f, "%d\n", (int)other); fclose(f); }
+	bt_loop_stop();
+	ck(waitpid(other, &st, WNOHANG) == 0, "a process that isn't the loop is left alone");
+	kill(other, SIGKILL);
+	waitpid(other, &st, 0);
+	unlink(fake);
+}
+#endif
+
 int main(void)
 {
 	addresses();
@@ -296,6 +351,9 @@ int main(void)
 	labels();
 	rows_are_shaped_like_the_others();
 	sweep();
+#ifdef __linux__
+	loop_stop();
+#endif
 	if (fails) { printf("\n%d FAILED\n", fails); return 1; }
 	printf("\nok: addresses are validated and names are only ever data\n");
 	return 0;

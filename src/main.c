@@ -9547,8 +9547,14 @@ static void bt_screen(app *a)
 					 * pair. The one written at boot had none to read */
 					if (want && u.state == BT_STOPPED)
 						bt_asoundrc(P_ROOT, P_USERDATA);
+					/* Off: the reconnect loop first, so it neither redials
+					 * nor keeps the sound on the headset going away */
+					if (!want) bt_loop_stop();
 					bt_power(want);
 					if (!want) bt_down();
+					/* On: the loop that follows the headset, as boot starts
+					 * it (none, or the one from boot, runs already) */
+					if (want) bt_loop_start(P_ROOT);
 					snprintf(u.note, sizeof u.note, "%s", want ? "On" : "Off");
 				}
 				note_until = now + 4000;

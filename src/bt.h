@@ -112,6 +112,16 @@ bool bt_power(bool on);
 bool bt_up(void);
 void bt_down(void);
 
+/* ChaOS: the reconnect loop, ChaOS/bt-reconnect.sh (tools/chaos-btloop.sh,
+ * launch.sh's own bt_reconnect): it publishes /tmp/tortos_btsink, which the
+ * sound follows, and reconnects a remembered headset. Boot starts it with
+ * Bluetooth; bt_loop_start starts it when the menu turns Bluetooth on (a
+ * second start does nothing), and bt_loop_stop ends it and withdraws the
+ * sink when the menu turns Bluetooth off. Without it a headset connected
+ * after turning Bluetooth on in the menu never got the sound (2026-11-27). */
+void bt_loop_start(const char *tortos_dir);
+void bt_loop_stop(void);
+
 bool bt_disconnect(const char *mac);
 /* Disconnect every connected bonded device but `keep`, and return how many.
  * For the Bluetooth screen, where connecting a headset means choosing it. */

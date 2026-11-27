@@ -641,7 +641,7 @@ static void on_term(int sig) { (void)sig; g_quit = 1; }
 static void save_syslog(void)
 {
 	const char *dir = getenv("LOGS_PATH");
-	char path[512], cmd[600];
+	char path[512], cmd[1024];
 	time_t now = time(NULL);
 	struct tm tm;
 
@@ -649,7 +649,13 @@ static void save_syslog(void)
 	snprintf(path, sizeof path, "%s/muse-stall-%04d%02d%02d-%02d%02d%02d.txt",
 	         dir && *dir ? dir : "/tmp", tm.tm_year + 1900, tm.tm_mon + 1,
 	         tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
-	snprintf(cmd, sizeof cmd, "logread > '%s' 2>&1", path);
+	/* Masked as the log pack masks (src/logpack.c): the system log names
+	 * headsets' addresses, the network's and the router's, which a file on
+	 * the card must not hold (CLAUDE.md; found 2026-11-27) */
+	snprintf(cmd, sizeof cmd, "logread 2>&1 | sed -E "
+	         "'s/([0-9A-Fa-f]{2}[:_-]){5}[0-9A-Fa-f]{2}/xx:xx:xx:xx:xx:xx/g; "
+	         "s/[0-9]{1,3}([.][0-9]{1,3}){3}/x.x.x.x/g; "
+	         "s/(ssid|SSID)([=: ]+)('\\''[^'\\'']*'\\''|\"[^\"]*\"|[^ ,]+)/\\1\\2(network)/g' > '%s'", path);
 	if (fork() == 0) {
 		execl("/bin/sh", "sh", "-c", cmd, (char *)NULL);
 		_exit(127);

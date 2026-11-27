@@ -353,6 +353,14 @@ grep -q '^LOG=$LOGS_PATH/chaos.log$' "$L" || { echo "launch.sh: the log did not 
 grep -q '^	"$TORTOS_DIR/diatom" --socket "$TORTOS_DIATOM_SOCKET" \\$' "$L" || { echo "launch.sh has changed: check how it starts Diatom" >&2; exit 1; }
 sed -i 's|^	"$TORTOS_DIR/diatom" --socket "$TORTOS_DIATOM_SOCKET" \\$|	z=""; [ -r "$USERDATA_PATH/zone" ] \&\& read -r z < "$USERDATA_PATH/zone"\n	${z:+env TZ="$z"} "$TORTOS_DIR/diatom" --socket "$TORTOS_DIATOM_SOCKET" \\|' "$L"
 grep -q 'env TZ="$z"} "$TORTOS_DIR/diatom"' "$L" || { echo "launch.sh: Diatom's zone did not go in" >&2; exit 1; }
+# Bluetooth's reconnect loop as a script of its own, cut out of launch.sh
+# (tools/chaos-btloop.sh), which bt_on runs in the loop's place and the
+# launcher runs when the menu turns Bluetooth on: without it a headset
+# connected then never got the sound (2026-11-27)
+sh "$ROOT/tools/chaos-btloop.sh" "$L" "$C/ChaOS/bt-reconnect.sh"
+[ "$(grep -c '^	bt_reconnect$' "$L")" = 1 ] || { echo "launch.sh has changed: check how bt_on starts the loop" >&2; exit 1; }
+sed -i 's|^	bt_reconnect$|	"$TORTOS_DIR/bt-reconnect.sh"|' "$L"
+grep -q '^	"$TORTOS_DIR/bt-reconnect.sh"$' "$L" || { echo "launch.sh: the loop did not go in" >&2; exit 1; }
 [ "$(tail -n 1 "$L")" = "poweroff" ] || { echo "launch.sh has changed: check how it ends" >&2; exit 1; }
 sed -i '$d' "$L"
 cat >> "$L" <<'EOF2'
