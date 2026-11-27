@@ -111,17 +111,21 @@ for f in mod_ChaOS.txt libgl_ChaOS.txt; do
 done
 
 # The input devices once the port is going, for the log: the pad, and the
-# keyboard gptokeyb makes of it. And whether its sound is playing, read once
-# from the hardware (the mixer keeps it running while anyone plays), so a
-# port with no sound says so in its log: in 2.8.0-test3 every port lost its
-# sound and no log said a word (2026-11-26)
+# keyboard gptokeyb makes of it. And whether its sound is playing, from the
+# hardware (the mixer keeps it running while anyone plays; Muse has closed
+# its device before a port starts, and Diatom has gone), so a port with no
+# sound says so in its log: in 2.8.0-test3 every port lost its sound and no
+# log said a word (2026-11-26). At 4 s, and once more at 20 s for a port
+# still loading then (Godot, .NET): two reads, nothing after.
 ( sleep 4; echo "inputs, 4 s in:"; grep '^N:' /proc/bus/input/devices
-  st=$(head -1 /proc/asound/card0/pcm0p/sub0/status 2> /dev/null)
-  case "$st" in
-  "state: RUNNING") echo "ChaOS: sound playing, 4 s in" ;;
-  closed) echo "ChaOS: no sound, 4 s in: nothing has the sound open (the port has none, or couldn't open it)" ;;
-  *) echo "ChaOS: sound open but not playing, 4 s in (${st:-unknown})" ;;
-  esac ) &
+  for t in 4 20; do
+    [ $t = 20 ] && sleep 16
+    st=$(head -1 /proc/asound/card0/pcm0p/sub0/status 2> /dev/null)
+    [ "$st" = "state: RUNNING" ] && { echo "ChaOS: sound playing, $t s in"; break; }
+    [ $t = 20 ] && echo "ChaOS: no sound playing, 20 s in (${st:-unknown}): the port has none, or couldn't open it"
+  done ) &
+# stopped with the port (below), so it never reads what plays after
+snd_watch=$!
 
 # Ended from outside (ChaOS's power or Select+Start): said so, and what the
 # kernel had to say (an out-of-memory kill, a crash)
@@ -275,7 +279,7 @@ if [ -n "$gd" ] && [ -n "$card" ] && [ -d "/roms/ports/$gd" ] && [ -d "$card/Sav
 			echo "ChaOS: $gd/$sub kept in Saves/Ports"
 	done
 fi
-trap 'cpu_back; chaos_unbind' EXIT
+trap 'cpu_back; chaos_unbind; kill $snd_watch 2> /dev/null' EXIT
 cd "$(dirname "$PORT")" || exit 1
 /bin/bash "$PORT"
 st=$?

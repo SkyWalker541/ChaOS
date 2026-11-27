@@ -370,9 +370,10 @@ static void *player(void *arg)
 
 	(void)arg;
 	/* ChaOS: the sound device is open only while something plays. Paused,
-	 * stopped or idle, Muse lets go of it, so a port started from the shelf
-	 * gets the hardware itself (res/ports/run.sh) rather than the shared
-	 * mixer, which Muse held for good once it had played (2.7.9). A pause
+	 * stopped or idle, Muse lets go of it, so nothing of Muse's holds the
+	 * sound while a port plays, and a port's log can tell from the hardware
+	 * whether the port's own sound is playing (res/ports/run.sh). Muse held
+	 * the shared mixer for good once it had played (2.7.9). A pause
 	 * already drops what was queued and resumes from what was heard
 	 * (C_PAUSE, C_RESUME), so closing loses nothing; reopening takes a few
 	 * ms, a little more on a headset. */

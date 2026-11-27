@@ -10,7 +10,9 @@ runs on), for `make check-portaudio`:
   `buildroot/board/brick/rootfs-overlay/etc/asound.conf`), the shared mixer
   everything plays through.
 
-alsa-lib is LGPL-2.1-or-later; its source is at
+alsa-lib is LGPL-2.1-or-later. This build is Buildroot's alsa-lib package
+as plastron builds it (https://github.com/ericreinsmidt/plastron, whose
+image's sources include it with any patches Buildroot applies); upstream is
 https://github.com/alsa-project/alsa-lib (tag v1.2.15.3). Nothing here ships:
 it is only run, under qemu-user, by the checks. When plastron's ALSA or its
 `asound.conf` changes, copy the new ones here.
