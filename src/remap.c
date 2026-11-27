@@ -161,13 +161,14 @@ const char *rm_choice_label(const char *tag, int choice, char *buf, int n)
 	return buf;
 }
 
-/* Half a press, in the console's frames: on a 60 Hz console 6, 10, 15 and
- * 30 presses a second, on a 50 Hz (PAL) one 5, 8, 12 and 25 - so the row
- * names them rather than counting. A turbo pad's slow and fast settings
- * either side of the shipped speed, and the fastest a game reading every
- * frame can see: one reading every other frame misses Fastest. */
-static const struct { int period; const char *name; } SPEED[RM_SPEEDS] = {
-	{ 5, "Slow" }, { RM_TURBO, "Normal" }, { 2, "Fast" }, { 1, "Fastest" }
+/* Half a press, in the console's frames: 6, 10, 15 and 30 presses a second
+ * on a 60 Hz console, which the row says beside each name; a 50 Hz (PAL)
+ * game runs a sixth slower (the website says so). A turbo pad's slow and
+ * fast settings either side of the shipped speed, and the fastest a game
+ * reading every frame can see: one reading every other frame misses
+ * Fastest. */
+static const struct { int period; const char *name; int per_s; } SPEED[RM_SPEEDS] = {
+	{ 5, "Slow", 6 }, { RM_TURBO, "Normal", 10 }, { 2, "Fast", 15 }, { 1, "Fastest", 30 }
 };
 
 bool rm_has_turbo(const char *tag, const rm_map *m)
@@ -186,7 +187,7 @@ const char *rm_speed_label(int period, char *buf, int n)
 
 	for (i = 0; i < RM_SPEEDS; i++)
 		if (SPEED[i].period == period) {
-			snprintf(buf, n, "%s", SPEED[i].name);
+			snprintf(buf, n, "%s, %d/s", SPEED[i].name, SPEED[i].per_s);
 			return buf;
 		}
 	snprintf(buf, n, "Custom");

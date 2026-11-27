@@ -72,7 +72,7 @@ const char *rm_choice_label(const char *tag, int choice, char *buf, int n);
  * its row rests (main.c) */
 bool rm_has_turbo(const char *tag, const rm_map *m);
 
-/* Turbo Speed: "Normal", or "Custom" for a period no preset has */
+/* Turbo Speed: "Normal, 10/s", or "Custom" for a period no preset has */
 const char *rm_speed_label(int period, char *buf, int n);
 /* The next preset, `d` (-1 or 1) along, round the four; a custom period
  * goes to the preset nearest it in that direction */

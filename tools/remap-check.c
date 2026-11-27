@@ -54,7 +54,10 @@ int main(void)
 	printf("Turbo Speed:\n");
 	rm_from_spec("GB", "x:a~3,y:b~3", &m);
 	ck(m.period == RM_TURBO, "a map from before reads as Normal");
-	ck(!strcmp(rm_speed_label(m.period, spec, sizeof spec), "Normal"), "and says so");
+	ck(!strcmp(rm_speed_label(m.period, spec, sizeof spec), "Normal, 10/s"), "and says so");
+	ck(!strcmp(rm_speed_label(5, spec, sizeof spec), "Slow, 6/s") &&
+	   !strcmp(rm_speed_label(2, spec, sizeof spec), "Fast, 15/s") &&
+	   !strcmp(rm_speed_label(1, spec, sizeof spec), "Fastest, 30/s"), "each speed with its presses a second");
 	rm_from_spec("GB", NULL, &m);
 	ck(m.period == RM_TURBO, "no map at all is Normal");
 	m.period = rm_speed_step(m.period, 1);
