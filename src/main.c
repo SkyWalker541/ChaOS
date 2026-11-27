@@ -6515,6 +6515,7 @@ static int menu_build(app *a, screen_id screen, int sys,
 		 * twenty-second poll. One source for both now. */
 		{
 			static char btname[BT_NAME_MAX];
+			static bool bt_off = true;
 			static unsigned next_bt;
 			unsigned now = plat_now_ms();
 
@@ -6524,7 +6525,10 @@ static int menu_build(app *a, screen_id screen, int sys,
 
 				next_bt = now + 2000;
 				btname[0] = '\0';
-				if (nb > 0 && bt_status() == BT_READY) {
+				/* off costs one access() (no hci0), on one bluetoothctl
+				 * every two seconds while this page is open, as before */
+				bt_off = bt_status() != BT_READY;
+				if (nb > 0 && !bt_off) {
 					bt_mark_connected_now(bd, nb);
 					for (i = 0; i < nb; i++)
 						if (bd[i].connected) {
@@ -6534,6 +6538,7 @@ static int menu_build(app *a, screen_id screen, int sys,
 				}
 			}
 			u.bt_name = btname[0] ? btname : NULL;
+			u.bt_off = bt_off;
 		}
 	}
 	return sys_menu_build(&u, out, b, heading);
@@ -9528,19 +9533,19 @@ static void bt_screen(app *a)
 
 				wait_panel(a, "Bluetooth",
 				           want ? "Turning on..." : "Turning off...");
-				/* On: the stack first when there is no adapter (Bluetooth
-				 * was off at boot), so the switch works now rather than at
-				 * the next boot. Never bt_power without one: bluetoothctl
-				 * waits for a controller that is not coming. Off: the
-				 * adapter, then the stack and the radio's power. */
-				if (want && u.state == BT_NO_ADAPTER && !bt_up()) {
+				/* On: the stack first when it isn't running (Bluetooth was
+				 * off at boot, or turned off), so the switch works now
+				 * rather than at the next boot. Never bt_power without it:
+				 * bluetoothctl waits for a controller that is not coming.
+				 * Off: the radio's power, then the stack. */
+				if (want && u.state == BT_STOPPED && !bt_up()) {
 					snprintf(u.note, sizeof u.note, "Bluetooth did not come up");
 				} else {
 					/* The stack just started: the bonds are readable now
 					 * (on the Brick they're on plastron's state partition,
 					 * which bt_up mounts), so a PCM for each, as after a
 					 * pair. The one written at boot had none to read */
-					if (want && u.state == BT_NO_ADAPTER)
+					if (want && u.state == BT_STOPPED)
 						bt_asoundrc(P_ROOT, P_USERDATA);
 					bt_power(want);
 					if (!want) bt_down();
@@ -25229,6 +25234,7 @@ static int shot_discpage = -1;   /* ChaOS: --discpage ROW [how], the Disc page *
 static bool shot_dischow;
 static int shot_upd_pill = -1;  /* ChaOS: --update-pill <upd_state>, the shelf's notice */
 static const char *shot_remap;  /* ChaOS: --remap <TAG>: its Button Mapping */
+static bool shot_bt;            /* ChaOS: --bluetooth: the Bluetooth screen */
 static bool shot_remap_shelf;   /* --remap-shelf: from the shelf, no For row */
 static int shot_remap_sel = 2;  /* the row lit */
 static int shot_cc_page = -1;  /* ChaOS: --cc <page>, with --remap: its Controls */
@@ -26243,6 +26249,18 @@ static void take_shot(app *a)
 		SDL_RenderFillRect(a->r, NULL);
 		menu_draw(a, head, rows, n, -1, menu_std_width(a), MENU_ACCENT);
 	}
+	if (shot_bt) {
+		/* ChaOS: --bluetooth: the Bluetooth screen with the stack not running,
+		 * as after a boot with it off */
+		bt_ui u = { 0 };
+		menu_row rows[BT_VISIBLE + 4];
+		int n;
+
+		u.state = BT_STOPPED;
+		u.cursor = -1;
+		n = bt_menu_build(&u, rows, BT_VISIBLE + 4, BT_VISIBLE);
+		menu_draw(a, "Bluetooth", rows, n, 0, menu_std_width(a), MENU_ACCENT);
+	}
 	if (shot_remap) {
 		rm_ctx c;
 		menu_row rows[24];
@@ -26642,6 +26660,7 @@ int main(int argc, char *argv[])
 		else if (!strcmp(argv[i], "--info")) shot_info = 1;
 		else if (!strcmp(argv[i], "--cc") && i + 1 < argc)
 			shot_cc_page = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "--bluetooth")) shot_bt = true;
 		else if ((!strcmp(argv[i], "--remap") || !strcmp(argv[i], "--remap-shelf")) && i + 1 < argc) {
 			/* --remap TAG [row]: in a game; --remap-shelf: from its shelf */
 			shot_remap_shelf = argv[i][7] == '-';

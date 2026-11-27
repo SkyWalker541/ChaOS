@@ -314,6 +314,17 @@ static void tortos_menu_offline(void)
 	 * be dead and read "not yet", which was true of the screen and false of
 	 * the feature - game audio had been going to a headset for three days. */
 	ck((*by_id(&u, rows, n, PM_BT)).live, "Bluetooth is reachable now that pairing exists");
+	/* Off said "not connected", which read as on and looking (2026-11-27) */
+	u.bt_off = true;
+	u.bt_name = "Shokz";
+	n = sys_menu_build(&u, rows, &b, &heading);
+	ck(!strcmp(val(by_id(&u, rows, n, PM_BT)), "off"), "Bluetooth off says off");
+	u.bt_off = false;
+	n = sys_menu_build(&u, rows, &b, &heading);
+	ck(!strcmp(val(by_id(&u, rows, n, PM_BT)), "Shokz"), "on, the headset it plays to");
+	u.bt_name = NULL;
+	n = sys_menu_build(&u, rows, &b, &heading);
+	ck(!strcmp(val(by_id(&u, rows, n, PM_BT)), "not connected"), "on with none, not connected");
 	/* Always reachable, even with no radio and no cable: it is the row you go
 	 * to in order to say "not Bluetooth", so it must not vanish with the thing
 	 * it refuses. */

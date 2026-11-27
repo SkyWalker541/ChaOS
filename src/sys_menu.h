@@ -266,6 +266,7 @@ typedef struct {
 	 * false of the feature - game audio has gone to a headset since
 	 * 2026-09-03. */
 	const char *bt_name;
+	bool        bt_off;     /* ChaOS: Bluetooth off (bt_status not READY) */
 
 	/* The system menu */
 	const char *sys_name;

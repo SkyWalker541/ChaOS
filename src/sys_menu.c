@@ -280,8 +280,11 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	                              u->update_dot ? u->update_dot : "On", true };
 	full[PM_SHOWCLOCK].toggle = full[PM_UPDDOT].toggle = true;
 	full[PM_SHOWBATT].cycles = true;
+	/* ChaOS: "off" when it is, rather than "not connected", which read as
+	 * on and looking (2026-11-27) */
 	full[PM_BT]           = (menu_row){ "Bluetooth",
-	                                   u->bt_name ? u->bt_name : "not connected",
+	                                   u->bt_off ? "off"
+	                                   : u->bt_name ? u->bt_name : "not connected",
 	                                   true  };
 	/* Where the system's sound goes - not Diatom's, which is why the label says
 	 * neither "game" nor "emulator": the audiobook and music player will read

@@ -235,6 +235,15 @@ static void rows_are_shaped_like_the_others(void)
 	ck(!strcmp(r[0].value, "off"), "the toggle says off");
 	ck(!strcmp(bt_menu_footer(&u), "A: turn on"),
 	   "and the footer says how to fix it");
+
+	/* The stack not running (off at boot) said "no adapter", with the switch
+	 * drawn dead and the footer pointing at the next boot - on devices that
+	 * all have the radio, where A starts it at once (2026-11-27) */
+	u.state = BT_STOPPED;
+	n = bt_menu_build(&u, r, 16, 7);
+	ck(!strcmp(r[0].value, "off") && r[0].toggle && r[0].live,
+	   "stopped is off, a live switch, not \"no adapter\"");
+	ck(!strcmp(bt_menu_footer(&u), "A: turn on"), "and A turns it on now");
 }
 
 /* The sweep DELETES FILES, so it is checked against a tree built here rather

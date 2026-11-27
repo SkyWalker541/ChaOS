@@ -223,7 +223,7 @@ int bt_sweep_cache(const char *root)
  * -1 if it could not be run, and -2 if it had to be killed.
  *
  * The deadline is not defensive programming, it is a bug fix. On a fresh card
- * Bluetooth is off, so launch.sh never runs hciattach and there is no adapter;
+ * Bluetooth is off, so launch.sh never starts the stack and there is no hci0;
  * `bluetoothctl power on` in that state does not fail and does not exit, it
  * WAITS for a controller that is never coming. The launcher sat in waitpid
  * behind it and the screen froze on "Turning on...", needing the process
@@ -325,8 +325,8 @@ bt_state bt_status(void)
 {
 	char out[512];
 
-	if (access("/sys/class/bluetooth/hci0", F_OK) != 0) return BT_NO_ADAPTER;
-	if (btctl(out, sizeof out, BT_ASK_S, "show", NULL) != 0) return BT_NO_ADAPTER;
+	if (access("/sys/class/bluetooth/hci0", F_OK) != 0) return BT_STOPPED;
+	if (btctl(out, sizeof out, BT_ASK_S, "show", NULL) != 0) return BT_STOPPED;
 	return strstr(out, "Powered: yes") ? BT_READY : BT_POWERED_OFF;
 }
 
@@ -679,7 +679,7 @@ bool bt_asoundrc(const char *tortos_dir, const char *userdata_dir)
 
 #else   /* not __linux__ */
 
-bt_state bt_status(void) { return BT_NO_ADAPTER; }
+bt_state bt_status(void) { return BT_STOPPED; }
 int  bt_bonded(bt_device *out, int max) { (void)out; (void)max; return 0; }
 int  bt_visible(bt_device *out, int max) { (void)out; (void)max; return 0; }
 bool bt_scan(int secs) { (void)secs; return false; }

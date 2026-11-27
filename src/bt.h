@@ -36,7 +36,12 @@ typedef struct {
 	bool connected;
 } bt_device;
 
-typedef enum { BT_NO_ADAPTER, BT_POWERED_OFF, BT_READY } bt_state;
+/* BT_STOPPED: the stack isn't running (Bluetooth was off at boot, or turned
+ * off since), so the kernel shows no hci0. Every device ChaOS runs on - the
+ * Brick, the Brick Hammer, the Brick Pro - has the radio, so to a player
+ * this is simply "off"; bt_up starts the stack. It was "no adapter" on
+ * screen until 2.8.0, from TortOS's devices without one. */
+typedef enum { BT_STOPPED, BT_POWERED_OFF, BT_READY } bt_state;
 
 /* --- pure, and checked on the host ---------------------------------------
  * An address is the one thing here that is ever handed back to bluetoothctl as
