@@ -70,6 +70,8 @@ static const struct { int code; in_button b; } keymap[] = {
 	{ KEY_POWER, IN_POWER },
 	/* ChaOS: L2 and R2, for the shelves' letter scrub */
 	{ BTN_TL2, IN_L2 },           { BTN_TR2, IN_R2 },
+	/* ChaOS: the Brick Pro's L3 and R3 (plastron's 0046 patch) */
+	{ BTN_TRIGGER_HAPPY1, IN_L3 }, { BTN_TRIGGER_HAPPY2, IN_R3 },
 };
 #endif
 
@@ -452,6 +454,36 @@ float plat_stick_axis(const plat_stick_cal *c, const int raw[4])
 	if (v > 1) v = 1;
 	if (v < 0) v = 0;
 	return plus ? v : -v;
+}
+
+bool plat_panel_info(char *out, size_t n, double *hz)
+{
+#ifdef __linux__
+	struct fb_var_screeninfo v;
+	struct fb_fix_screeninfo f;
+	int fd = open("/dev/fb0", O_RDONLY | O_CLOEXEC);
+	double rate = 0;
+
+	if (fd < 0) return false;
+	if (ioctl(fd, FBIOGET_VSCREENINFO, &v) != 0 || ioctl(fd, FBIOGET_FSCREENINFO, &f) != 0) {
+		close(fd);
+		return false;
+	}
+	close(fd);
+	if (v.pixclock) {
+		double total = (double)(v.xres + v.left_margin + v.right_margin + v.hsync_len) *
+		               (v.yres + v.upper_margin + v.lower_margin + v.vsync_len);
+		if (total > 0) rate = 1e12 / v.pixclock / total;
+	}
+	if (hz) *hz = rate;
+	snprintf(out, n, "%ux%u, %u bpp, fb %ux%u, stride %u, rgba %u/%u/%u/%u, rotate %u, %.2f Hz",
+	         v.xres, v.yres, v.bits_per_pixel, v.xres_virtual, v.yres_virtual, f.line_length,
+	         v.red.offset, v.green.offset, v.blue.offset, v.transp.offset, v.rotate, rate);
+	return true;
+#else
+	(void)out; (void)n; (void)hz;
+	return false;
+#endif
 }
 
 /* ChaOS: the sticks for a port (portsticks.h): the mapping's fields for

@@ -45,6 +45,9 @@ typedef enum {
 	PM_SLEEP,
 	/* ChaOS: on the Brick Pro only, its sticks taught to ChaOS */
 	PM_STICKS,
+	/* ChaOS: Hardware Test, on every device: every button and stick, then
+	 * the screen, shown and logged, for a new device or a bug report */
+	PM_BTNTEST, PM_SCRTEST,
 	PM_APPEARANCE, PM_THEME, PM_DIR, PM_SPEED, PM_COLOR,
 	/* ChaOS: Shelves, a page of its own under Appearance: how a shelf of games
 	 * shows, and which shelves there are and in what order */
@@ -127,7 +130,7 @@ typedef enum { SMM_COUNT, SMM_SHOW, SMM_SORT, SMM_LOCK, SMM_ART, SMM_RESCAN } sm
  * two cannot disagree about what row 2 is. */
 int sys_menu_muse_rows(bool books, bool both, bool no_wifi, sm_muse_row *out);
 
-#define MENU_MAX_ROWS 42
+#define MENU_MAX_ROWS 44
 
 /* The array every caller declares must hold every row a build can produce, and
  * on 2026-09-16 it stopped: PM_ROWS went to 13 against a cap of 12 when the

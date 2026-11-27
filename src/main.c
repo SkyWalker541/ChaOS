@@ -57,6 +57,7 @@ static void os_cycle(const char *tag, int d, bool live);
 #include "controls.h"
 #include "cpumode.h"
 #include "padlayout.h"
+#include "hwtest.h"
 #include "update.h"
 #include "remap.h"
 #include "shots.h"
@@ -11601,6 +11602,8 @@ static void about_screen(app *a)
 }
 
 static void sticks_screen(app *a);   /* ChaOS: Calibrate Sticks, below */
+static void btntest_screen(app *a);  /* ChaOS: Hardware Test, below */
+static void scrtest_screen(app *a);
 
 /* Which page the shelf's controls are described on. See controls.h: the page
  * follows UI Direction, because which axis moves is what that setting does. */
@@ -12437,6 +12440,8 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 	case PM_STATS:        if (stats_screen(a)) return MENU_DONE; break;
 	case PM_CONTROLS:     controls_screen(a); break;
 	case PM_STICKS:       sticks_screen(a); break;
+	case PM_BTNTEST:      btntest_screen(a); break;
+	case PM_SCRTEST:      scrtest_screen(a); break;
 	case PM_PORTS:        pm_get(a); break;
 	case PM_ROMMGMT:      rom_page_screen(a); break;
 	case PM_ROMM:         romm_screen(a); break;
@@ -17922,6 +17927,253 @@ static void sticks_screen(app *a)
 	plat_input_flush();
 	memset(&a->in, 0, sizeof a->in);
 }
+
+/* ---- ChaOS: Hardware Test (hwtest.h) -------------------------------------
+ *
+ * Button Test: every button the device has, lit while it's down and ticked
+ * once seen, and on a device with sticks the two sticks live, raw and as
+ * calibrated. Power, Menu and F1/F2 are the test's here, not the menus':
+ * hold Select and Start together to leave. Every press goes to the log, and
+ * on leaving which were never seen and how far each stick's axes went.
+ * Screen Test: whole-screen fields and patterns, left and right through them,
+ * B to leave; the panel as the driver has it, and the measured frame rate,
+ * to the log. Both for a new device (the Brick Pro) and for a bug report. */
+static const int HWT_IN[HWT_COUNT] = {
+	IN_UP, IN_DOWN, IN_LEFT, IN_RIGHT, IN_ACCEPT, IN_BACK, IN_X, IN_Y,
+	IN_L1, IN_R1, IN_L2, IN_R2, IN_L3, IN_R3,
+	IN_SELECT, IN_START, IN_MENU, IN_F1, IN_F2,
+	IN_VOLUP, IN_VOLDN, IN_BRIGHTUP, IN_BRIGHTDN, IN_POWER
+};
+static int g_btntest_shot = -1, g_scrtest_shot = -1;   /* --btntest, --scrtest N */
+
+static void btntest_draw(app *a, const bool seen[HWT_COUNT], const bool down[HWT_COUNT], bool sticks,
+                         const plat_stick_cal *cal, const int raw[4], float leave)
+{
+	SDL_Rect panel = PM_PANEL;
+	TTF_Font *fs = ui_font(UI_F_META);
+	int cols = 5, tw = (panel.w - 80) / cols, th = 50, x0 = panel.x + 40, y0 = panel.y + 92;
+	int b, k = 0, total = hwtest_total(sticks), got = 0;
+	char meta[24], miss[8];
+
+	for (b = 0; b < HWT_COUNT; b++) if (seen[b] && (sticks || !hwtest_sticks_only(b))) got++;
+	snprintf(meta, sizeof meta, "%d of %d", got, total);
+	pm_frame_begin(a, MENU_ACCENT, "Button Test", meta);
+	for (b = 0; b < HWT_COUNT; b++) {
+		SDL_Rect t;
+		SDL_Color c = down[b] ? (SDL_Color){ 0x3D, 0xD6, 0xFF, 255 }
+		            : seen[b] ? (SDL_Color){ 60, 150, 90, 255 } : (SDL_Color){ 255, 255, 255, 22 };
+
+		if (hwtest_sticks_only(b) && !sticks) continue;
+		t = (SDL_Rect){ x0 + (k % cols) * tw + 4, y0 + (k / cols) * (th + 8), tw - 8, th };
+		ui_round_rect(a->r, &t, 10, c);
+		ui_text(a->r, fs, HWT_NAME[b], t.x + t.w / 2, t.y + (th - ui_font_line(UI_F_META)) / 2, 0,
+		        down[b] || seen[b] ? UI_TEXT : UI_TEXT_DIM);
+		k++;
+	}
+	if (sticks) {
+		int r = 62, cy = y0 + ((k + cols - 1) / cols) * (th + 8) + r + 16, s;
+
+		for (s = 0; s < 2; s++) {
+			int cx = panel.x + panel.w / 2 + (s ? 190 : -190);
+			float x = plat_stick_axis(&cal[s * 2], raw), y = plat_stick_axis(&cal[s * 2 + 1], raw);
+			char v[48];
+
+			ui_round_rect(a->r, &(SDL_Rect){ cx - r, cy - r, 2 * r, 2 * r }, r, (SDL_Color){ 255, 255, 255, 22 });
+			ui_round_rect(a->r, &(SDL_Rect){ cx + (int)(x * (r - 12)) - 10, cy + (int)(y * (r - 12)) - 10, 20, 20 },
+			              10, (SDL_Color){ 0x3D, 0xD6, 0xFF, 255 });
+			snprintf(v, sizeof v, "%s  %d, %d", s ? "Right" : "Left", raw[cal[s * 2].idx], raw[cal[s * 2 + 1].idx]);
+			ui_text(a->r, fs, v, cx, cy + r + 6, 0, UI_TEXT_DIM);
+		}
+	}
+	(void)miss;
+	if (leave > 0) {
+		int bw = 240, by = panel.y + panel.h - 92;
+
+		SDL_SetRenderDrawColor(a->r, 255, 255, 255, 30);
+		SDL_RenderFillRect(a->r, &(SDL_Rect){ panel.x + (panel.w - bw) / 2, by, bw, 8 });
+		SDL_SetRenderDrawColor(a->r, 0x3D, 0xD6, 0xFF, 255);
+		SDL_RenderFillRect(a->r, &(SDL_Rect){ panel.x + (panel.w - bw) / 2, by, (int)(bw * leave), 8 });
+	}
+	pm_footer(a, "Press every button. Hold Select+Start to leave");
+	pm_frame_end(a);
+}
+
+static void btntest_screen(app *a)
+{
+	bool seen[HWT_COUNT] = { false }, down[HWT_COUNT] = { false };
+	plat_stick_cal cal[4];
+	int raw[4] = { 0 }, lo[4], hi[4], b, i;
+	bool sticks = plat_sticks(raw) && plat_sticks_cal(cal);
+	unsigned both_since = 0;
+	char miss[256];
+
+	if (!sticks) for (i = 0; i < 4; i++) cal[i] = (plat_stick_cal){ i, 0, 1, 2 };
+	for (i = 0; i < 4; i++) lo[i] = hi[i] = raw[i];
+	if (g_btntest_shot >= 0) {
+		/* a screenshot: some seen, one down */
+		for (b = 0; b < HWT_COUNT; b++) seen[b] = b < g_btntest_shot;
+		down[HWT_A] = true;
+		btntest_draw(a, seen, down, true, (plat_stick_cal[4]){ { 0, 350, 2048, 3750 }, { 1, 350, 2048, 3750 },
+		             { 2, 350, 2048, 3750 }, { 3, 350, 2048, 3750 } }, (int[4]){ 2048, 900, 2900, 2048 }, 0);
+		return;
+	}
+	fprintf(stderr, "hwtest: buttons, %s\n", sticks ? "with sticks" : "no sticks");
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+	while (a->running) {
+		float leave = 0;
+
+		plat_input_poll(&a->in);
+		if (sticks) {
+			plat_sticks(raw);
+			for (i = 0; i < 4; i++) { if (raw[i] < lo[i]) lo[i] = raw[i]; if (raw[i] > hi[i]) hi[i] = raw[i]; }
+		}
+		if (a->in.quit_requested) { a->running = false; break; }
+		for (b = 0; b < HWT_COUNT; b++) {
+			bool d = a->in.down[HWT_IN[b]] || a->in.pressed[HWT_IN[b]];
+
+			if (a->in.pressed[HWT_IN[b]]) {
+				if (!seen[b]) fprintf(stderr, "hwtest: %s, first press\n", HWT_NAME[b]);
+				seen[b] = true;
+			}
+			down[b] = d;
+		}
+		if (a->in.down[IN_SELECT] && a->in.down[IN_START]) {
+			if (!both_since) both_since = plat_now_ms();
+			leave = (plat_now_ms() - both_since) / 1200.0f;
+			if (leave >= 1) break;
+		} else {
+			both_since = 0;
+		}
+		btntest_draw(a, seen, down, sticks, cal, raw, leave);
+		plat_present();
+	}
+	fprintf(stderr, "hwtest: %d of %d buttons seen", hwtest_summary(seen, sticks, miss, sizeof miss),
+	        hwtest_total(sticks));
+	fprintf(stderr, miss[0] ? "; never: %s\n" : "\n", miss);
+	if (sticks)
+		for (i = 0; i < 4; i++)
+			fprintf(stderr, "hwtest: stick axis %d raw %d to %d (calibrated %d, rest %d, %d)\n", i, lo[i], hi[i],
+			        cal[i].neg, cal[i].mid, cal[i].pos);
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+}
+
+#define SCRTEST_PATTERNS 10
+static const char *const SCRTEST_NAME[SCRTEST_PATTERNS] = {
+	"The panel", "Red", "Green", "Blue", "White", "Black", "Gradients", "Grid and edges",
+	"Checkerboard", "Moving bar"
+};
+
+static void scrtest_draw(app *a, int p, const char *info, double hz, double fps, unsigned t)
+{
+	SDL_Renderer *r = a->r;
+	int W = TORTOS_SCREEN_W, H = TORTOS_SCREEN_H, x, y;
+	TTF_Font *fm = ui_font(UI_F_MENU), *fs = ui_font(UI_F_META);
+	char line[160];
+
+	switch (p) {
+	case 1: SDL_SetRenderDrawColor(r, 255, 0, 0, 255); SDL_RenderClear(r); break;
+	case 2: SDL_SetRenderDrawColor(r, 0, 255, 0, 255); SDL_RenderClear(r); break;
+	case 3: SDL_SetRenderDrawColor(r, 0, 0, 255, 255); SDL_RenderClear(r); break;
+	case 4: SDL_SetRenderDrawColor(r, 255, 255, 255, 255); SDL_RenderClear(r); break;
+	case 5: SDL_SetRenderDrawColor(r, 0, 0, 0, 255); SDL_RenderClear(r); break;
+	case 6:
+		for (x = 0; x < W; x++) {
+			int v = x * 255 / (W - 1);
+			SDL_SetRenderDrawColor(r, v, v, v, 255); SDL_RenderDrawLine(r, x, 0, x, H / 4 - 1);
+			SDL_SetRenderDrawColor(r, v, 0, 0, 255); SDL_RenderDrawLine(r, x, H / 4, x, H / 2 - 1);
+			SDL_SetRenderDrawColor(r, 0, v, 0, 255); SDL_RenderDrawLine(r, x, H / 2, x, 3 * H / 4 - 1);
+			SDL_SetRenderDrawColor(r, 0, 0, v, 255); SDL_RenderDrawLine(r, x, 3 * H / 4, x, H - 1);
+		}
+		break;
+	case 7:
+		SDL_SetRenderDrawColor(r, 0, 0, 0, 255); SDL_RenderClear(r);
+		SDL_SetRenderDrawColor(r, 90, 90, 90, 255);
+		for (x = 0; x < W; x += 32) SDL_RenderDrawLine(r, x, 0, x, H - 1);
+		for (y = 0; y < H; y += 32) SDL_RenderDrawLine(r, 0, y, W - 1, y);
+		/* the outermost pixel row and column, and the corners */
+		SDL_SetRenderDrawColor(r, 255, 255, 255, 255);
+		SDL_RenderDrawRect(r, &(SDL_Rect){ 0, 0, W, H });
+		SDL_SetRenderDrawColor(r, 255, 60, 60, 255);
+		SDL_RenderFillRect(r, &(SDL_Rect){ 0, 0, 16, 16 });
+		SDL_RenderFillRect(r, &(SDL_Rect){ W - 16, 0, 16, 16 });
+		SDL_RenderFillRect(r, &(SDL_Rect){ 0, H - 16, 16, 16 });
+		SDL_RenderFillRect(r, &(SDL_Rect){ W - 16, H - 16, 16, 16 });
+		SDL_SetRenderDrawColor(r, 60, 255, 60, 255);
+		SDL_RenderDrawLine(r, W / 2, H / 2 - 40, W / 2, H / 2 + 40);
+		SDL_RenderDrawLine(r, W / 2 - 40, H / 2, W / 2 + 40, H / 2);
+		break;
+	case 8:
+		for (y = 0; y < H; y++)
+			for (x = 0; x < W; x += 2) {
+				int on = (x + y) & 1 ? 0 : 255;
+				SDL_SetRenderDrawColor(r, on, on, on, 255);
+				SDL_RenderDrawPoint(r, x, y); SDL_SetRenderDrawColor(r, 255 - on, 255 - on, 255 - on, 255);
+				SDL_RenderDrawPoint(r, x + 1, y);
+			}
+		break;
+	case 9:
+		SDL_SetRenderDrawColor(r, 0, 0, 0, 255); SDL_RenderClear(r);
+		SDL_SetRenderDrawColor(r, 255, 255, 255, 255);
+		SDL_RenderFillRect(r, &(SDL_Rect){ (int)((t / 2) % (unsigned)W), 0, 24, H });
+		snprintf(line, sizeof line, "%.1f frames a second", fps);
+		ui_text(r, fm, line, W / 2, H - 80, 0, (SDL_Color){ 255, 200, 60, 255 });
+		break;
+	default:
+		SDL_SetRenderDrawColor(r, 20, 20, 26, 255); SDL_RenderClear(r);
+		ui_text(r, fm, "Screen Test", W / 2, 120, 0, UI_TEXT);
+		ui_text(r, fs, info[0] ? info : "The display driver didn't say", W / 2, 200, 0, UI_TEXT_DIM);
+		snprintf(line, sizeof line, "ChaOS draws %dx%d; the driver says %.2f Hz", W, H, hz);
+		ui_text(r, fs, line, W / 2, 240, 0, UI_TEXT_DIM);
+		ui_text(r, fs, "Left/Right: the next pattern   B: leave", W / 2, H - 100, 0, UI_TEXT_DIM);
+		break;
+	}
+	if (p > 0) {
+		snprintf(line, sizeof line, "%d of %d: %s", p + 1, SCRTEST_PATTERNS, SCRTEST_NAME[p]);
+		ui_text(r, fs, line, W / 2, 24, 0, p == 4 ? (SDL_Color){ 20, 20, 20, 255 } : (SDL_Color){ 255, 200, 60, 255 });
+	}
+}
+
+static void scrtest_screen(app *a)
+{
+	char info[200] = "";
+	double hz = 0, fps = 0;
+	int p = 0, frames = 0;
+	unsigned t0, tf;
+
+	plat_panel_info(info, sizeof info, &hz);
+	if (g_scrtest_shot >= 0) {
+		scrtest_draw(a, g_scrtest_shot % SCRTEST_PATTERNS, info[0] ? info : "1024x768, 32 bpp (a screenshot)",
+		             hz ? hz : 60, 60, 300);
+		return;
+	}
+	fprintf(stderr, "hwtest: screen: %s\n", info[0] ? info : "the display driver didn't say");
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+	t0 = tf = plat_now_ms();
+	while (a->running) {
+		unsigned now;
+
+		plat_input_poll(&a->in);
+		if (a->in.quit_requested) { a->running = false; break; }
+		if (a->in.pressed[IN_BACK] || a->in.pressed[IN_POWER]) break;
+		if (a->in.pressed[IN_RIGHT] || a->in.pressed[IN_ACCEPT] || a->in.pressed[IN_LEFT]) {
+			if (p == 9 && fps > 0) fprintf(stderr, "hwtest: screen: moving bar at %.1f frames a second\n", fps);
+			p = (p + (a->in.pressed[IN_LEFT] ? SCRTEST_PATTERNS - 1 : 1)) % SCRTEST_PATTERNS;
+			frames = 0;
+			tf = plat_now_ms();
+		}
+		now = plat_now_ms();
+		scrtest_draw(a, p, info, hz, fps, now - t0);
+		plat_present();
+		if (++frames >= 60) { fps = frames * 1000.0 / (double)(plat_now_ms() - tf ? plat_now_ms() - tf : 1); frames = 0; tf = plat_now_ms(); }
+	}
+	if (fps > 0 && p == 9) fprintf(stderr, "hwtest: screen: moving bar at %.1f frames a second\n", fps);
+	plat_input_flush();
+	memset(&a->in, 0, sizeof a->in);
+}
+
 
 
 /* A small tag: what a port is, beside its name */
@@ -25798,6 +26050,8 @@ static void take_shot(app *a)
 		menu_draw(a, heading, rows, n, g_log_shot - 1, 0, MENU_ACCENT);
 	}
 	if (g_sticks_shot >= 0) sticks_screen(a);
+	if (g_btntest_shot >= 0) btntest_screen(a);
+	if (g_scrtest_shot >= 0) scrtest_screen(a);
 	if (g_arrange_shot) {
 		arrange_ctx c = { .a = a, .held = g_arrange_shot - 1 };
 		menu_row rows[ARRANGE_MAX];
@@ -26225,6 +26479,9 @@ int main(int argc, char *argv[])
 		else if (!strcmp(argv[i], "--port-power") && i + 1 < argc) shot_port_power = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--about")) g_about_shot = true;
 		else if (!strcmp(argv[i], "--sticks") && i + 1 < argc) g_sticks_shot = atoi(argv[++i]);
+		/* ChaOS: Hardware Test, --btntest SEEN (that many ticked), --scrtest PATTERN */
+		else if (!strcmp(argv[i], "--btntest") && i + 1 < argc) g_btntest_shot = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "--scrtest") && i + 1 < argc) g_scrtest_shot = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--chan") && i + 1 < argc) g_chan_shot = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--arrange") && i + 1 < argc) g_arrange_shot = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--shelfnote") && i + 1 < argc) shot_shelfnote = atoi(argv[++i]);

@@ -52,7 +52,7 @@ static const struct { const char *word; logcat c; } WORDS[] = {
 	{ "settings", LOGCAT_SYSTEM }, { "setting", LOGCAT_SYSTEM },
 	{ "idle", LOGCAT_SYSTEM }, { "lights", LOGCAT_SYSTEM },
 	{ "boot", LOGCAT_SYSTEM }, { "exit", LOGCAT_SYSTEM },
-	{ "cleanup", LOGCAT_SYSTEM }, { "cpu", LOGCAT_GAMES },
+	{ "cleanup", LOGCAT_SYSTEM }, { "hwtest", LOGCAT_SYSTEM }, { "cpu", LOGCAT_GAMES },
 };
 
 logcat logcat_of(const char *line, size_t n)

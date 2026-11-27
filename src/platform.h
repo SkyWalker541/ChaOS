@@ -43,6 +43,8 @@ typedef enum {
 	IN_L2, IN_R2,      /* ChaOS: the letter scrub on the shelves */
 	IN_F1, IN_F2,      /* ChaOS: the Brick's front keys - rewind and fast forward
 	                    * in games; with both held, Muse's pocket lock */
+	IN_L3, IN_R3,      /* ChaOS: the Brick Pro's stick clicks; nothing in the
+	                    * launcher's menus asks for them but Hardware Test */
 	IN_COUNT,
 	IN_NONE = -1,
 } in_button;
@@ -456,6 +458,9 @@ float plat_stick_axis(const plat_stick_cal *c, const int raw[4]);
  * on, the SDL mapping's stick fields ("leftx:a0,..."), the axes' ranges set
  * for the port; off, the ranges put back. NULL with no sticks. */
 const char *plat_port_sticks(bool on);
+/* ChaOS: the panel as the display driver has it, for Screen Test: its size,
+ * the framebuffer's, its depth and refresh, one line. False with none. */
+bool plat_panel_info(char *out, size_t n, double *hz);
 
 /* Date & Time (src/clock.h). Set the clock to `t`, and the hardware clock with
  * it, which keeps the time while the device is off: the Pixel 2 has nothing

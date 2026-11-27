@@ -67,7 +67,7 @@ int sys_menu_tortos_rows(const sys_ui *u, pm_row *out)
 			bool sys  = r == PM_AUDIO || r == PM_CHANNELS || r == PM_NIGHT ||
 			            r == PM_CLOCK || r == PM_SHOWCLOCK || r == PM_SHOWBATT || r == PM_BATTWARN ||
 			            r == PM_UPDDOT ||
-			            r == PM_SLEEP || r == PM_STICKS;
+			            r == PM_SLEEP || r == PM_STICKS || r == PM_BTNTEST || r == PM_SCRTEST;
 			int page = look ? 1 : roms ? 2 : net ? 3 : sys ? 4 : shelf ? 5 : 0;
 			/* Shelves first: it opens from Appearance, which is still open */
 			int want = u->shelf_page ? 5 : u->appearance ? 1 : u->rom_page ? 2
@@ -322,6 +322,8 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	full[PM_CLOCK]        = (menu_row){ "Date & Time", u->clock,  true  };
 	full[PM_SLEEP]        = (menu_row){ "Auto Off",  b->c,      true  };
 	full[PM_STICKS]       = (menu_row){ "Calibrate Sticks", NULL, true, true };
+	full[PM_BTNTEST]      = (menu_row){ "Button Test", NULL, true, true };
+	full[PM_SCRTEST]      = (menu_row){ "Screen Test", NULL, true, true };
 	/* Both change how the shelf looks and nothing about what is on it. They
 	 * are what is left of that group: Text Size stood here until the band it
 	 * offered turned out to be too narrow to matter - src/ui.c. */
@@ -402,6 +404,8 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 	full[PM_UPDDOT].hint       = "A dot on Updates when a new ChaOS is out";
 	full[PM_SLEEP].hint        = "Power off after this long with no buttons pressed";
 	full[PM_STICKS].hint       = "Their middles, their ends, which way is up";
+	full[PM_BTNTEST].hint      = "Every button and stick, shown and logged";
+	full[PM_SCRTEST].hint      = "Colors, edges and refresh, shown and logged";
 	full[PM_APPEARANCE].hint   = "Theme, layout, menu color and the shelves";
 	full[PM_SHELVES].hint      = "Which shelves show, their order and their games";
 	full[PM_THEME].hint        = "The look of the cards on the shelf";

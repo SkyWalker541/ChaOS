@@ -229,7 +229,7 @@ static bool has_label(const menu_row *rows, int n, const char *label);
  * (Audio Output, Audio Channels, Night Mode, Date & Time, Show Clock, Show
  * Battery, Update Available Dot, Auto Off) */
 #define NET_ROWS 2
-#define SYS_ROWS 9
+#define SYS_ROWS 11   /* ChaOS: with Button Test and Screen Test, on every device */
 /* less Calibrate Sticks, on System Settings for a Brick Pro alone */
 #define TOP_ROWS (PM_ROWS - PAGE_ROWS - ROM_ROWS - NET_ROWS - SYS_ROWS - SHELF_ROWS - 1)
 /* (the page's description line is drawn by menu_draw, not a row) */
@@ -552,6 +552,10 @@ static void tortos_menu_online(void)
 		n = sys_menu_build(&p, rows, &b, &heading);
 		ck(n == SYS_ROWS + 1 && has_label(rows, n, "Calibrate Sticks") &&
 		   (*by_id(&p, rows, n, PM_STICKS)).opens, "on a Brick Pro, on System Settings, opening its page");
+		/* ChaOS: Hardware Test, by id: each opens its own screen */
+		ck(!strcmp((*by_id(&p, rows, n, PM_BTNTEST)).label, "Button Test") && (*by_id(&p, rows, n, PM_BTNTEST)).opens &&
+		   !strcmp((*by_id(&p, rows, n, PM_SCRTEST)).label, "Screen Test") && (*by_id(&p, rows, n, PM_SCRTEST)).opens,
+		   "Button Test and Screen Test, each by its id, on System Settings");
 		n = sys_menu_build(&u, rows, &b, &heading);
 	}
 	printf("the Controls row:\n");

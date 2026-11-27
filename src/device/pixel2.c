@@ -166,6 +166,7 @@ void plat_present_hold(void)
 
 /* ChaOS: no sticks on the Pixel 2 (platform.h) */
 const char *plat_port_sticks(bool on) { (void)on; return NULL; }
+bool plat_panel_info(char *out, size_t n, double *hz) { (void)out; (void)n; (void)hz; return false; }
 
 void plat_draw_to_screen(void) { SDL_SetRenderTarget(ren, screen_tex); }
 
