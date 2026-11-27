@@ -82,7 +82,13 @@ typedef enum {
 	/* ChaOS: Performance, how fast the CPU runs for this console's games, or
 	 * for ports (src/cpumode.h); not PICO-8's, which runs on its own */
 	SM_PERF,
-	SM_BOXART, SM_RESCAN, SM_ROWS
+	SM_BOXART, SM_RESCAN,
+	/* ChaOS: Ports only, how SDL's a/b/x/y sit on the Brick's buttons: Xbox
+	 * (by position, PortMaster's own way) or Nintendo (A is A), spruceOS's
+	 * Controller Mode (src/padlayout.h). Last, so that leaving it out of a
+	 * console's menu moves no row */
+	SM_LAYOUT,
+	SM_ROWS
 } sm_row;
 
 /* What the Favorites shelf's menu is, which is two of those rows.
@@ -230,6 +236,7 @@ typedef struct {
 	const char *update;      /* ChaOS: Updates' value, upd_row_value */
 	bool        rewind;      /* ChaOS: this console keeps states to rewind to */
 	const char *perf;        /* ChaOS: its Performance (cpumode.h); NULL reads Auto */
+	const char *layout;      /* ChaOS: Ports' Controls Layout (padlayout.h); NULL reads Xbox */
 	const char *overscan;    /* ChaOS: Crop Overscan's choice, NULL for no row */
 	/* ChaOS: a shelf whose games run outside the emulator (PICO-8): none
 	 * of its rows about the picture (but Overlay), the buttons, rewind or

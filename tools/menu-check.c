@@ -617,7 +617,7 @@ static void system_menu(void)
 	n = sys_menu_build(&u, rows, &b, &heading);
 
 	printf("system menu:\n");
-	ck(n == SM_ROWS, "every row is filled");
+	ck(n == SM_ROWS - 1, "every row is filled (Controls Layout is Ports')");
 	ck(!strcmp(heading, "Game Boy"), "heading is the system, not TortOS");
 	ck(!strcmp(val(&rows[SM_GAMES]), "412"), "the count is the real one");
 	ck(!strcmp(val(&rows[SM_CORE]), "gambatte"), "the core is the real one");
@@ -840,7 +840,7 @@ static void cursor_reaches(void)
 	ck(reaches(rows, got, k, "Display Mode") && !strcmp(val(&rows[SM_DISPLAY]), "Integer"),
 	   "Display Mode, Integer when nothing says otherwise");
 	ck(!reaches(rows, got, k, "Shader"), "no Shader: nothing is made for the NES yet");
-	ck(n == SM_ROWS - 2 && !strcmp(rows[SM_SHADER].label, "Overlay"),
+	ck(n == SM_ROWS - 3 && !strcmp(rows[SM_SHADER].label, "Overlay"),
 	   "and Overlay moves up into its place");
 	ck(!reaches(rows, got, k, "Crop Overscan"), "no Crop Overscan where nothing can crop");
 	/* Live since sorting stopped being alphabetical-only. It was a
@@ -865,6 +865,8 @@ static void cursor_reaches(void)
 		n = sys_menu_build(&u, rows, &b, &heading);
 		for (i = 0, at = -1; i < n; i++) if (rows[i].id == MENU_ID(SM_PERF)) at = i;
 		ck(at >= 0 && !strcmp(val(&rows[at]), "Max"), "Performance says what is set");
+		for (i = 0, at = -1; i < n; i++) if (rows[i].id == MENU_ID(SM_LAYOUT)) at = i;
+		ck(at < 0, "no Controls Layout on a console's menu");
 		u.perf = NULL;
 		n = sys_menu_build(&u, rows, &b, &heading);
 		k = reachable(rows, n, got, MENU_MAX_ROWS);
@@ -890,8 +892,21 @@ static void cursor_reaches(void)
 	   reaches(rows, got, k, "Rescan Folder") && !reaches(rows, got, k, "Display Mode") &&
 	   !reaches(rows, got, k, "Rewind") && !reaches(rows, got, k, "Box Art") &&
 	   !reaches(rows, got, k, "Overlay") && !reaches(rows, got, k, "Shader") &&
-	   !reaches(rows, got, k, "Crop Overscan") && reaches(rows, got, k, "Performance"),
-	   "Ports: Controls, Sort By, Performance and Rescan Folder, none of the emulator's rows");
+	   !reaches(rows, got, k, "Crop Overscan") && reaches(rows, got, k, "Performance") &&
+	   reaches(rows, got, k, "Controls Layout"),
+	   "Ports: Controls, Sort By, Performance, Rescan Folder and Controls Layout, none of the emulator's rows");
+	{
+		int i, at = -1;
+
+		for (i = 0; i < n; i++) if (rows[i].id == MENU_ID(SM_LAYOUT)) at = i;
+		ck(at >= 0 && !strcmp(val(&rows[at]), "Xbox") && rows[at].cycles,
+		   "Controls Layout by its id, Xbox unless set, left and right going round");
+		u.layout = "Nintendo";
+		n = sys_menu_build(&u, rows, &b, &heading);
+		for (i = 0, at = -1; i < n; i++) if (rows[i].id == MENU_ID(SM_LAYOUT)) at = i;
+		ck(at >= 0 && !strcmp(val(&rows[at]), "Nintendo"), "Controls Layout says what is set");
+		u.layout = NULL;
+	}
 	u.ports = false; u.sys_name = "NES"; u.sys_core = "nestopia"; u.shader = NULL; u.overscan = NULL;
 
 	memset(&u, 0, sizeof u);
@@ -1004,7 +1019,7 @@ static void radio_less(void)
 	u.overscan = "Off";
 	k = sys_menu_system_rows(&u, sm);
 	for (i = 0, ok = true; i < k; i++) if (sm[i] != (sm_row)i) ok = false;
-	ck(k == SM_ROWS && ok, "every system row, in the enum's order");
+	ck(k == SM_ROWS - 1 && ok, "every system row, in the enum's order (Controls Layout is Ports')");
 
 	/* ChaOS: Get PortMaster until it is installed, then not */
 	{
@@ -1075,7 +1090,7 @@ static void radio_less(void)
 	n = sys_menu_build(&u, rows, &b, &heading);
 	k = sys_menu_system_rows(&u, sm);
 	printf("system menu, no radio at all:\n");
-	ck(n == k && n == SM_ROWS - 1, "Box Art goes and nothing else");
+	ck(n == k && n == SM_ROWS - 2, "Box Art goes and nothing else (and Controls Layout, Ports')");
 	ck(!has_label(rows, n, "Box Art"), "no Box Art");
 	ck(sm[n - 1] == SM_RESCAN && !strcmp(rows[n - 1].label, "Rescan Folder"),
 	   "Rescan Folder moves up into its place");
@@ -1251,9 +1266,13 @@ static void info_rows(void)
 	snprintf(gi.genre, sizeof gi.genre, "Platform,Shoot'em Up");
 	/* ChaOS: and its Performance, a game's own or Default, under the action */
 	snprintf(gi.perf, sizeof gi.perf, "Default");
+	/* and a port's Controls Layout under it (a port's screen: the most rows) */
+	snprintf(gi.layout, sizeof gi.layout, "Default");
 	n = gi_rows(rows, &gi, true);
 	printf("game info, scraped with a year, a genre and prose:\n");
-	ck(n == GI_MAX, "three rows more than an unscraped game, and Performance");
+	ck(n == GI_MAX, "three rows more than an unscraped game, Performance and Controls Layout");
+	ck(!strcmp(rows[6].label, "Controls Layout") && !strcmp(val(&rows[6]), "Default") && rows[6].cycles,
+	   "Controls Layout under Performance, Default, left and right going round");
 	ck(!strcmp(rows[5].label, "Performance") && !strcmp(val(&rows[5]), "Default") && rows[5].cycles,
 	   "Performance under the action, Default, left and right going round");
 	ck(!strcmp(rows[0].label, "Synopsis"), "what the game IS leads");
@@ -1266,7 +1285,7 @@ static void info_rows(void)
 	   "then what there is to shoot for, which is worth seeing before starting");
 	ck(!strcmp(rows[4].label, "Replace Box Art"), "and the action last");
 	k = reachable(rows, n, got, GI_MAX);
-	ck(k == 4, "four stops: the synopsis, the set, the action and Performance");
+	ck(k == 5, "five stops: the synopsis, the set, the action, Performance and Controls Layout");
 
 	gi.has_synopsis = false;
 	n = gi_rows(rows, &gi, true);

@@ -56,6 +56,7 @@ static void os_cycle(const char *tag, int d, bool live);
 #include "sys_menu.h"
 #include "controls.h"
 #include "cpumode.h"
+#include "padlayout.h"
 #include "update.h"
 #include "remap.h"
 #include "shots.h"
@@ -3718,6 +3719,8 @@ static void draw_upd_notice(app *a);   /* ChaOS: with the Updates screen */
 static bool rewind_load(const char *tag);   /* ChaOS: with Button Mapping */
 static int  cpu_mode_get(const char *tag, const char *file);   /* ChaOS: with it */
 static void cpu_mode_set(const char *tag, const char *file, int m);
+static int  pad_layout_get(const char *file);
+static void pad_layout_set(const char *file, int m);
 static int  menu_shelf_width(app *a);
 static void upd_poll(void);
 
@@ -6438,6 +6441,7 @@ static int menu_build(app *a, screen_id screen, int sys,
 			u.native  = !strcmp(sc->core, PICO8_CORE);
 			u.ports   = !strcmp(sc->core, PORTS_CORE);
 			u.perf    = cpumode_name(cpu_mode_get(sc->tag, NULL));
+			u.layout  = padlayout_name(pad_layout_get(NULL));
 			u.shader  = look_console_of(sc->tag) == LOOK_NONE ? NULL
 			          : a->view[sys].look.on ? "On" : "Off";
 			u.overlay = u.fav || u.muse ? NULL : overlay_label(a, sys, ovl, sizeof ovl);
@@ -8404,6 +8408,9 @@ static void gi_gather(app *a, int owner, const game_entry *g, game_info *gi)
 	 * and ports, not PICO-8 or PortMaster's own card */
 	if (strcmp(s->core, PICO8_CORE) && s->core[0] && !pm_is_entry(g->file))
 		snprintf(gi->perf, sizeof gi->perf, "%s", cpumode_name(cpu_mode_get(s->tag, g->file)));
+	/* ChaOS: a port's Controls Layout; not PortMaster's card, always Nintendo */
+	if (!strcmp(s->core, PORTS_CORE) && !pm_is_entry(g->file))
+		snprintf(gi->layout, sizeof gi->layout, "%s", padlayout_name(pad_layout_get(g->file)));
 
 	/* Loading the set clobbers whatever set is loaded, which is nobody's
 	 * during shelf browsing - no game is running. It stays loaded after this
@@ -9301,6 +9308,13 @@ static menu_result info_key(app *a, void *ctx, in_button key, int sel)
 		gi_gather(a, c->owner, c->g, &c->gi);
 		return MENU_STAY;
 	}
+	if (sel < n && !strcmp(rows[sel].label, "Controls Layout") &&
+	    (key == IN_LEFT || key == IN_RIGHT || key == IN_ACCEPT)) {
+		pad_layout_set(c->g->file,
+		               padlayout_step(pad_layout_get(c->g->file), key == IN_LEFT ? -1 : 1, true));
+		gi_gather(a, c->owner, c->g, &c->gi);
+		return MENU_STAY;
+	}
 	if (key != IN_ACCEPT || sel >= n || !rows[sel].live) return MENU_STAY;
 
 	if (!strcmp(rows[sel].label, "Synopsis")) {
@@ -9959,6 +9973,41 @@ static void cpu_mode_set(const char *tag, const char *file, int m)
 	cpu_key(k, sizeof k, tag, file);
 	if (file && *file && m == CPU_DEFAULT) db_del(db_dev(), k);
 	else db_set_int(db_dev(), k, m);
+}
+
+/* ChaOS: Ports' Controls Layout (padlayout.h): all ports' in
+ * "padlayout.PORTS", Xbox unless set; a port's own in
+ * "padlayout.PORTS:<file>", none meaning the shelf's. By file, as above. */
+static int pad_layout_get(const char *file)
+{
+	char k[LIB_PATH + 32];
+	int m, lo = file && *file ? PAD_DEFAULT : PAD_XBOX;
+
+	if (file && *file) snprintf(k, sizeof k, "padlayout.PORTS:%s", file);
+	else snprintf(k, sizeof k, "padlayout.PORTS");
+	m = db_get_int(db_dev(), k, lo);
+	return m < lo || m >= PAD_LAYOUTS ? lo : m;
+}
+
+static void pad_layout_set(const char *file, int m)
+{
+	char k[LIB_PATH + 32];
+
+	if (file && *file) snprintf(k, sizeof k, "padlayout.PORTS:%s", file);
+	else snprintf(k, sizeof k, "padlayout.PORTS");
+	if (file && *file && m == PAD_DEFAULT) db_del(db_dev(), k);
+	else db_set_int(db_dev(), k, m);
+}
+
+/* What a port plays with: PortMaster's own card Nintendo always, so its
+ * menus choose with A as ChaOS's do; a port its own, else the shelf's */
+static int pad_layout_for(const char *file)
+{
+	int m;
+
+	if (pm_is_entry(file)) return PAD_NINTENDO;
+	m = pad_layout_get(file);
+	return m == PAD_DEFAULT ? pad_layout_get(NULL) : m;
 }
 
 /* What a game or port runs at: its own, else its console's */
@@ -12108,6 +12157,11 @@ static menu_result sysmenu_key(app *a, void *ctx, in_button key, int sel)
 		if (sel == SM_REWIND) {
 			const char *tag = a->sys.systems[a->sys_cursor].tag;
 			if (d || key == IN_ACCEPT) rewind_save(tag, !rewind_load(tag));
+			return MENU_STAY;
+		}
+		if (sel == SM_LAYOUT) {
+			if (d || key == IN_ACCEPT)
+				pad_layout_set(NULL, padlayout_step(pad_layout_get(NULL), d ? d : 1, false));
 			return MENU_STAY;
 		}
 		if (sel == SM_PERF) {
@@ -16653,7 +16707,7 @@ static void port_launch(app *a, int o, const char *romfile, const char *title)
 	const system_cfg *s = &a->sys.systems[o];
 	char script[LIB_PATH * 2], runner[CFG_STR * 2], why[96], ud[LIB_PATH + 32];
 	char *argv[4];
-	const char *envkv[3];
+	const char *envkv[4];
 	bool music;
 	int how = PORT_ENDED, rc;
 	/* ChaOS: the Ports shelf's first card is PortMaster's own app, run by
@@ -16692,11 +16746,15 @@ static void port_launch(app *a, int o, const char *romfile, const char *title)
 		static char sk[160];
 		const char *map = plat_port_sticks(true);
 
+		int k = 1;
+
 		if (map) {
 			snprintf(sk, sizeof sk, "CHAOS_STICKS=%s", map);
-			envkv[1] = sk;
-			envkv[2] = NULL;
+			envkv[k++] = sk;
 		}
+		/* ChaOS: Controls Layout (padlayout.h), for run.sh's CHAOS_PAD */
+		if (pad_layout_for(romfile) == PAD_NINTENDO) envkv[k++] = "CHAOS_PAD_LAYOUT=nintendo";
+		envkv[k] = NULL;
 	}
 	argv[0] = (char *)"/bin/sh";
 	argv[1] = runner;

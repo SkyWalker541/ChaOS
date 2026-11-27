@@ -53,7 +53,11 @@ date
 # The Brick Pro's sticks are SDL's sticks too: CHAOS_STICKS, set by ChaOS from
 # Calibrate Sticks ("leftx:a0,lefty:a1,..." - src/portsticks.h), empty on a
 # Brick
-M="a:b1,b:b0,x:b3,y:b2,back:b8,start:b9,guide:b10,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,leftstick:b11,rightstick:b12,dpup:b13,dpdown:b14,dpleft:b15,dpright:b16,${CHAOS_STICKS}platform:Linux,"
+# Controls Layout (src/padlayout.h): Xbox, by position, unless ChaOS says
+# Nintendo (CHAOS_PAD_LAYOUT), where A is a - as PortMaster's own menus have
+# it always, so they choose with A as ChaOS's do
+if [ "$CHAOS_PAD_LAYOUT" = nintendo ]; then F="a:b0,b:b1,x:b2,y:b3"; else F="a:b1,b:b0,x:b3,y:b2"; fi
+M="$F,back:b8,start:b9,guide:b10,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,leftstick:b11,rightstick:b12,dpup:b13,dpdown:b14,dpleft:b15,dpright:b16,${CHAOS_STICKS}platform:Linux,"
 CHAOS_PAD="19001eec427269636b2047616d657000,Brick Gamepad,$M
 19000000427269636b2047616d657000,Brick Gamepad,$M"
 export CHAOS_PAD
