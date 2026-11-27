@@ -27,7 +27,8 @@ ChaOS is custom firmware for the **TrimUI Brick** and **Brick Hammer**. It runs 
 |---|---|
 | **[Shaders and overlays](https://skywalker541.github.io/ChaOS/#shaders)** | CRT, LCD and PT SkyWalker541 looks you can tune, frames around the picture, every setting explained in the menu, overscan cropping, and a [speed check](https://skywalker541.github.io/ChaOS/#speed) that says whether a game keeps full speed |
 | **[Cheats](https://skywalker541.github.io/ChaOS/#cheats)** | Game Genie, Action Replay and GameShark codes from libretro's cheat database, switched on and off in the in-game menu |
-| **[Ports](https://skywalker541.github.io/ChaOS/#ports)** | PortMaster's catalog on the Brick, with runtimes and libraries fetched for you. On Pre-Release, PortMaster's own app, whole catalog, in ChaOS's colors |
+| **[Ports](https://skywalker541.github.io/ChaOS/#ports)** | PortMaster's own app on the Brick, whole catalog, in ChaOS's colors, with runtimes, libraries and the GPU set up for you, saves that sync, and Xbox or Nintendo button layouts |
+| **[Performance](https://skywalker541.github.io/ChaOS/#performance)** | How fast the CPU runs, per console, per game and for ports: Auto, Powersave, Balanced, Performance or Max |
 | **[PICO-8](https://skywalker541.github.io/ChaOS/#pico8)** | Your own copy of PICO-8, with Splore for the carts people share |
 | **[Game Boy or Color, sorted](https://skywalker541.github.io/ChaOS/#gbsort)** | Indie games named `.gb` that are really Game Boy Color play in color, and ChaOS offers to move them to the right folder with their saves, play time and covers |
 | **[RomM and Syncthing](https://skywalker541.github.io/ChaOS/#sync)** | In ROM Management: games, saves, save states and BIOS from your own RomM server, and saves, save states, games and BIOS kept the same on all your devices |

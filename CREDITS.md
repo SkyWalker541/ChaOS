@@ -131,6 +131,14 @@ sold, put behind a paywall, or shipped with a device that is sold.
 - **QR Code generator library** by **Project Nayuki** (https://www.nayuki.io/page/qr-code-generator-library), `src/qrcodegen.c` and `src/qrcodegen.h`, unchanged from https://github.com/nayuki/QR-Code-generator (commit bcfe1b0): the QR code on a Get Homebrew game's page. Licence: **MIT**, Copyright (c) Project Nayuki; the notice is in the files.
 - **7-Zip's C decoder** by **Igor Pavlov** (https://7-zip.org), `lib/7z/src`, unchanged from https://github.com/ip7z/7zip (26.06): games in `.7z` archives, in ChaOS and in ChaOS-diatom. Licence: **public domain**, as the files say.
 
+## What ChaOS brings for ports
+
+Programs ports ask the Brick for, which it hasn't got. Each one's licence text goes on the card beside it.
+
+- **Python** 3.11 (https://www.python.org, https://github.com/python/cpython), built by `tools/build-python.sh`: what PortMaster's own app and some ports' scripts run on. Licence: **Python Software Foundation License** (`Licenses/ports/python-LICENSE.txt`).
+- **Zip** 3.0 by **Info-ZIP** (https://infozip.sourceforge.net), built by `tools/build-zip.sh`: for ports whose patchers pack files. Licence: the **Info-ZIP license** (`ChaOS/ports/pybin/zip-LICENSE.txt`).
+- **libudev-zero** 1.0.3 by **illiliti** (https://github.com/illiliti/libudev-zero), built by `tools/build-libudev.sh`: the udev library Weston ports look for. Licence: **ISC** (`ChaOS/ports/lib/libudev-LICENSE.txt`).
+
 ## Ideas from players
 
 - **Trebuchet**: Turbo Speed, how fast a turbo button presses (Button Mapping). Thank you.

@@ -225,7 +225,7 @@ int sys_menu_build(const sys_ui *u, menu_row *out, menu_bufs *b,
 		full[SM_BUTTONS].hint = u->ports ? "What ChaOS's buttons do in a port"
 		                                 : "What each button does in this console's games";
 		full[SM_REWIND].hint  = "Hold F1 to rewind. Costs a little speed";
-		full[SM_LAYOUT].hint  = "Xbox: by position. Nintendo: A is A. X on one sets its own";
+		full[SM_LAYOUT].hint  = "Xbox: by position. Nintendo: A is A";
 		full[SM_PERF].hint    = u->ports ? "CPU speed for ports. X on one sets its own"
 		                                 : "CPU speed for these games. X on one sets its own";
 		full[SM_BOXART].hint  = "Download box art for this console's games";
