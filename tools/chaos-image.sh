@@ -154,6 +154,7 @@ grep -q '^NAME=' "$OSR" || { echo "no os-release to name ChaOS in" >&2; exit 1; 
 grep -q '^OS_NAME=' "$OSR" || echo 'OS_NAME=ChaOS' >> "$OSR"
 mkdir -p "$C/TortOS/ports"
 install -m 755 "$ROOT/res/ports/run.sh" "$C/TortOS/ports/run.sh"
+install -m 644 "$ROOT/res/ports/sound.sh" "$C/TortOS/ports/sound.sh"   # where a port's sound goes, sourced by run.sh
 install -m 644 "$ROOT/res/ports/mod_ChaOS.txt" "$C/TortOS/ports/mod_ChaOS.txt"
 install -m 644 "$ROOT/res/ports/libgl_ChaOS.txt" "$C/TortOS/ports/libgl_ChaOS.txt"
 install -D -m 755 "$ROOT/dist/brick/libchaos-alsafix.so" "$C/TortOS/ports/lib/libchaos-alsafix.so"
