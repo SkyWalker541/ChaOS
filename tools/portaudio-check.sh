@@ -82,17 +82,79 @@ for h in source shipped; do
 	echo "ok: ALSA linked, OpenAL Soft and SDL all play with the $h ALSA helper"
 done
 
-# 2. With the Brick's /etc/asound.conf (alsa.conf's hooks point at it above:
-# qemu-user can't redirect the access() they make in any case)
-: > "$B/asoundrc"     # the launcher's .asoundrc, as it is with no headset
-got=$(run -E LD_LIBRARY_PATH="$B/lib" -E ALSA_CONFIG_DIR="$F/share" \
-	-E ALSA_CONFIG_PATH="$B/alsa.conf:$B/asoundrc" "$B/portaudio-check" default 2>&1) ||
-	fail "ALSA's configuration didn't load: $got"
-said=$(sed -n 's/^[[:space:]]*echo "ChaOS: sound through \(.*\)"$/\1/p' "$ROOT/res/ports/run.sh")
+# 2. Where a port's sound really goes, as res/ports/sound.sh (run.sh's) sets
+# it up: with no headset, with one, and with a sink no headset is behind -
+# against what the port's log says. Run in BusyBox's shell and tools, as on
+# the Brick, when this machine has BusyBox (CI installs it).
+SH=sh
+mkdir -p "$B/bb"
+if command -v busybox > /dev/null 2>&1; then
+	SH="busybox sh"
+	for t in sed grep printf cat; do ln -sf "$(command -v busybox)" "$B/bb/$t"; done
+fi
+# the system's alsa.conf as sound.sh reads it - /etc/asound.conf named as on
+# the Brick - with only this machine's own conf.d kept out
+hooks '/etc/asound.conf|||/usr/etc/asound.conf' > "$B/alsa-brick.conf"
+mac=A8_F5_E1_4A_93_71
+printf 'pcm.bt_%s {\n    type bluealsa\n    device "%s"\n    profile "a2dp"\n}\n' \
+	"$mac" "$(echo $mac | tr _ :)" > "$B/asoundrc-headset"
+: > "$B/asoundrc"     # the launcher's .asoundrc, as it is with no headset paired
+
+# sound.sh's choice, then the default device ALSA resolves with it
+port_sound() {     # SINK_NAME ASOUNDRC [STUBS] -> "said:got"
+	rm -f "$B/chaos-ports-alsa.conf" "$B/chaos-ports-headset.conf"
+	out=$(PATH="$B/bb:${3:+$3:}$PATH" ALSA_CONFIG_PATH="$B/alsa.conf:$2" $SH -c \
+		'. "$0" && chaos_port_sound "$1" "$2" "$3" "$4" && echo "PATH=$ALSA_CONFIG_PATH"' \
+		"$ROOT/res/ports/sound.sh" "$1" "$2" "$B/alsa-brick.conf" "$B") || fail "sound.sh failed: $out"
+	said=$(echo "$out" | sed -n 's/^ChaOS: sound through //p')
+	path=$(echo "$out" | sed -n 's/^PATH=//p')
+	# the device's /etc/asound.conf is the fixture's here (qemu-user can't
+	# redirect alsa.conf's access() to it)
+	[ -f "$B/chaos-ports-alsa.conf" ] &&
+		sed -i "s#\"/etc/asound.conf|||/usr/etc/asound.conf\"#\"$F/etc/asound.conf\"#" "$B/chaos-ports-alsa.conf"
+	got=$(run -E LD_LIBRARY_PATH="$B/lib" -E ALSA_CONFIG_DIR="$F/share" \
+		-E ALSA_CONFIG_PATH="$path" "$B/portaudio-check" default 2>&1) ||
+		fail "ALSA's configuration didn't load: $got"
+	echo "$said:$got"
+}
+
+[ "$(port_sound "" "$B/asoundrc")" = "the shared mixer:mixer" ] ||
+	fail "no headset: $(port_sound "" "$B/asoundrc") (the log's word, then where it plays)"
+echo "ok: with no headset, a port plays through the shared mixer, as its log says"
+
+r=$(port_sound "bt_$mac" "$B/asoundrc-headset")
+[ "$r" = "the Bluetooth headset:bt_$mac" ] || fail "a headset: $r"
+grep -q "$mac\|$(echo $mac | tr _ :)" "$ROOT/res/ports/sound.sh" && fail "a headset's address in sound.sh"
+echo "ok: with a headset, a port plays through it, as its log says"
+
+# bluealsa's list, as on the Brick: the headset's A2DP stream there, or not
+# yet (connected, no stream: the mixer, not a device that opens nothing)
+mkdir -p "$B/a2dp" "$B/noa2dp"
+printf '#!/bin/sh\necho "hci0: %s [Headset], trusted audio-headset"\necho "  A2DP (SBC): S16_LE 2 channels 48000 Hz"\n' \
+	"$(echo $mac | tr _ :)" > "$B/a2dp/bluealsa-aplay"
+printf '#!/bin/sh\necho "hci0: %s [Headset], trusted audio-headset"\n' \
+	"$(echo $mac | tr _ :)" > "$B/noa2dp/bluealsa-aplay"
+chmod 755 "$B/a2dp/bluealsa-aplay" "$B/noa2dp/bluealsa-aplay"
+r=$(port_sound "bt_$mac" "$B/asoundrc-headset" "$B/a2dp")
+[ "$r" = "the Bluetooth headset:bt_$mac" ] || fail "a headset with its stream: $r"
+r=$(port_sound "bt_$mac" "$B/asoundrc-headset" "$B/noa2dp")
+[ "$r" = "the shared mixer:mixer" ] || fail "a headset with no stream yet: $r"
+echo "ok: only a headset whose stream is there; one without keeps the mixer"
+
+# a sink whose PCM the launcher's .asoundrc doesn't have (unpaired since), and
+# one that isn't a PCM's name at all: the mixer, not a device that can't open
+r=$(port_sound "bt_$mac" "$B/asoundrc")
+[ "$r" = "the shared mixer:mixer" ] || fail "a sink with no PCM: $r"
+r=$(port_sound "bt_x\"; touch $B/owned #" "$B/asoundrc-headset")
+[ "$r" = "the shared mixer:mixer" ] && [ ! -e "$B/owned" ] || fail "a sink that isn't a name: $r"
+echo "ok: a headset that can't be opened, or a name that isn't one, keeps the mixer"
+
+# and run.sh asks sound.sh, and sets nothing of ALSA's itself
+grep -q '^	chaos_port_sound "$CHAOS_PORT_SINK" ' "$ROOT/res/ports/run.sh" || fail "run.sh doesn't ask sound.sh with the launcher's choice"
 grep -Eq '^[^#]*ALSA_CONFIG_PATH=' "$ROOT/res/ports/run.sh" &&
-	fail "run.sh sets ALSA_CONFIG_PATH: this check doesn't read what that gives a port"
-case "$said:$got" in
-"the shared mixer:mixer") ;;
-*) fail "run.sh's log says the port plays through '${said:-nothing}', but its default device plays to '$got'" ;;
-esac
-echo "ok: a port plays through the shared mixer, as its log says"
+	fail "run.sh sets ALSA_CONFIG_PATH itself: this check doesn't read what that gives a port"
+grep -q 'res/ports/sound.sh' "$ROOT/tools/chaos-image.sh" || fail "the card image doesn't carry sound.sh"
+# a Weston port, or one with its own libasound, is never sent to a headset
+grep -q 'grep -q weston "$PORT"' "$ROOT/res/ports/run.sh" && grep -q "libasound.so\*" "$ROOT/res/ports/run.sh" ||
+	fail "run.sh sends Weston ports, or ports with their own libasound, to a headset"
+echo "ok: run.sh's sound is sound.sh's"

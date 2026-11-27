@@ -119,6 +119,10 @@ void plat_child_grab(bool on);   /* the buttons kept from the port while it asks
 bool plat_power_event(bool *down);
 int  plat_run_port(char *const argv[], const char *const envkv[], const char *workdir,
                    int *how, int (*on_power)(void *ctx), void *ctx);
+/* ChaOS: called after the volume keys move the level while a port runs, when
+ * set - the port's sound on a Bluetooth headset, whose volume the codec's
+ * level doesn't reach (main.c port_launch) */
+extern void (*plat_port_volume_hook)(void);
 /* Say that something equivalent to a power press has happened, for the paths
  * the evdev watchdog cannot see: a screen the launcher is drawing over a
  * paused game, where plat_resident_wait is not running and so nothing is

@@ -16727,12 +16727,22 @@ static void perf_port(const char *title)
 		        title, secs, cpu, rss / 1024);
 }
 
+/* ChaOS: the headset a port's sound goes to, for the volume keys while it
+ * runs: the codec's level doesn't reach a headset, so each press is sent on
+ * to it, as for Muse and games (bt_volume_follow) */
+static char g_port_sink[64];
+
+static void port_bt_volume(void)
+{
+	if (g_port_sink[0]) bt_volume_follow(g_port_sink, false);
+}
+
 static void port_launch(app *a, int o, const char *romfile, const char *title)
 {
 	const system_cfg *s = &a->sys.systems[o];
 	char script[LIB_PATH * 2], runner[CFG_STR * 2], why[96], ud[LIB_PATH + 32];
 	char *argv[4];
-	const char *envkv[4];
+	const char *envkv[6];
 	bool music;
 	int how = PORT_ENDED, rc;
 	/* ChaOS: the Ports shelf's first card is PortMaster's own app, run by
@@ -16779,6 +16789,22 @@ static void port_launch(app *a, int o, const char *romfile, const char *title)
 		}
 		/* ChaOS: Controls Layout (padlayout.h), for run.sh's CHAOS_PAD */
 		if (pad_layout_for(romfile) == PAD_NINTENDO) envkv[k++] = "CHAOS_PAD_LAYOUT=nintendo";
+		/* ChaOS: where the port's sound goes, decided as for games and
+		 * Muse (Audio Output, a cable, the connected headset): a headset's
+		 * PCM for run.sh's sound.sh, or nothing for the shared mixer */
+		{
+			static char sink_env[96];
+			aout_state st = aout_now();
+			const char *dev = aout_device(&st);
+
+			g_port_sink[0] = '\0';
+			if (aout_resolve(&st) == AOUT_BT && !strncmp(dev, "bt_", 3) &&
+			    strlen(dev) < sizeof g_port_sink) {
+				snprintf(g_port_sink, sizeof g_port_sink, "%s", dev);
+				snprintf(sink_env, sizeof sink_env, "CHAOS_PORT_SINK=%s", dev);
+				envkv[k++] = sink_env;
+			}
+		}
 		envkv[k] = NULL;
 	}
 	argv[0] = (char *)"/bin/sh";
@@ -16802,7 +16828,14 @@ static void port_launch(app *a, int o, const char *romfile, const char *title)
 	sth_hold(true);
 	gbs_cancel();   /* and the Game Boy look, tried again later */
 	port_cpu_begin(cpu_mode_for(s->tag, romfile), true);
+	/* the headset at the Brick's level from the start, and the keys after */
+	if (g_port_sink[0]) {
+		bt_volume_follow(g_port_sink, true);
+		plat_port_volume_hook = port_bt_volume;
+	}
 	rc = plat_run_port(argv, envkv, NULL, &how, port_power_prompt, a);
+	plat_port_volume_hook = NULL;
+	g_port_sink[0] = '\0';
 	port_cpu_end();
 	plat_port_sticks(false);
 	port_saves_unbind();

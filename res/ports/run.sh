@@ -91,13 +91,32 @@ export SEATD_VTBOUND=0
 # Lasagna Boy Classic's stopped on "Couldn't find a valid ICU package"
 # (2026-11-26). Without ICU it runs with invariant culture, as Microsoft says.
 export DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
-# A port plays through the shared mixer, ALSA's default (/etc/asound.conf),
-# as Diatom and Muse do. From 2.7.9-test5 to 2.8.0-test4 this tried to give
-# the port the hardware itself instead, and said so in the log, but it never
-# took: ALSA reads ALSA_CONFIG_PATH's files first and runs alsa.conf's hooks,
-# which read /etc/asound.conf, after, so the mixer was always the default
-# (found 2026-11-26; make check-portaudio now reads what a port really gets).
-echo "ChaOS: sound through the shared mixer"
+# A port's sound goes where a game's and Muse's do: the Bluetooth headset
+# when one is connected, else the shared mixer, ALSA's default
+# (/etc/asound.conf). sound.sh says how, and why ALSA_CONFIG_PATH alone never
+# could; make check-portaudio reads what a port really gets either way.
+CHAOS_SOUND=mixer
+# Not for a Weston port, nor one that brings its own libasound: neither reads
+# the system's bluealsa plugin, and a headset as their default would leave
+# them silent, where the mixer is built into every libasound
+case "$PORT" in
+--portmaster) ;;
+*)
+	if grep -q weston "$PORT" 2> /dev/null; then
+		CHAOS_PORT_SINK=
+	else
+		_gd=$(sed -n 's|^[[:space:]]*\(export[[:space:]]\{1,\}\)\{0,1\}GAMEDIR=.*/ports/\([^/"'"'"' ]*\).*|\2|p' "$PORT" | head -1)
+		[ -n "$_gd" ] && [ -n "$(find "/roms/ports/$_gd" -maxdepth 3 -name 'libasound.so*' 2> /dev/null | head -1)" ] &&
+			CHAOS_PORT_SINK=
+		unset _gd
+	fi ;;
+esac
+if [ -f "$HERE/sound.sh" ] && . "$HERE/sound.sh"; then
+	chaos_port_sound "$CHAOS_PORT_SINK" "${USERDATA_PATH:-$CHAOS_USERDATA}/.asoundrc" \
+		/usr/share/alsa/alsa.conf /tmp
+else
+	echo "ChaOS: sound through the shared mixer"
+fi
 # how many there are before the port starts anything (mod_ChaOS.txt)
 CHAOS_EV_BASE=$(ls /dev/input/event* 2> /dev/null | wc -l)
 export CHAOS_EV_BASE
@@ -118,6 +137,8 @@ done
 # log said a word (2026-11-26). At 4 s, and once more at 20 s for a port
 # still loading then (Godot, .NET): two reads, nothing after.
 ( sleep 4; echo "inputs, 4 s in:"; grep '^N:' /proc/bus/input/devices
+  # the speaker's hardware says nothing of a headset's stream
+  [ "$CHAOS_SOUND" = headset ] && { echo "ChaOS: sound to the headset: whether it plays isn't read"; exit 0; }
   for t in 4 20; do
     [ $t = 20 ] && sleep 16
     st=$(head -1 /proc/asound/card0/pcm0p/sub0/status 2> /dev/null)

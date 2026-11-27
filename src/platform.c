@@ -384,6 +384,8 @@ bool plat_port_usage(long *maxrss_kb, int *cpu_pct, unsigned *secs)
 	return true;
 }
 
+void (*plat_port_volume_hook)(void);
+
 int plat_run_port(char *const argv[], const char *const envkv[], const char *workdir,
                   int *how, int (*on_power)(void *ctx), void *ctx)
 {
@@ -479,8 +481,14 @@ int plat_run_port(char *const argv[], const char *const envkv[], const char *wor
 				continue;
 			}
 			if (paused) continue;   /* nothing else while it sleeps */
-			if (in_repeat(&in, IN_VOLUP)) plat_volume_nudge(+1);
-			if (in_repeat(&in, IN_VOLDN)) plat_volume_nudge(-1);
+			{
+				bool up = in_repeat(&in, IN_VOLUP), dn = in_repeat(&in, IN_VOLDN);
+
+				if (up) plat_volume_nudge(+1);
+				if (dn) plat_volume_nudge(-1);
+				/* ChaOS: and to the headset, when the port's sound is there */
+				if ((up || dn) && plat_port_volume_hook) plat_port_volume_hook();
+			}
 			/* ChaOS: MENU and the volume keys, brightness, in ports too */
 			if (in_repeat(&in, IN_BRIGHTUP)) plat_brightness_nudge(+1);
 			if (in_repeat(&in, IN_BRIGHTDN)) plat_brightness_nudge(-1);

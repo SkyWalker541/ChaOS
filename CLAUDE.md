@@ -120,6 +120,8 @@ Scale this to the risk. A typo needs a look; the update system needs all of it.
    each kind is played on a Brick, with sound: Gone Fishing (LÖVE, OpenAL),
    Celeste Classic (SDL_mixer), Doukutsu-rs (linked ALSA; the power menu,
    then Resume) and a Godot port. Each log says `ChaOS: sound playing`.
+   With a Bluetooth headset connected, one of them again: its log says
+   `sound through the Bluetooth headset`, and the sound is in the headset.
    `make check-portaudio` runs the same three sound paths with no device;
    it is no substitute for the Brick (2.8.0-test3 lost every port's sound).
 5. **Adversarial review**, as a separate pass after the work is done: read the

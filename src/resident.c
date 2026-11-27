@@ -1037,6 +1037,10 @@ void plat_resident_end(void)
 	DIR *d = opendir("/proc");
 	struct dirent *e;
 
+	/* ChaOS: any level it reported and wasn't applied yet, applied now, so
+	 * nothing after (a port's volume keys, bt_volume_follow) reads a level of
+	 * an emulator that is gone (2026-11-27) */
+	d_apply_levels();
 	dclose();
 	if (!d) return;
 	/* By its command line rather than /tmp/diatom.pid: launch.sh writes that
