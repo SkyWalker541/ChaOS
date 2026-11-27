@@ -14,8 +14,8 @@
  *
  * Preloaded for every port (res/ports/run.sh). It links no ALSA of its own:
  * every call goes to the ALSA the port already has, found at run time, so a
- * port that carries its own libasound is served by that one. A port whose
- * SDL opens ALSA itself (dlopen) isn't reached at all, and needs nothing.
+ * port that carries its own libasound is served by that one, and one whose
+ * SDL or OpenAL opens ALSA itself (dlopen) by the one it opened (next()).
  * In ordinary play each wrapped call costs one comparison. */
 #define _GNU_SOURCE
 #include <dlfcn.h>
@@ -29,7 +29,24 @@ typedef unsigned long snd_pcm_uframes_t;
 
 static int said;
 
-static void *next(const char *name) { return dlsym(RTLD_NEXT, name); }
+/* The port's own ALSA's `name`. RTLD_NEXT finds an ALSA the port links; but
+ * SDL and OpenAL Soft open ALSA themselves (dlopen, RTLD_LOCAL), and RTLD_NEXT
+ * never looks there - yet that ALSA's own calls to these functions (dmix
+ * asking its hardware's poll descriptors) still come here. With nothing to
+ * call, every such call failed, and no port that opens ALSA that way had any
+ * sound at all (2.8.0-test3, 2026-11-26: Gone Fishing, Celeste Classic). So
+ * that ALSA is found by its name, among the libraries already loaded. */
+static void *next(const char *name)
+{
+	void *f = dlsym(RTLD_NEXT, name), *h;
+
+	if (f) return f;
+	h = dlopen("libasound.so.2", RTLD_LAZY | RTLD_NOLOAD);
+	if (!h) return NULL;
+	f = dlsym(h, name);
+	dlclose(h);
+	return f;
+}
 
 /* The stream started over, with the port's own ALSA */
 static int reset(snd_pcm_t *pcm, const char *call, int r)

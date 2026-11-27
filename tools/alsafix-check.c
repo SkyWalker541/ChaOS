@@ -5,9 +5,12 @@
  * What broke: Doukutsu-rs's audio library (cpal) met EPIPE from
  * snd_pcm_poll_descriptors after the freeze and played nothing again; then,
  * once the stream was restarted, a free-frames figure past any real one made
- * it ask for a buffer that size and stop (2.8.0-test2). Built three ways by
- * the Makefile: this program, the stand-in (-DFAKE_ALSA) as a library it
- * links, and the helper, preloaded. */
+ * it ask for a buffer that size and stop (2.8.0-test2). And then, with the
+ * helper in, no port whose SDL or OpenAL opens ALSA itself (dlopen) had any
+ * sound: that ALSA's own calls came to the helper, which couldn't find it to
+ * pass them on (2.8.0-test3). Built four ways by the Makefile: this program,
+ * the stand-in (-DFAKE_ALSA) as a library it links and as a libasound.so.2 it
+ * opens itself (-DDLOPEN_CHECK), and the helper, preloaded. */
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -24,6 +27,28 @@ int snd_pcm_prepare(snd_pcm_t *p) { (void)p; fake_prepares++; fake_fail = 0; ret
 long snd_pcm_avail(snd_pcm_t *p) { (void)p; return fake_avail; }
 int snd_pcm_get_params(snd_pcm_t *p, unsigned long *buf, unsigned long *per)
 { (void)p; *buf = 3763; *per = 940; return 0; }
+int snd_pcm_poll_descriptors_count(snd_pcm_t *p) { (void)p; return 1; }
+/* as dmix asks its hardware: ALSA calling its own exported function, which
+ * the preloaded helper takes */
+int fake_inner_count(snd_pcm_t *p) { return snd_pcm_poll_descriptors_count(p); }
+#elif defined DLOPEN_CHECK
+#include <dlfcn.h>
+int main(void)
+{
+	/* as SDL and OpenAL Soft open it: by name, kept to themselves */
+	void *h = dlopen("libasound.so.2", RTLD_NOW | RTLD_LOCAL);
+	int (*inner)(snd_pcm_t *) = h ? (int (*)(snd_pcm_t *))dlsym(h, "fake_inner_count") : NULL;
+	int r;
+
+	if (!inner) { fprintf(stderr, "alsafix-check: the stand-in ALSA didn't open\n"); return 1; }
+	r = inner((snd_pcm_t *)&h);
+	if (r != 1) {
+		fprintf(stderr, "alsafix-check: an ALSA the port opened itself got %d, not its own answer\n", r);
+		return 1;
+	}
+	printf("ok: a port that opens ALSA itself still has sound\n");
+	return 0;
+}
 #else
 extern int fake_fail, fake_drops, fake_prepares;
 extern long fake_avail;

@@ -686,6 +686,7 @@ clean:
 # ChaOS: the ports' ALSA helper, preloaded before a stand-in ALSA
 check-alsafix: build-native/alsafix-check
 	@LD_PRELOAD=$(CURDIR)/build-native/chaos-alsafix.so LD_LIBRARY_PATH=$(CURDIR)/build-native ./build-native/alsafix-check
+	@LD_PRELOAD=$(CURDIR)/build-native/chaos-alsafix.so LD_LIBRARY_PATH=$(CURDIR)/build-native/fakealsa ./build-native/alsafix-dlopen-check
 
 build-native/alsafix-check: tools/alsafix-check.c tools/alsafix/chaos-alsafix.c FORCE
 # The compiler alone, never the sanitizers check-asan adds: a preloaded
@@ -694,6 +695,9 @@ build-native/alsafix-check: tools/alsafix-check.c tools/alsafix/chaos-alsafix.c 
 	$(firstword $(CC)) -std=gnu11 -Wall -Wextra -O1 -shared -fPIC -DFAKE_ALSA -o build-native/libfakealsa.so tools/alsafix-check.c
 	$(firstword $(CC)) -std=gnu11 -Wall -Wextra -O1 -shared -fPIC -o build-native/chaos-alsafix.so tools/alsafix/chaos-alsafix.c -ldl
 	$(firstword $(CC)) -std=gnu11 -Wall -Wextra -O1 -o $@ tools/alsafix-check.c -Lbuild-native -lfakealsa
+	@mkdir -p build-native/fakealsa
+	$(firstword $(CC)) -std=gnu11 -Wall -Wextra -O1 -shared -fPIC -DFAKE_ALSA -Wl,-soname,libasound.so.2 -o build-native/fakealsa/libasound.so.2 tools/alsafix-check.c
+	$(firstword $(CC)) -std=gnu11 -Wall -Wextra -O1 -DDLOPEN_CHECK -o build-native/alsafix-dlopen-check tools/alsafix-check.c -ldl
 
 # ChaOS: Performance's modes (src/cpumode.h)
 check-cpumode: build-native/cpumode-check
