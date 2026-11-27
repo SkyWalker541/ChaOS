@@ -177,7 +177,7 @@
   <h2>Features</h2>
   <p class="intro">Everything ChaOS adds to TortOS, grouped the way you'll use it. <span class="tag">ChaOS</span> marks what ChaOS brings; the rest comes from TortOS. The pictures are the Brick's own screens: tap the labels under one to see more.</p>
   <nav class="subnav" aria-label="Feature groups">
-    <a href="#playing">Playing</a><a href="#cheats">Cheats</a><a href="#shaders">Shaders</a><a href="#performance">Performance</a><a href="#speed">Speed check</a><a href="#display">Display &amp; overlays</a><a href="#shelves">Shelves &amp; themes</a><a href="#boxart">Box art</a><a href="#transfer">Transfer &amp; Wire</a><a href="#ports">Ports</a><a href="#playstation">PlayStation</a><a href="#romm">RomM</a><a href="#homebrew">Homebrew</a><a href="#muse">Muse &amp; sound</a><a href="#look">Look &amp; settings</a>
+    <a href="#playing">Playing</a><a href="#cheats">Cheats</a><a href="#shaders">Shaders</a><a href="#speed">Speed check</a><a href="#display">Display &amp; overlays</a><a href="#shelves">Shelves &amp; themes</a><a href="#boxart">Box art</a><a href="#transfer">Transfer &amp; Wire</a><a href="#ports">Ports</a><a href="#playstation">PlayStation</a><a href="#romm">RomM</a><a href="#homebrew">Homebrew</a><a href="#muse">Muse &amp; sound</a><a href="#look">Look &amp; settings</a>
   </nav>
 
   <!-- Playing -->
@@ -251,25 +251,6 @@
     </div>
     <figure class="device" data-screens='[["chaos-shader","NES: CRT"],["shader-gb","Game Boy: PT"],["sysmenu","Console menu"]]'>
       <div class="bezel"><img src="img/chaos-shader.webp" alt="" loading="lazy" width="1024" height="768"></div>
-      <figcaption class="chips"></figcaption>
-    </figure>
-  </article>
-
-  <!-- Performance -->
-  <article class="feature" id="performance">
-    <div class="feature-text">
-      <h3>Performance <span class="tag">ChaOS</span></h3>
-      <p>How fast the Brick's CPU runs while a game or a port plays: more for a game that needs it, less to save battery.</p>
-      <ul>
-        <li><b>A console's</b>: <b>Performance</b> in its shelf's menu (<kbd>MENU</kbd> on the shelf). <b>Ports</b> has its own.</li>
-        <li><b>A game's or port's own</b>: <kbd>X</kbd> on it. <b>Default</b> follows its shelf.</li>
-        <li><b>Auto</b>, the default, is ChaOS as it always ran. <b>Powersave</b> (up to 1488 MHz) saves battery, <b>Balanced</b> runs from 1008 to 1800 MHz, <b>Performance</b> holds 1800 MHz and <b>Max</b> 2000 MHz.</li>
-        <li>Set as the game starts and put back as it ends: nothing runs while you play. Fast forward still goes as fast as the mode allows.</li>
-      </ul>
-      <p class="small">The modes follow <a href="https://github.com/spruceUI/spruceOS">spruceOS</a>'s for the Brick.</p>
-    </div>
-    <figure class="device" data-screens='[["performance","A console&#39;s"],["info","A game&#39;s own"]]'>
-      <div class="bezel"><img src="img/performance.webp" alt="" loading="lazy" width="1024" height="768"></div>
       <figcaption class="chips"></figcaption>
     </figure>
   </article>
@@ -420,32 +401,31 @@
       <p>PC games rebuilt for handhelds, packaged by <a href="https://portmaster.games">PortMaster</a>: Cave Story, Doom, OpenTyrian, Spelunky Classic and over a thousand more, most of them free.</p>
       <ol>
         <li><b>MENU &gt; Get PortMaster</b> downloads it over Wi-Fi. Nothing about ports is on the card until you choose this.</li>
-        <li>A <b>Ports</b> shelf appears. Its first card, <b>PortMaster</b>, opens PortMaster's own app, in ChaOS's colors, with its whole catalog, its options and its themes. <kbd>A</kbd> chooses and <kbd>B</kbd> goes back, as in ChaOS's menus.</li>
-        <li>Install a port, and it's on the shelf with its screenshot as its cover.</li>
+        <li>A <b>Ports</b> shelf appears. Its first card, <b>PortMaster</b>, opens the catalog.</li>
+        <li><kbd>A</kbd> on a port installs it, checked against PortMaster's checksum. Its screenshot becomes its cover.</li>
       </ol>
       <ul>
-        <li><b>What ports need comes with them</b>: Godot, .NET, Java, Pyxel and the rest are fetched with the port, and ChaOS brings what ports ask of the Brick that it hasn't got: Python, zip, libraries, and a GPU setup that gets ports drawing in OpenGL onto the Brick's graphics chip.</li>
-        <li><b>Saves sync</b>: a port's saves and settings live in <code>Saves/Ports</code>, beside every other game's, so Syncthing carries them too.</li>
-        <li><b>Controls Layout</b>, in the Ports shelf's menu: <b>Xbox</b> (by position, as PortMaster lays a pad out) or <b>Nintendo</b> (<kbd>A</kbd> is A). <kbd>X</kbd> on a port sets its own. Following spruceOS's Controller Mode.</li>
-        <li><b>Performance</b> for all ports, or one, as for <a href="#performance">games</a>.</li>
-        <li>PortMaster keeps itself and your ports up to date, from its own app.</li>
+        <li><b>May Run on ChaOS</b> lists what the Brick can run, as PortMaster's own site filters it: no second analog stick, 2 GB of memory or OpenGL needed. <b>Show All</b> lists everything. Also <b>Genres</b>, <b>Installed</b>, <b>Updates</b> and <b>Ready to Run Only</b>.</li>
+        <li>Each port shows its screenshot, genre, size, porter, needs, and description (<kbd>Y</kbd> reads it all). <kbd>L2</kbd>/<kbd>R2</kbd> jump by letter.</li>
+        <li><b>Runtimes and libraries come with it</b>: Godot, .NET, Java, Pyxel and the rest are fetched and unpacked with the port, and any library it needs that the Brick hasn't got comes from ChaOS's library pack.</li>
       </ul>
+      <p><b>On <a href="#updates">Pre-Release</a>: PortMaster's own app.</b> The <b>PortMaster</b> card opens PortMaster itself, in ChaOS's colors, with its whole catalog, nothing filtered, and its own options and themes. ChaOS brings the Python it runs on, and what ports ask of the Brick that it hasn't got (zip, Python, libudev for Weston ports). Ports installed before keep working; only the old screens' picture cache is cleared, once each port's picture is its cover.</p>
     </div>
-    <figure class="device" data-screens='[["pm-home","PortMaster"],["pm-list","The Ports shelf"],["ports-layout","Controls Layout"],["power","Power in a port"]]'>
+    <figure class="device" data-screens='[["pm-home","PortMaster"],["pm-list","Browsing"],["power","Power in a port"]]'>
       <div class="bezel"><img src="img/pm-home.webp" alt="" loading="lazy" width="1024" height="768"></div>
       <figcaption class="chips"></figcaption>
     </figure>
   </article>
   <div class="cards3">
-    <div class="mini"><h4>Playing a port</h4><p><kbd>SELECT</kbd>+<kbd>START</kbd> quits at once. <kbd>POWER</kbd> freezes the port and asks <b>Resume</b> (exactly where it was), <b>Close Port</b> or <b>Power Off</b>, and the port's sound comes back when it resumes. Buttons are the port's own, as PortMaster sets them.</p></div>
-    <div class="mini"><h4>Removing</h4><p>Uninstall a port from PortMaster's app. Its saves stay in <code>Saves/Ports</code>, waiting for a reinstall.</p></div>
-    <div class="mini"><h4>Updates keep your saves</h4><p>A port's update, from PortMaster's app, unpacks over the old one, so any game files you copied in stay, and its saves are in <code>Saves/Ports</code>.</p></div>
+    <div class="mini"><h4>Playing a port</h4><p><kbd>SELECT</kbd>+<kbd>START</kbd> quits at once. <kbd>POWER</kbd> freezes the port and asks <b>Resume</b> (exactly where it was), <b>Close Port</b> or <b>Power Off</b>. The d-pad works as the left stick too.</p></div>
+    <div class="mini"><h4>Removing</h4><p><kbd>X</kbd> on a port's page: <b>Keep Saves and Settings</b> (they wait for a reinstall) or <b>Remove Everything</b>. <b>Uninstall PortMaster</b> does the same for all of it.</p></div>
+    <div class="mini"><h4>Updates keep your saves</h4><p>A port's update unpacks over the old one, so its saves and any game files you copied in stay. <b>Update PortMaster</b> keeps its runtimes and settings.</p></div>
   </div>
   <div class="callout">
     <div class="callout-icon" aria-hidden="true">i</div>
     <div>
       <h4>Ports that need your files</h4>
-      <p>Some ports need data from a game you own, like Doom's WAD files. After installing, the port says which files and where they go. PortMaster's <b>Ready to Run</b> filter hides those. If a port stops on a library ChaOS doesn't have, it says which, and each port's last run is logged in <code>.userdata/brick/ports/logs/</code>.</p>
+      <p>Some ports need data from a game you own, like Doom's WAD files. After installing, the port says which files and where they go. <b>Ready to Run Only</b> hides those. If a port stops on a library ChaOS doesn't have, it says which, and each port's last run is logged in <code>.userdata/brick/ports/logs/</code>.</p>
     </div>
   </div>
 
@@ -646,7 +626,7 @@
         <li><b>Appearance</b> <span class="tag">ChaOS</span> on one page: UI Theme, UI Direction, Transition Speed, Menu Color, and <b>Shelves</b>, a page of its own: Game List View, <b>Show Shelf Name</b>, <b>Shelf Order</b> (the consoles by release date, A to Z, or by maker, with the Game Boys side by side, or your own, set in <b>Arrange Shelves</b>), and <b>Show Favorites</b>, <b>Show Recently Played</b> and <b>Show Muse</b>.</li>
         <li><b>Every menu says what its rows do</b> <span class="tag">ChaOS</span>, in a line at the bottom.</li>
         <li><b>The clock and battery</b> <span class="tag">ChaOS</span> in every menu's heading. <b>MENU &gt; System Settings</b> has Date &amp; Time (the zone, 12- or 24-hour), <b>Show Clock</b>, and <b>Show Battery</b> as an icon, a percent or both. Wi-Fi keeps the clock right.</li>
-        <li><b>Boot and power-off</b> <span class="tag">ChaOS</span>: the logo's pixels fly in at the start, and the logo stays on the screen until the power goes.</li>
+        <li><b>Boot and power-off</b> <span class="tag">ChaOS</span>: the logo's pixels fly in, and fly out again, like the little logo at the top of this page.</li>
         <li><b>Auto Off</b> after a while without a button (not while music plays or it's charging).</li>
         <li><b>About ChaOS</b>: version, the TortOS it's built on, free space on the card, address, battery, time awake.</li>
       </ul>
@@ -713,7 +693,6 @@
   </div>
   <div class="releases">
     <h3>Recent releases</h3>
-    <div class="rel"><span class="ver">2.8.0</span><p><a href="#ports">PortMaster's own app</a> on the Ports shelf, in ChaOS's colors, with its whole catalog; its menus choose with <kbd>A</kbd>. Ports get the Brick's GPU through gl4es, their saves in <code>Saves/Ports</code> so they sync, <b>Controls Layout</b> (Xbox or Nintendo), sound back after the power menu, and what they need: Python, zip, libraries. <a href="#performance">Performance</a>: how fast the CPU runs, per console and per game. <b>Muse</b> lets go of the sound when it's paused. The logo stays on screen at power off. Old releases' leftovers are cleaned off the card.</p></div>
     <div class="rel"><span class="ver">2.7.7</span><p><b>Favorites</b> is a matte red heart and <b>Recently Played</b> a mid-century wall clock: photographs in Fancy Pants, drawn to match in Plain Jane. Fixed: <b>RomM</b> pairing failed with "422" on RomM 5.4; when RomM turns something down, ChaOS now shows its reason. Fixed: after an update with the ChaOS Installer, the next start could offer the same version again.</p></div>
     <div class="rel"><span class="ver">2.7.6</span><p><b>Muse</b> is a first-generation iPod: a photograph in Fancy Pants, drawn to match in Plain Jane. <b>Splore</b> has its own box art on the PICO-8 shelf. Fixed: <b>Box Art</b> skipped every game, as libretro's thumbnail server went empty; covers now come from libretro's own collection on GitHub. A big music library no longer slows startup.</p></div>
     <div class="rel"><span class="ver">2.7.5</span><p><b>Ports</b> is an early-90s all-in-one computer: a photograph in Fancy Pants, drawn to match in Plain Jane. Fancy Pants' rendered cards (Favorites, Recently Played, Muse, PICO-8) are lit like the console photographs beside them.</p></div>
@@ -792,7 +771,7 @@
     <details><summary>Will an update or reinstall lose my saves?</summary>
       <p>No. Updates over Wi-Fi, ChaOS Wire and ChaOS Installer's <b>Update</b> all keep your games, music, saves, settings, ports and port saves. Only writing the image by hand erases the card.</p></details>
     <details><summary>A port won't start, or shows a black screen.</summary>
-      <p>Some ports aren't made for a device like the Brick: PortMaster lists what each needs. If ChaOS names a missing library, it may come in a later library pack. Otherwise send the port's log from <code>.userdata/brick/ports/logs/</code>.</p></details>
+      <p>Check it's under <b>May Run on ChaOS</b>. If ChaOS names a missing library, it may come in a later library pack. Otherwise send the port's log from <code>.userdata/brick/ports/logs/</code>.</p></details>
     <details><summary>Something went wrong. How do I send the logs?</summary>
       <p>Open <b>MENU &gt; ChaOS Transfer</b>, open its address in a browser, and click <b>Download logs</b>. Then post it in <b>#bugs</b> on the <a href="https://discord.gg/axxyBSS2me">ChaOS Control Discord</a>, with what you were doing and roughly when it happened.</p></details>
     <details><summary>I have an idea for a feature. Where do I suggest it?</summary>
@@ -839,7 +818,7 @@
     </div>
     <div class="credit">
       <h4>Ports and services</h4>
-      <p><a href="https://portmaster.games">PortMaster</a> and its porters; <b>minui-portmaster</b> by ben16w. For ports, ChaOS brings <a href="https://www.python.org">Python</a>, Info-ZIP's <b>zip</b> and <b>libudev-zero</b> by illiliti. Controls Layout follows <a href="https://github.com/spruceUI/spruceOS">spruceOS</a>'s Controller Mode, and ports' buttons, as PortMaster sets them, NextUI's lead. Performance's CPU modes follow <a href="https://github.com/spruceUI/spruceOS">spruceOS</a>'s for the Brick. <a href="https://romm.app">RomM</a> and its client Grout. <a href="https://syncthing.net">Syncthing</a> (MPL-2.0), downloaded from its own releases, not part of ChaOS. <a href="https://www.lexaloffle.com/pico-8.php">PICO-8</a> by Lexaloffle Games, not included; the way its Splore downloads with curl is <a href="https://github.com/spruceUI/spruceOS">spruceUI</a>'s. <a href="https://retroachievements.org">RetroAchievements</a>, libretro thumbnails, <a href="https://github.com/libretro/libretro-database">libretro's cheat database</a> (CC BY-SA 4.0), MusicBrainz and the Cover Art Archive, and itch.io (with NextUI-Itchio-Pak by Christophe Vanlancker).</p>
+      <p><a href="https://portmaster.games">PortMaster</a> and its porters; <b>minui-portmaster</b> by ben16w. Performance's CPU modes follow <a href="https://github.com/spruceUI/spruceOS">spruceOS</a>'s for the Brick. <a href="https://romm.app">RomM</a> and its client Grout. <a href="https://syncthing.net">Syncthing</a> (MPL-2.0), downloaded from its own releases, not part of ChaOS. <a href="https://www.lexaloffle.com/pico-8.php">PICO-8</a> by Lexaloffle Games, not included; the way its Splore downloads with curl is <a href="https://github.com/spruceUI/spruceOS">spruceUI</a>'s. <a href="https://retroachievements.org">RetroAchievements</a>, libretro thumbnails, <a href="https://github.com/libretro/libretro-database">libretro's cheat database</a> (CC BY-SA 4.0), MusicBrainz and the Cover Art Archive, and itch.io (with NextUI-Itchio-Pak by Christophe Vanlancker).</p>
     </div>
     <div class="credit">
       <h4>Ideas from players</h4>
