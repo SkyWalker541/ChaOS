@@ -1,0 +1,78 @@
+ChaOS: pvrfb asks again with less when a port asks for a GL it cannot have
+
+The Brick's EGL is GLES only. A port asking for desktop GL, with gl4es
+translating through SDL_VIDEO_GL_DRIVER, found no EGL config and fell back
+to software (Doukutsu-rs, 2.8.0-test2). Asked again as GLES 2 it works;
+then multisampling, alpha and deep depth or stencil are let go one at a
+time. What was asked and each try go to the port's log.
+
+--- a/src/video/pvrfb/SDL_pvrfbvideo.c
++++ b/src/video/pvrfb/SDL_pvrfbvideo.c
+@@ -155,9 +155,65 @@
+     if (data->egl_surface == EGL_NO_SURFACE) {
+         data->egl_surface = SDL_EGL_CreateSurface(_this, (NativeWindowType)0);
+         if (data->egl_surface == EGL_NO_SURFACE) {
++            /* ChaOS: what was asked, said, and asked again with less: the
++             * Brick's EGL is GLES only, so a port asking for desktop GL (gl4es
++             * translating, through SDL_VIDEO_GL_DRIVER) gets a GLES 2 one, and
++             * then what the panel can't give - samples, alpha, a deep depth
++             * or stencil - is let go one at a time. Each try is in the log. */
++            static const char *what[] = { "GLES 2 profile", "no multisampling", "no alpha",
++                                          "depth 24, stencil 8", "depth 16, no stencil",
++                                          "no depth, no stencil" };
++            int step;
++
+             fprintf(stderr, "pvrfb: no EGL surface: %s\n", SDL_GetError());
+-            SDL_SetError("pvrfb: can't create the EGL surface");
+-            return NULL;
++            fprintf(stderr, "pvrfb: it asked: profile 0x%x %d.%d, rgba %d/%d/%d/%d, buffer %d, depth %d, "
++                    "stencil %d, samples %d/%d, egl %s\n",
++                    _this->gl_config.profile_mask, _this->gl_config.major_version,
++                    _this->gl_config.minor_version, _this->gl_config.red_size,
++                    _this->gl_config.green_size, _this->gl_config.blue_size,
++                    _this->gl_config.alpha_size, _this->gl_config.buffer_size,
++                    _this->gl_config.depth_size, _this->gl_config.stencil_size,
++                    _this->gl_config.multisamplebuffers, _this->gl_config.multisamplesamples,
++                    SDL_getenv("SDL_VIDEO_EGL_DRIVER") ? SDL_getenv("SDL_VIDEO_EGL_DRIVER") : "(default)");
++            for (step = 0; step < 6 && data->egl_surface == EGL_NO_SURFACE; step++) {
++                switch (step) {
++                case 0:
++                    if (_this->gl_config.profile_mask == SDL_GL_CONTEXT_PROFILE_ES) continue;
++                    _this->gl_config.profile_mask = SDL_GL_CONTEXT_PROFILE_ES;
++                    _this->gl_config.major_version = 2;
++                    _this->gl_config.minor_version = 0;
++                    break;
++                case 1:
++                    if (!_this->gl_config.multisamplebuffers && !_this->gl_config.multisamplesamples) continue;
++                    _this->gl_config.multisamplebuffers = _this->gl_config.multisamplesamples = 0;
++                    break;
++                case 2:
++                    if (!_this->gl_config.alpha_size && !_this->gl_config.buffer_size) continue;
++                    _this->gl_config.alpha_size = _this->gl_config.buffer_size = 0;
++                    break;
++                case 3:
++                    if (_this->gl_config.depth_size <= 24 && _this->gl_config.stencil_size <= 8) continue;
++                    if (_this->gl_config.depth_size > 24) _this->gl_config.depth_size = 24;
++                    if (_this->gl_config.stencil_size > 8) _this->gl_config.stencil_size = 8;
++                    break;
++                case 4:
++                    if (_this->gl_config.depth_size <= 16 && !_this->gl_config.stencil_size) continue;
++                    if (_this->gl_config.depth_size > 16) _this->gl_config.depth_size = 16;
++                    _this->gl_config.stencil_size = 0;
++                    break;
++                default:
++                    if (!_this->gl_config.depth_size && !_this->gl_config.stencil_size) continue;
++                    _this->gl_config.depth_size = _this->gl_config.stencil_size = 0;
++                    break;
++                }
++                data->egl_surface = SDL_EGL_CreateSurface(_this, (NativeWindowType)0);
++                fprintf(stderr, "pvrfb: tried again with %s: %s\n", what[step],
++                        data->egl_surface != EGL_NO_SURFACE ? "it worked" : SDL_GetError());
++            }
++            if (data->egl_surface == EGL_NO_SURFACE) {
++                SDL_SetError("pvrfb: can't create the EGL surface");
++                return NULL;
++            }
+         }
+     }
+     {
