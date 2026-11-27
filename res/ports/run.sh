@@ -104,10 +104,12 @@ CHAOS_EV_BASE=$(ls /dev/input/event* 2> /dev/null | wc -l)
 export CHAOS_EV_BASE
 
 # ChaOS's settings for PortMaster, put back every time: a PortMaster update
-# doesn't know them
-if [ -d "$PM" ] && ! cmp -s "$HERE/mod_ChaOS.txt" "$PM/mod_ChaOS.txt"; then
-	cp -f "$HERE/mod_ChaOS.txt" "$PM/mod_ChaOS.txt"
-fi
+# doesn't know them. libgl_ChaOS.txt too: gl4es without GBM (it says why)
+for f in mod_ChaOS.txt libgl_ChaOS.txt; do
+	if [ -d "$PM" ] && [ -f "$HERE/$f" ] && ! cmp -s "$HERE/$f" "$PM/$f"; then
+		cp -f "$HERE/$f" "$PM/$f"
+	fi
+done
 
 # The input devices once the port is going, for the log: the pad, and the
 # keyboard gptokeyb makes of it

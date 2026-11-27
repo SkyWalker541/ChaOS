@@ -1,0 +1,34 @@
+#!/bin/bash
+#
+# SPDX-License-Identifier: MIT
+#
+# ChaOS: PortMaster's libgl_default.txt for the Brick, which ports source as
+# libgl_${CFW_NAME}.txt when it is there. The one change: gl4es draws through
+# the framebuffer (LIBGL_FB=2), never GBM. libgl_default.txt picks GBM when
+# /dev/dri/card0 exists, and on the Brick it does, but its EGL can't give a
+# GBM display ("egl_eglGetPlatformDisplay is NULL"): a newer gl4es then found
+# no EGL config, and Doukutsu-rs fell back to SDL's software renderer - slow
+# menus, poor speed (2.8.0-test2). ChaOS puts this file back in PortMaster's
+# folder before each port (res/ports/run.sh).
+#
+# NOTE: This script uses $PWD to setup the GL4ES directory!
+# Before calling this, ensure you are on the port root directory, e.g.:
+# > gamedir="/$directory/ports/stardewvalley"
+# > cd "$gamedir/"
+
+export LIBGL_ES=2
+export LIBGL_GL=21
+export LIBGL_FB=2
+
+if [ -d "$PWD/gl4es.$DEVICE_ARCH" ]; then
+  export LD_LIBRARY_PATH="$PWD/gl4es.$DEVICE_ARCH:$LD_LIBRARY_PATH"
+elif [ -d "$PWD/gl4es" ]; then
+  export LD_LIBRARY_PATH="$PWD/gl4es:$LD_LIBRARY_PATH"
+fi
+
+# This sets up the standard libs directory.
+if [ -d "$PWD/libs.$DEVICE_ARCH" ]; then
+  export LD_LIBRARY_PATH="$PWD/libs.$DEVICE_ARCH:$LD_LIBRARY_PATH"
+elif [ -d "$PWD/libs" ]; then
+  export LD_LIBRARY_PATH="$PWD/libs:$LD_LIBRARY_PATH"
+fi
