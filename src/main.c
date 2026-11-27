@@ -10025,8 +10025,6 @@ static void rewind_save(const char *tag, bool on)
 	db_set_int(db_dev(), k, on ? 1 : 0);
 }
 
-enum { RM_ROW_SCOPE = 100, RM_ROW_RESET, RM_ROW_NONE };
-
 static void gm_backdrop(app *a, void *ctx);   /* with the in-game menu */
 
 typedef struct {
@@ -10036,8 +10034,9 @@ typedef struct {
 	void       *game;         /* the in-game menu's gm_ctx, for its backdrop */
 	bool        own;          /* the game has a map of its own */
 	rm_map      map;
-	int         ids[24];
+	int         ids[RM_ROWS_MAX];
 	char        vals[RM_BUTTONS][24];
+	char        speed[24];
 	char        scope[48], heading[64];
 } rm_ctx;
 
@@ -10067,25 +10066,35 @@ static int rm_build(void *ctx, menu_row *rows, int max, const char **heading)
 {
 	rm_ctx *c = ctx;
 	const system_cfg *sc = &c->a->sys.systems[c->sys];
-	int n = 0, i;
+	int n, i;
 
-	(void)max;
 	snprintf(c->heading, sizeof c->heading, "%s Button Mapping", ctl_console_short(sc->tag, sc->name));
 	*heading = c->heading;
-	if (c->file) {
-		snprintf(c->scope, sizeof c->scope, "%s", c->own ? "This game" : "All its games");
-		c->ids[n] = RM_ROW_SCOPE;
-		rows[n++] = (menu_row){ "For", c->scope, true, .cycles = true };
-		c->ids[n] = RM_ROW_NONE; rows[n++] = MENU_RULE;
+	/* the rows in remap.c's order (tools/remap-check.c holds it), each
+	 * filled in by what it is */
+	n = rm_rows(c->file != NULL, c->ids, max < RM_ROWS_MAX ? max : RM_ROWS_MAX);
+	for (i = 0; i < n; i++) {
+		int id = c->ids[i];
+
+		if (id >= 0 && id < RM_BUTTONS) {
+			rm_choice_label(sc->tag, c->map.choice[id], c->vals[id], sizeof c->vals[id]);
+			rows[i] = (menu_row){ rm_button_label(id), c->vals[id], true, .cycles = true };
+		} else if (id == RM_ROW_SCOPE) {
+			snprintf(c->scope, sizeof c->scope, "%s", c->own ? "This game" : "All its games");
+			rows[i] = (menu_row){ "For", c->scope, true, .cycles = true };
+		} else if (id == RM_ROW_SPEED) {
+			/* always here, resting while no button is a turbo one */
+			bool on = rm_has_turbo(sc->tag, &c->map);
+
+			if (on) rm_speed_label(c->map.period, c->speed, sizeof c->speed);
+			else snprintf(c->speed, sizeof c->speed, "No turbo buttons");
+			rows[i] = (menu_row){ "Turbo Speed", c->speed, on, .cycles = on };
+		} else if (id == RM_ROW_RESET) {
+			rows[i] = (menu_row){ "Reset to Default", NULL, true };
+		} else {
+			rows[i] = MENU_RULE;
+		}
 	}
-	for (i = 0; i < RM_BUTTONS; i++) {
-		rm_choice_label(sc->tag, c->map.choice[i], c->vals[i], sizeof c->vals[i]);
-		c->ids[n] = i;
-		rows[n++] = (menu_row){ rm_button_label(i), c->vals[i], true, .cycles = true };
-	}
-	c->ids[n] = RM_ROW_NONE; rows[n++] = MENU_RULE;
-	c->ids[n] = RM_ROW_RESET;
-	rows[n++] = (menu_row){ "Reset to Default", NULL, true };
 	return n;
 }
 
@@ -10093,7 +10102,7 @@ static menu_result rm_key(app *a, void *ctx, in_button key, int sel)
 {
 	rm_ctx *c = ctx;
 	const char *tag = a->sys.systems[c->sys].tag;
-	int id = sel >= 0 && sel < 24 ? c->ids[sel] : RM_ROW_NONE;
+	int id = sel >= 0 && sel < RM_ROWS_MAX ? c->ids[sel] : RM_ROW_NONE;
 	int d = key == IN_LEFT ? -1 : key == IN_RIGHT || key == IN_ACCEPT ? 1 : 0;
 	char k[CFG_STR + LIB_PATH + 16];
 
@@ -10103,6 +10112,13 @@ static menu_result rm_key(app *a, void *ctx, in_button key, int sel)
 		int n = rm_choices(tag, ch);
 		c->map.choice[id] = (c->map.choice[id] + d + n) % n;
 		rm_store(c);
+	} else if (id == RM_ROW_SPEED) {
+		/* every turbo button in this map; saved with it, and in a game sent
+		 * at once, as a button's choice is. With none, nothing to change. */
+		if (rm_has_turbo(tag, &c->map)) {
+			c->map.period = rm_speed_step(c->map.period, d);
+			rm_store(c);
+		}
 	} else if (id == RM_ROW_SCOPE) {
 		/* This game takes the console's map as its start; all its games
 		 * drops the game's own */
@@ -24968,6 +24984,8 @@ static int shot_discpage = -1;   /* ChaOS: --discpage ROW [how], the Disc page *
 static bool shot_dischow;
 static int shot_upd_pill = -1;  /* ChaOS: --update-pill <upd_state>, the shelf's notice */
 static const char *shot_remap;  /* ChaOS: --remap <TAG>: its Button Mapping */
+static bool shot_remap_shelf;   /* --remap-shelf: from the shelf, no For row */
+static int shot_remap_sel = 2;  /* the row lit */
 static int shot_cc_page = -1;  /* ChaOS: --cc <page>, with --remap: its Controls */
 static int shot_art;
 static const char *shot_art_now = "Legend of Zelda, The - A Link to the Past (USA)";
@@ -25988,7 +26006,7 @@ static void take_shot(app *a)
 		c.a = a;
 		for (i = 0; i < a->sys.count; i++)
 			if (!strcmp(a->sys.systems[i].tag, shot_remap)) c.sys = i;
-		c.file = "game.bin";
+		c.file = shot_remap_shelf ? NULL : "game.bin";
 		rm_load(&c);
 		n = rm_build(&c, rows, 24, &head);
 		if (shot_cc_page >= 0) {
@@ -26005,7 +26023,7 @@ static void take_shot(app *a)
 		SDL_SetRenderDrawBlendMode(a->r, SDL_BLENDMODE_BLEND);
 		SDL_SetRenderDrawColor(a->r, 0, 0, 0, 120);
 		SDL_RenderFillRect(a->r, NULL);
-		menu_draw(a, head, rows, n, 2, menu_shelf_width(a), MENU_ACCENT);
+		menu_draw(a, head, rows, n, shot_remap_sel, menu_shelf_width(a), MENU_ACCENT);
 	}
 shot_done:
 	if (shot_updates >= 0) {
@@ -26374,8 +26392,13 @@ int main(int argc, char *argv[])
 		else if (!strcmp(argv[i], "--info")) shot_info = 1;
 		else if (!strcmp(argv[i], "--cc") && i + 1 < argc)
 			shot_cc_page = atoi(argv[++i]);
-		else if (!strcmp(argv[i], "--remap") && i + 1 < argc)
+		else if ((!strcmp(argv[i], "--remap") || !strcmp(argv[i], "--remap-shelf")) && i + 1 < argc) {
+			/* --remap TAG [row]: in a game; --remap-shelf: from its shelf */
+			shot_remap_shelf = argv[i][7] == '-';
 			shot_remap = argv[++i];
+			if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9')
+				shot_remap_sel = atoi(argv[++i]);
+		}
 		else if (!strcmp(argv[i], "--update-pill") && i + 1 < argc)
 			shot_upd_pill = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--updates") && i + 1 < argc)

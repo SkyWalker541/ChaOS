@@ -47,6 +47,74 @@ int main(void)
 		ck(!memcmp(&back, &m, sizeof m), "and read back the same");
 	}
 	ck(!strstr(spec, "menu"), "MENU is never in it");
+
+	/* Turbo Speed (Trebuchet's idea): one speed for the map's turbo buttons,
+	 * in the ~period Diatom already takes, so maps saved before it read as
+	 * Normal and Diatom needs nothing new */
+	printf("Turbo Speed:\n");
+	rm_from_spec("GB", "x:a~3,y:b~3", &m);
+	ck(m.period == RM_TURBO, "a map from before reads as Normal");
+	ck(!strcmp(rm_speed_label(m.period, spec, sizeof spec), "Normal, 10/s"), "and says so");
+	rm_from_spec("GB", NULL, &m);
+	ck(m.period == RM_TURBO, "no map at all is Normal");
+	m.period = rm_speed_step(m.period, 1);
+	ck(m.period == 2, "one step faster is Fast");
+	rm_from_spec("GB", "x:a~2,y:b~2", &m);
+	ck(rm_to_spec("GB", &m, spec, sizeof spec) && strstr(spec, "x:a~2") && strstr(spec, "y:b~2"),
+	   "every turbo button is sent at the map's speed");
+	{
+		rm_map back;
+		rm_from_spec("GB", spec, &back);
+		ck(!memcmp(&back, &m, sizeof m), "and read back the same");
+	}
+	rm_from_spec("SFC", "a:b,b:a", &m);
+	ck(rm_to_spec("SFC", &m, spec, sizeof spec) && !strchr(spec, '~'),
+	   "a map with no turbo button carries no speed");
+	ck(!rm_has_turbo("SFC", &m), "and has no turbo button, so its row rests");
+	rm_from_spec("GB", "x:a~2", &m);
+	ck(rm_has_turbo("GB", &m), "one turbo button wakes it");
+	{
+		int p = RM_TURBO, seen = 0, k;
+		for (k = 0; k < RM_SPEEDS; k++) { p = rm_speed_step(p, 1); seen |= 1 << p; }
+		ck(p == RM_TURBO && seen == ((1 << 1) | (1 << 2) | (1 << 3) | (1 << 5)),
+		   "Right goes round all four speeds and back");
+		ck(rm_speed_step(rm_speed_step(RM_TURBO, 1), -1) == RM_TURBO, "Left undoes Right");
+		ck(rm_speed_step(5, 1) == 3 && rm_speed_step(1, 1) == 5, "slowest first, and round");
+	}
+	rm_from_spec("GB", "x:a~7", &m);
+	ck(m.period == 7 && !strcmp(rm_speed_label(7, spec, sizeof spec), "Custom"),
+	   "a speed no preset has is kept, and called Custom");
+	ck(rm_speed_step(7, 1) == 5 && rm_speed_step(7, -1) == 1 && rm_speed_step(4, -1) == 5 &&
+	   rm_speed_step(4, 1) == 3, "and steps to the nearest preset that way");
+	rm_from_spec("GB", "x:a~0,y:b~31", &m);
+	ck(m.period == RM_TURBO, "a speed Diatom wouldn't take reads as Normal");
+	rm_from_spec("GB", "x:a~x", &m);
+	ck(m.period == RM_TURBO && !strcmp(lab("GB", &m, 2), "Turbo A"), "nor does one that isn't a number");
+
+	/* The page's rows, by what they are, in both states: from a shelf, and
+	 * in a game with the For row (the rule: a row does what it says) */
+	printf("Button Mapping's rows:\n");
+	{
+		int st;
+		for (st = 0; st < 2; st++) {
+			int ids[RM_ROWS_MAX], n = rm_rows(st == 1, ids, RM_ROWS_MAX), k, speed = -1, reset = -1;
+			int seen[RM_BUTTONS] = { 0 }, last_btn = -1, scopes = 0, speeds = 0, ok = 1;
+
+			for (k = 0; k < n; k++) {
+				if (ids[k] >= 0 && ids[k] < RM_BUTTONS) { seen[ids[k]]++; last_btn = k; }
+				else if (ids[k] == RM_ROW_SPEED) { speed = k; speeds++; }
+				else if (ids[k] == RM_ROW_RESET) reset = k;
+				else if (ids[k] == RM_ROW_SCOPE) scopes++;
+				else if (ids[k] != RM_ROW_NONE) ok = 0;
+			}
+			for (k = 0; k < RM_BUTTONS; k++) if (seen[k] != 1) ok = 0;
+			ck(ok, st ? "in a game: each button once, nothing unknown" : "from a shelf: each button once, nothing unknown");
+			ck(speeds == 1 && speed > last_btn && reset > speed && reset == n - 1,
+			   "Turbo Speed once, after the buttons, Reset last");
+			ck(scopes == st && (!st || ids[0] == RM_ROW_SCOPE), "For only in a game, first");
+			ck(n <= RM_ROWS_MAX, "it fits its table");
+		}
+	}
 	if (fails) { printf("%d FAILED\n", fails); return 1; }
 	printf("ok: every check passed\n");
 	return 0;
